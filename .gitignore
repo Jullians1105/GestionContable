@@ -25,3 +25,6 @@ dist-ssr
 
 # Claude Code
 .claude/
+
+# MCP config (contains API keys)
+.mcp.json
