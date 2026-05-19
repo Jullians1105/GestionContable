@@ -1,15 +1,15 @@
-import { useSearchParams } from 'react-router-dom'
-import TaskList from '../components/TaskList'
+﻿import { useSearchParams } from "react-router-dom"
+import TaskList from "../components/TaskList"
 
 export default function TasksPage() {
   const [searchParams] = useSearchParams()
-  const search = searchParams.get('search') || ''
+  const search = searchParams.get("search") || ""
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Mis Tareas</h1>
-        <p className="text-gray-500 mt-1">Gestiona y organiza todas las tareas del equipo</p>
+      <div className="mb-8">
+        <h2 className="text-[24px] font-bold text-[#191c1e]">Mis Tareas</h2>
+        <p className="text-[14px] text-[#434655] mt-1">Gestiona y organiza tus entregables activos</p>
       </div>
       <TaskList initialFilters={search ? { search } : {}} />
     </div>

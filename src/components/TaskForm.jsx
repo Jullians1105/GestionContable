@@ -1,16 +1,20 @@
-import { useState } from 'react'
-import { validators } from '../utils/validators'
-import { today } from '../utils/helpers'
-import { useTeam } from '../hooks/useTeam'
+﻿import { useState } from "react"
+import { validators } from "../utils/validators"
+import { today } from "../utils/helpers"
+import { useTeam } from "../hooks/useTeam"
 
 const EMPTY_TASK = {
-  title: '',
-  description: '',
-  status: 'pending',
-  priority: 'medium',
-  assignedTo: '',
-  dueDate: '',
+  title: "",
+  description: "",
+  status: "pending",
+  priority: "medium",
+  assignedTo: "",
+  dueDate: "",
 }
+
+const labelCls = "block text-[12px] font-semibold text-[#434655] mb-1"
+const inputCls = "w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-[#004ac6] hover:bg-[#f3f4f6] transition-colors"
+const inputErrCls = "border-[#EF4444] focus:ring-[#EF4444] focus:border-[#EF4444]"
 
 export default function TaskForm({ task, onSubmit, onCancel }) {
   const { members } = useTeam()
@@ -34,77 +38,70 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Título */}
+      {/* Titulo */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Título <span className="text-red-500">*</span>
-        </label>
+        <label className={labelCls}>Titulo <span className="text-[#EF4444]">*</span></label>
         <input
           type="text"
           value={form.title}
-          onChange={(e) => handleChange('title', e.target.value)}
+          onChange={(e) => handleChange("title", e.target.value)}
           placeholder="Nombre de la tarea"
-          className={`input-field ${errors.title ? 'input-error' : ''}`}
+          className={`${inputCls} ${errors.title ? inputErrCls : ""}`}
         />
-        {errors.title && <p className="text-red-500 text-xs mt-1">{errors.title}</p>}
+        {errors.title && <p className="text-[#EF4444] text-[12px] mt-1">{errors.title}</p>}
       </div>
 
-      {/* Descripción */}
+      {/* Descripcion */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+        <label className={labelCls}>Descripcion</label>
         <textarea
           value={form.description}
-          onChange={(e) => handleChange('description', e.target.value)}
-          placeholder="Descripción detallada de la tarea..."
+          onChange={(e) => handleChange("description", e.target.value)}
+          placeholder="Descripcion detallada de la tarea..."
           rows={3}
-          className="input-field resize-none"
+          className="w-full border border-[#c3c6d7] rounded-lg px-3 py-2 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-[#004ac6] hover:bg-[#f3f4f6] transition-colors resize-none"
         />
       </div>
 
       {/* Prioridad + Estado */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Prioridad <span className="text-red-500">*</span>
-          </label>
+          <label className={labelCls}>Prioridad <span className="text-[#EF4444]">*</span></label>
           <select
             value={form.priority}
-            onChange={(e) => handleChange('priority', e.target.value)}
-            className={`input-field ${errors.priority ? 'input-error' : ''}`}
+            onChange={(e) => handleChange("priority", e.target.value)}
+            className={`${inputCls} ${errors.priority ? inputErrCls : ""}`}
           >
             <option value="">Seleccionar...</option>
             <option value="high">Alta</option>
             <option value="medium">Media</option>
             <option value="low">Baja</option>
           </select>
-          {errors.priority && <p className="text-red-500 text-xs mt-1">{errors.priority}</p>}
+          {errors.priority && <p className="text-[#EF4444] text-[12px] mt-1">{errors.priority}</p>}
         </div>
-
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Estado <span className="text-red-500">*</span>
-          </label>
+          <label className={labelCls}>Estado <span className="text-[#EF4444]">*</span></label>
           <select
             value={form.status}
-            onChange={(e) => handleChange('status', e.target.value)}
-            className={`input-field ${errors.status ? 'input-error' : ''}`}
+            onChange={(e) => handleChange("status", e.target.value)}
+            className={`${inputCls} ${errors.status ? inputErrCls : ""}`}
           >
             <option value="pending">Pendiente</option>
             <option value="in_progress">En Progreso</option>
             <option value="completed">Completada</option>
           </select>
-          {errors.status && <p className="text-red-500 text-xs mt-1">{errors.status}</p>}
+          {errors.status && <p className="text-[#EF4444] text-[12px] mt-1">{errors.status}</p>}
         </div>
       </div>
 
       {/* Asignado + Fecha */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Asignado a</label>
+          <label className={labelCls}>Asignado a</label>
           <select
             value={form.assignedTo}
-            onChange={(e) => handleChange('assignedTo', e.target.value)}
-            className="input-field"
+            onChange={(e) => handleChange("assignedTo", e.target.value)}
+            className={inputCls}
           >
             <option value="">Sin asignar</option>
             {members.map((m) => (
@@ -112,15 +109,14 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
             ))}
           </select>
         </div>
-
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Fecha límite</label>
+          <label className={labelCls}>Fecha limite</label>
           <input
             type="date"
             value={form.dueDate}
             min={today()}
-            onChange={(e) => handleChange('dueDate', e.target.value)}
-            className="input-field"
+            onChange={(e) => handleChange("dueDate", e.target.value)}
+            className={inputCls}
           />
         </div>
       </div>
@@ -131,7 +127,8 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
           Cancelar
         </button>
         <button type="submit" className="btn-primary">
-          {task ? 'Guardar cambios' : 'Crear tarea'}
+          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>save</span>
+          {task ? "Guardar cambios" : "Crear tarea"}
         </button>
       </div>
     </form>

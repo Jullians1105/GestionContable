@@ -1,17 +1,28 @@
-import { useState } from 'react'
-import { validators } from '../utils/validators'
+﻿import { useState } from "react"
+import { validators } from "../utils/validators"
 
 const EMPTY_MEMBER = {
-  name: '',
-  email: '',
-  role: 'member',
+  name: "",
+  email: "",
+  role: "member",
 }
 
-const ROLE_COLORS = {
-  admin: 'text-red-700 bg-red-50',
-  leader: 'text-blue-700 bg-blue-50',
-  member: 'text-green-700 bg-green-50',
-  viewer: 'text-gray-700 bg-gray-100',
+const labelCls = "block text-[12px] font-semibold text-[#434655] mb-1"
+const inputCls = "w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-[#004ac6] hover:bg-[#f3f4f6] transition-colors"
+const inputErrCls = "border-[#EF4444] focus:ring-[#EF4444] focus:border-[#EF4444]"
+
+const ROLE_HINTS = {
+  admin: "Administrador - Acceso completo",
+  leader: "Lider - Gestiona y asigna tareas",
+  member: "Miembro - Crea y actualiza tareas",
+  viewer: "Viewer - Solo lectura",
+}
+
+const ROLE_HINT_COLORS = {
+  admin: "bg-[#ffdad6] text-[#93000a]",
+  leader: "bg-[#dbe1ff] text-[#003ea8]",
+  member: "bg-green-100 text-green-800",
+  viewer: "bg-[#edeef0] text-[#434655]",
 }
 
 export default function TeamForm({ member, onSubmit, onCancel }) {
@@ -35,70 +46,58 @@ export default function TeamForm({ member, onSubmit, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Nombre */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Nombre <span className="text-red-500">*</span>
-        </label>
+        <label className={labelCls}>Nombre <span className="text-[#EF4444]">*</span></label>
         <input
           type="text"
           value={form.name}
-          onChange={(e) => handleChange('name', e.target.value)}
+          onChange={(e) => handleChange("name", e.target.value)}
           placeholder="Nombre completo"
-          className={`input-field ${errors.name ? 'input-error' : ''}`}
+          className={`${inputCls} ${errors.name ? inputErrCls : ""}`}
         />
-        {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+        {errors.name && <p className="text-[#EF4444] text-[12px] mt-1">{errors.name}</p>}
       </div>
 
-      {/* Email */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Email <span className="text-red-500">*</span>
-        </label>
+        <label className={labelCls}>Email <span className="text-[#EF4444]">*</span></label>
         <input
           type="email"
           value={form.email}
-          onChange={(e) => handleChange('email', e.target.value)}
+          onChange={(e) => handleChange("email", e.target.value)}
           placeholder="correo@empresa.com"
-          className={`input-field ${errors.email ? 'input-error' : ''}`}
+          className={`${inputCls} ${errors.email ? inputErrCls : ""}`}
         />
-        {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+        {errors.email && <p className="text-[#EF4444] text-[12px] mt-1">{errors.email}</p>}
       </div>
 
-      {/* Rol */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Rol <span className="text-red-500">*</span>
-        </label>
+        <label className={labelCls}>Rol <span className="text-[#EF4444]">*</span></label>
         <select
           value={form.role}
-          onChange={(e) => handleChange('role', e.target.value)}
-          className={`input-field ${errors.role ? 'input-error' : ''}`}
+          onChange={(e) => handleChange("role", e.target.value)}
+          className={`${inputCls} ${errors.role ? inputErrCls : ""}`}
         >
           <option value="">Seleccionar rol...</option>
           <option value="admin">Administrador</option>
-          <option value="leader">Líder</option>
+          <option value="leader">Lider</option>
           <option value="member">Miembro</option>
           <option value="viewer">Viewer</option>
         </select>
-        {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
+        {errors.role && <p className="text-[#EF4444] text-[12px] mt-1">{errors.role}</p>}
         {form.role && (
-          <span className={`inline-block mt-2 text-xs font-medium px-2.5 py-1 rounded-full ${ROLE_COLORS[form.role]}`}>
-            {form.role === 'admin' && 'Administrador - Acceso completo'}
-            {form.role === 'leader' && 'Líder - Gestiona y asigna tareas'}
-            {form.role === 'member' && 'Miembro - Crea y actualiza tareas'}
-            {form.role === 'viewer' && 'Viewer - Solo lectura'}
+          <span className={`inline-block mt-2 text-[11px] font-semibold px-2.5 py-1 rounded-full ${ROLE_HINT_COLORS[form.role]}`}>
+            {ROLE_HINTS[form.role]}
           </span>
         )}
       </div>
 
-      {/* Actions */}
       <div className="flex justify-end gap-3 pt-2">
         <button type="button" onClick={onCancel} className="btn-secondary">
           Cancelar
         </button>
         <button type="submit" className="btn-primary">
-          {member ? 'Guardar cambios' : 'Agregar miembro'}
+          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>save</span>
+          {member ? "Guardar cambios" : "Agregar miembro"}
         </button>
       </div>
     </form>

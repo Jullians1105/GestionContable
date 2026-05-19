@@ -1,24 +1,24 @@
-import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+﻿import { useMemo } from "react"
+import { Link } from "react-router-dom"
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend,
-} from 'recharts'
-import { useTasks } from '../hooks/useTasks'
-import { useTeam } from '../hooks/useTeam'
-import StatsCard from './StatsCard'
-import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from '../utils/helpers'
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+} from "recharts"
+import { useTasks } from "../hooks/useTasks"
+import { useTeam } from "../hooks/useTeam"
+import StatsCard from "./StatsCard"
+import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from "../utils/helpers"
 
 const STATUS_COLORS = {
-  pending: '#6B7280',
-  in_progress: '#2563EB',
-  completed: '#10B981',
+  pending: "#737686",
+  in_progress: "#004ac6",
+  completed: "#10B981",
 }
 
 const PRIORITY_COLORS = {
-  high: '#EF4444',
-  medium: '#FBBF24',
-  low: '#10B981',
+  high: "#EF4444",
+  medium: "#FBBF24",
+  low: "#10B981",
 }
 
 export default function Dashboard() {
@@ -27,83 +27,90 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const total = tasks.length
-    const completed = tasks.filter((t) => t.status === 'completed').length
-    const inProgress = tasks.filter((t) => t.status === 'in_progress').length
-    const pending = tasks.filter((t) => t.status === 'pending').length
+    const completed = tasks.filter((t) => t.status === "completed").length
+    const inProgress = tasks.filter((t) => t.status === "in_progress").length
+    const pending = tasks.filter((t) => t.status === "pending").length
     return { total, completed, inProgress, pending }
   }, [tasks])
 
   const pieData = useMemo(() => [
-    { name: 'Pendientes', value: stats.pending, color: STATUS_COLORS.pending },
-    { name: 'En Progreso', value: stats.inProgress, color: STATUS_COLORS.in_progress },
-    { name: 'Completadas', value: stats.completed, color: STATUS_COLORS.completed },
+    { name: "Pendientes", value: stats.pending, color: STATUS_COLORS.pending },
+    { name: "En Progreso", value: stats.inProgress, color: STATUS_COLORS.in_progress },
+    { name: "Completadas", value: stats.completed, color: STATUS_COLORS.completed },
   ].filter((d) => d.value > 0), [stats])
 
   const barData = useMemo(() => [
-    { name: 'Alta', value: tasks.filter((t) => t.priority === 'high').length, fill: PRIORITY_COLORS.high },
-    { name: 'Media', value: tasks.filter((t) => t.priority === 'medium').length, fill: PRIORITY_COLORS.medium },
-    { name: 'Baja', value: tasks.filter((t) => t.priority === 'low').length, fill: PRIORITY_COLORS.low },
+    { name: "Alta", value: tasks.filter((t) => t.priority === "high").length, fill: PRIORITY_COLORS.high },
+    { name: "Media", value: tasks.filter((t) => t.priority === "medium").length, fill: PRIORITY_COLORS.medium },
+    { name: "Baja", value: tasks.filter((t) => t.priority === "low").length, fill: PRIORITY_COLORS.low },
   ], [tasks])
 
   const urgentTasks = useMemo(() =>
     tasks
-      .filter((t) => t.status !== 'completed' && t.dueDate && (isDueDateOverdue(t.dueDate) || isDueDateSoon(t.dueDate)))
+      .filter((t) => t.status !== "completed" && t.dueDate && (isDueDateOverdue(t.dueDate) || isDueDateSoon(t.dueDate)))
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
       .slice(0, 5),
     [tasks]
   )
 
+  const completionPct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0
+
   return (
     <div className="space-y-6">
-      {/* Stats cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatsCard title="Total de Tareas" value={stats.total} icon="📋" colorClass="bg-blue-50 text-blue-600" />
-        <StatsCard title="Completadas" value={stats.completed} icon="✅" colorClass="bg-green-50 text-green-600" />
-        <StatsCard title="En Progreso" value={stats.inProgress} icon="🔄" colorClass="bg-indigo-50 text-indigo-600" />
-        <StatsCard title="Pendientes" value={stats.pending} icon="⏳" colorClass="bg-gray-100 text-gray-600" />
+        <StatsCard title="Total de Tareas" value={stats.total} icon="analytics" borderColor="#004ac6" iconColor="#004ac6" sub={`${completionPct}% completadas`} />
+        <StatsCard title="Completadas" value={stats.completed} icon="check_circle" borderColor="#10B981" iconColor="#10B981" sub={stats.total > 0 ? `${completionPct}% del total` : "Sin tareas"} subColor="#434655" />
+        <StatsCard title="En Progreso" value={stats.inProgress} icon="pending" borderColor="#FBBF24" iconColor="#FBBF24" sub="Tareas activas" subColor="#434655" />
+        <StatsCard title="Pendientes" value={stats.pending} icon="priority_high" borderColor="#EF4444" iconColor="#EF4444" sub={stats.pending > 0 ? "Por iniciar" : "Todo al dia"} subColor={stats.pending > 0 ? "#EF4444" : "#10B981"} />
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pie chart */}
-        <div className="card">
-          <h2 className="font-semibold text-gray-900 mb-4">Distribución por Estado</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="card lg:col-span-1">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-[18px] font-bold text-[#191c1e]">Distribucion por Estado</h2>
+            <span className="material-symbols-outlined text-[#434655]" style={{ fontSize: 20 }}>more_vert</span>
+          </div>
           {pieData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={55}
-                  outerRadius={85}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
                   {pieData.map((entry, index) => (
                     <Cell key={index} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value, name) => [value, name]} />
-                <Legend />
+                <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #c3c6d7", fontSize: 12 }} formatter={(value, name) => [value, name]} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-gray-400">
-              <p>No hay tareas</p>
+            <div className="h-[220px] flex items-center justify-center">
+              <p className="text-[14px] text-[#434655]">No hay tareas</p>
             </div>
           )}
+          <div className="grid grid-cols-3 gap-2 mt-4">
+            {[
+              { label: "Pendientes", color: STATUS_COLORS.pending },
+              { label: "En Progreso", color: STATUS_COLORS.in_progress },
+              { label: "Completadas", color: STATUS_COLORS.completed },
+            ].map(({ label, color }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                <span className="text-[11px] text-[#434655] leading-tight">{label}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Bar chart */}
-        <div className="card">
-          <h2 className="font-semibold text-gray-900 mb-4">Distribución por Prioridad</h2>
+        <div className="card lg:col-span-2">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-[18px] font-bold text-[#191c1e]">Tareas por Prioridad</h2>
+            <span className="material-symbols-outlined text-[#434655]" style={{ fontSize: 20 }}>filter_list</span>
+          </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={barData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
-              <Tooltip />
+              <CartesianGrid strokeDasharray="3 3" stroke="#edeef0" />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#434655" }} />
+              <YAxis tick={{ fontSize: 12, fill: "#434655" }} allowDecimals={false} />
+              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #c3c6d7", fontSize: 12 }} />
               <Bar dataKey="value" name="Tareas" radius={[4, 4, 0, 0]}>
                 {barData.map((entry, index) => (
                   <Cell key={index} fill={entry.fill} />
@@ -114,38 +121,29 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Urgent tasks */}
       <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-gray-900">Próximas a Vencer</h2>
-          <Link to="/tasks" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-            Ver todas →
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-[18px] font-bold text-[#191c1e]">Proximas a Vencer</h2>
+          <Link to="/tasks" className="text-[12px] font-semibold text-[#004ac6] hover:text-[#2563eb] flex items-center gap-1 transition-colors">
+            Ver todas
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>
           </Link>
         </div>
-
         {urgentTasks.length > 0 ? (
           <div className="space-y-3">
             {urgentTasks.map((task) => {
               const overdue = isDueDateOverdue(task.dueDate)
               const member = task.assignedTo ? getMemberById(task.assignedTo) : null
               return (
-                <div
-                  key={task.id}
-                  className={`flex items-center gap-4 p-3 rounded-xl border ${
-                    overdue ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'
-                  }`}
-                >
+                <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border ${overdue ? "border-[#ffdad6] bg-[#fff5f5]" : "border-yellow-200 bg-yellow-50"}`}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{task.title}</p>
+                    <p className="text-[14px] font-semibold text-[#191c1e] truncate">{task.title}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-xs font-medium ${overdue ? 'text-red-700' : 'text-yellow-700'}`}>
-                        {overdue ? '⚠ Vencida' : '⏰ Próxima'} · {formatDate(task.dueDate)}
+                      <span className={`text-[12px] font-semibold flex items-center gap-1 ${overdue ? "text-[#93000a]" : "text-yellow-700"}`}>
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{overdue ? "warning" : "schedule"}</span>
+                        {overdue ? "Vencida" : "Proxima"} · {formatDate(task.dueDate)}
                       </span>
-                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                        task.priority === 'high' ? 'bg-red-100 text-red-700' :
-                        task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-green-100 text-green-700'
-                      }`}>
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${task.priority === "high" ? "bg-[#ffdad6] text-[#93000a]" : task.priority === "medium" ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}`}>
                         {PRIORITY_LABELS[task.priority]}
                       </span>
                     </div>
@@ -160,8 +158,10 @@ export default function Dashboard() {
             })}
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-400">
-            <p className="text-sm">No hay tareas urgentes. Todo está al día.</p>
+          <div className="text-center py-8">
+            <span className="material-symbols-outlined block mb-2 mx-auto" style={{ fontSize: 40, color: "#c3c6d7" }}>check_circle</span>
+            <p className="text-[14px] font-semibold text-[#434655]">Todo al dia</p>
+            <p className="text-[12px] mt-1 text-[#434655]">No hay tareas urgentes por el momento</p>
           </div>
         )}
       </div>

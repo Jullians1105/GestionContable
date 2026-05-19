@@ -1,12 +1,12 @@
-import { useState } from 'react'
-import TaskCard from './TaskCard'
-import TaskModal from './TaskModal'
-import TaskFilters from './TaskFilters'
-import { useTasks } from '../hooks/useTasks'
+﻿import { useState } from "react"
+import TaskCard from "./TaskCard"
+import TaskModal from "./TaskModal"
+import TaskFilters from "./TaskFilters"
+import { useTasks } from "../hooks/useTasks"
 
 const PAGE_SIZE = 9
 
-const EMPTY_FILTERS = { search: '', status: '', priority: '', assignedTo: '' }
+const EMPTY_FILTERS = { search: "", status: "", priority: "", assignedTo: "" }
 
 export default function TaskList({ initialFilters = {} }) {
   const { tasks, addTask, updateTask, deleteTask } = useTasks()
@@ -34,15 +34,8 @@ export default function TaskList({ initialFilters = {} }) {
     setPage(1)
   }
 
-  const openCreate = () => {
-    setEditingTask(null)
-    setModalOpen(true)
-  }
-
-  const openEdit = (task) => {
-    setEditingTask(task)
-    setModalOpen(true)
-  }
+  const openCreate = () => { setEditingTask(null); setModalOpen(true) }
+  const openEdit = (task) => { setEditingTask(task); setModalOpen(true) }
 
   const handleSubmit = (formData) => {
     if (editingTask) {
@@ -55,9 +48,7 @@ export default function TaskList({ initialFilters = {} }) {
   }
 
   const handleDelete = (id) => {
-    if (window.confirm('¿Eliminar esta tarea?')) {
-      deleteTask(id)
-    }
+    if (window.confirm("Eliminar esta tarea?")) deleteTask(id)
   }
 
   const handleStatusChange = (id, status) => {
@@ -67,26 +58,22 @@ export default function TaskList({ initialFilters = {} }) {
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
-        <div className="flex-1">
-          <TaskFilters
-            filters={filters}
-            onChange={handleFilterChange}
-            onClear={() => { setFilters(EMPTY_FILTERS); setPage(1) }}
-          />
-        </div>
-        <button onClick={openCreate} className="btn-primary shrink-0 flex items-center gap-2">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between mb-2">
+        <p className="text-[14px] text-[#434655]">
+          <span className="font-semibold text-[#191c1e]">{filtered.length}</span> {filtered.length === 1 ? "tarea" : "tareas"} encontradas
+        </p>
+        <button onClick={openCreate} className="btn-primary shrink-0">
+          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
           Nueva Tarea
         </button>
       </div>
 
-      {/* Results count */}
-      <p className="text-sm text-gray-500">
-        {filtered.length} {filtered.length === 1 ? 'tarea' : 'tareas'} encontradas
-      </p>
+      {/* Filters */}
+      <TaskFilters
+        filters={filters}
+        onChange={handleFilterChange}
+        onClear={() => { setFilters(EMPTY_FILTERS); setPage(1) }}
+      />
 
       {/* Grid */}
       {paginated.length > 0 ? (
@@ -102,23 +89,20 @@ export default function TaskList({ initialFilters = {} }) {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 text-gray-400">
-          <svg className="w-12 h-12 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          <p className="font-medium">No hay tareas</p>
-          <p className="text-sm mt-1">Crea una nueva tarea o ajusta los filtros</p>
+        <div className="text-center py-16 text-[#434655]">
+          <span className="material-symbols-outlined block mb-3 mx-auto" style={{ fontSize: 48, color: "#c3c6d7" }}>assignment</span>
+          <p className="text-[14px] font-semibold">No hay tareas</p>
+          <p className="text-[12px] mt-1">Crea una nueva tarea o ajusta los filtros</p>
         </div>
       )}
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-2">
+        <div className="flex items-center justify-center gap-2 pt-4">
           <button
             disabled={page === 1}
             onClick={() => setPage((p) => p - 1)}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 h-9 text-[12px] font-semibold border border-[#c3c6d7] rounded-lg hover:bg-[#f3f4f6] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Anterior
           </button>
@@ -126,10 +110,10 @@ export default function TaskList({ initialFilters = {} }) {
             <button
               key={p}
               onClick={() => setPage(p)}
-              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+              className={`w-9 h-9 text-[12px] font-semibold rounded-lg border transition-colors ${
                 p === page
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'border-gray-200 hover:bg-gray-50'
+                  ? "bg-[#004ac6] text-white border-[#004ac6]"
+                  : "border-[#c3c6d7] hover:bg-[#f3f4f6]"
               }`}
             >
               {p}
@@ -138,7 +122,7 @@ export default function TaskList({ initialFilters = {} }) {
           <button
             disabled={page === totalPages}
             onClick={() => setPage((p) => p + 1)}
-            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3 h-9 text-[12px] font-semibold border border-[#c3c6d7] rounded-lg hover:bg-[#f3f4f6] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Siguiente
           </button>
