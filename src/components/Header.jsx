@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTasks } from '../hooks/useTasks'
-import { getInitials } from '../utils/helpers'
-
-const USER_NAME = 'Carlos Mendoza'
-const USER_ROLE = 'Project Manager'
+import { useAuth } from '../context/AuthContext'
+import { useTheme } from '../context/ThemeContext'
+import { getInitials, getAvatarColor, ROLE_LABELS } from '../utils/helpers'
+import NotificationBell from './Notifications/NotificationBell'
+import GroupSelector from './Groups/GroupSelector'
 
 export default function Header() {
   const [search, setSearch] = useState('')
   const { tasks } = useTasks()
+  const { user, logout } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -19,9 +23,10 @@ export default function Header() {
     }
   }
 
+  const avatarBg = user ? getAvatarColor(user.name) : 'bg-[#004ac6]'
+
   return (
-    <header className="fixed top-0 right-0 left-[250px] h-16 z-40 bg-white border-b border-[#c3c6d7] shadow-sm flex items-center justify-between px-6">
-      {/* Search */}
+    <header className="fixed top-0 right-0 left-[250px] h-16 z-40 bg-white dark:bg-[#1e2030] border-b border-[#c3c6d7] dark:border-[#2e3148] shadow-sm flex items-center justify-between px-6 gap-4">
       <form onSubmit={handleSearch} className="flex-1 max-w-md">
         <div className="relative focus-within:ring-2 focus-within:ring-[#004ac6] rounded-lg transition-all">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655]" style={{ fontSize: 18 }}>search</span>
@@ -29,41 +34,63 @@ export default function Header() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar tareas, proyectos..."
-            className="w-full h-10 pl-10 pr-4 bg-[#f3f4f6] border-none rounded-lg text-[14px] text-[#191c1e] focus:outline-none focus:ring-0"
+            placeholder="Buscar tareas..."
+            className="w-full h-10 pl-10 pr-4 bg-[#f3f4f6] dark:bg-[#252840] border-none rounded-lg text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none"
           />
         </div>
       </form>
 
-      {/* Right side */}
-      <div className="flex items-center gap-4">
-        {/* Task count pill */}
-        <span className="hidden sm:block text-[12px] font-semibold px-3 py-1 bg-[#edeef0] text-[#434655] rounded-full">
+      <div className="flex items-center gap-2">
+        <GroupSelector />
+
+        <span className="hidden sm:block text-xs font-semibold px-3 py-1 bg-[#edeef0] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] rounded-full">
           {tasks.length} tareas
         </span>
 
-        {/* Icon buttons */}
-        <div className="flex items-center gap-1">
-          <button className="w-10 h-10 rounded-full flex items-center justify-center text-[#434655] hover:bg-[#e7e8ea] transition-colors">
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>notifications</span>
-          </button>
-          <button className="w-10 h-10 rounded-full flex items-center justify-center text-[#434655] hover:bg-[#e7e8ea] transition-colors">
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>help_outline</span>
-          </button>
-        </div>
+        <button
+          onClick={toggleTheme}
+          className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-[#434655] dark:text-[#c4c8e8]"
+          title={theme === 'light' ? 'Modo oscuro' : 'Modo claro'}
+        >
+          <span className="material-symbols-outlined text-xl">{theme === 'light' ? 'dark_mode' : 'light_mode'}</span>
+        </button>
 
-        {/* Divider */}
-        <div className="h-8 w-px bg-[#c3c6d7]" />
+        <NotificationBell />
 
-        {/* User */}
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <p className="text-[12px] font-semibold text-[#191c1e] leading-tight">{USER_NAME}</p>
-            <p className="text-[12px] text-[#434655]">{USER_ROLE}</p>
-          </div>
-          <div className="w-10 h-10 rounded-full bg-[#004ac6] flex items-center justify-center text-white text-sm font-bold border border-[#c3c6d7]">
-            {getInitials(USER_NAME)}
-          </div>
+        <div className="h-8 w-px bg-[#c3c6d7] dark:bg-[#2e3148]" />
+
+        <div className="relative">
+          <button onClick={() => setUserMenuOpen((v) => !v)} className="flex items-center gap-2 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] px-2 py-1 transition">
+            <div className="text-right hidden sm:block">
+              <p className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">{user?.name}</p>
+              <p className="text-[10px] text-[#434655] dark:text-[#c4c8e8]">{ROLE_LABELS[user?.role]}</p>
+            </div>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${avatarBg}`}>
+              {getInitials(user?.name || '')}
+            </div>
+          </button>
+
+          {userMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+              <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-[#1e2030] rounded-xl shadow-xl border border-[#c3c6d7] dark:border-[#2e3148] min-w-[160px] overflow-hidden">
+                <button
+                  onClick={() => { navigate('/settings'); setUserMenuOpen(false) }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+                >
+                  <span className="material-symbols-outlined text-base">settings</span>
+                  Configuración
+                </button>
+                <button
+                  onClick={() => { logout(); navigate('/login') }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[#EF4444] hover:bg-[#ffdad6] transition"
+                >
+                  <span className="material-symbols-outlined text-base">logout</span>
+                  Cerrar sesión
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>

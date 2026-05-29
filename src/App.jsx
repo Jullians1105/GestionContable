@@ -1,17 +1,35 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { TaskProvider } from './context/TaskContext'
 import { TeamProvider } from './context/TeamContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { GroupProvider } from './context/GroupContext'
+import { NotificationProvider } from './context/NotificationContext'
+import { TagProvider } from './context/TagContext'
+import { ThemeProvider } from './context/ThemeContext'
+import { ToastProvider } from './context/ToastContext'
+import ProtectedRoute from './components/Auth/ProtectedRoute'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
+import Toast from './components/Toast'
 import DashboardPage from './pages/DashboardPage'
 import TasksPage from './pages/TasksPage'
 import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
+import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
+import GroupsPage from './pages/GroupsPage'
+import KanbanPage from './pages/KanbanPage'
+import CalendarPage from './pages/CalendarPage'
+import ReportsPage from './pages/ReportsPage'
+import NotificationsPage from './pages/NotificationsPage'
 import './App.css'
 
 function Layout() {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+
   return (
-    <div className="min-h-screen bg-[#f3f4f6] text-[#191c1e]">
+    <div className="min-h-screen bg-[#f3f4f6] dark:bg-[#0f1117] text-[#191c1e] dark:text-[#e4e6f0]">
       <Sidebar />
       <Header />
       <main className="ml-[250px] pt-16 min-h-screen">
@@ -20,10 +38,16 @@ function Layout() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/tasks" element={<TasksPage />} />
             <Route path="/team" element={<TeamPage />} />
+            <Route path="/groups" element={<GroupsPage />} />
+            <Route path="/kanban" element={<KanbanPage />} />
+            <Route path="/calendar" element={<CalendarPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </div>
       </main>
+      <Toast />
     </div>
   )
 }
@@ -31,11 +55,27 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <TeamProvider>
-        <TaskProvider>
-          <Layout />
-        </TaskProvider>
-      </TeamProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <TeamProvider>
+              <TaskProvider>
+                <GroupProvider>
+                  <NotificationProvider>
+                    <TagProvider>
+                      <Routes>
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/register" element={<RegisterPage />} />
+                        <Route path="/*" element={<Layout />} />
+                      </Routes>
+                    </TagProvider>
+                  </NotificationProvider>
+                </GroupProvider>
+              </TaskProvider>
+            </TeamProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </BrowserRouter>
   )
 }

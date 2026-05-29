@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useState, useEffect, useCallback, useContext } from 'react'
 import { storage } from '../utils/storage'
 import { generateId, today } from '../utils/helpers'
 import { SAMPLE_MEMBERS } from '../utils/sampleData'
@@ -17,6 +17,8 @@ export function TeamProvider({ children }) {
 
   const addMember = useCallback((memberData) => {
     const newMember = {
+      groupIds: [],
+      preferences: { theme: 'light', notifications: true },
       ...memberData,
       id: generateId('user'),
       createdAt: today(),
@@ -26,25 +28,24 @@ export function TeamProvider({ children }) {
   }, [])
 
   const updateMember = useCallback((id, updates) => {
-    setMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
-    )
+    setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)))
   }, [])
 
   const deleteMember = useCallback((id) => {
     setMembers((prev) => prev.filter((m) => m.id !== id))
   }, [])
 
-  const getMemberById = useCallback(
-    (id) => members.find((m) => m.id === id),
-    [members]
-  )
+  const getMemberById = useCallback((id) => members.find((m) => m.id === id), [members])
 
   return (
-    <TeamContext.Provider
-      value={{ members, addMember, updateMember, deleteMember, getMemberById }}
-    >
+    <TeamContext.Provider value={{ members, addMember, updateMember, deleteMember, getMemberById }}>
       {children}
     </TeamContext.Provider>
   )
+}
+
+export function useTeam() {
+  const ctx = useContext(TeamContext)
+  if (!ctx) throw new Error('useTeam must be used inside TeamProvider')
+  return ctx
 }

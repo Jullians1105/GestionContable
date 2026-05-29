@@ -1,90 +1,93 @@
-﻿import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS } from "../utils/helpers"
-import { useTeam } from "../hooks/useTeam"
+import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS } from '../utils/helpers'
+import { useTeam } from '../hooks/useTeam'
+import { useTags } from '../context/TagContext'
 
-const PRIORITY_BADGE = {
-  high: "badge-high",
-  medium: "badge-medium",
-  low: "badge-low",
-}
-
-const STATUS_BADGE = {
-  pending: "badge-pending",
-  in_progress: "badge-in_progress",
-  completed: "badge-completed",
-}
+const PRIORITY_COLORS = { high: '#EF4444', medium: '#FBBF24', low: '#10B981' }
+const STATUS_COLORS = { pending: '#888', in_progress: '#004ac6', completed: '#10B981' }
 
 export default function TaskCard({ task, onEdit, onDelete, onStatusChange }) {
   const { getMemberById } = useTeam()
+  const { getTagById } = useTags()
   const member = task.assignedTo ? getMemberById(task.assignedTo) : null
+  const overdue = isDueDateOverdue(task.dueDate) && task.status !== 'completed'
+  const soon = isDueDateSoon(task.dueDate) && task.status !== 'completed'
 
-  const overdue = isDueDateOverdue(task.dueDate) && task.status !== "completed"
-  const soon = isDueDateSoon(task.dueDate) && task.status !== "completed"
+  const subtasks = task.subtasks || []
+  const completedSubtasks = subtasks.filter((s) => s.completed).length
+  const tags = (task.tagIds || []).map(getTagById).filter(Boolean)
+  const commentCount = (task.comments || []).length
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-[#c3c6d7] p-5 hover:shadow-md transition-shadow duration-200 flex flex-col gap-3">
-      {/* Header row */}
+    <div className="bg-white dark:bg-[#1e2030] rounded-xl shadow-sm border border-[#c3c6d7] dark:border-[#2e3148] p-5 hover:shadow-md transition-shadow flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
-        <h3 className="text-[14px] font-semibold text-[#191c1e] leading-snug line-clamp-2 flex-1">
-          {task.title}
-        </h3>
+        <h3 className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] leading-snug line-clamp-2 flex-1">{task.title}</h3>
         <div className="flex gap-1 shrink-0">
-          <button
-            onClick={() => onEdit(task)}
-            className="p-1.5 text-[#434655] hover:text-[#004ac6] hover:bg-[#dbe1ff] rounded-lg transition-colors"
-            title="Editar"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+          <button onClick={() => onEdit(task)} className="p-1.5 text-[#434655] hover:text-[#004ac6] hover:bg-[#dbe1ff] rounded-lg transition" title="Editar">
+            <span className="material-symbols-outlined text-base">edit</span>
           </button>
-          <button
-            onClick={() => onDelete(task.id)}
-            className="p-1.5 text-[#434655] hover:text-[#93000a] hover:bg-[#ffdad6] rounded-lg transition-colors"
-            title="Eliminar"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
+          <button onClick={() => onDelete(task.id)} className="p-1.5 text-[#434655] hover:text-[#93000a] hover:bg-[#ffdad6] rounded-lg transition" title="Eliminar">
+            <span className="material-symbols-outlined text-base">delete</span>
           </button>
         </div>
       </div>
 
-      {/* Description */}
-      {task.description && (
-        <p className="text-[12px] text-[#434655] line-clamp-2">{task.description}</p>
-      )}
+      {task.description && <p className="text-xs text-[#434655] dark:text-[#c4c8e8] line-clamp-2">{task.description}</p>}
 
-      {/* Badges */}
       <div className="flex flex-wrap gap-1.5">
-        <span className={PRIORITY_BADGE[task.priority]}>{PRIORITY_LABELS[task.priority]}</span>
-        <span className={STATUS_BADGE[task.status]}>{STATUS_LABELS[task.status]}</span>
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style={{ background: PRIORITY_COLORS[task.priority] }}>
+          {PRIORITY_LABELS[task.priority]}
+        </span>
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style={{ background: STATUS_COLORS[task.status] }}>
+          {STATUS_LABELS[task.status]}
+        </span>
+        {tags.map((tag) => (
+          <span key={tag.id} className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ background: tag.color }}>
+            {tag.name}
+          </span>
+        ))}
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-2 border-t border-[#edeef0]">
+      {subtasks.length > 0 && (
+        <div>
+          <div className="h-1 bg-[#edeef0] dark:bg-[#252840] rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${Math.round((completedSubtasks / subtasks.length) * 100)}%`, background: '#004ac6' }} />
+          </div>
+          <p className="text-[10px] text-[#888] mt-0.5">{completedSubtasks}/{subtasks.length} subtareas</p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-2 border-t border-[#edeef0] dark:border-[#252840]">
         {member ? (
           <div className="flex items-center gap-1.5">
             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold ${getAvatarColor(member.name)}`}>
               {getInitials(member.name)}
             </div>
-            <span className="text-[12px] text-[#434655] truncate max-w-[100px]">{member.name}</span>
+            <span className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate max-w-[90px]">{member.name}</span>
           </div>
         ) : (
-          <span className="text-[12px] text-[#737686] italic">Sin asignar</span>
+          <span className="text-xs text-[#888] italic">Sin asignar</span>
         )}
-
-        {task.dueDate && (
-          <span className={`text-[12px] font-semibold flex items-center gap-1 ${
-            overdue ? "text-[#93000a]" : soon ? "text-yellow-700" : "text-[#434655]"
-          }`}>
-            {overdue && <span className="material-symbols-outlined" style={{ fontSize: 13 }}>warning</span>}
-            {soon && !overdue && <span className="material-symbols-outlined" style={{ fontSize: 13 }}>schedule</span>}
-            {formatDate(task.dueDate)}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {commentCount > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] text-[#888]">
+              <span className="material-symbols-outlined text-xs">chat</span>
+              {commentCount}
+            </span>
+          )}
+          {task.dueDate && (
+            <span className={`text-xs font-semibold flex items-center gap-0.5 ${overdue ? 'text-[#EF4444]' : soon ? 'text-[#FBBF24]' : 'text-[#434655] dark:text-[#c4c8e8]'}`}>
+              {overdue && <span className="material-symbols-outlined text-xs">warning</span>}
+              {soon && !overdue && <span className="material-symbols-outlined text-xs">schedule</span>}
+              {formatDate(task.dueDate)}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Status change */}
       <select
         value={task.status}
         onChange={(e) => onStatusChange(task.id, e.target.value)}
-        className="text-[12px] border border-[#c3c6d7] rounded-lg px-2 h-8 bg-[#f3f4f6] text-[#191c1e] focus:outline-none focus:ring-1 focus:ring-[#004ac6] cursor-pointer"
+        className="text-xs border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-2 h-8 bg-[#f3f4f6] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-1 focus:ring-[#004ac6] cursor-pointer"
       >
         <option value="pending">Pendiente</option>
         <option value="in_progress">En Progreso</option>

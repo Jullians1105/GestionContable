@@ -1,37 +1,37 @@
-﻿import { useTeam } from "../hooks/useTeam"
+import { useTeam } from '../hooks/useTeam'
+import { useGroups } from '../context/GroupContext'
+import { useTags } from '../context/TagContext'
 
 export default function TaskFilters({ filters, onChange, onClear }) {
   const { members } = useTeam()
+  const { groups } = useGroups()
+  const { tags } = useTags()
 
-  const handleChange = (field, value) => {
-    onChange({ ...filters, [field]: value })
-  }
+  const handleChange = (field, value) => onChange({ ...filters, [field]: value })
 
-  const hasActiveFilters = filters.search || filters.status || filters.priority || filters.assignedTo
+  const hasActive = filters.search || filters.status || filters.priority || filters.assignedTo || filters.groupId || filters.tagId
 
-  const selectCls = "h-10 border border-[#c3c6d7] rounded-lg px-3 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-[#004ac6] hover:bg-[#f3f4f6] transition-colors min-w-[140px]"
+  const selectCls = 'h-10 border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-white dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition min-w-[130px]'
 
   return (
-    <div className="bg-white rounded-xl border border-[#c3c6d7] p-4 mb-6 flex flex-wrap items-end gap-4 shadow-sm">
-      {/* Search */}
+    <div className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#c3c6d7] dark:border-[#2e3148] p-4 mb-6 flex flex-wrap items-end gap-3 shadow-sm">
       <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-semibold text-[#434655] px-1">Buscar</label>
+        <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] px-1">Buscar</label>
         <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655]" style={{ fontSize: 16 }}>search</span>
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655] text-base">search</span>
           <input
             type="text"
             value={filters.search}
-            onChange={(e) => handleChange("search", e.target.value)}
+            onChange={(e) => handleChange('search', e.target.value)}
             placeholder="Buscar tareas..."
-            className="h-10 pl-9 pr-4 border border-[#c3c6d7] rounded-lg text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] hover:bg-[#f3f4f6] transition-colors min-w-[180px]"
+            className="h-10 pl-9 pr-4 border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-white dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition min-w-[180px]"
           />
         </div>
       </div>
 
-      {/* Estado */}
       <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-semibold text-[#434655] px-1">Estado</label>
-        <select value={filters.status} onChange={(e) => handleChange("status", e.target.value)} className={selectCls}>
+        <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] px-1">Estado</label>
+        <select value={filters.status} onChange={(e) => handleChange('status', e.target.value)} className={selectCls}>
           <option value="">Todos</option>
           <option value="pending">Pendiente</option>
           <option value="in_progress">En Progreso</option>
@@ -39,10 +39,9 @@ export default function TaskFilters({ filters, onChange, onClear }) {
         </select>
       </div>
 
-      {/* Prioridad */}
       <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-semibold text-[#434655] px-1">Prioridad</label>
-        <select value={filters.priority} onChange={(e) => handleChange("priority", e.target.value)} className={selectCls}>
+        <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] px-1">Prioridad</label>
+        <select value={filters.priority} onChange={(e) => handleChange('priority', e.target.value)} className={selectCls}>
           <option value="">Todas</option>
           <option value="high">Alta</option>
           <option value="medium">Media</option>
@@ -50,27 +49,39 @@ export default function TaskFilters({ filters, onChange, onClear }) {
         </select>
       </div>
 
-      {/* Asignado */}
       <div className="flex flex-col gap-1">
-        <label className="text-[12px] font-semibold text-[#434655] px-1">Asignado</label>
-        <select value={filters.assignedTo} onChange={(e) => handleChange("assignedTo", e.target.value)} className={selectCls}>
+        <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] px-1">Asignado</label>
+        <select value={filters.assignedTo} onChange={(e) => handleChange('assignedTo', e.target.value)} className={selectCls}>
           <option value="">Todos</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>{m.name}</option>
-          ))}
+          {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] px-1">Grupo</label>
+        <select value={filters.groupId} onChange={(e) => handleChange('groupId', e.target.value)} className={selectCls}>
+          <option value="">Todos</option>
+          {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] px-1">Etiqueta</label>
+        <select value={filters.tagId} onChange={(e) => handleChange('tagId', e.target.value)} className={selectCls}>
+          <option value="">Todas</option>
+          {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
       </div>
 
       <div className="flex-1" />
 
-      {/* Clear */}
-      {hasActiveFilters && (
+      {hasActive && (
         <button
           onClick={onClear}
-          className="h-10 px-4 text-[12px] font-semibold text-[#434655] flex items-center gap-2 hover:bg-[#f3f4f6] rounded-lg transition-colors border border-[#c3c6d7]"
+          className="h-10 px-4 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] flex items-center gap-1.5 hover:bg-[#edeef0] dark:hover:bg-[#252840] rounded-lg transition border border-[#c3c6d7] dark:border-[#2e3148]"
         >
-          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
-          Limpiar
+          <span className="material-symbols-outlined text-base">close</span>
+          Limpiar filtros
         </button>
       )}
     </div>
