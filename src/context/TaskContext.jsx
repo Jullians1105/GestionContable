@@ -1,21 +1,55 @@
-import { createContext, useState, useEffect, useCallback, useContext } from 'react'
+import { createContext, useState, useEffect, useCallback, useContext, useRef } from 'react'
 import { storage } from '../utils/storage'
 import { generateId, today } from '../utils/helpers'
 import { SAMPLE_TASKS } from '../utils/sampleData'
+import { useAuth } from './AuthContext'
 
 export const TaskContext = createContext(null)
 
+function pushAssignNotif(assignedTo, actorName, taskTitle, taskId) {
+  if (!assignedTo) return
+  storage.pushNotificationToUser(assignedTo, {
+    id: generateId('notif'),
+    type: 'task_assigned',
+    message: `${actorName} te asignó la tarea "${taskTitle}"`,
+    taskId,
+    read: false,
+    createdAt: new Date().toISOString(),
+  })
+}
+
 export function TaskProvider({ children }) {
+  const { user } = useAuth()
   const [tasks, setTasks] = useState(() => {
     const saved = storage.getTasks()
     return saved ?? SAMPLE_TASKS
   })
+  const addingRef = useRef(false)
+
+  const savingRef = useRef(false)
 
   useEffect(() => {
+    savingRef.current = true
     storage.saveTasks(tasks)
+    savingRef.current = false
   }, [tasks])
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (savingRef.current) return
+      const fresh = storage.getTasks()
+      if (!fresh) return
+      setTasks((prev) => {
+        if (fresh.length !== prev.length || fresh[0]?.updatedAt !== prev[0]?.updatedAt) return fresh
+        return prev
+      })
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
   const addTask = useCallback((taskData) => {
+    if (addingRef.current) return null
+    addingRef.current = true
     const newTask = {
       groupId: null,
       tagIds: [],
@@ -26,15 +60,29 @@ export function TaskProvider({ children }) {
       createdAt: today(),
       updatedAt: today(),
     }
-    setTasks((prev) => [newTask, ...prev])
+    setTasks((prev) => {
+      addingRef.current = false
+      return [newTask, ...prev]
+    })
+    if (newTask.assignedTo && newTask.assignedTo !== user?.id) {
+      pushAssignNotif(newTask.assignedTo, user?.name ?? 'Alguien', newTask.title, newTask.id)
+    }
     return newTask
-  }, [])
+  }, [user])
 
-  const updateTask = useCallback((id, updates) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...updates, updatedAt: today() } : t))
-    )
-  }, [])
+  const updateTask = useCallback((id, updates, prevAssignedTo) => {
+    setTasks((prev) => {
+      const current = prev.find((t) => t.id === id)
+      if (
+        updates.assignedTo &&
+        updates.assignedTo !== current?.assignedTo &&
+        updates.assignedTo !== user?.id
+      ) {
+        pushAssignNotif(updates.assignedTo, user?.name ?? 'Alguien', current?.title ?? '', id)
+      }
+      return prev.map((t) => (t.id === id ? { ...t, ...updates, updatedAt: today() } : t))
+    })
+  }, [user])
 
   const deleteTask = useCallback((id) => {
     setTasks((prev) => prev.filter((t) => t.id !== id))

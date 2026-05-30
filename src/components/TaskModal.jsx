@@ -28,8 +28,6 @@ export default function TaskModal({ isOpen, task, onSubmit, onClose, onSave }) {
       addTask(formData)
       addToast('Tarea creada', 'success')
     }
-    if (onSave) onSave(formData)
-    if (onSubmit) onSubmit(formData)
     onClose()
   }
 

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useTasks } from '../hooks/useTasks'
 import TaskModal from './TaskModal'
 
 const navItems = [
@@ -17,8 +16,7 @@ const navItems = [
 ]
 
 export default function Sidebar() {
-  const { isAdmin, isLeader } = useAuth()
-  const { addTask } = useTasks()
+  const { isAdmin, isLeader, canEdit } = useAuth()
   const [showModal, setShowModal] = useState(false)
 
   const visible = navItems.filter((item) => {
@@ -60,18 +58,20 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        <button
-          onClick={() => setShowModal(true)}
-          className="mt-2 w-full h-10 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-2 hover:opacity-90 transition active:scale-[0.97]"
-          style={{ background: '#004ac6' }}
-        >
-          <span className="material-symbols-outlined text-lg">add</span>
-          Nueva Tarea
-        </button>
+        {canEdit() && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="mt-2 w-full h-10 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-2 hover:opacity-90 transition active:scale-[0.97]"
+            style={{ background: '#004ac6' }}
+          >
+            <span className="material-symbols-outlined text-lg">add</span>
+            Nueva Tarea
+          </button>
+        )}
       </aside>
 
       {showModal && (
-        <TaskModal onClose={() => setShowModal(false)} onSave={(data) => { addTask(data); setShowModal(false) }} />
+        <TaskModal onClose={() => setShowModal(false)} />
       )}
     </>
   )

@@ -1,32 +1,43 @@
-import { createContext, useState, useCallback, useContext } from 'react'
-import { generateId, today } from '../utils/helpers'
-
-const STORAGE_KEY = 'notifications'
-
-function load() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-function save(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-}
+import { createContext, useState, useCallback, useContext, useEffect } from 'react'
+import { generateId } from '../utils/helpers'
+import { storage } from '../utils/storage'
+import { useAuth } from './AuthContext'
 
 export const NotificationContext = createContext(null)
 
 export function NotificationProvider({ children }) {
-  const [notifications, setNotifications] = useState(load)
+  const { user } = useAuth()
+  const userId = user?.id ?? null
 
-  const persist = (updated) => {
-    setNotifications(updated)
-    save(updated)
-  }
+  const [notifications, setNotifications] = useState(() =>
+    storage.getNotifications(userId)
+  )
 
-  const addNotification = useCallback((type, message, taskId = null) => {
+  useEffect(() => {
+    setNotifications(storage.getNotifications(userId))
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) return
+    const interval = setInterval(() => {
+      const fresh = storage.getNotifications(userId)
+      setNotifications((prev) => {
+        if (fresh.length !== prev.length || fresh[0]?.id !== prev[0]?.id) return fresh
+        return prev
+      })
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [userId])
+
+  const persist = useCallback((updater) => {
+    setNotifications((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      storage.saveNotifications(next, userId)
+      return next
+    })
+  }, [userId])
+
+  const addNotification = useCallback((type, message, taskId = null, targetUserId = null) => {
     const notif = {
       id: generateId('notif'),
       type,
@@ -35,26 +46,27 @@ export function NotificationProvider({ children }) {
       read: false,
       createdAt: new Date().toISOString(),
     }
-    persist((prev) => [notif, ...prev].slice(0, 50))
-  }, [])
+    const dest = targetUserId ?? userId
+    if (dest && dest !== userId) {
+      storage.pushNotificationToUser(dest, notif)
+    } else {
+      persist((prev) => [notif, ...prev].slice(0, 50))
+    }
+  }, [userId, persist])
 
   const markAsRead = useCallback((notifId) => {
-    persist((prev) =>
-      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
-    )
-  }, [])
+    persist((prev) => prev.map((n) => (n.id === notifId ? { ...n, read: true } : n)))
+  }, [persist])
 
   const markAllAsRead = useCallback(() => {
     persist((prev) => prev.map((n) => ({ ...n, read: true })))
-  }, [])
+  }, [persist])
 
   const deleteNotification = useCallback((notifId) => {
     persist((prev) => prev.filter((n) => n.id !== notifId))
-  }, [])
+  }, [persist])
 
-  const clearAll = useCallback(() => {
-    persist([])
-  }, [])
+  const clearAll = useCallback(() => persist([]), [persist])
 
   const unreadCount = notifications.filter((n) => !n.read).length
 

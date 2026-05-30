@@ -3,6 +3,7 @@ import { useTeam } from "../hooks/useTeam"
 import { useTasks } from "../hooks/useTasks"
 import TeamForm from "./TeamForm"
 import { getInitials, getAvatarColor, ROLE_LABELS } from "../utils/helpers"
+import { useToast } from "../context/ToastContext"
 
 const ROLE_BADGE = {
   admin: "bg-[#ffdad6] text-[#93000a]",
@@ -14,8 +15,10 @@ const ROLE_BADGE = {
 export default function TeamManager() {
   const { members, addMember, updateMember, deleteMember } = useTeam()
   const { getTasksByMember } = useTasks()
+  const { addToast } = useToast()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingMember, setEditingMember] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
 
   const openCreate = () => { setEditingMember(null); setModalOpen(true) }
   const openEdit = (m) => { setEditingMember(m); setModalOpen(true) }
@@ -23,19 +26,23 @@ export default function TeamManager() {
   const handleSubmit = (formData) => {
     if (editingMember) {
       updateMember(editingMember.id, formData)
+      addToast('Miembro actualizado', 'success')
     } else {
       addMember(formData)
+      addToast('Miembro agregado al equipo', 'success')
     }
     setModalOpen(false)
     setEditingMember(null)
   }
 
   const handleDelete = (id) => {
-    const taskCount = getTasksByMember(id).length
-    const msg = taskCount > 0
-      ? `Este miembro tiene ${taskCount} tareas asignadas. Eliminar de todas formas?`
-      : "Eliminar este miembro del equipo?"
-    if (window.confirm(msg)) deleteMember(id)
+    setDeleteConfirm(id)
+  }
+
+  const confirmDelete = () => {
+    deleteMember(deleteConfirm)
+    addToast('Miembro eliminado', 'info')
+    setDeleteConfirm(null)
   }
 
   return (
@@ -109,18 +116,18 @@ export default function TeamManager() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal editar/crear */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setModalOpen(false)} />
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md border border-[#c3c6d7]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#edeef0]">
-              <h2 className="text-[18px] font-bold text-[#191c1e]">
+          <div className="relative bg-white dark:bg-[#1e2030] rounded-xl shadow-xl w-full max-w-md border border-[#c3c6d7] dark:border-[#2e3148]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#edeef0] dark:border-[#2e3148]">
+              <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">
                 {editingMember ? "Editar miembro" : "Nuevo miembro"}
               </h2>
               <button
                 onClick={() => setModalOpen(false)}
-                className="p-2 text-[#434655] hover:text-[#191c1e] hover:bg-[#edeef0] rounded-lg transition-colors"
+                className="p-2 text-[#434655] hover:text-[#191c1e] hover:bg-[#edeef0] dark:hover:bg-[#252840] rounded-lg transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
               </button>
@@ -135,6 +142,28 @@ export default function TeamManager() {
           </div>
         </div>
       )}
+
+      {/* Modal confirmación eliminar */}
+      {deleteConfirm && (() => {
+        const m = members.find((x) => x.id === deleteConfirm)
+        const taskCount = getTasksByMember(deleteConfirm).length
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteConfirm(null)} />
+            <div className="relative bg-white dark:bg-[#1e2030] rounded-xl shadow-xl w-full max-w-sm border border-[#c3c6d7] dark:border-[#2e3148] p-6">
+              <h3 className="text-base font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-2">Eliminar miembro</h3>
+              <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-4">
+                ¿Eliminar a <strong>{m?.name}</strong>?
+                {taskCount > 0 && <span className="block mt-1 text-[#FBBF24]">Tiene {taskCount} tarea{taskCount > 1 ? 's' : ''} asignada{taskCount > 1 ? 's' : ''}.</span>}
+              </p>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">Cancelar</button>
+                <button onClick={confirmDelete} className="btn-danger">Eliminar</button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

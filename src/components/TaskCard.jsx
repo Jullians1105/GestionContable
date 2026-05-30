@@ -1,16 +1,19 @@
 import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS } from '../utils/helpers'
 import { useTeam } from '../hooks/useTeam'
 import { useTags } from '../context/TagContext'
+import { useAuth } from '../context/AuthContext'
 
 const PRIORITY_COLORS = { high: '#EF4444', medium: '#FBBF24', low: '#10B981' }
 const STATUS_COLORS = { pending: '#888', in_progress: '#004ac6', completed: '#10B981' }
 
-export default function TaskCard({ task, onEdit, onDelete, onStatusChange }) {
+export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onView }) {
   const { getMemberById } = useTeam()
   const { getTagById } = useTags()
+  const { isAdmin, isLeader } = useAuth()
   const member = task.assignedTo ? getMemberById(task.assignedTo) : null
   const overdue = isDueDateOverdue(task.dueDate) && task.status !== 'completed'
   const soon = isDueDateSoon(task.dueDate) && task.status !== 'completed'
+  const canEdit = isAdmin() || isLeader()
 
   const subtasks = task.subtasks || []
   const completedSubtasks = subtasks.filter((s) => s.completed).length
@@ -18,16 +21,23 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange }) {
   const commentCount = (task.comments || []).length
 
   return (
-    <div className="bg-white dark:bg-[#1e2030] rounded-xl shadow-sm border border-[#c3c6d7] dark:border-[#2e3148] p-5 hover:shadow-md transition-shadow flex flex-col gap-3">
+    <div
+      className="bg-white dark:bg-[#1e2030] rounded-xl shadow-sm border border-[#c3c6d7] dark:border-[#2e3148] p-5 hover:shadow-md hover:border-[#004ac6] transition-all flex flex-col gap-3 cursor-pointer"
+      onClick={() => onView && onView(task)}
+    >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] leading-snug line-clamp-2 flex-1">{task.title}</h3>
-        <div className="flex gap-1 shrink-0">
-          <button onClick={() => onEdit(task)} className="p-1.5 text-[#434655] hover:text-[#004ac6] hover:bg-[#dbe1ff] rounded-lg transition" title="Editar">
-            <span className="material-symbols-outlined text-base">edit</span>
-          </button>
-          <button onClick={() => onDelete(task.id)} className="p-1.5 text-[#434655] hover:text-[#93000a] hover:bg-[#ffdad6] rounded-lg transition" title="Eliminar">
-            <span className="material-symbols-outlined text-base">delete</span>
-          </button>
+        <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {canEdit && (
+            <button onClick={() => onEdit(task)} className="p-1.5 text-[#434655] hover:text-[#004ac6] hover:bg-[#dbe1ff] rounded-lg transition" title="Editar">
+              <span className="material-symbols-outlined text-base">edit</span>
+            </button>
+          )}
+          {canEdit && (
+            <button onClick={() => onDelete(task.id)} className="p-1.5 text-[#434655] hover:text-[#93000a] hover:bg-[#ffdad6] rounded-lg transition" title="Eliminar">
+              <span className="material-symbols-outlined text-base">delete</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -84,15 +94,17 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange }) {
         </div>
       </div>
 
-      <select
-        value={task.status}
-        onChange={(e) => onStatusChange(task.id, e.target.value)}
-        className="text-xs border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-2 h-8 bg-[#f3f4f6] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-1 focus:ring-[#004ac6] cursor-pointer"
-      >
-        <option value="pending">Pendiente</option>
-        <option value="in_progress">En Progreso</option>
-        <option value="completed">Completada</option>
-      </select>
+      <div onClick={(e) => e.stopPropagation()}>
+        <select
+          value={task.status}
+          onChange={(e) => onStatusChange(task.id, e.target.value)}
+          className="w-full text-xs border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-2 h-8 bg-[#f3f4f6] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-1 focus:ring-[#004ac6] cursor-pointer"
+        >
+          <option value="pending">Pendiente</option>
+          <option value="in_progress">En Progreso</option>
+          <option value="completed">Completada</option>
+        </select>
+      </div>
     </div>
   )
 }

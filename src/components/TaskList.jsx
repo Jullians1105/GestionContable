@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import TaskCard from './TaskCard'
 import TaskModal from './TaskModal'
+import TaskDetailModal from './TaskDetailModal'
 import TaskFilters from './TaskFilters'
 import { useTasks } from '../hooks/useTasks'
 import { useGroups } from '../context/GroupContext'
 import { useToast } from '../context/ToastContext'
+import { useAuth } from '../context/AuthContext'
 
 const PAGE_SIZE = 9
 const EMPTY_FILTERS = { search: '', status: '', priority: '', assignedTo: '', groupId: '', tagId: '' }
@@ -13,9 +15,11 @@ export default function TaskList({ initialFilters = {} }) {
   const { tasks, updateTask, deleteTask } = useTasks()
   const { currentGroupId } = useGroups()
   const { addToast } = useToast()
+  const { isAdmin, isLeader } = useAuth()
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS, ...initialFilters })
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
+  const [detailTask, setDetailTask] = useState(null)
   const [page, setPage] = useState(1)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
 
@@ -58,14 +62,16 @@ export default function TaskList({ initialFilters = {} }) {
         <p className="text-sm text-[#434655] dark:text-[#c4c8e8]">
           <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{filtered.length}</span> {filtered.length === 1 ? 'tarea' : 'tareas'} encontradas
         </p>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition shrink-0"
-          style={{ background: '#004ac6' }}
-        >
-          <span className="material-symbols-outlined text-lg">add</span>
-          Nueva Tarea
-        </button>
+        {(isAdmin() || isLeader()) && (
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition shrink-0"
+            style={{ background: '#004ac6' }}
+          >
+            <span className="material-symbols-outlined text-lg">add</span>
+            Nueva Tarea
+          </button>
+        )}
       </div>
 
       <TaskFilters filters={filters} onChange={handleFilterChange} onClear={() => { setFilters(EMPTY_FILTERS); setPage(1) }} />
@@ -73,7 +79,7 @@ export default function TaskList({ initialFilters = {} }) {
       {paginated.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {paginated.map((task) => (
-            <TaskCard key={task.id} task={task} onEdit={openEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} />
+            <TaskCard key={task.id} task={task} onEdit={openEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} onView={(t) => setDetailTask(t)} />
           ))}
         </div>
       ) : (
@@ -101,6 +107,14 @@ export default function TaskList({ initialFilters = {} }) {
       )}
 
       <TaskModal isOpen={modalOpen} task={editingTask} onClose={() => { setModalOpen(false); setEditingTask(null) }} />
+
+      {detailTask && (
+        <TaskDetailModal
+          task={detailTask}
+          onClose={() => setDetailTask(null)}
+          onEdit={(t) => { setDetailTask(null); openEdit(t) }}
+        />
+      )}
 
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">

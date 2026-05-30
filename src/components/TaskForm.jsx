@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { validators } from '../utils/validators'
-import { today } from '../utils/helpers'
+import { today, generateId } from '../utils/helpers'
 import { useTeam } from '../hooks/useTeam'
 import { useGroups } from '../context/GroupContext'
 import TagSelector from './Tags/TagSelector'
@@ -14,6 +14,7 @@ const EMPTY_TASK = {
   dueDate: '',
   groupId: '',
   tagIds: [],
+  subtasks: [],
 }
 
 const labelCls = 'block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5'
@@ -25,10 +26,24 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
   const { groups } = useGroups()
   const [form, setForm] = useState(task ?? EMPTY_TASK)
   const [errors, setErrors] = useState({})
+  const [subtaskInput, setSubtaskInput] = useState('')
 
   const handleChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }))
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: null }))
+  }
+
+  const handleAddSubtask = (e) => {
+    e.preventDefault()
+    const title = subtaskInput.trim()
+    if (!title) return
+    const newSub = { id: generateId('st'), title, completed: false, createdAt: today() }
+    setForm((prev) => ({ ...prev, subtasks: [...(prev.subtasks || []), newSub] }))
+    setSubtaskInput('')
+  }
+
+  const handleRemoveSubtask = (id) => {
+    setForm((prev) => ({ ...prev, subtasks: prev.subtasks.filter((s) => s.id !== id) }))
   }
 
   const handleSubmit = (e) => {
@@ -110,6 +125,45 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
       <div>
         <label className={labelCls}>Etiquetas</label>
         <TagSelector selectedIds={form.tagIds || []} onChange={(ids) => handleChange('tagIds', ids)} />
+      </div>
+
+      <div>
+        <label className={labelCls}>Subtareas</label>
+        {(form.subtasks || []).length > 0 && (
+          <ul className="mb-2 space-y-1">
+            {form.subtasks.map((s) => (
+              <li key={s.id} className="flex items-center gap-2 px-2 py-1 rounded-lg bg-[#edeef0] dark:bg-[#252840] group">
+                <span className="material-symbols-outlined text-sm text-[#004ac6]">radio_button_unchecked</span>
+                <span className="flex-1 text-sm text-[#191c1e] dark:text-[#e4e6f0]">{s.title}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSubtask(s.id)}
+                  className="opacity-0 group-hover:opacity-100 text-[#EF4444] transition"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex gap-2">
+          <input
+            value={subtaskInput}
+            onChange={(e) => setSubtaskInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask(e)}
+            placeholder="Agregar subtarea..."
+            className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+          />
+          <button
+            type="button"
+            onClick={handleAddSubtask}
+            disabled={!subtaskInput.trim()}
+            className="h-9 px-3 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition hover:opacity-90"
+            style={{ background: '#004ac6' }}
+          >
+            <span className="material-symbols-outlined text-base">add</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex justify-end gap-3 pt-2">

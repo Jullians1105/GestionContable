@@ -24,7 +24,7 @@ function timeAgo(dateStr) {
   }
 }
 
-export default function CommentSection({ task }) {
+export default function CommentSection({ task, readOnly = false }) {
   const { addComment, updateComment, deleteComment } = useTasks()
   const { user } = useAuth()
   const { getMemberById } = useTeam()
@@ -109,25 +109,29 @@ export default function CommentSection({ task }) {
         })}
       </div>
 
-      <form onSubmit={handleAdd} className="flex gap-2 items-end">
-        <Avatar name={user?.name || ''} />
-        <div className="flex-1 flex gap-2">
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Escribe un comentario..."
-            className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
-          />
-          <button
-            type="submit"
-            disabled={!text.trim()}
-            className="h-9 px-3 rounded-lg text-sm font-semibold text-white disabled:opacity-40 hover:opacity-90 transition"
-            style={{ background: '#004ac6' }}
-          >
-            <span className="material-symbols-outlined text-base">send</span>
-          </button>
-        </div>
-      </form>
+      {readOnly ? (
+        <p className="text-xs text-[#888] italic text-center py-2">Solo los miembros del equipo pueden comentar.</p>
+      ) : (
+        <form onSubmit={handleAdd} className="flex gap-2 items-end">
+          <Avatar name={user?.name || ''} />
+          <div className="flex-1 flex gap-2">
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Escribe un comentario..."
+              className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+            />
+            <button
+              type="submit"
+              disabled={!text.trim()}
+              className="h-9 px-3 rounded-lg text-sm font-semibold text-white disabled:opacity-40 hover:opacity-90 transition"
+              style={{ background: '#004ac6' }}
+            >
+              <span className="material-symbols-outlined text-base">send</span>
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   )
 }

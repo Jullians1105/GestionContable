@@ -32,8 +32,13 @@ export const storage = {
   saveGroups: (groups) => set(KEYS.GROUPS, groups),
   getTags: () => get(KEYS.TAGS),
   saveTags: (tags) => set(KEYS.TAGS, tags),
-  getNotifications: () => get(KEYS.NOTIFICATIONS) ?? [],
-  saveNotifications: (notifs) => set(KEYS.NOTIFICATIONS, notifs),
+  getNotifications: (userId) => get(userId ? `notifications_${userId}` : KEYS.NOTIFICATIONS) ?? [],
+  saveNotifications: (notifs, userId) => set(userId ? `notifications_${userId}` : KEYS.NOTIFICATIONS, notifs),
+  pushNotificationToUser: (userId, notif) => {
+    const key = `notifications_${userId}`
+    const existing = get(key) ?? []
+    set(key, [notif, ...existing].slice(0, 50))
+  },
   getSavedFilters: () => get(KEYS.SAVED_FILTERS) ?? [],
   saveSavedFilters: (filters) => set(KEYS.SAVED_FILTERS, filters),
   getTheme: () => localStorage.getItem(KEYS.THEME) ?? 'light',
