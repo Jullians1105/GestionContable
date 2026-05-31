@@ -1,166 +1,138 @@
-# TaskFlow Pro - FASE 2
+# CLAUDE.md
 
-## Descripción del Proyecto
-Aplicación web de gestión de tareas para equipos de hasta 25 personas. Construida con React 18, Vite, Tailwind CSS y localStorage como persistencia. FASE 2 completada: autenticación, grupos, Kanban, Calendario, Reportes, Subtareas, Comentarios, Tags, Notificaciones, Tema oscuro.
-
-## Stack Tecnológico
-- **Frontend:** React 18 + Vite 5
-- **Estilos:** Tailwind CSS 3 (darkMode: 'class')
-- **Routing:** React Router v6
-- **Gráficos:** Recharts 2
-- **Fechas:** date-fns 3
-- **Estado global:** Context API
-- **Persistencia:** localStorage
-- **Drag & Drop:** @dnd-kit/core, @dnd-kit/sortable
-- **Exportación:** jsPDF, xlsx
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Comandos
+
 ```bash
-npm run dev      # Servidor de desarrollo (localhost:5173)
-npm run build    # Build de producción
-npm run preview  # Previsualizar build
+npm run dev      # Servidor de desarrollo en localhost:5173
+npm run build    # Build de producción (verifica errores antes de entregar)
+npm run lint     # ESLint con max-warnings 0 (falla si hay warnings)
+npm run preview  # Previsualizar build de producción
 ```
 
-## Estructura del Proyecto
+No hay tests automatizados. Verificar con `npm run build` que no hay errores antes de dar por terminado cualquier cambio.
+
+## Stack
+
+React 18 + Vite 5 · Tailwind CSS 3 (`darkMode: 'class'`) · React Router v6 · Context API · localStorage · @dnd-kit (Kanban) · Recharts 2 · date-fns 3 · jsPDF + xlsx (exportación)
+
+## Arquitectura
+
+### Jerarquía de providers (App.jsx)
+
+El orden de providers importa — los internos pueden consumir los externos:
+
 ```
-src/
-├── components/
-│   ├── Auth/
-│   │   └── ProtectedRoute.jsx     # Guard de rutas por rol
-│   ├── Comments/
-│   │   └── CommentSection.jsx     # Comentarios en tareas (editar/eliminar)
-│   ├── Groups/
-│   │   ├── GroupForm.jsx          # Modal crear/editar grupo
-│   │   └── GroupSelector.jsx      # Dropdown selector en Header
-│   ├── Notifications/
-│   │   └── NotificationBell.jsx   # Bell icon con panel dropdown
-│   ├── Subtasks/
-│   │   └── SubtaskList.jsx        # Lista de subtareas con barra de progreso
-│   ├── Tags/
-│   │   └── TagSelector.jsx        # Selector de etiquetas con crear nueva
-│   ├── Dashboard.jsx
-│   ├── Header.jsx                 # Búsqueda, GroupSelector, toggle tema, NotificationBell, user menu
-│   ├── Sidebar.jsx                # Nav lateral con todas las rutas (filtradas por rol)
-│   ├── StatsCard.jsx
-│   ├── TaskCard.jsx               # Muestra tags, subtask progress, contador comentarios
-│   ├── TaskFilters.jsx            # Filtros: texto, estado, prioridad, asignado, grupo, tag
-│   ├── TaskForm.jsx               # Formulario tarea con grupo y tags
-│   ├── TaskList.jsx               # Grid paginado con modal confirmación eliminación
-│   ├── TaskModal.jsx              # Modal con tabs: Detalles / Subtareas / Comentarios
-│   ├── TeamForm.jsx
-│   ├── TeamManager.jsx
-│   └── Toast.jsx                  # Toasts flotantes (success/error/warning/info)
-├── context/
-│   ├── AuthContext.jsx            # user, token, login(), logout(), register(), canEdit(), isAdmin()
-│   ├── GroupContext.jsx           # groups, currentGroupId, CRUD grupos, add/removeMember
-│   ├── NotificationContext.jsx    # notifications, unreadCount, addNotification, markAsRead
-│   ├── TagContext.jsx             # tags, createTag, updateTag, deleteTag
-│   ├── TaskContext.jsx            # tasks + CRUD + subtask ops + comment ops
-│   ├── TeamContext.jsx            # members + CRUD
-│   ├── ThemeContext.jsx           # theme ('light'|'dark'), toggleTheme()
-│   └── ToastContext.jsx           # toasts, addToast(message, type), removeToast
-├── hooks/
-│   ├── useTasks.js                # Consume TaskContext
-│   ├── useTeam.js                 # Consume TeamContext
-│   └── useLocalStorage.js
-├── pages/
-│   ├── DashboardPage.jsx          # Ruta /
-│   ├── TasksPage.jsx              # Ruta /tasks (acepta ?search=)
-│   ├── TeamPage.jsx               # Ruta /team
-│   ├── GroupsPage.jsx             # Ruta /groups (admin/leader)
-│   ├── KanbanPage.jsx             # Ruta /kanban — drag-and-drop @dnd-kit
-│   ├── CalendarPage.jsx           # Ruta /calendar — grid mensual + sidebar
-│   ├── ReportsPage.jsx            # Ruta /reports — filtros + tabla + gráfico + export PDF/Excel
-│   ├── NotificationsPage.jsx      # Ruta /notifications
-│   ├── SettingsPage.jsx           # Ruta /settings — perfil, tema, export, reset
-│   ├── LoginPage.jsx              # Ruta pública /login
-│   └── RegisterPage.jsx           # Ruta pública /register
-└── utils/
-    ├── helpers.js                 # generateId, formatDate, isDueDate*, getInitials, LABELS
-    ├── sampleData.js              # 5 miembros + 8 tareas con nuevos campos
-    ├── storage.js                 # Wrapper localStorage — todas las keys de FASE 2
-    └── validators.js              # validateTask(), validateMember()
+ThemeProvider
+  ToastProvider
+    AuthProvider
+      TeamProvider
+        TaskProvider
+          GroupProvider
+            NotificationProvider
+              TagProvider
+                <Routes>
 ```
 
-## Modelos de Datos
+`NotificationContext` depende de `AuthContext` para saber el `userId` actual. `TaskContext` depende de `AuthContext` para el nombre del actor al crear notificaciones.
 
-### Tarea (Task)
+### Layout
+
+`Layout` en App.jsx protege todas las rutas autenticadas. La estructura fija es:
+- `Sidebar` (fixed left, 250px)
+- `Header` (fixed top, 64px — `pt-16` en main)
+- `main` con `ml-[250px] pt-16`
+
+Los modales que se renderizan sobre este layout deben usar `fixed inset-0 z-50` y considerar el offset del header/sidebar al centrarse verticalmente.
+
+### Persistencia y sincronización entre usuarios
+
+Todo vive en localStorage. Múltiples usuarios simulados en la misma pestaña. Patrones clave:
+
+- **Por usuario:** Las notificaciones usan clave `notifications_<userId>` en lugar de la clave global `notifications`.
+- **`storage.pushNotificationToUser(userId, notif)`** escribe directamente en la clave del usuario destino sin que él esté logueado.
+- **Polling cada 3 segundos** en `NotificationContext` y `TaskContext` para detectar cambios escritos por otros "usuarios" en la misma sesión. Sin esto, Ana no ve las tareas que Maria le asignó hasta recargar.
+
 ```js
-{
-  id: string,
-  title: string,
-  description: string,
-  status: 'pending' | 'in_progress' | 'completed',
-  priority: 'high' | 'medium' | 'low',
-  assignedTo: string,
-  dueDate: string,
-  groupId: string,           // id del grupo o null
-  tagIds: string[],          // ids de etiquetas
-  subtasks: [{ id, title, completed, createdAt }],
-  comments: [{ id, authorId, text, mentions, createdAt, updatedAt }],
-  createdAt: string,
-  updatedAt: string,
-}
+// Patrón de polling en contextos (NotificationContext, TaskContext)
+useEffect(() => {
+  const interval = setInterval(() => {
+    const fresh = storage.getNotifications(userId)
+    setNotifications(prev => {
+      if (fresh.length !== prev.length || fresh[0]?.id !== prev[0]?.id) return fresh
+      return prev  // referencia estable si no cambió nada
+    })
+  }, 3000)
+  return () => clearInterval(interval)
+}, [userId])
 ```
 
-### Miembro (TeamMember)
+### Control de roles
+
+`AuthContext` expone:
+- `isAdmin()` → role === 'admin'
+- `isLeader()` → role === 'admin' || 'leader'
+- `canEdit()` → role !== 'viewer'
+
+Reglas de UI vigentes:
+- Botones "Nueva Tarea" y "Editar/Eliminar" en TaskCard/TaskList: solo `isAdmin() || isLeader()`
+- Comentarios: solo `role !== 'viewer'` (members y superiores)
+- Rutas `/groups` y `/reports`: solo `isAdmin() || isLeader()` (filtradas en Sidebar)
+
+### Prevención de duplicados al crear tareas
+
+React StrictMode ejecuta los efectos dos veces en dev. `TaskContext.addTask` usa un `addingRef = useRef(false)` como guard:
+
 ```js
-{
-  id: string,
-  name: string,
-  email: string,
-  password: string,          // plaintext (FASE 3 tendrá hash)
-  role: 'admin' | 'leader' | 'member' | 'viewer',
-  groupIds: string[],
-  preferences: { theme: 'light'|'dark', notifications: boolean },
-  createdAt: string,
-}
+const addTask = useCallback((taskData) => {
+  if (addingRef.current) return null
+  addingRef.current = true
+  // ...
+  setTasks(prev => { addingRef.current = false; return [newTask, ...prev] })
+}, [user])
 ```
 
-### Grupo (Group)
+`TaskModal` llama `addTask`/`updateTask` internamente y luego `onClose()`. **No pasar `onSave` callback desde el padre** — causaría doble inserción.
+
+### Notificaciones al asignar tareas
+
+`TaskContext` tiene `pushAssignNotif(assignedTo, actorName, taskTitle, taskId)` que llama a `storage.pushNotificationToUser` directamente (sin pasar por `NotificationContext`). Se dispara en `addTask` (si `assignedTo !== user.id`) y en `updateTask` (si `assignedTo` cambió).
+
+### TaskDetailModal
+
+Se abre al hacer clic en un `TaskCard`. Usa `getTaskById(task.id)` para siempre renderizar datos vivos del contexto, no los props posiblemente stale. El `onEdit` cierra el detail y abre el `TaskModal` de edición.
+
+## Modelos de datos relevantes
+
 ```js
-{
-  id: string,
-  name: string,
-  description: string,
-  leaderId: string,
-  memberIds: string[],
-  taskIds: string[],
-  color: string,
-  createdAt: string,
-  updatedAt: string,
-}
+// Task
+{ id, title, description, status: 'pending'|'in_progress'|'completed',
+  priority: 'high'|'medium'|'low', assignedTo: userId, dueDate: 'YYYY-MM-DD',
+  groupId, tagIds: [], subtasks: [{id, title, completed, createdAt}],
+  comments: [{id, authorId, text, mentions:[], createdAt, updatedAt}],
+  createdAt, updatedAt }
+
+// TeamMember
+{ id, name, email, password, role: 'admin'|'leader'|'member'|'viewer',
+  groupIds: [], preferences: {theme, notifications}, createdAt }
 ```
 
-## Persistencia localStorage — Keys
-```
-tasks              → tareas
-team_members       → miembros
-groups             → grupos de trabajo
-tags               → etiquetas
-notifications      → notificaciones
-saved_filters      → filtros guardados (pendiente implementar UI)
-theme              → 'light' | 'dark'
-auth_user          → usuario logueado (JSON)
-auth_token         → token de sesión
-```
+IDs generados con `generateId('prefix')` de `utils/helpers.js` (timestamp + random).
 
-## Paleta de Colores
-```
-Primary:           #004ac6
-Primary container: #2563eb
-Success:           #10B981
-Warning:           #FBBF24
-Error/Danger:      #EF4444
-Info:              #F97316
-Background:        #f3f4f6
-Surface:           #ffffff
-On-surface:        #191c1e
-On-surface-variant:#434655
-Outline-variant:   #c3c6d7
-```
+## Paleta de colores (design tokens)
 
-## Usuarios de Prueba (sampleData)
+```
+Primary:    #004ac6    Success: #10B981
+Warning:    #FBBF24    Error:   #EF4444
+Background: #f3f4f6    Surface: #ffffff
+Text:       #191c1e    Muted:   #434655
+Border:     #c3c6d7
+```
+Dark mode usa clases `dark:bg-[#1e2030]`, `dark:text-[#e4e6f0]`, etc. — siempre inline con hex.
+
+## Usuarios de prueba
+
 | Email | Password | Rol |
 |---|---|---|
 | maria@empresa.com | admin123 | admin |
@@ -169,46 +141,12 @@ Outline-variant:   #c3c6d7
 | pedro@empresa.com | member123 | member |
 | laura@empresa.com | viewer123 | viewer |
 
-## Funcionalidades Implementadas
+Si el login falla con credenciales correctas, ejecutar `localStorage.clear()` en la consola del navegador — indica datos stale de una versión anterior sin campo `password`.
 
-### FASE 1 (completada)
-- [x] CRUD tareas y miembros, estados, prioridades, asignación, fechas límite
-- [x] Búsqueda global, filtros combinables, paginación
-- [x] Dashboard con gráficos Recharts, export JSON, reset datos
+## Convenciones
 
-### FASE 2 (completada — commit 650bd28)
-- [x] AuthContext + LoginPage + RegisterPage + ProtectedRoute
-- [x] Control por rol (admin/leader/member/viewer)
-- [x] GroupContext + GroupsPage + GroupForm + GroupSelector en Header
-- [x] TagContext + TagSelector (pills de color en tareas)
-- [x] NotificationContext + NotificationBell + NotificationsPage
-- [x] ThemeContext + modo oscuro (toggle en Header y Settings)
-- [x] ToastContext + Toast flotantes en todas las acciones
-- [x] KanbanPage con drag-and-drop @dnd-kit (3 columnas por estado)
-- [x] CalendarPage con grid mensual, navegación y sidebar del día
-- [x] ReportsPage: 3 tipos de reporte, filtros, gráficos, exportar PDF/Excel
-- [x] SubtaskList con barra de progreso (tab en TaskModal)
-- [x] CommentSection con editar/eliminar propios (tab en TaskModal)
-- [x] TaskModal con tabs: Detalles / Subtareas / Comentarios
-- [x] TaskFilters extendido: grupo y etiqueta
-- [x] TaskCard muestra tags, progreso subtareas, contador comentarios
-- [x] Sidebar con todas las rutas (filtradas por rol)
-
-### Pendiente (FASE 2 restante)
-- [ ] Vistas guardadas de filtros (UI — el storage ya está listo)
-- [ ] Notificaciones automáticas al asignar tarea o comentar
-- [ ] Menciones @usuario en comentarios con autocomplete
-- [ ] Testing responsivo en Kanban y Calendar
-
-## Estado del Proyecto
-- **Fase actual:** FASE 2 completada
-- **Commit FASE 2:** `650bd28`
-- **Próxima fase:** FASE 3 (backend real, API REST, base de datos)
-
-## Convenciones de Código
-- Componentes: PascalCase
-- Hooks y utils: camelCase
-- Sin comentarios en código (nombres de funciones son descriptivos)
-- Tailwind CSS para todos los estilos (tokens inline con hex del design system)
-- No usar `useEffect` para derivar estado (usar `useMemo`)
-- Contextos exportan su propio hook (ej: `useAuth()`, `useGroups()`)
+- Tailwind CSS para todos los estilos, sin CSS modules ni styled-components
+- Colores siempre como hex inline (no clases de Tailwind para colores del design system)
+- Contextos exportan su propio hook: `useAuth()`, `useTasks()`, `useGroups()`, etc.
+- `useEffect` solo para side effects (storage, timers, DOM). Derivar estado con `useMemo` o cálculo inline
+- Sin comentarios en código salvo invariantes no obvios
