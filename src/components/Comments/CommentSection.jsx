@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useTasks } from '../../context/TaskContext'
 import { useAuth } from '../../context/AuthContext'
 import { useTeam } from '../../hooks/useTeam'
@@ -24,7 +24,7 @@ function timeAgo(dateStr) {
   }
 }
 
-export default function CommentSection({ task, readOnly = false }) {
+export default function CommentSection({ task, readOnly = false, scrollToCommentId = null }) {
   const { addComment, updateComment, deleteComment } = useTasks()
   const { user } = useAuth()
   const { getMemberById } = useTeam()
@@ -32,8 +32,21 @@ export default function CommentSection({ task, readOnly = false }) {
   const [text, setText] = useState('')
   const [editId, setEditId] = useState(null)
   const [editText, setEditText] = useState('')
+  const [highlighted, setHighlighted] = useState(scrollToCommentId)
+  const commentRefs = useRef({})
 
   const comments = task.comments || []
+
+  useEffect(() => {
+    if (!scrollToCommentId) return
+    const el = commentRefs.current[scrollToCommentId]
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setHighlighted(scrollToCommentId)
+      const t = setTimeout(() => setHighlighted(null), 2500)
+      return () => clearTimeout(t)
+    }
+  }, [scrollToCommentId, comments.length])
 
   const handleAdd = (e) => {
     e.preventDefault()
@@ -76,7 +89,11 @@ export default function CommentSection({ task, readOnly = false }) {
           const isOwn = c.authorId === user?.id
 
           return (
-            <div key={c.id} className="flex gap-2.5">
+            <div
+              key={c.id}
+              ref={(el) => { commentRefs.current[c.id] = el }}
+              className={`flex gap-2.5 rounded-xl transition-colors duration-700 ${highlighted === c.id ? 'bg-[#dbeafe] dark:bg-[#1e3a5f] px-2 -mx-2' : ''}`}
+            >
               <Avatar name={authorName} />
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-0.5">

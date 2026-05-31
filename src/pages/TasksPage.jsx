@@ -4,6 +4,8 @@ import TaskList from "../components/TaskList"
 export default function TasksPage() {
   const [searchParams] = useSearchParams()
   const search = searchParams.get("search") || ""
+  const openTaskId = searchParams.get("openTask") || null
+  const openCommentId = searchParams.get("comment") || null
 
   return (
     <div>
@@ -11,7 +13,11 @@ export default function TasksPage() {
         <h2 className="text-[24px] font-bold text-[#191c1e]">Mis Tareas</h2>
         <p className="text-[14px] text-[#434655] mt-1">Gestiona y organiza tus entregables activos</p>
       </div>
-      <TaskList initialFilters={search ? { search } : {}} />
+      <TaskList
+        initialFilters={search ? { search } : {}}
+        openTaskId={openTaskId}
+        openCommentId={openCommentId}
+      />
     </div>
   )
 }

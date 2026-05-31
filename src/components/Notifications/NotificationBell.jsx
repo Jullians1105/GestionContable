@@ -5,10 +5,15 @@ import { formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 const TYPE_ICONS = {
-  task_assigned: 'assignment_ind',
-  comment: 'chat',
-  due_soon: 'schedule',
-  overdue: 'warning',
+  task_assigned:    'assignment_ind',
+  task_completed:   'check_circle',
+  task_in_progress: 'pending_actions',
+  task_overdue:     'warning',
+  comment_added:    'chat_bubble',
+  comment:          'chat',
+  subtask_done:     'task_alt',
+  due_soon:         'schedule',
+  overdue:          'warning',
 }
 
 function timeAgo(str) {
@@ -25,7 +30,11 @@ export default function NotificationBell() {
   const handleClick = (n) => {
     markAsRead(n.id)
     setOpen(false)
-    if (n.taskId) navigate('/tasks')
+    if (n.taskId) {
+      const params = new URLSearchParams({ openTask: n.taskId })
+      if (n.extra?.commentId) params.set('comment', n.extra.commentId)
+      navigate(`/tasks?${params}`)
+    }
   }
 
   return (
@@ -36,9 +45,12 @@ export default function NotificationBell() {
       >
         <span className="material-symbols-outlined text-[#434655] dark:text-[#c4c8e8]">notifications</span>
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#EF4444' }}>
-            {unreadCount > 9 ? '9+' : unreadCount}
-          </span>
+          <>
+            <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#EF4444' }}>
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: '#10B981' }} />
+          </>
         )}
       </button>
 
@@ -75,7 +87,12 @@ export default function NotificationBell() {
                       <p className="text-xs text-[#191c1e] dark:text-[#e4e6f0] leading-relaxed">{n.message}</p>
                       <p className="text-[10px] text-[#888] mt-0.5">{timeAgo(n.createdAt)}</p>
                     </div>
-                    {!n.read && <span className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: '#004ac6' }} />}
+                    {!n.read && (
+                      <span className="relative flex-shrink-0 mt-1.5">
+                        <span className="block w-2.5 h-2.5 rounded-full" style={{ background: '#10B981' }} />
+                        <span className="absolute inset-0 rounded-full animate-ping" style={{ background: '#10B98166' }} />
+                      </span>
+                    )}
                   </button>
                 ))
               )}

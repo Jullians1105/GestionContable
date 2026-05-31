@@ -37,7 +37,8 @@ export const storage = {
   pushNotificationToUser: (userId, notif) => {
     const key = `notifications_${userId}`
     const existing = get(key) ?? []
-    set(key, [notif, ...existing].slice(0, 50))
+    const next = [notif, ...existing].slice(0, 50)
+    set(key, next)
   },
   getSavedFilters: () => get(KEYS.SAVED_FILTERS) ?? [],
   saveSavedFilters: (filters) => set(KEYS.SAVED_FILTERS, filters),

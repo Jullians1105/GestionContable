@@ -1,153 +1,178 @@
 import { createContext, useState, useEffect, useCallback, useContext, useRef } from 'react'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
+import { api } from '../services/api'
 import { storage } from '../utils/storage'
 import { generateId, today } from '../utils/helpers'
-import { SAMPLE_TASKS } from '../utils/sampleData'
 import { useAuth } from './AuthContext'
+import { useTeam } from './TeamContext'
 
 export const TaskContext = createContext(null)
 
-function pushAssignNotif(assignedTo, actorName, taskTitle, taskId) {
-  if (!assignedTo) return
-  storage.pushNotificationToUser(assignedTo, {
+function push(userId, type, message, taskId, extra = null) {
+  storage.pushNotificationToUser(userId, {
     id: generateId('notif'),
-    type: 'task_assigned',
-    message: `${actorName} te asignó la tarea "${taskTitle}"`,
+    type,
+    message,
     taskId,
     read: false,
     createdAt: new Date().toISOString(),
+    ...(extra && { extra }),
   })
+}
+
+function notifyLeaders(members, type, message, taskId, excludeId, extra = null) {
+  members
+    .filter(m => (m.role === 'admin' || m.role === 'leader') && m.id !== excludeId)
+    .forEach(m => push(m.id, type, message, taskId, extra))
 }
 
 export function TaskProvider({ children }) {
   const { user } = useAuth()
-  const [tasks, setTasks] = useState(() => {
-    const saved = storage.getTasks()
-    return saved ?? SAMPLE_TASKS
-  })
+  const { members } = useTeam()
+  const [tasks, setTasks] = useState([])
+  const [loading, setLoading] = useState(true)
   const addingRef = useRef(false)
+  const tasksRef = useRef(tasks)
+  const sentOverdueRef = useRef(new Set())
 
-  const savingRef = useRef(false)
-
-  useEffect(() => {
-    savingRef.current = true
-    storage.saveTasks(tasks)
-    savingRef.current = false
-  }, [tasks])
+  useEffect(() => { tasksRef.current = tasks }, [tasks])
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (savingRef.current) return
-      const fresh = storage.getTasks()
-      if (!fresh) return
-      setTasks((prev) => {
-        if (fresh.length !== prev.length || fresh[0]?.updatedAt !== prev[0]?.updatedAt) return fresh
-        return prev
-      })
-    }, 3000)
-    return () => clearInterval(interval)
+    api.getTasks()
+      .then(data => { setTasks(data); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
-  const addTask = useCallback((taskData) => {
+  useEffect(() => {
+    if (!user) return
+    const interval = setInterval(() => {
+      api.getTasks().then(fresh => {
+        setTasks(prev => {
+          if (fresh.length !== prev.length || fresh[0]?.updatedAt !== prev[0]?.updatedAt) return fresh
+          return prev
+        })
+        const todayStr = today()
+        fresh.forEach(task => {
+          if (
+            task.assignedTo === user.id &&
+            task.status !== 'completed' &&
+            task.dueDate &&
+            task.dueDate < todayStr &&
+            !sentOverdueRef.current.has(task.id)
+          ) {
+            sentOverdueRef.current.add(task.id)
+            push(user.id, 'task_overdue', `La tarea "${task.title}" está vencida`, task.id)
+          }
+        })
+      }).catch(() => {})
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [user])
+
+  const addTask = useCallback(async (taskData) => {
     if (addingRef.current) return null
     addingRef.current = true
-    const newTask = {
+    const payload = {
       groupId: null,
       tagIds: [],
       subtasks: [],
       comments: [],
       ...taskData,
-      id: generateId('task'),
       createdAt: today(),
       updatedAt: today(),
     }
-    setTasks((prev) => {
+    try {
+      const newTask = await api.createTask(payload)
+      setTasks(prev => { addingRef.current = false; return [newTask, ...prev] })
+      if (newTask.assignedTo && newTask.assignedTo !== user?.id) {
+        push(newTask.assignedTo, 'task_assigned',
+          `${user?.name ?? 'Alguien'} te asignó la tarea "${newTask.title}"`, newTask.id)
+      }
+      return newTask
+    } catch (e) {
       addingRef.current = false
-      return [newTask, ...prev]
-    })
-    if (newTask.assignedTo && newTask.assignedTo !== user?.id) {
-      pushAssignNotif(newTask.assignedTo, user?.name ?? 'Alguien', newTask.title, newTask.id)
+      throw e
     }
-    return newTask
   }, [user])
 
-  const updateTask = useCallback((id, updates, prevAssignedTo) => {
-    setTasks((prev) => {
-      const current = prev.find((t) => t.id === id)
-      if (
-        updates.assignedTo &&
-        updates.assignedTo !== current?.assignedTo &&
-        updates.assignedTo !== user?.id
-      ) {
-        pushAssignNotif(updates.assignedTo, user?.name ?? 'Alguien', current?.title ?? '', id)
+  const updateTask = useCallback((id, updates) => {
+    const current = tasksRef.current.find(t => t.id === id)
+    if (!current) return
+
+    if (updates.assignedTo && updates.assignedTo !== current.assignedTo && updates.assignedTo !== user?.id) {
+      push(updates.assignedTo, 'task_assigned',
+        `${user?.name ?? 'Alguien'} te asignó la tarea "${current.title}"`, id)
+    }
+
+    if (updates.status === 'completed' && current.status !== 'completed') {
+      const cuando = format(new Date(), "dd/MM/yyyy 'a las' HH:mm", { locale: es })
+      notifyLeaders(members, 'task_completed',
+        `${user?.name ?? 'Alguien'} completó "${current.title}" — ${cuando}`, id, user?.id)
+      if (current.assignedTo && current.assignedTo !== user?.id) {
+        push(current.assignedTo, 'task_completed',
+          `"${current.title}" fue marcada como completada el ${cuando}`, id)
       }
-      return prev.map((t) => (t.id === id ? { ...t, ...updates, updatedAt: today() } : t))
-    })
-  }, [user])
+    }
+
+    if (updates.status === 'in_progress' && current.status !== 'in_progress') {
+      notifyLeaders(members, 'task_in_progress',
+        `"${current.title}" está ahora en progreso`, id, user?.id)
+    }
+
+    const updated = { ...current, ...updates, updatedAt: today() }
+    setTasks(prev => prev.map(t => t.id === id ? updated : t))
+    api.updateTask(id, updated).catch(() => {})
+  }, [user, members])
 
   const deleteTask = useCallback((id) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id))
+    setTasks(prev => prev.filter(t => t.id !== id))
+    api.deleteTask(id).catch(() => {})
   }, [])
 
-  const getTaskById = useCallback((id) => tasks.find((t) => t.id === id), [tasks])
-
-  const getTasksByMember = useCallback(
-    (memberId) => tasks.filter((t) => t.assignedTo === memberId),
-    [tasks]
-  )
-
-  const getTasksByGroup = useCallback(
-    (groupId) => tasks.filter((t) => t.groupId === groupId),
-    [tasks]
-  )
+  const getTaskById = useCallback((id) => tasksRef.current.find(t => t.id === id), [])
+  const getTasksByMember = useCallback((memberId) => tasksRef.current.filter(t => t.assignedTo === memberId), [])
+  const getTasksByGroup = useCallback((groupId) => tasksRef.current.filter(t => t.groupId === groupId), [])
 
   const addSubtask = useCallback((taskId, title) => {
-    const subtask = {
-      id: generateId('subtask'),
-      title,
-      completed: false,
-      createdAt: today(),
-    }
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? { ...t, subtasks: [...(t.subtasks || []), subtask], updatedAt: today() }
-          : t
-      )
-    )
+    const task = tasksRef.current.find(t => t.id === taskId)
+    if (!task) return null
+    const subtask = { id: generateId('subtask'), title, completed: false, createdAt: today() }
+    const updated = { ...task, subtasks: [...(task.subtasks || []), subtask], updatedAt: today() }
+    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
+    api.updateTask(taskId, updated).catch(() => {})
     return subtask
   }, [])
 
   const toggleSubtask = useCallback((taskId, subtaskId) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              subtasks: (t.subtasks || []).map((s) =>
-                s.id === subtaskId ? { ...s, completed: !s.completed } : s
-              ),
-              updatedAt: today(),
-            }
-          : t
-      )
-    )
-  }, [])
+    const task = tasksRef.current.find(t => t.id === taskId)
+    if (!task) return
+    const subtask = (task.subtasks || []).find(s => s.id === subtaskId)
+    const completing = subtask && !subtask.completed
+    const updated = {
+      ...task,
+      subtasks: (task.subtasks || []).map(s => s.id === subtaskId ? { ...s, completed: !s.completed } : s),
+      updatedAt: today(),
+    }
+    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
+    api.updateTask(taskId, updated).catch(() => {})
+    if (completing) {
+      notifyLeaders(members, 'subtask_done',
+        `Subtarea completada en "${task.title}": ${subtask.title}`, taskId, user?.id)
+    }
+  }, [members, user])
 
   const deleteSubtask = useCallback((taskId, subtaskId) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              subtasks: (t.subtasks || []).filter((s) => s.id !== subtaskId),
-              updatedAt: today(),
-            }
-          : t
-      )
-    )
+    const task = tasksRef.current.find(t => t.id === taskId)
+    if (!task) return
+    const updated = { ...task, subtasks: (task.subtasks || []).filter(s => s.id !== subtaskId), updatedAt: today() }
+    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
+    api.updateTask(taskId, updated).catch(() => {})
   }, [])
 
   const addComment = useCallback((taskId, authorId, text) => {
+    const task = tasksRef.current.find(t => t.id === taskId)
+    if (!task) return null
     const comment = {
       id: generateId('comment'),
       authorId,
@@ -156,64 +181,61 @@ export function TaskProvider({ children }) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? { ...t, comments: [...(t.comments || []), comment], updatedAt: today() }
-          : t
-      )
-    )
+    const updated = { ...task, comments: [...(task.comments || []), comment], updatedAt: today() }
+    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
+    api.updateTask(taskId, updated).catch(() => {})
+
+    const extra = { commentId: comment.id }
+    notifyLeaders(members, 'comment_added',
+      `${user?.name ?? 'Alguien'} comentó en "${task.title}"`, taskId, authorId, extra)
+
+    if (task.assignedTo && task.assignedTo !== authorId) {
+      push(task.assignedTo, 'comment_added',
+        `${user?.name ?? 'Alguien'} comentó en tu tarea "${task.title}"`, taskId, extra)
+    }
+
     return comment
-  }, [])
+  }, [members, user])
 
   const updateComment = useCallback((taskId, commentId, text) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              comments: (t.comments || []).map((c) =>
-                c.id === commentId ? { ...c, text, updatedAt: new Date().toISOString() } : c
-              ),
-              updatedAt: today(),
-            }
-          : t
-      )
-    )
+    const task = tasksRef.current.find(t => t.id === taskId)
+    if (!task) return
+    const updated = {
+      ...task,
+      comments: (task.comments || []).map(c =>
+        c.id === commentId ? { ...c, text, updatedAt: new Date().toISOString() } : c
+      ),
+      updatedAt: today(),
+    }
+    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
+    api.updateTask(taskId, updated).catch(() => {})
   }, [])
 
   const deleteComment = useCallback((taskId, commentId) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              comments: (t.comments || []).filter((c) => c.id !== commentId),
-              updatedAt: today(),
-            }
-          : t
-      )
-    )
+    const task = tasksRef.current.find(t => t.id === taskId)
+    if (!task) return
+    const updated = { ...task, comments: (task.comments || []).filter(c => c.id !== commentId), updatedAt: today() }
+    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
+    api.updateTask(taskId, updated).catch(() => {})
   }, [])
 
   return (
-    <TaskContext.Provider
-      value={{
-        tasks,
-        addTask,
-        updateTask,
-        deleteTask,
-        getTaskById,
-        getTasksByMember,
-        getTasksByGroup,
-        addSubtask,
-        toggleSubtask,
-        deleteSubtask,
-        addComment,
-        updateComment,
-        deleteComment,
-      }}
-    >
+    <TaskContext.Provider value={{
+      tasks,
+      loading,
+      addTask,
+      updateTask,
+      deleteTask,
+      getTaskById,
+      getTasksByMember,
+      getTasksByGroup,
+      addSubtask,
+      toggleSubtask,
+      deleteSubtask,
+      addComment,
+      updateComment,
+      deleteComment,
+    }}>
       {children}
     </TaskContext.Provider>
   )

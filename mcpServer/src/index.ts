@@ -3,11 +3,11 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema, Tool } from '@modelcontextprotocol/sdk/types.js';
 import * as tools from './tools';
 import { CreateTaskSchema, UpdateTaskSchema, FilterTasksSchema } from './schemas';
-import { closePool } from './database';
+import { closeDb } from './database';
 
 const server = new Server(
     {
-    name: 'gestor-tareas-postgresql',
+    name: 'gestor-tareas-sqlite',
     version: '1.0.0',
     },
     {
@@ -180,8 +180,8 @@ async function main() {
     console.error('Gestor de Tareas MCP Server running...');
 }
 
-process.on('SIGINT', async () => {
-    await closePool();
+process.on('SIGINT', () => {
+    closeDb();
     process.exit(0);
 });
 

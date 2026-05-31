@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import TaskCard from './TaskCard'
 import TaskModal from './TaskModal'
 import TaskDetailModal from './TaskDetailModal'
@@ -11,7 +11,7 @@ import { useAuth } from '../context/AuthContext'
 const PAGE_SIZE = 9
 const EMPTY_FILTERS = { search: '', status: '', priority: '', assignedTo: '', groupId: '', tagId: '' }
 
-export default function TaskList({ initialFilters = {} }) {
+export default function TaskList({ initialFilters = {}, openTaskId = null, openCommentId = null }) {
   const { tasks, updateTask, deleteTask } = useTasks()
   const { currentGroupId } = useGroups()
   const { addToast } = useToast()
@@ -20,8 +20,18 @@ export default function TaskList({ initialFilters = {} }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [detailTask, setDetailTask] = useState(null)
+  const [detailCommentId, setDetailCommentId] = useState(null)
   const [page, setPage] = useState(1)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+
+  useEffect(() => {
+    if (!openTaskId || tasks.length === 0) return
+    const task = tasks.find(t => t.id === openTaskId)
+    if (task) {
+      setDetailTask(task)
+      setDetailCommentId(openCommentId)
+    }
+  }, [openTaskId, openCommentId, tasks])
 
   const filtered = tasks.filter((t) => {
     if (currentGroupId && t.groupId !== currentGroupId) return false
@@ -79,7 +89,7 @@ export default function TaskList({ initialFilters = {} }) {
       {paginated.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {paginated.map((task) => (
-            <TaskCard key={task.id} task={task} onEdit={openEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} onView={(t) => setDetailTask(t)} />
+            <TaskCard key={task.id} task={task} onEdit={openEdit} onDelete={handleDelete} onStatusChange={handleStatusChange} onView={(t) => { setDetailTask(t); setDetailCommentId(null) }} />
           ))}
         </div>
       ) : (
@@ -111,8 +121,9 @@ export default function TaskList({ initialFilters = {} }) {
       {detailTask && (
         <TaskDetailModal
           task={detailTask}
-          onClose={() => setDetailTask(null)}
-          onEdit={(t) => { setDetailTask(null); openEdit(t) }}
+          scrollToCommentId={detailCommentId}
+          onClose={() => { setDetailTask(null); setDetailCommentId(null) }}
+          onEdit={(t) => { setDetailTask(null); setDetailCommentId(null); openEdit(t) }}
         />
       )}
 

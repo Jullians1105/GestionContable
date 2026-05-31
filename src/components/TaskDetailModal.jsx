@@ -16,7 +16,7 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'Completada' },
 ]
 
-export default function TaskDetailModal({ task, onClose, onEdit }) {
+export default function TaskDetailModal({ task, onClose, onEdit, scrollToCommentId = null }) {
   const { getTaskById, updateTask } = useTasks()
   const { user, isAdmin, isLeader } = useAuth()
   const { getMemberById } = useTeam()
@@ -156,7 +156,7 @@ export default function TaskDetailModal({ task, onClose, onEdit }) {
 
           {/* Comentarios */}
           <div className="border-t border-[#edeef0] dark:border-[#2e3148] pt-4">
-            <CommentSection task={liveTask} readOnly={!canComment} />
+            <CommentSection task={liveTask} readOnly={!canComment} scrollToCommentId={scrollToCommentId} />
           </div>
         </div>
       </div>
