@@ -7,7 +7,7 @@ import { getInitials, getAvatarColor, ROLE_LABELS } from '../utils/helpers'
 import NotificationBell from './Notifications/NotificationBell'
 import GroupSelector from './Groups/GroupSelector'
 
-export default function Header() {
+export default function Header({ onMenuToggle }) {
   const [search, setSearch] = useState('')
   const { tasks } = useTasks()
   const { user, logout } = useAuth()
@@ -26,7 +26,13 @@ export default function Header() {
   const avatarBg = user ? getAvatarColor(user.name) : 'bg-[#004ac6]'
 
   return (
-    <header className="fixed top-0 right-0 left-[250px] h-16 z-40 bg-white dark:bg-[#1e2030] border-b border-[#c3c6d7] dark:border-[#2e3148] shadow-sm flex items-center justify-between px-6 gap-4">
+    <header className="fixed top-0 right-0 left-0 lg:left-[250px] h-16 z-40 bg-white dark:bg-[#1e2030] border-b border-[#c3c6d7] dark:border-[#2e3148] shadow-sm flex items-center justify-between px-4 gap-3">
+      <button
+        onClick={onMenuToggle}
+        className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-[#434655] dark:text-[#c4c8e8] flex-shrink-0"
+      >
+        <span className="material-symbols-outlined text-xl">menu</span>
+      </button>
       <form onSubmit={handleSearch} className="flex-1 max-w-md">
         <div className="relative focus-within:ring-2 focus-within:ring-[#004ac6] rounded-lg transition-all">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655]" style={{ fontSize: 18 }}>search</span>
@@ -41,9 +47,9 @@ export default function Header() {
       </form>
 
       <div className="flex items-center gap-2">
-        <GroupSelector />
+        <span className="hidden sm:block"><GroupSelector /></span>
 
-        <span className="hidden sm:block text-xs font-semibold px-3 py-1 bg-[#edeef0] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] rounded-full">
+        <span className="hidden lg:block text-xs font-semibold px-3 py-1 bg-[#edeef0] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] rounded-full">
           {tasks.length} tareas
         </span>
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { TaskProvider } from './context/TaskContext'
 import { TeamProvider } from './context/TeamContext'
@@ -26,14 +27,18 @@ import './App.css'
 
 function Layout() {
   const { isAuthenticated } = useAuth()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
   return (
     <div className="min-h-screen bg-[#f3f4f6] dark:bg-[#0f1117] text-[#191c1e] dark:text-[#e4e6f0]">
-      <Sidebar />
-      <Header />
-      <main className="ml-[250px] pt-16 min-h-screen">
-        <div className="p-6">
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Header onMenuToggle={() => setSidebarOpen(v => !v)} />
+      <main className="lg:ml-[250px] pt-16 min-h-screen">
+        <div className="p-4 sm:p-6">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/tasks" element={<TasksPage />} />

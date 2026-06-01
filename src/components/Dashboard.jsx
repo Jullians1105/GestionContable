@@ -67,7 +67,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card lg:col-span-1">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-[18px] font-bold text-[#191c1e]">Distribucion por Estado</h2>
+            <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">Distribucion por Estado</h2>
             <span className="material-symbols-outlined text-[#434655]" style={{ fontSize: 20 }}>more_vert</span>
           </div>
           {pieData.length > 0 ? (
@@ -102,7 +102,7 @@ export default function Dashboard() {
 
         <div className="card lg:col-span-2">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-[18px] font-bold text-[#191c1e]">Tareas por Prioridad</h2>
+            <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">Tareas por Prioridad</h2>
             <span className="material-symbols-outlined text-[#434655]" style={{ fontSize: 20 }}>filter_list</span>
           </div>
           <ResponsiveContainer width="100%" height={220}>
@@ -123,7 +123,7 @@ export default function Dashboard() {
 
       <div className="card">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-[18px] font-bold text-[#191c1e]">Proximas a Vencer</h2>
+          <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">Proximas a Vencer</h2>
           <Link to="/tasks" className="text-[12px] font-semibold text-[#004ac6] hover:text-[#2563eb] flex items-center gap-1 transition-colors">
             Ver todas
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>

@@ -57,7 +57,7 @@ export default function SettingsPage() {
         <div className={cardCls}>
           <h3 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-4">Mi Perfil</h3>
           <form onSubmit={handleSaveProfile} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-[#434655] mb-1.5">Nombre</label>
                 <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} />

@@ -41,7 +41,17 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
     if (!scrollToCommentId) return
     const el = commentRefs.current[scrollToCommentId]
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // Scroll within the modal body only — stop before reaching any fixed container
+      let scrollable = el.parentElement
+      while (scrollable) {
+        if (window.getComputedStyle(scrollable).position === 'fixed') { scrollable = null; break }
+        if (scrollable.scrollHeight > scrollable.clientHeight) break
+        scrollable = scrollable.parentElement
+      }
+      if (scrollable) {
+        const top = el.offsetTop - scrollable.offsetTop - scrollable.clientHeight / 2 + el.clientHeight / 2
+        scrollable.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+      }
       setHighlighted(scrollToCommentId)
       const t = setTimeout(() => setHighlighted(null), 2500)
       return () => clearTimeout(t)

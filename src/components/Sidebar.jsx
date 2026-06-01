@@ -15,7 +15,7 @@ const navItems = [
   { to: '/settings', label: 'Configuración', icon: 'settings' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ open, onClose }) {
   const { isAdmin, isLeader, canEdit } = useAuth()
   const [showModal, setShowModal] = useState(false)
 
@@ -27,15 +27,20 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="fixed left-0 top-0 h-full w-[250px] z-50 bg-white dark:bg-[#1e2030] border-r border-[#c3c6d7] dark:border-[#2e3148] flex flex-col p-4 gap-1">
-        <div className="flex items-center gap-3 px-2 py-4 mb-2">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: '#004ac6' }}>
-            <span className="material-symbols-outlined text-xl">task_alt</span>
+      <aside className={`fixed left-0 top-0 h-full w-[250px] z-50 bg-white dark:bg-[#1e2030] border-r border-[#c3c6d7] dark:border-[#2e3148] flex flex-col p-4 gap-1 transition-transform duration-300 ease-in-out ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <div className="flex items-center justify-between px-2 py-4 mb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: '#004ac6' }}>
+              <span className="material-symbols-outlined text-xl">task_alt</span>
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">TaskFlow Pro</h1>
+              <p className="text-xs text-[#434655] dark:text-[#c4c8e8]">Fase 2</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">TaskFlow Pro</h1>
-            <p className="text-xs text-[#434655] dark:text-[#c4c8e8]">Fase 2</p>
-          </div>
+          <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] transition">
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
         </div>
 
         <nav className="flex-1 flex flex-col gap-0.5 overflow-y-auto">
@@ -44,6 +49,7 @@ export default function Sidebar() {
               key={to}
               to={to}
               end={end}
+              onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
                   isActive
