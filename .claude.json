@@ -2,7 +2,7 @@
 "mcpServers": {
     "gestor-tareas": {
     "command": "node",
-    "args": ["C:\\Users\\default.LAPTOP-UECHLOAU\\Documents\\Proyectos\\Personales\\GestionTareasOficina\\GestionTareasOficina\\mcpServer\\dist\\index.js"]
+    "args": ["./mcpServer/dist/index.js"]
     }
     }
 }
