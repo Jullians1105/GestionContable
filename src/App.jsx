@@ -8,7 +8,7 @@ import { NotificationProvider } from './context/NotificationContext'
 import { TagProvider } from './context/TagContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ToastProvider } from './context/ToastContext'
-import ProtectedRoute from './components/Auth/ProtectedRoute'
+import { SocketProvider } from './context/SocketContext'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
 import Toast from './components/Toast'
@@ -63,21 +63,23 @@ export default function App() {
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
-            <TeamProvider>
-              <TaskProvider>
-                <GroupProvider>
-                  <NotificationProvider>
-                    <TagProvider>
-                      <Routes>
-                        <Route path="/login" element={<LoginPage />} />
-                        <Route path="/register" element={<RegisterPage />} />
-                        <Route path="/*" element={<Layout />} />
-                      </Routes>
-                    </TagProvider>
-                  </NotificationProvider>
-                </GroupProvider>
-              </TaskProvider>
-            </TeamProvider>
+            <SocketProvider>
+              <TeamProvider>
+                <TaskProvider>
+                  <GroupProvider>
+                    <NotificationProvider>
+                      <TagProvider>
+                        <Routes>
+                          <Route path="/login" element={<LoginPage />} />
+                          <Route path="/register" element={<RegisterPage />} />
+                          <Route path="/*" element={<Layout />} />
+                        </Routes>
+                      </TagProvider>
+                    </NotificationProvider>
+                  </GroupProvider>
+                </TaskProvider>
+              </TeamProvider>
+            </SocketProvider>
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>

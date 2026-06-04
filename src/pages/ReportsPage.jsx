@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useTasks } from '../context/TaskContext'
 import { useTeam } from '../hooks/useTeam'
 import { useGroups } from '../context/GroupContext'
@@ -31,7 +31,7 @@ export default function ReportsPage() {
   })
   const [generated, setGenerated] = useState(false)
 
-  const applyFilters = (taskList) => {
+  const applyFilters = useCallback((taskList) => {
     return taskList.filter((t) => {
       if (filters.groupId && t.groupId !== filters.groupId) return false
       if (filters.memberId && t.assignedTo !== filters.memberId) return false
@@ -39,7 +39,7 @@ export default function ReportsPage() {
       if (filters.dateTo && t.dueDate && isAfter(parseISO(t.dueDate), parseISO(filters.dateTo))) return false
       return true
     })
-  }
+  }, [filters])
 
   const reportData = useMemo(() => {
     if (!generated) return null
@@ -74,12 +74,12 @@ export default function ReportsPage() {
       ]
     }
     return null
-  }, [generated, tasks, members, filters])
+  }, [generated, tasks, members, filters, applyFilters])
 
   const totalCompleted = useMemo(() => {
     if (!generated) return 0
     return applyFilters(tasks).filter((t) => t.status === 'completed').length
-  }, [generated, tasks, filters])
+  }, [generated, tasks, applyFilters])
 
   const handleExportPDF = () => {
     const doc = new jsPDF()

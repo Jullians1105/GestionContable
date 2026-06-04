@@ -5,7 +5,7 @@ import CommentSection from './Comments/CommentSection'
 import { useTasks } from '../context/TaskContext'
 import { useToast } from '../context/ToastContext'
 
-export default function TaskModal({ isOpen, task, onSubmit, onClose, onSave }) {
+export default function TaskModal({ isOpen, task, onClose }) {
   const { addTask, updateTask, getTaskById } = useTasks()
   const { addToast } = useToast()
   const [activeTab, setActiveTab] = useState('form')

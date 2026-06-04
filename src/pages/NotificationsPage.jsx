@@ -53,7 +53,7 @@ export default function NotificationsPage() {
             <p className="text-sm text-[#888] mt-1">Aquí aparecerán las notificaciones de tus tareas</p>
           </div>
         ) : (
-          notifications.map((n, i) => {
+          notifications.map((n) => {
             const meta = TYPE_ICONS[n.type] || { icon: 'notifications', color: '#004ac6' }
             return (
               <div

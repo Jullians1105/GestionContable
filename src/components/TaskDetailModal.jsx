@@ -24,6 +24,13 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
   const { addToast } = useToast()
 
   const liveTask = getTaskById(task?.id) ?? task
+
+  useEffect(() => {
+    if (!liveTask) return
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [liveTask])
+
   if (!liveTask) return null
 
   const member = liveTask.assignedTo ? getMemberById(liveTask.assignedTo) : null
@@ -32,11 +39,6 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
   const soon = isDueDateSoon(liveTask.dueDate) && liveTask.status !== 'completed'
   const canEdit = isAdmin() || isLeader()
   const canComment = user?.role !== 'viewer'
-
-  useEffect(() => {
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = '' }
-  }, [])
 
   const handleStatusChange = (e) => {
     updateTask(liveTask.id, { status: e.target.value })

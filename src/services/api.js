@@ -1,27 +1,128 @@
 const BASE = '/api';
 
-async function request(path, options = {}) {
-  const res = await fetch(`${BASE}${path}`, {
+let _refreshPromise = null;
+
+function getToken() {
+  return localStorage.getItem('auth_token');
+}
+
+function getRefreshToken() {
+  return localStorage.getItem('auth_refresh_token');
+}
+
+function setTokens(token, refreshToken) {
+  localStorage.setItem('auth_token', token);
+  if (refreshToken) localStorage.setItem('auth_refresh_token', refreshToken);
+}
+
+function clearTokens() {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_refresh_token');
+  localStorage.removeItem('auth_user');
+}
+
+async function refreshAccessToken() {
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = fetch(`${BASE}/auth/refresh`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
+    body: JSON.stringify({ refreshToken: getRefreshToken() }),
+  }).then(async (res) => {
+    if (!res.ok) { clearTokens(); window.location.href = '/login'; throw new Error('Session expired'); }
+    const data = await res.json();
+    setTokens(data.token, data.refreshToken);
+    return data.token;
+  }).finally(() => { _refreshPromise = null; });
+  return _refreshPromise;
+}
+
+async function request(path, options = {}, retry = true) {
+  const token = getToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
+  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+
+  if (res.status === 401 && retry && getRefreshToken()) {
+    try {
+      await refreshAccessToken();
+      return request(path, options, false);
+    } catch {
+      throw new Error('Sesión expirada');
+    }
+  }
+
   if (!res.ok) {
-    const msg = await res.text().catch(() => res.statusText);
-    throw new Error(msg);
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error || `Error ${res.status}`);
   }
   return res.json();
 }
 
 export const api = {
+  // Auth
+  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  login: async (email, password) => {
+    const data = await request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    setTokens(data.token, data.refreshToken);
+    return data;
+  },
+  logout: async (refreshToken) => {
+    try {
+      await request('/auth/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) });
+    } finally {
+      clearTokens();
+    }
+  },
+  me: () => request('/auth/me'),
+
+  // Tasks
   getTasks: (filters = {}) => {
     const params = new URLSearchParams(
-      Object.fromEntries(Object.entries(filters).filter(([, v]) => v != null))
+      Object.fromEntries(Object.entries(filters).filter(([, v]) => v != null && v !== ''))
     ).toString();
     return request(`/tasks${params ? `?${params}` : ''}`);
   },
+  getTask: (id) => request(`/tasks/${id}`),
   createTask: (data) => request('/tasks', { method: 'POST', body: JSON.stringify(data) }),
   updateTask: (id, data) => request(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
+  searchTasks: (q, limit = 20) => request(`/tasks/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+  getTaskHistory: (id) => request(`/tasks/${id}/history`),
+
+  // Employees
   getEmployees: () => request('/employees'),
+  createEmployee: (data) => request('/employees', { method: 'POST', body: JSON.stringify(data) }),
+  updateEmployee: (id, data) => request(`/employees/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteEmployee: (id) => request(`/employees/${id}`, { method: 'DELETE' }),
+
+  // Groups
+  getGroups: () => request('/groups'),
+  createGroup: (data) => request('/groups', { method: 'POST', body: JSON.stringify(data) }),
+  updateGroup: (id, data) => request(`/groups/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteGroup: (id) => request(`/groups/${id}`, { method: 'DELETE' }),
+  addGroupMember: (groupId, userId) => request(`/groups/${groupId}/members`, { method: 'POST', body: JSON.stringify({ userId }) }),
+  removeGroupMember: (groupId, userId) => request(`/groups/${groupId}/members/${userId}`, { method: 'DELETE' }),
+
+  // Tags
+  getTags: () => request('/tags'),
+  createTag: (data) => request('/tags', { method: 'POST', body: JSON.stringify(data) }),
+  updateTag: (id, data) => request(`/tags/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteTag: (id) => request(`/tags/${id}`, { method: 'DELETE' }),
+
+  // Stats
   getStats: () => request('/stats'),
+  getAuditLog: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/audit${qs ? `?${qs}` : ''}`);
+  },
+
+  // Notifications
+  getNotifications: () => request('/notifications'),
+  markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: 'PUT' }),
+  markAllNotificationsRead: () => request('/notifications/read-all', { method: 'PUT' }),
+  deleteNotification: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
 };

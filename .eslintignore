@@ -1,0 +1,4 @@
+backend/
+mcpServer/
+dist/
+node_modules/

@@ -6,15 +6,14 @@ import { storage } from '../utils/storage'
 import { generateId, today } from '../utils/helpers'
 import { useAuth } from './AuthContext'
 import { useTeam } from './TeamContext'
+import { useSocket } from './SocketContext'
 
 export const TaskContext = createContext(null)
 
 function push(userId, type, message, taskId, extra = null) {
   storage.pushNotificationToUser(userId, {
     id: generateId('notif'),
-    type,
-    message,
-    taskId,
+    type, message, taskId,
     read: false,
     createdAt: new Date().toISOString(),
     ...(extra && { extra }),
@@ -28,26 +27,55 @@ function notifyLeaders(members, type, message, taskId, excludeId, extra = null) 
 }
 
 export function TaskProvider({ children }) {
-  const { user } = useAuth()
+  const { user, useRealBackend } = useAuth()
   const { members } = useTeam()
+  const socket = useSocket()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const addingRef = useRef(false)
   const tasksRef = useRef(tasks)
   const sentOverdueRef = useRef(new Set())
+  const pollingRef = useRef(null)
 
   useEffect(() => { tasksRef.current = tasks }, [tasks])
 
+  // Carga inicial
   useEffect(() => {
     api.getTasks()
-      .then(data => { setTasks(data); setLoading(false) })
+      .then(data => {
+        const tasks = Array.isArray(data) ? data : (data.tasks || [])
+        setTasks(tasks)
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [])
 
+  // Suscripción a eventos Socket.io (reemplaza polling cuando backend real está disponible)
   useEffect(() => {
-    if (!user) return
+    if (!socket) return
+
+    const onTaskCreated = (task) => setTasks(prev => [task, ...prev.filter(t => t.id !== task.id)])
+    const onTaskUpdated = (task) => setTasks(prev => prev.map(t => t.id === task.id ? task : t))
+    const onTaskDeleted = ({ id }) => setTasks(prev => prev.filter(t => t.id !== id))
+
+    socket.on('task:created', onTaskCreated)
+    socket.on('task:updated', onTaskUpdated)
+    socket.on('task:deleted', onTaskDeleted)
+
+    return () => {
+      socket.off('task:created', onTaskCreated)
+      socket.off('task:updated', onTaskUpdated)
+      socket.off('task:deleted', onTaskDeleted)
+    }
+  }, [socket])
+
+  // Polling fallback (solo cuando no hay socket activo)
+  useEffect(() => {
+    if (!user || socket?.connected) return
+
     const interval = setInterval(() => {
-      api.getTasks().then(fresh => {
+      api.getTasks().then(data => {
+        const fresh = Array.isArray(data) ? data : (data.tasks || [])
         setTasks(prev => {
           if (fresh.length !== prev.length || fresh[0]?.updatedAt !== prev[0]?.updatedAt) return fresh
           return prev
@@ -57,8 +85,7 @@ export function TaskProvider({ children }) {
           if (
             task.assignedTo === user.id &&
             task.status !== 'completed' &&
-            task.dueDate &&
-            task.dueDate < todayStr &&
+            task.dueDate && task.dueDate < todayStr &&
             !sentOverdueRef.current.has(task.id)
           ) {
             sentOverdueRef.current.add(task.id)
@@ -67,25 +94,23 @@ export function TaskProvider({ children }) {
         })
       }).catch(() => {})
     }, 3000)
+
+    pollingRef.current = interval
     return () => clearInterval(interval)
-  }, [user])
+  }, [user, socket])
 
   const addTask = useCallback(async (taskData) => {
     if (addingRef.current) return null
     addingRef.current = true
-    const payload = {
-      groupId: null,
-      tagIds: [],
-      subtasks: [],
-      comments: [],
-      ...taskData,
-      createdAt: today(),
-      updatedAt: today(),
-    }
+    const payload = { groupId: null, tagIds: [], subtasks: [], comments: [], ...taskData, createdAt: today(), updatedAt: today() }
     try {
       const newTask = await api.createTask(payload)
-      setTasks(prev => { addingRef.current = false; return [newTask, ...prev] })
-      if (newTask.assignedTo && newTask.assignedTo !== user?.id) {
+      // Actualización local solo cuando NO hay socket (el socket emitirá task:created)
+      if (!socket?.connected) {
+        setTasks(prev => [newTask, ...prev])
+      }
+      addingRef.current = false
+      if (!useRealBackend && newTask.assignedTo && newTask.assignedTo !== user?.id) {
         push(newTask.assignedTo, 'task_assigned',
           `${user?.name ?? 'Alguien'} te asignó la tarea "${newTask.title}"`, newTask.id)
       }
@@ -94,36 +119,35 @@ export function TaskProvider({ children }) {
       addingRef.current = false
       throw e
     }
-  }, [user])
+  }, [user, socket, useRealBackend])
 
   const updateTask = useCallback((id, updates) => {
     const current = tasksRef.current.find(t => t.id === id)
     if (!current) return
 
-    if (updates.assignedTo && updates.assignedTo !== current.assignedTo && updates.assignedTo !== user?.id) {
-      push(updates.assignedTo, 'task_assigned',
-        `${user?.name ?? 'Alguien'} te asignó la tarea "${current.title}"`, id)
-    }
-
-    if (updates.status === 'completed' && current.status !== 'completed') {
-      const cuando = format(new Date(), "dd/MM/yyyy 'a las' HH:mm", { locale: es })
-      notifyLeaders(members, 'task_completed',
-        `${user?.name ?? 'Alguien'} completó "${current.title}" — ${cuando}`, id, user?.id)
-      if (current.assignedTo && current.assignedTo !== user?.id) {
-        push(current.assignedTo, 'task_completed',
-          `"${current.title}" fue marcada como completada el ${cuando}`, id)
+    if (!useRealBackend) {
+      if (updates.assignedTo && updates.assignedTo !== current.assignedTo && updates.assignedTo !== user?.id) {
+        push(updates.assignedTo, 'task_assigned',
+          `${user?.name ?? 'Alguien'} te asignó la tarea "${current.title}"`, id)
+      }
+      if (updates.status === 'completed' && current.status !== 'completed') {
+        const cuando = format(new Date(), "dd/MM/yyyy 'a las' HH:mm", { locale: es })
+        notifyLeaders(members, 'task_completed',
+          `${user?.name ?? 'Alguien'} completó "${current.title}" — ${cuando}`, id, user?.id)
+      }
+      if (updates.status === 'in_progress' && current.status !== 'in_progress') {
+        notifyLeaders(members, 'task_in_progress', `"${current.title}" está ahora en progreso`, id, user?.id)
       }
     }
 
-    if (updates.status === 'in_progress' && current.status !== 'in_progress') {
-      notifyLeaders(members, 'task_in_progress',
-        `"${current.title}" está ahora en progreso`, id, user?.id)
-    }
-
     const updated = { ...current, ...updates, updatedAt: today() }
+    // Actualización optimista local (socket revertirá si falla)
     setTasks(prev => prev.map(t => t.id === id ? updated : t))
-    api.updateTask(id, updated).catch(() => {})
-  }, [user, members])
+    api.updateTask(id, updated).catch(() => {
+      // Revertir en caso de error
+      setTasks(prev => prev.map(t => t.id === id ? current : t))
+    })
+  }, [user, members, useRealBackend])
 
   const deleteTask = useCallback((id) => {
     setTasks(prev => prev.filter(t => t.id !== id))
@@ -156,11 +180,11 @@ export function TaskProvider({ children }) {
     }
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
     api.updateTask(taskId, updated).catch(() => {})
-    if (completing) {
+    if (completing && !useRealBackend) {
       notifyLeaders(members, 'subtask_done',
         `Subtarea completada en "${task.title}": ${subtask.title}`, taskId, user?.id)
     }
-  }, [members, user])
+  }, [members, user, useRealBackend])
 
   const deleteSubtask = useCallback((taskId, subtaskId) => {
     const task = tasksRef.current.find(t => t.id === taskId)
@@ -174,9 +198,7 @@ export function TaskProvider({ children }) {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return null
     const comment = {
-      id: generateId('comment'),
-      authorId,
-      text,
+      id: generateId('comment'), authorId, text,
       mentions: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -184,18 +206,17 @@ export function TaskProvider({ children }) {
     const updated = { ...task, comments: [...(task.comments || []), comment], updatedAt: today() }
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
     api.updateTask(taskId, updated).catch(() => {})
-
-    const extra = { commentId: comment.id }
-    notifyLeaders(members, 'comment_added',
-      `${user?.name ?? 'Alguien'} comentó en "${task.title}"`, taskId, authorId, extra)
-
-    if (task.assignedTo && task.assignedTo !== authorId) {
-      push(task.assignedTo, 'comment_added',
-        `${user?.name ?? 'Alguien'} comentó en tu tarea "${task.title}"`, taskId, extra)
+    if (!useRealBackend) {
+      const extra = { commentId: comment.id }
+      notifyLeaders(members, 'comment_added',
+        `${user?.name ?? 'Alguien'} comentó en "${task.title}"`, taskId, authorId, extra)
+      if (task.assignedTo && task.assignedTo !== authorId) {
+        push(task.assignedTo, 'comment_added',
+          `${user?.name ?? 'Alguien'} comentó en tu tarea "${task.title}"`, taskId, extra)
+      }
     }
-
     return comment
-  }, [members, user])
+  }, [members, user, useRealBackend])
 
   const updateComment = useCallback((taskId, commentId, text) => {
     const task = tasksRef.current.find(t => t.id === taskId)
@@ -221,20 +242,11 @@ export function TaskProvider({ children }) {
 
   return (
     <TaskContext.Provider value={{
-      tasks,
-      loading,
-      addTask,
-      updateTask,
-      deleteTask,
-      getTaskById,
-      getTasksByMember,
-      getTasksByGroup,
-      addSubtask,
-      toggleSubtask,
-      deleteSubtask,
-      addComment,
-      updateComment,
-      deleteComment,
+      tasks, loading,
+      addTask, updateTask, deleteTask,
+      getTaskById, getTasksByMember, getTasksByGroup,
+      addSubtask, toggleSubtask, deleteSubtask,
+      addComment, updateComment, deleteComment,
     }}>
       {children}
     </TaskContext.Provider>
