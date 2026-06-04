@@ -250,9 +250,97 @@ npm run backend:migrate:seed
 - [x] GitHub Actions CI (unit tests + integration + docker build)
 - [x] .eslintignore + .eslintrc.cjs
 
-### Pendiente (requiere infraestructura externa)
-- [ ] PostgreSQL instalado localmente o Docker
+### Pendiente (requiere infraestructura)
+- [ ] PostgreSQL instalado en el servidor
 - [ ] Redis para caché (opcional — performance avanzada)
 - [ ] SendGrid API key para emails
 - [ ] Slack webhook para notificaciones
-- [ ] Deploy a ambiente cloud (Heroku, AWS, DigitalOcean)
+
+---
+
+## 🏢 DEPLOYMENT EN SERVIDOR LOCAL (EMPRESA)
+
+El proyecto está diseñado para correr en servidores locales de la empresa. **No se necesita cloud ni Docker** para producción — solo dos dependencias de sistema.
+
+### Requisitos obligatorios
+
+| Componente | Versión mínima | Propósito |
+|---|---|---|
+| **Node.js** | v20+ | Correr el backend |
+| **PostgreSQL** | 16 | Base de datos |
+
+### Componentes opcionales
+
+| Componente | ¿Necesario? | Para qué sirve |
+|---|---|---|
+| Docker | ❌ No | Solo simplifica setup inicial |
+| Redis | ❌ No | Caché avanzada (no en código actual) |
+| SendGrid | ❌ No | Solo si quieren emails automáticos |
+| GitHub Actions | ❌ No | Solo si tienen CI/CD con repo remoto |
+| Nginx | ✅ Recomendado | Proxy reverso, HTTPS, puerto 80/443 |
+| PM2 | ✅ Recomendado | Mantener Node.js corriendo como servicio |
+
+### Instalación en macOS (Homebrew)
+
+```bash
+brew install postgresql@16 node
+brew services start postgresql@16
+psql -U postgres -c "CREATE DATABASE taskflow;"
+```
+
+### Instalación en Ubuntu/Debian
+
+```bash
+apt install postgresql-16 nodejs npm
+systemctl start postgresql
+psql -U postgres -c "CREATE DATABASE taskflow;"
+```
+
+### Levantar la aplicación
+
+```bash
+# Instalar dependencias del backend
+npm run backend:install
+
+# Crear tablas y datos de prueba
+npm run backend:migrate:seed
+
+# Iniciar (backend :3000 + frontend :5173 en modo dev)
+npm start
+```
+
+### Producción con PM2 (recomendado)
+
+PM2 mantiene el proceso Node corriendo aunque se cierre la terminal y lo reinicia automáticamente si el servidor se reinicia.
+
+```bash
+npm install -g pm2
+
+# Iniciar el backend como servicio
+cd backend
+pm2 start src/index.js --name taskflow
+
+# Guardar configuración y habilitar arranque automático
+pm2 save
+pm2 startup
+```
+
+### Nginx como proxy reverso (recomendado)
+
+Permite acceder por el puerto 80 (HTTP) o 443 (HTTPS) en lugar del puerto 3000.
+
+```nginx
+server {
+    listen 80;
+    server_name taskflow.empresa.local;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
