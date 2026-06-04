@@ -6,6 +6,17 @@ import { SAMPLE_MEMBERS } from '../utils/sampleData'
 
 export const AuthContext = createContext(null)
 
+// Limpia tokens del sistema anterior (no son JWT reales)
+;(function purgeStaleTokens() {
+  const token = localStorage.getItem('auth_token')
+  const isJWT = token && token.split('.').length === 3
+  if (token && !isJWT) {
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('auth_refresh_token')
+    localStorage.removeItem('auth_user')
+  }
+})()
+
 // Detecta si el backend real está disponible
 let backendAvailable = null
 async function checkBackend() {
@@ -32,20 +43,24 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     checkBackend().then(available => {
       setUseRealBackend(available)
-      // Verificar que el token guardado sigue siendo válido
-      if (available && token) {
-        api.me().then(({ user: serverUser }) => {
-          const merged = { ...serverUser }
-          localStorage.setItem('auth_user', JSON.stringify(merged))
-          setUser(merged)
-        }).catch(() => {
-          // Token expirado sin posibilidad de refresh
-          localStorage.removeItem('auth_user')
-          localStorage.removeItem('auth_token')
-          localStorage.removeItem('auth_refresh_token')
-          setUser(null)
-          setToken(null)
-        })
+      // Leer token actual de localStorage (no del closure — evita condición de carrera con login)
+      const tokenToValidate = localStorage.getItem('auth_token')
+      if (available && tokenToValidate) {
+        api.me()
+          .then(({ user: serverUser }) => {
+            localStorage.setItem('auth_user', JSON.stringify(serverUser))
+            setUser(serverUser)
+          })
+          .catch(() => {
+            // Solo limpiar si el token no fue reemplazado por un login concurrente
+            if (localStorage.getItem('auth_token') === tokenToValidate) {
+              localStorage.removeItem('auth_user')
+              localStorage.removeItem('auth_token')
+              localStorage.removeItem('auth_refresh_token')
+              setUser(null)
+              setToken(null)
+            }
+          })
       }
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -53,6 +68,9 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const hasBackend = await checkBackend()
     if (hasBackend) {
+      // Limpiar tokens previos antes de hacer login para evitar que refresh de token viejo interfiera
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('auth_refresh_token')
       try {
         const data = await api.login(email, password)
         localStorage.setItem('auth_user', JSON.stringify(data.user))

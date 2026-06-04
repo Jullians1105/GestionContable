@@ -39,8 +39,9 @@ export function TaskProvider({ children }) {
 
   useEffect(() => { tasksRef.current = tasks }, [tasks])
 
-  // Carga inicial
+  // Carga inicial (solo cuando hay sesión activa)
   useEffect(() => {
+    if (!user) { setLoading(false); return }
     api.getTasks()
       .then(data => {
         const tasks = Array.isArray(data) ? data : (data.tasks || [])
@@ -48,7 +49,7 @@ export function TaskProvider({ children }) {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [])
+  }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Suscripción a eventos Socket.io (reemplaza polling cuando backend real está disponible)
   useEffect(() => {

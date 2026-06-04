@@ -1,5 +1,7 @@
-import { createContext, useState, useCallback, useContext } from 'react'
+import { createContext, useState, useCallback, useContext, useEffect } from 'react'
 import { generateId, today } from '../utils/helpers'
+import { api } from '../services/api'
+import { useAuth } from './AuthContext'
 
 const STORAGE_KEY = 'groups'
 
@@ -44,12 +46,20 @@ const SAMPLE_GROUPS = [
 export const GroupContext = createContext(null)
 
 export function GroupProvider({ children }) {
+  const { useRealBackend } = useAuth()
   const [groups, setGroups] = useState(() => loadGroups() ?? SAMPLE_GROUPS)
   const [currentGroupId, setCurrentGroupId] = useState(null)
 
+  useEffect(() => {
+    if (!useRealBackend) return
+    api.getGroups()
+      .then(data => setGroups(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [useRealBackend])
+
   const persist = (updated) => {
     setGroups(updated)
-    saveGroups(updated)
+    if (!useRealBackend) saveGroups(updated)
   }
 
   const createGroup = useCallback((groupData) => {

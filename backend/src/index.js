@@ -24,9 +24,14 @@ const notificationRoutes = require('./routes/notifications');
 const app = express();
 const server = http.createServer(app);
 
+// En desarrollo permite cualquier puerto de localhost (Vite puede usar 5173, 5174, etc.)
+const corsOrigin = env.NODE_ENV === 'development'
+  ? /^http:\/\/localhost(:\d+)?$/
+  : env.CLIENT_URL;
+
 // Socket.io
 const io = new Server(server, {
-  cors: { origin: env.CLIENT_URL, credentials: true },
+  cors: { origin: corsOrigin, credentials: true },
 });
 setupSocket(io);
 
@@ -35,7 +40,7 @@ app.use((req, _res, next) => { req.io = io; next(); });
 
 // Security middlewares
 app.use(helmet({ contentSecurityPolicy: env.NODE_ENV === 'production' }));
-app.use(cors({ origin: env.CLIENT_URL, credentials: true }));
+app.use(cors({ origin: corsOrigin, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 

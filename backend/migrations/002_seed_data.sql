@@ -4,15 +4,15 @@
 
 INSERT INTO users (id, email, password_hash, name, role) VALUES
   ('00000000-0000-0000-0000-000000000001', 'maria@empresa.com',
-   '$2b$10$8K1p/a0dclxMFWe5KbMlhOGx9jNc1.B0xHcRuL3PZgvE9gCbGgCLK', 'María García', 'admin'),
+   '$2b$10$s10FdP/4safD4u8fV2/ONu93bdZf9zoyHeYH1YUS2E4YdWkSK4b.y', 'María García', 'admin'),
   ('00000000-0000-0000-0000-000000000002', 'carlos@empresa.com',
-   '$2b$10$LDnxWnGHcCb0qlw01Q4MVOOHkWj.cZrXfxfKR6FQfHpEyMjhvsMoO', 'Carlos López', 'leader'),
+   '$2b$10$HoHncArMq/MwafGW6dnImewaFezYKbcRBrynzid5WBM/rYnbWhEnS', 'Carlos López', 'leader'),
   ('00000000-0000-0000-0000-000000000003', 'ana@empresa.com',
-   '$2b$10$lsImpkRiEuvh7ZG7UkM0m.Yqaz6xJilnSIQgSk.DG0OMFbXmFfVAu', 'Ana Martínez', 'member'),
+   '$2b$10$HMKSfYhpr6PC6c2aCMAoXuIlBgy.j.lEK5uWS7Bbs1wdqly1CmkNu', 'Ana Martínez', 'member'),
   ('00000000-0000-0000-0000-000000000004', 'pedro@empresa.com',
-   '$2b$10$lsImpkRiEuvh7ZG7UkM0m.Yqaz6xJilnSIQgSk.DG0OMFbXmFfVAu', 'Pedro Sánchez', 'member'),
+   '$2b$10$HMKSfYhpr6PC6c2aCMAoXuIlBgy.j.lEK5uWS7Bbs1wdqly1CmkNu', 'Pedro Sánchez', 'member'),
   ('00000000-0000-0000-0000-000000000005', 'laura@empresa.com',
-   '$2b$10$rCPHpAQ3Ihy4qdxbFzKexeHK1qN89bLLvvbOW6/9KE11tVY.V7I8u', 'Laura Torres', 'viewer')
+   '$2b$10$Tr49aIU0rcU2C7t8cv6MpO014SJJCxao0WiFNI6ZJDIIdzKvXE03a', 'Laura Torres', 'viewer')
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO groups (id, leader_id, name, description, color) VALUES

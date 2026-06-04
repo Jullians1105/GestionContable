@@ -2,18 +2,29 @@ import { createContext, useState, useEffect, useCallback, useContext } from 'rea
 import { storage } from '../utils/storage'
 import { generateId, today } from '../utils/helpers'
 import { SAMPLE_MEMBERS } from '../utils/sampleData'
+import { api } from '../services/api'
+import { useAuth } from './AuthContext'
 
 export const TeamContext = createContext(null)
 
 export function TeamProvider({ children }) {
+  const { useRealBackend } = useAuth()
   const [members, setMembers] = useState(() => {
     const saved = storage.getMembers()
     return saved ?? SAMPLE_MEMBERS
   })
 
   useEffect(() => {
+    if (!useRealBackend) return
+    api.getEmployees()
+      .then(data => setMembers(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [useRealBackend])
+
+  useEffect(() => {
+    if (useRealBackend) return
     storage.saveMembers(members)
-  }, [members])
+  }, [members, useRealBackend])
 
   const addMember = useCallback((memberData) => {
     const newMember = {

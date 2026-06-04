@@ -1,5 +1,7 @@
-import { createContext, useState, useCallback, useContext } from 'react'
+import { createContext, useState, useCallback, useContext, useEffect } from 'react'
 import { generateId, today } from '../utils/helpers'
+import { api } from '../services/api'
+import { useAuth } from './AuthContext'
 
 const STORAGE_KEY = 'tags'
 
@@ -26,11 +28,19 @@ const SAMPLE_TAGS = [
 export const TagContext = createContext(null)
 
 export function TagProvider({ children }) {
+  const { useRealBackend } = useAuth()
   const [tags, setTags] = useState(() => load() ?? SAMPLE_TAGS)
+
+  useEffect(() => {
+    if (!useRealBackend) return
+    api.getTags()
+      .then(data => setTags(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [useRealBackend])
 
   const persist = (updated) => {
     setTags(updated)
-    save(updated)
+    if (!useRealBackend) save(updated)
   }
 
   const createTag = useCallback((name, color) => {

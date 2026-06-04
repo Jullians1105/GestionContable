@@ -9,7 +9,7 @@ const authMiddleware = async (req, res, next) => {
   const token = authHeader.slice(7);
   try {
     const blacklisted = await db.query(
-      'SELECT id FROM token_blacklist WHERE token = $1',
+      'SELECT 1 FROM token_blacklist WHERE token = $1',
       [token]
     );
     if (blacklisted.rows.length > 0) {
