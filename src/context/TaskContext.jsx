@@ -29,7 +29,7 @@ function notifyLeaders(members, type, message, taskId, excludeId, extra = null) 
 export function TaskProvider({ children }) {
   const { user, useRealBackend } = useAuth()
   const { members } = useTeam()
-  const socket = useSocket()
+  const { socket, connected } = useSocket()
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const addingRef = useRef(false)
@@ -70,10 +70,13 @@ export function TaskProvider({ children }) {
     }
   }, [socket])
 
-  // Polling fallback (solo cuando no hay socket activo)
+  // Polling fallback (solo cuando no hay socket conectado)
+  // En modo backend real: 15s (evita saturar el rate limiter de 200 req/15min)
+  // En modo localStorage: 3s (sin restricciones de red)
   useEffect(() => {
-    if (!user || socket?.connected) return
+    if (!user || connected) return
 
+    const delay = useRealBackend ? 15000 : 3000
     const interval = setInterval(() => {
       api.getTasks().then(data => {
         const fresh = Array.isArray(data) ? data : (data.tasks || [])
@@ -94,11 +97,11 @@ export function TaskProvider({ children }) {
           }
         })
       }).catch(() => {})
-    }, 3000)
+    }, delay)
 
     pollingRef.current = interval
     return () => clearInterval(interval)
-  }, [user, socket])
+  }, [user, connected, useRealBackend])
 
   const addTask = useCallback(async (taskData) => {
     if (addingRef.current) return null
@@ -106,8 +109,8 @@ export function TaskProvider({ children }) {
     const payload = { groupId: null, tagIds: [], subtasks: [], comments: [], ...taskData, createdAt: today(), updatedAt: today() }
     try {
       const newTask = await api.createTask(payload)
-      // Actualización local solo cuando NO hay socket (el socket emitirá task:created)
-      if (!socket?.connected) {
+      // Actualización local solo cuando NO hay socket conectado (el socket emitirá task:created)
+      if (!connected) {
         setTasks(prev => [newTask, ...prev])
       }
       addingRef.current = false
@@ -120,7 +123,7 @@ export function TaskProvider({ children }) {
       addingRef.current = false
       throw e
     }
-  }, [user, socket, useRealBackend])
+  }, [user, connected, useRealBackend])
 
   const updateTask = useCallback((id, updates) => {
     const current = tasksRef.current.find(t => t.id === id)
@@ -162,16 +165,34 @@ export function TaskProvider({ children }) {
   const addSubtask = useCallback((taskId, title) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return null
+    if (useRealBackend) {
+      api.addSubtask(taskId, title)
+        .then(fullTask => {
+          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
+        })
+        .catch(() => {})
+      return null
+    }
     const subtask = { id: generateId('subtask'), title, completed: false, createdAt: today() }
     const updated = { ...task, subtasks: [...(task.subtasks || []), subtask], updatedAt: today() }
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
     api.updateTask(taskId, updated).catch(() => {})
     return subtask
-  }, [])
+  }, [useRealBackend, connected])
 
   const toggleSubtask = useCallback((taskId, subtaskId) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return
+    if (useRealBackend) {
+      const subtask = (task.subtasks || []).find(s => s.id === subtaskId)
+      if (!subtask) return
+      api.updateSubtask(taskId, subtaskId, { completed: !subtask.completed })
+        .then(fullTask => {
+          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
+        })
+        .catch(() => {})
+      return
+    }
     const subtask = (task.subtasks || []).find(s => s.id === subtaskId)
     const completing = subtask && !subtask.completed
     const updated = {
@@ -181,23 +202,39 @@ export function TaskProvider({ children }) {
     }
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
     api.updateTask(taskId, updated).catch(() => {})
-    if (completing && !useRealBackend) {
+    if (completing) {
       notifyLeaders(members, 'subtask_done',
         `Subtarea completada en "${task.title}": ${subtask.title}`, taskId, user?.id)
     }
-  }, [members, user, useRealBackend])
+  }, [useRealBackend, connected, members, user])
 
   const deleteSubtask = useCallback((taskId, subtaskId) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return
+    if (useRealBackend) {
+      api.deleteSubtask(taskId, subtaskId)
+        .then(fullTask => {
+          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
+        })
+        .catch(() => {})
+      return
+    }
     const updated = { ...task, subtasks: (task.subtasks || []).filter(s => s.id !== subtaskId), updatedAt: today() }
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
     api.updateTask(taskId, updated).catch(() => {})
-  }, [])
+  }, [useRealBackend, connected])
 
   const addComment = useCallback((taskId, authorId, text) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return null
+    if (useRealBackend) {
+      api.addComment(taskId, text)
+        .then(fullTask => {
+          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
+        })
+        .catch(() => {})
+      return null
+    }
     const comment = {
       id: generateId('comment'), authorId, text,
       mentions: [],
@@ -207,21 +244,27 @@ export function TaskProvider({ children }) {
     const updated = { ...task, comments: [...(task.comments || []), comment], updatedAt: today() }
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
     api.updateTask(taskId, updated).catch(() => {})
-    if (!useRealBackend) {
-      const extra = { commentId: comment.id }
-      notifyLeaders(members, 'comment_added',
-        `${user?.name ?? 'Alguien'} comentó en "${task.title}"`, taskId, authorId, extra)
-      if (task.assignedTo && task.assignedTo !== authorId) {
-        push(task.assignedTo, 'comment_added',
-          `${user?.name ?? 'Alguien'} comentó en tu tarea "${task.title}"`, taskId, extra)
-      }
+    const snippet = text.length > 80 ? text.slice(0, 77) + '…' : text
+    const message = `${user?.name ?? 'Alguien'} comentó en "${task.title}": "${snippet}"`
+    const extra = { commentId: comment.id }
+    notifyLeaders(members, 'comment_added', message, taskId, authorId, extra)
+    if (task.assignedTo && task.assignedTo !== authorId) {
+      push(task.assignedTo, 'comment_added', message, taskId, extra)
     }
     return comment
-  }, [members, user, useRealBackend])
+  }, [useRealBackend, connected, members, user])
 
   const updateComment = useCallback((taskId, commentId, text) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return
+    if (useRealBackend) {
+      api.updateComment(taskId, commentId, text)
+        .then(fullTask => {
+          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
+        })
+        .catch(() => {})
+      return
+    }
     const updated = {
       ...task,
       comments: (task.comments || []).map(c =>
@@ -231,15 +274,23 @@ export function TaskProvider({ children }) {
     }
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
     api.updateTask(taskId, updated).catch(() => {})
-  }, [])
+  }, [useRealBackend, connected])
 
   const deleteComment = useCallback((taskId, commentId) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return
+    if (useRealBackend) {
+      api.deleteComment(taskId, commentId)
+        .then(fullTask => {
+          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
+        })
+        .catch(() => {})
+      return
+    }
     const updated = { ...task, comments: (task.comments || []).filter(c => c.id !== commentId), updatedAt: today() }
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
     api.updateTask(taskId, updated).catch(() => {})
-  }, [])
+  }, [useRealBackend, connected])
 
   return (
     <TaskContext.Provider value={{

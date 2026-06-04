@@ -28,6 +28,7 @@ export const validators = {
     if (titleError) errors.title = titleError
     if (!task.priority) errors.priority = 'La prioridad es obligatoria'
     if (!task.status) errors.status = 'El estado es obligatorio'
+    if (!task.assignedTo) errors.assignedTo = 'Debes asignar la tarea a alguien'
     return errors
   },
 

@@ -47,15 +47,15 @@ export function TagProvider({ children }) {
     const newTag = { id: generateId('tag'), name, color, createdAt: today() }
     persist((prev) => [...prev, newTag])
     return newTag
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateTag = useCallback((id, updates) => {
     persist((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)))
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteTag = useCallback((id) => {
     persist((prev) => prev.filter((t) => t.id !== id))
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getTagById = useCallback((id) => tags.find((t) => t.id === id), [tags])
 

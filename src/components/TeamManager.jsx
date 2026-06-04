@@ -49,8 +49,8 @@ export default function TeamManager() {
     <div className="space-y-6">
       {/* Header bar */}
       <div className="flex items-center justify-between">
-        <p className="text-[14px] text-[#434655]">
-          <span className="font-semibold text-[#191c1e]">{members.length}</span> miembros en el equipo
+        <p className="text-[14px] text-[#434655] dark:text-[#c4c8e8]">
+          <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{members.length}</span> miembros en el equipo
         </p>
         <button onClick={openCreate} className="btn-primary">
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>person_add</span>
@@ -64,27 +64,27 @@ export default function TeamManager() {
           {members.map((m) => {
             const taskCount = getTasksByMember(m.id).length
             return (
-              <div key={m.id} className="bg-white p-6 rounded-xl shadow-sm border border-[#c3c6d7] hover:shadow-md transition-shadow flex flex-col items-center text-center">
+              <div key={m.id} className="bg-white dark:bg-[#1e2030] p-6 rounded-xl shadow-sm border border-[#c3c6d7] dark:border-[#2e3148] hover:shadow-md transition-shadow flex flex-col items-center text-center">
                 {/* Avatar */}
                 <div className="relative mb-4">
-                  <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold border-4 border-white shadow-sm ${getAvatarColor(m.name)}`}>
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold border-4 border-white dark:border-[#1e2030] shadow-sm ${getAvatarColor(m.name)}`}>
                     {getInitials(m.name)}
                   </div>
-                  <div className="absolute bottom-0 right-0 w-5 h-5 bg-[#10B981] border-2 border-white rounded-full"></div>
+                  <div className="absolute bottom-0 right-0 w-5 h-5 bg-[#10B981] border-2 border-white dark:border-[#1e2030] rounded-full"></div>
                 </div>
 
                 {/* Info */}
-                <h3 className="text-[18px] font-bold text-[#191c1e]">{m.name}</h3>
-                <p className="text-[14px] text-[#434655] mb-3">{m.email}</p>
+                <h3 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">{m.name}</h3>
+                <p className="text-[14px] text-[#434655] dark:text-[#c4c8e8] mb-3">{m.email}</p>
                 <span className={`text-[11px] font-semibold px-3 py-1 rounded-full mb-4 ${ROLE_BADGE[m.role]}`}>
                   {ROLE_LABELS[m.role]}
                 </span>
 
                 {/* Stats */}
-                <div className="w-full flex justify-around items-center border-t border-[#edeef0] pt-4 mb-4">
+                <div className="w-full flex justify-around items-center border-t border-[#edeef0] dark:border-[#2e3148] pt-4 mb-4">
                   <div className="text-center">
                     <span className="block text-[18px] font-bold text-[#004ac6]">{taskCount}</span>
-                    <span className="text-[12px] text-[#434655]">Tareas</span>
+                    <span className="text-[12px] text-[#434655] dark:text-[#c4c8e8]">Tareas</span>
                   </div>
                 </div>
 
@@ -92,14 +92,14 @@ export default function TeamManager() {
                 <div className="flex w-full gap-2">
                   <button
                     onClick={() => openEdit(m)}
-                    className="flex-1 h-10 border border-[#c3c6d7] text-[#191c1e] rounded-lg text-[12px] font-semibold hover:bg-[#f3f4f6] transition-colors flex items-center justify-center gap-1"
+                    className="flex-1 h-10 border border-[#c3c6d7] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] rounded-lg text-[12px] font-semibold hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition-colors flex items-center justify-center gap-1"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
                     Editar
                   </button>
                   <button
                     onClick={() => handleDelete(m.id)}
-                    className="w-10 h-10 border border-[#c3c6d7] text-[#93000a] rounded-lg hover:bg-[#ffdad6] hover:border-[#EF4444] transition-colors flex items-center justify-center"
+                    className="w-10 h-10 border border-[#c3c6d7] dark:border-[#2e3148] text-[#93000a] rounded-lg hover:bg-[#ffdad6] hover:border-[#EF4444] transition-colors flex items-center justify-center"
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                   </button>
@@ -109,7 +109,7 @@ export default function TeamManager() {
           })}
         </div>
       ) : (
-        <div className="text-center py-16 text-[#434655]">
+        <div className="text-center py-16 text-[#434655] dark:text-[#c4c8e8]">
           <span className="material-symbols-outlined block mb-3 mx-auto" style={{ fontSize: 48, color: "#c3c6d7" }}>group</span>
           <p className="text-[14px] font-semibold">No hay miembros en el equipo</p>
           <p className="text-[12px] mt-1">Agrega el primer miembro</p>
@@ -127,7 +127,7 @@ export default function TeamManager() {
               </h2>
               <button
                 onClick={() => setModalOpen(false)}
-                className="p-2 text-[#434655] hover:text-[#191c1e] hover:bg-[#edeef0] dark:hover:bg-[#252840] rounded-lg transition-colors"
+                className="p-2 text-[#434655] dark:text-[#c4c8e8] hover:text-[#191c1e] dark:hover:text-[#e4e6f0] hover:bg-[#edeef0] dark:hover:bg-[#252840] rounded-lg transition-colors"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
               </button>

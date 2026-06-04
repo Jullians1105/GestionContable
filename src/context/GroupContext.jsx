@@ -71,18 +71,18 @@ export function GroupProvider({ children }) {
     }
     persist((prev) => [...prev, newGroup])
     return newGroup
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateGroup = useCallback((id, updates) => {
     persist((prev) =>
       prev.map((g) => (g.id === id ? { ...g, ...updates, updatedAt: today() } : g))
     )
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteGroup = useCallback((id) => {
     persist((prev) => prev.filter((g) => g.id !== id))
     setCurrentGroupId((prev) => (prev === id ? null : prev))
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const addMemberToGroup = useCallback((groupId, userId) => {
     persist((prev) =>
@@ -92,7 +92,7 @@ export function GroupProvider({ children }) {
           : g
       )
     )
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const removeMemberFromGroup = useCallback((groupId, userId) => {
     persist((prev) =>
@@ -102,7 +102,7 @@ export function GroupProvider({ children }) {
           : g
       )
     )
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getGroupById = useCallback((id) => groups.find((g) => g.id === id), [groups])
 

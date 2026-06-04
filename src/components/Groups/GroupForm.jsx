@@ -55,13 +55,13 @@ export default function GroupForm({ group, onClose }) {
             {group ? 'Editar grupo' : 'Nuevo grupo'}
           </h2>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#2e3148] transition">
-            <span className="material-symbols-outlined text-[#434655]">close</span>
+            <span className="material-symbols-outlined text-[#434655] dark:text-[#c4c8e8]">close</span>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-[#434655] mb-1.5">Nombre *</label>
+            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Nombre *</label>
             <input
               value={form.name}
               onChange={(e) => { setForm({ ...form, name: e.target.value }); setErrors({}) }}
@@ -72,7 +72,7 @@ export default function GroupForm({ group, onClose }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#434655] mb-1.5">Descripción</label>
+            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Descripción</label>
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -83,7 +83,7 @@ export default function GroupForm({ group, onClose }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#434655] mb-2">Color</label>
+            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-2">Color</label>
             <div className="flex flex-wrap gap-2">
               {COLORS.map((c) => (
                 <button
@@ -102,7 +102,7 @@ export default function GroupForm({ group, onClose }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#434655] mb-2">Miembros</label>
+            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-2">Miembros</label>
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {members.map((m) => (
                 <label key={m.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] cursor-pointer">
@@ -113,14 +113,14 @@ export default function GroupForm({ group, onClose }) {
                     className="accent-[#004ac6]"
                   />
                   <span className="text-sm text-[#191c1e] dark:text-[#e4e6f0]">{m.name}</span>
-                  <span className="text-xs text-[#434655] ml-auto">{m.role}</span>
+                  <span className="text-xs text-[#434655] dark:text-[#c4c8e8] ml-auto">{m.role}</span>
                 </label>
               ))}
             </div>
           </div>
 
           <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 h-10 rounded-lg border border-[#c3c6d7] text-sm font-semibold text-[#434655] hover:bg-[#edeef0] transition">
+            <button type="button" onClick={onClose} className="flex-1 h-10 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition">
               Cancelar
             </button>
             <button type="submit" className="flex-1 h-10 rounded-lg text-sm font-semibold text-white transition hover:opacity-90" style={{ background: '#004ac6' }}>

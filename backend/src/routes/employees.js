@@ -21,7 +21,7 @@ router.use(authMiddleware);
 router.get('/', async (req, res, next) => {
   try {
     const result = await db.query(
-      'SELECT id, email, name, role, created_at, updated_at FROM users ORDER BY name ASC'
+      'SELECT id, email, name, role, permissions, created_at, updated_at FROM users ORDER BY name ASC'
     );
     res.json(result.rows);
   } catch (err) {
@@ -32,7 +32,7 @@ router.get('/', async (req, res, next) => {
 router.get('/:id', async (req, res, next) => {
   try {
     const result = await db.query(
-      'SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1',
+      'SELECT id, email, name, role, permissions, created_at, updated_at FROM users WHERE id = $1',
       [req.params.id]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -81,18 +81,38 @@ router.put('/:id',
   roleMiddleware('admin'),
   body('role').optional().isIn(['admin', 'leader', 'member', 'viewer']),
   body('name').optional().trim().notEmpty(),
+  body('password').optional().isLength({ min: 8 }),
+  body('permissions').optional(),
   validate,
   async (req, res, next) => {
     try {
-      const { name, role } = req.body;
-      const result = await db.query(
-        `UPDATE users SET
-          name = COALESCE($1, name),
-          role = COALESCE($2, role),
-          updated_at = NOW()
-         WHERE id = $3 RETURNING id, email, name, role, updated_at`,
-        [name, role, req.params.id]
-      );
+      const { name, role, password, permissions } = req.body;
+
+      let result;
+      if (password) {
+        const passwordHash = await bcrypt.hash(password, 10);
+        result = await db.query(
+          `UPDATE users SET
+            name = COALESCE($1, name),
+            role = COALESCE($2, role),
+            password_hash = $3,
+            permissions = COALESCE($4, permissions),
+            updated_at = NOW()
+           WHERE id = $5 RETURNING id, email, name, role, permissions, updated_at`,
+          [name, role, passwordHash, permissions ? JSON.stringify(permissions) : null, req.params.id]
+        );
+      } else {
+        result = await db.query(
+          `UPDATE users SET
+            name = COALESCE($1, name),
+            role = COALESCE($2, role),
+            permissions = COALESCE($3, permissions),
+            updated_at = NOW()
+           WHERE id = $4 RETURNING id, email, name, role, permissions, updated_at`,
+          [name, role, permissions ? JSON.stringify(permissions) : null, req.params.id]
+        );
+      }
+
       if (!result.rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
       res.json(result.rows[0]);
     } catch (err) {

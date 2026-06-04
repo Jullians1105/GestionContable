@@ -27,17 +27,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
+    <div className="min-h-screen bg-[#f3f4f6] dark:bg-[#0f1117] flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-lg p-8 w-full max-w-md border border-[#c3c6d7] dark:border-[#2e3148]">
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: '#004ac6' }}>
             <span className="material-symbols-outlined text-white text-xl">task_alt</span>
           </div>
-          <h1 className="text-2xl font-bold text-[#191c1e]">TaskFlow Pro</h1>
+          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">TaskFlow Pro</h1>
         </div>
 
-        <h2 className="text-xl font-bold text-[#191c1e] mb-1">Iniciar sesión</h2>
-        <p className="text-sm text-[#434655] mb-6">Accede a tu espacio de trabajo</p>
+        <h2 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">Iniciar sesión</h2>
+        <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-6">Accede a tu espacio de trabajo</p>
 
         {error && (
           <div className="bg-[#ffdad6] text-[#EF4444] rounded-lg px-4 py-3 text-sm mb-4 flex items-center gap-2">
@@ -48,23 +48,23 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-[#434655] mb-1.5">Email</label>
+            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Email</label>
             <input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               placeholder="tu@empresa.com"
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition"
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[#434655] mb-1.5">Contraseña</label>
+            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Contraseña</label>
             <input
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               placeholder="••••••••"
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition"
             />
           </div>
 
@@ -85,15 +85,15 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-6 pt-6 border-t border-[#c3c6d7]">
-          <p className="text-xs text-[#434655] text-center mb-3">Usuarios de prueba:</p>
-          <div className="grid grid-cols-2 gap-2 text-xs text-[#434655]">
-            <div className="bg-[#edeef0] rounded-lg p-2">
+        <div className="mt-6 pt-6 border-t border-[#c3c6d7] dark:border-[#2e3148]">
+          <p className="text-xs text-[#434655] dark:text-[#c4c8e8] text-center mb-3">Usuarios de prueba:</p>
+          <div className="grid grid-cols-2 gap-2 text-xs text-[#434655] dark:text-[#c4c8e8]">
+            <div className="bg-[#edeef0] dark:bg-[#252840] rounded-lg p-2">
               <p className="font-semibold">Admin</p>
               <p>maria@empresa.com</p>
               <p>admin123</p>
             </div>
-            <div className="bg-[#edeef0] rounded-lg p-2">
+            <div className="bg-[#edeef0] dark:bg-[#252840] rounded-lg p-2">
               <p className="font-semibold">Líder</p>
               <p>carlos@empresa.com</p>
               <p>leader123</p>
@@ -101,7 +101,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-sm text-center text-[#434655] mt-6">
+        <p className="text-sm text-center text-[#434655] dark:text-[#c4c8e8] mt-6">
           ¿No tienes cuenta?{' '}
           <Link to="/register" className="font-semibold" style={{ color: '#004ac6' }}>
             Regístrate

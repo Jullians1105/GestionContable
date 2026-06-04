@@ -29,7 +29,7 @@ export default function NotificationsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Notificaciones</h1>
-          {unread > 0 && <p className="text-sm text-[#434655] mt-0.5">{unread} sin leer</p>}
+          {unread > 0 && <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">{unread} sin leer</p>}
         </div>
         <div className="flex gap-2">
           {unread > 0 && (
@@ -49,16 +49,24 @@ export default function NotificationsPage() {
         {notifications.length === 0 ? (
           <div className="py-20 text-center">
             <span className="material-symbols-outlined text-5xl text-[#c3c6d7]">notifications_none</span>
-            <p className="text-lg font-semibold text-[#434655] mt-3">Sin notificaciones</p>
+            <p className="text-lg font-semibold text-[#434655] dark:text-[#c4c8e8] mt-3">Sin notificaciones</p>
             <p className="text-sm text-[#888] mt-1">Aquí aparecerán las notificaciones de tus tareas</p>
           </div>
         ) : (
           notifications.map((n) => {
             const meta = TYPE_ICONS[n.type] || { icon: 'notifications', color: '#004ac6' }
+            const handleRowClick = () => {
+              if (!n.taskId) return
+              markAsRead(n.id)
+              const params = new URLSearchParams({ openTask: n.taskId })
+              if (n.extra?.commentId) params.set('comment', n.extra.commentId)
+              navigate(`/tasks?${params}`)
+            }
             return (
               <div
                 key={n.id}
-                className={`flex items-start gap-4 px-5 py-4 border-b border-[#edeef0] dark:border-[#252840] last:border-0 ${!n.read ? 'bg-blue-50 dark:bg-[#1a2040]' : ''}`}
+                onClick={handleRowClick}
+                className={`flex items-start gap-4 px-5 py-4 border-b border-[#edeef0] dark:border-[#252840] last:border-0 ${!n.read ? 'bg-blue-50 dark:bg-[#1a2040]' : ''} ${n.taskId ? 'cursor-pointer hover:bg-[#f3f4f6] dark:hover:bg-[#252840]' : ''} transition`}
               >
                 <div className="relative flex-shrink-0">
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: `${meta.color}22` }}>
@@ -75,24 +83,10 @@ export default function NotificationsPage() {
                   <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0]">{n.message}</p>
                   <p className="text-xs text-[#888] mt-0.5">{timeAgo(n.createdAt)}</p>
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                   {!n.read && (
                     <button onClick={() => markAsRead(n.id)} className="p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition" title="Marcar como leída">
                       <span className="material-symbols-outlined text-sm text-[#004ac6]">done</span>
-                    </button>
-                  )}
-                  {n.taskId && (
-                    <button
-                      onClick={() => {
-                        markAsRead(n.id)
-                        const params = new URLSearchParams({ openTask: n.taskId })
-                        if (n.extra?.commentId) params.set('comment', n.extra.commentId)
-                        navigate(`/tasks?${params}`)
-                      }}
-                      className="p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
-                      title="Ver tarea"
-                    >
-                      <span className="material-symbols-outlined text-sm text-[#434655]">open_in_new</span>
                     </button>
                   )}
                   <button onClick={() => deleteNotification(n.id)} className="p-1.5 rounded-lg hover:bg-[#ffdad6] transition" title="Eliminar">

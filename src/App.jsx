@@ -23,6 +23,7 @@ import KanbanPage from './pages/KanbanPage'
 import CalendarPage from './pages/CalendarPage'
 import ReportsPage from './pages/ReportsPage'
 import NotificationsPage from './pages/NotificationsPage'
+import UsersPage from './pages/UsersPage'
 import './App.css'
 
 function Layout() {
@@ -49,6 +50,7 @@ function Layout() {
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/usuarios" element={<UsersPage />} />
           </Routes>
         </div>
       </main>

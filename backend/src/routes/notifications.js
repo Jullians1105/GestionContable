@@ -5,6 +5,18 @@ const { authMiddleware } = require('../middleware/auth');
 const router = Router();
 router.use(authMiddleware);
 
+function normalizeNotif(n) {
+  return {
+    id: n.id,
+    type: n.type,
+    message: n.message,
+    taskId: n.task_id || null,
+    read: n.read,
+    extra: n.extra_data || null,
+    createdAt: n.created_at,
+  };
+}
+
 /**
  * @openapi
  * /api/notifications:
@@ -20,7 +32,7 @@ router.get('/', async (req, res, next) => {
       `SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
       [req.user.userId]
     );
-    res.json(result.rows);
+    res.json(result.rows.map(normalizeNotif));
   } catch (err) { next(err); }
 });
 

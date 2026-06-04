@@ -110,14 +110,14 @@ export default function ReportsPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Reportes</h1>
-        <p className="text-sm text-[#434655] mt-0.5">Analiza el rendimiento de tu equipo</p>
+        <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">Analiza el rendimiento de tu equipo</p>
       </div>
 
       <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-5 mb-5">
         <h2 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-4">Filtros</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-[#434655] mb-1.5">Tipo de reporte</label>
+            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Tipo de reporte</label>
             <select
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
@@ -127,7 +127,7 @@ export default function ReportsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[#434655] mb-1.5">Grupo</label>
+            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Grupo</label>
             <select
               value={filters.groupId}
               onChange={(e) => setFilters({ ...filters, groupId: e.target.value })}
@@ -138,7 +138,7 @@ export default function ReportsPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[#434655] mb-1.5">Miembro</label>
+            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Miembro</label>
             <select
               value={filters.memberId}
               onChange={(e) => setFilters({ ...filters, memberId: e.target.value })}
@@ -150,11 +150,11 @@ export default function ReportsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[#434655] mb-1.5">Desde</label>
+              <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Desde</label>
               <input type="date" value={filters.dateFrom} onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#434655] mb-1.5">Hasta</label>
+              <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Hasta</label>
               <input type="date" value={filters.dateTo} onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]" />
             </div>
           </div>
@@ -174,7 +174,7 @@ export default function ReportsPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0]">{REPORT_TYPES.find((r) => r.value === filters.type)?.label}</h2>
-              <p className="text-sm text-[#434655] mt-0.5">{totalCompleted} tareas completadas en este período</p>
+              <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">{totalCompleted} tareas completadas en este período</p>
             </div>
             <div className="flex gap-2">
               <button onClick={handleExportPDF} className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition" style={{ background: '#EF4444' }}>
@@ -194,7 +194,7 @@ export default function ReportsPage() {
                 <thead>
                   <tr className="border-b border-[#edeef0] dark:border-[#252840]">
                     {['Nombre', 'Completadas', 'En Progreso', 'Pendientes', 'Total', '% Completado'].map((h) => (
-                      <th key={h} className="text-left text-xs font-semibold text-[#434655] py-2 px-3">{h}</th>
+                      <th key={h} className="text-left text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] py-2 px-3">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -205,13 +205,13 @@ export default function ReportsPage() {
                       <td className="py-2 px-3"><span className="text-[#10B981] font-semibold">{r.completed}</span></td>
                       <td className="py-2 px-3"><span className="text-[#004ac6] font-semibold">{r.inProgress}</span></td>
                       <td className="py-2 px-3"><span className="text-[#888] font-semibold">{r.pending}</span></td>
-                      <td className="py-2 px-3 text-[#434655]">{r.total}</td>
+                      <td className="py-2 px-3 text-[#434655] dark:text-[#c4c8e8]">{r.total}</td>
                       <td className="py-2 px-3">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-[#edeef0] rounded-full">
+                          <div className="flex-1 h-1.5 bg-[#edeef0] dark:bg-[#252840] rounded-full">
                             <div className="h-full rounded-full" style={{ width: `${r.pct}%`, background: '#004ac6' }} />
                           </div>
-                          <span className="text-xs text-[#434655] w-8">{r.pct}%</span>
+                          <span className="text-xs text-[#434655] dark:text-[#c4c8e8] w-8">{r.pct}%</span>
                         </div>
                       </td>
                     </tr>

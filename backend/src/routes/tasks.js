@@ -1,7 +1,9 @@
 const { Router } = require('express');
 const { body, query } = require('express-validator');
 const {
-  getTasks, getTask, createTask, updateTask, deleteTask, getTaskHistory, searchTasks
+  getTasks, getTask, createTask, updateTask, deleteTask, getTaskHistory, searchTasks,
+  addSubtask, updateSubtask, deleteSubtask,
+  addComment, updateComment, deleteComment,
 } = require('../controllers/taskController');
 const { authMiddleware, canEdit, roleMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
@@ -99,6 +101,7 @@ router.get('/:id/history', getTaskHistory);
 router.post('/',
   canEdit,
   body('title').trim().notEmpty().withMessage('El título es obligatorio').isLength({ max: 255 }),
+  body('assignedTo').notEmpty().withMessage('Debes asignar la tarea a alguien'),
   body('priority').optional().isIn(['high', 'medium', 'low']),
   body('status').optional().isIn(['pending', 'in_progress', 'completed']),
   validate,
@@ -133,5 +136,15 @@ router.put('/:id',
  *       - bearerAuth: []
  */
 router.delete('/:id', roleMiddleware('admin', 'leader'), deleteTask);
+
+// Subtareas
+router.post('/:id/subtasks', canEdit, addSubtask);
+router.put('/:id/subtasks/:subtaskId', canEdit, updateSubtask);
+router.delete('/:id/subtasks/:subtaskId', canEdit, deleteSubtask);
+
+// Comentarios
+router.post('/:id/comments', canEdit, addComment);
+router.put('/:id/comments/:commentId', canEdit, updateComment);
+router.delete('/:id/comments/:commentId', canEdit, deleteComment);
 
 module.exports = router;

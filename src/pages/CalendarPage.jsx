@@ -64,10 +64,10 @@ export default function CalendarPage() {
             Hoy
           </button>
           <button onClick={() => setCurrentDate((d) => subMonths(d, 1))} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition">
-            <span className="material-symbols-outlined text-[#434655]">chevron_left</span>
+            <span className="material-symbols-outlined text-[#434655] dark:text-[#c4c8e8]">chevron_left</span>
           </button>
           <button onClick={() => setCurrentDate((d) => addMonths(d, 1))} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition">
-            <span className="material-symbols-outlined text-[#434655]">chevron_right</span>
+            <span className="material-symbols-outlined text-[#434655] dark:text-[#c4c8e8]">chevron_right</span>
           </button>
         </div>
       </div>
@@ -118,7 +118,7 @@ export default function CalendarPage() {
             {[['#EF4444', 'Vencida'], ['#FBBF24', 'Próxima a vencer'], ['#004ac6', 'Normal']].map(([c, l]) => (
               <div key={l} className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: c }} />
-                <span className="text-xs text-[#434655]">{l}</span>
+                <span className="text-xs text-[#434655] dark:text-[#c4c8e8]">{l}</span>
               </div>
             ))}
           </div>
@@ -134,7 +134,7 @@ export default function CalendarPage() {
                 {selectedTasks.length === 0 ? (
                   <div className="text-center py-8">
                     <span className="material-symbols-outlined text-3xl text-[#c3c6d7]">event_available</span>
-                    <p className="text-sm text-[#434655] mt-2">Sin tareas este día</p>
+                    <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-2">Sin tareas este día</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -154,7 +154,7 @@ export default function CalendarPage() {
             ) : (
               <div className="text-center py-8">
                 <span className="material-symbols-outlined text-3xl text-[#c3c6d7]">touch_app</span>
-                <p className="text-sm text-[#434655] mt-2">Selecciona un día para ver sus tareas</p>
+                <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-2">Selecciona un día para ver sus tareas</p>
               </div>
             )}
           </div>

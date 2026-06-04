@@ -7,8 +7,8 @@ const EMPTY_MEMBER = {
   role: "member",
 }
 
-const labelCls = "block text-[12px] font-semibold text-[#434655] mb-1"
-const inputCls = "w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-[#004ac6] hover:bg-[#f3f4f6] transition-colors"
+const labelCls = "block text-[12px] font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1"
+const inputCls = "w-full border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 h-10 text-[14px] text-[#191c1e] dark:text-[#e4e6f0] bg-white dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] hover:bg-[#f3f4f6] dark:hover:bg-[#2e3148] transition-colors"
 const inputErrCls = "border-[#EF4444] focus:ring-[#EF4444] focus:border-[#EF4444]"
 
 const ROLE_HINTS = {

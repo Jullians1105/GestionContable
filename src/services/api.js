@@ -93,6 +93,16 @@ export const api = {
   searchTasks: (q, limit = 20) => request(`/tasks/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   getTaskHistory: (id) => request(`/tasks/${id}/history`),
 
+  // Subtareas
+  addSubtask: (taskId, title) => request(`/tasks/${taskId}/subtasks`, { method: 'POST', body: JSON.stringify({ title }) }),
+  updateSubtask: (taskId, subtaskId, data) => request(`/tasks/${taskId}/subtasks/${subtaskId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSubtask: (taskId, subtaskId) => request(`/tasks/${taskId}/subtasks/${subtaskId}`, { method: 'DELETE' }),
+
+  // Comentarios
+  addComment: (taskId, text) => request(`/tasks/${taskId}/comments`, { method: 'POST', body: JSON.stringify({ text }) }),
+  updateComment: (taskId, commentId, text) => request(`/tasks/${taskId}/comments/${commentId}`, { method: 'PUT', body: JSON.stringify({ text }) }),
+  deleteComment: (taskId, commentId) => request(`/tasks/${taskId}/comments/${commentId}`, { method: 'DELETE' }),
+
   // Employees
   getEmployees: () => request('/employees'),
   createEmployee: (data) => request('/employees', { method: 'POST', body: JSON.stringify(data) }),

@@ -35,7 +35,7 @@ export default function Header({ onMenuToggle }) {
       </button>
       <form onSubmit={handleSearch} className="flex-1 max-w-md">
         <div className="relative focus-within:ring-2 focus-within:ring-[#004ac6] rounded-lg transition-all">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655]" style={{ fontSize: 18 }}>search</span>
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655] dark:text-[#c4c8e8]" style={{ fontSize: 18 }}>search</span>
           <input
             type="text"
             value={search}

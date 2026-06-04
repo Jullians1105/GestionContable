@@ -26,7 +26,26 @@ export function TeamProvider({ children }) {
     storage.saveMembers(members)
   }, [members, useRealBackend])
 
-  const addMember = useCallback((memberData) => {
+  const addMember = useCallback(async (memberData) => {
+    if (useRealBackend) {
+      const created = await api.createEmployee({
+        name: memberData.name,
+        email: memberData.email,
+        role: memberData.role,
+        password: memberData.password,
+      })
+      const newMember = {
+        id: created.id,
+        name: created.name,
+        email: created.email,
+        role: created.role,
+        createdAt: created.created_at,
+        groupIds: [],
+        preferences: { theme: 'light', notifications: true },
+      }
+      setMembers((prev) => [...prev, newMember])
+      return newMember
+    }
     const newMember = {
       groupIds: [],
       preferences: { theme: 'light', notifications: true },
@@ -36,15 +55,28 @@ export function TeamProvider({ children }) {
     }
     setMembers((prev) => [...prev, newMember])
     return newMember
-  }, [])
+  }, [useRealBackend])
 
-  const updateMember = useCallback((id, updates) => {
+  const updateMember = useCallback(async (id, updates) => {
+    if (useRealBackend) {
+      const payload = {}
+      if (updates.name !== undefined) payload.name = updates.name
+      if (updates.role !== undefined) payload.role = updates.role
+      if (updates.password) payload.password = updates.password
+      if (updates.permissions !== undefined) payload.permissions = updates.permissions
+      const updated = await api.updateEmployee(id, payload)
+      setMembers((prev) => prev.map((m) => m.id === id ? { ...m, ...updates, name: updated.name, role: updated.role } : m))
+      return
+    }
     setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...updates } : m)))
-  }, [])
+  }, [useRealBackend])
 
-  const deleteMember = useCallback((id) => {
+  const deleteMember = useCallback(async (id) => {
+    if (useRealBackend) {
+      await api.deleteEmployee(id)
+    }
     setMembers((prev) => prev.filter((m) => m.id !== id))
-  }, [])
+  }, [useRealBackend])
 
   const getMemberById = useCallback((id) => members.find((m) => m.id === id), [members])
 

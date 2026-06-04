@@ -39,7 +39,7 @@ export default function TaskFilters({ filters, onChange, onClear }) {
         <div className="flex flex-col gap-1 w-full sm:w-auto">
           <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] px-1">Buscar</label>
           <div className="relative">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655] text-base">search</span>
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655] dark:text-[#c4c8e8] text-base">search</span>
             <input
               type="text"
               value={filters.search}

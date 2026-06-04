@@ -9,7 +9,7 @@ export const NotificationContext = createContext(null)
 
 export function NotificationProvider({ children }) {
   const { user, useRealBackend } = useAuth()
-  const socket = useSocket()
+  const { socket, connected } = useSocket()
   const userId = user?.id ?? null
 
   const [notifications, setNotifications] = useState(() =>
@@ -42,7 +42,7 @@ export function NotificationProvider({ children }) {
 
   // Polling fallback (solo sin socket activo y sin backend real)
   useEffect(() => {
-    if (!userId || socket?.connected || useRealBackend) return
+    if (!userId || connected || useRealBackend) return
     const interval = setInterval(() => {
       const fresh = storage.getNotifications(userId)
       setNotifications((prev) => {
@@ -51,7 +51,7 @@ export function NotificationProvider({ children }) {
       })
     }, 3000)
     return () => clearInterval(interval)
-  }, [userId, socket, useRealBackend])
+  }, [userId, connected, useRealBackend])
 
   const persist = useCallback((updater) => {
     setNotifications((prev) => {

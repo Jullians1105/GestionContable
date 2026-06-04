@@ -2,6 +2,7 @@ import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColo
 import { useTeam } from '../hooks/useTeam'
 import { useTags } from '../context/TagContext'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 
 const PRIORITY_COLORS = { high: '#EF4444', medium: '#FBBF24', low: '#10B981' }
 const STATUS_COLORS = { pending: '#888', in_progress: '#004ac6', completed: '#10B981' }
@@ -9,11 +10,16 @@ const STATUS_COLORS = { pending: '#888', in_progress: '#004ac6', completed: '#10
 export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onView }) {
   const { getMemberById } = useTeam()
   const { getTagById } = useTags()
-  const { isAdmin, isLeader } = useAuth()
+  const { hasPermission } = useAuth()
+  const { addToast } = useToast()
   const member = task.assignedTo ? getMemberById(task.assignedTo) : null
   const overdue = isDueDateOverdue(task.dueDate) && task.status !== 'completed'
   const soon = isDueDateSoon(task.dueDate) && task.status !== 'completed'
-  const canEdit = isAdmin() || isLeader()
+
+  const guard = (key, fn) => {
+    if (hasPermission(key)) fn()
+    else addToast('No tienes permiso para realizar esta acción', 'error')
+  }
 
   const subtasks = task.subtasks || []
   const completedSubtasks = subtasks.filter((s) => s.completed).length
@@ -28,16 +34,12 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] leading-snug line-clamp-2 flex-1">{task.title}</h3>
         <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-          {canEdit && (
-            <button onClick={() => onEdit(task)} className="p-1.5 text-[#434655] hover:text-[#004ac6] hover:bg-[#dbe1ff] rounded-lg transition" title="Editar">
-              <span className="material-symbols-outlined text-base">edit</span>
-            </button>
-          )}
-          {canEdit && (
-            <button onClick={() => onDelete(task.id)} className="p-1.5 text-[#434655] hover:text-[#93000a] hover:bg-[#ffdad6] rounded-lg transition" title="Eliminar">
-              <span className="material-symbols-outlined text-base">delete</span>
-            </button>
-          )}
+          <button onClick={() => guard('canEditTask', () => onEdit(task))} className="p-1.5 text-[#434655] dark:text-[#c4c8e8] hover:text-[#004ac6] hover:bg-[#dbe1ff] rounded-lg transition" title="Editar">
+            <span className="material-symbols-outlined text-base">edit</span>
+          </button>
+          <button onClick={() => guard('canDeleteTask', () => onDelete(task.id))} className="p-1.5 text-[#434655] dark:text-[#c4c8e8] hover:text-[#93000a] hover:bg-[#ffdad6] rounded-lg transition" title="Eliminar">
+            <span className="material-symbols-outlined text-base">delete</span>
+          </button>
         </div>
       </div>
 

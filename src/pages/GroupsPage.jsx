@@ -12,7 +12,7 @@ function ConfirmModal({ message, onConfirm, onCancel }) {
       <div className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 max-w-sm w-full">
         <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0] mb-4">{message}</p>
         <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 h-10 rounded-lg border border-[#c3c6d7] text-sm font-semibold text-[#434655] hover:bg-[#edeef0] transition">Cancelar</button>
+          <button onClick={onCancel} className="flex-1 h-10 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition">Cancelar</button>
           <button onClick={onConfirm} className="flex-1 h-10 rounded-lg text-sm font-semibold text-white transition hover:opacity-90" style={{ background: '#EF4444' }}>Eliminar</button>
         </div>
       </div>
@@ -24,13 +24,18 @@ export default function GroupsPage() {
   const { groups, deleteGroup } = useGroups()
   const { members } = useTeam()
   const { tasks } = useTasks()
-  const { isAdmin, isLeader } = useAuth()
+  const { hasPermission } = useAuth()
   const { addToast } = useToast()
   const [showForm, setShowForm] = useState(false)
   const [editGroup, setEditGroup] = useState(null)
   const [deleteId, setDeleteId] = useState(null)
 
-  const canManage = isAdmin() || isLeader()
+  const canManage = hasPermission('canManageGroups')
+
+  const guardedManage = (fn) => {
+    if (canManage) fn()
+    else addToast('No tienes permiso para gestionar grupos', 'error')
+  }
 
   const handleDelete = () => {
     deleteGroup(deleteId)
@@ -43,18 +48,16 @@ export default function GroupsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Grupos de Trabajo</h1>
-          <p className="text-sm text-[#434655] mt-0.5">{groups.length} grupos activos</p>
+          <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">{groups.length} grupos activos</p>
         </div>
-        {canManage && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold text-white transition hover:opacity-90"
-            style={{ background: '#004ac6' }}
-          >
-            <span className="material-symbols-outlined text-base">add</span>
-            Nuevo Grupo
-          </button>
-        )}
+        <button
+          onClick={() => guardedManage(() => setShowForm(true))}
+          className="flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold text-white transition hover:opacity-90"
+          style={{ background: '#004ac6' }}
+        >
+          <span className="material-symbols-outlined text-base">add</span>
+          Nuevo Grupo
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -72,23 +75,21 @@ export default function GroupsPage() {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-[#191c1e] dark:text-[#e4e6f0]">{group.name}</h3>
-                    {leader && <p className="text-xs text-[#434655]">Líder: {leader.name}</p>}
+                    {leader && <p className="text-xs text-[#434655] dark:text-[#c4c8e8]">Líder: {leader.name}</p>}
                   </div>
                 </div>
-                {canManage && (
-                  <div className="flex gap-1">
-                    <button onClick={() => setEditGroup(group)} className="p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition">
-                      <span className="material-symbols-outlined text-base text-[#434655]">edit</span>
-                    </button>
-                    <button onClick={() => setDeleteId(group.id)} className="p-1.5 rounded-lg hover:bg-[#ffdad6] transition">
-                      <span className="material-symbols-outlined text-base text-[#EF4444]">delete</span>
-                    </button>
-                  </div>
-                )}
+                <div className="flex gap-1">
+                  <button onClick={() => guardedManage(() => setEditGroup(group))} className="p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition">
+                    <span className="material-symbols-outlined text-base text-[#434655] dark:text-[#c4c8e8]">edit</span>
+                  </button>
+                  <button onClick={() => guardedManage(() => setDeleteId(group.id))} className="p-1.5 rounded-lg hover:bg-[#ffdad6] transition">
+                    <span className="material-symbols-outlined text-base text-[#EF4444]">delete</span>
+                  </button>
+                </div>
               </div>
 
               {group.description && (
-                <p className="text-sm text-[#434655] mb-3 line-clamp-2">{group.description}</p>
+                <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-3 line-clamp-2">{group.description}</p>
               )}
 
               <div className="flex items-center justify-between pt-3 border-t border-[#edeef0] dark:border-[#2e3148]">
@@ -100,9 +101,9 @@ export default function GroupsPage() {
                       </div>
                     ))}
                   </div>
-                  <span className="text-xs text-[#434655] ml-1">{groupMembers.length} miembros</span>
+                  <span className="text-xs text-[#434655] dark:text-[#c4c8e8] ml-1">{groupMembers.length} miembros</span>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-[#434655]">
+                <div className="flex items-center gap-1 text-xs text-[#434655] dark:text-[#c4c8e8]">
                   <span className="material-symbols-outlined text-sm">task_alt</span>
                   {taskCount} tareas
                 </div>
@@ -114,7 +115,7 @@ export default function GroupsPage() {
         {groups.length === 0 && (
           <div className="col-span-full py-20 text-center">
             <span className="material-symbols-outlined text-5xl text-[#c3c6d7]">group_add</span>
-            <p className="text-lg font-semibold text-[#434655] mt-3">Sin grupos de trabajo</p>
+            <p className="text-lg font-semibold text-[#434655] dark:text-[#c4c8e8] mt-3">Sin grupos de trabajo</p>
             <p className="text-sm text-[#888] mt-1">Crea el primer grupo para organizar tu equipo</p>
           </div>
         )}

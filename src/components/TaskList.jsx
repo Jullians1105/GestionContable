@@ -15,7 +15,7 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
   const { tasks, updateTask, deleteTask } = useTasks()
   const { currentGroupId } = useGroups()
   const { addToast } = useToast()
-  const { isAdmin, isLeader } = useAuth()
+  const { hasPermission } = useAuth()
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS, ...initialFilters })
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
@@ -62,8 +62,12 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
   }
 
   const handleStatusChange = (id, status) => {
+    if (!hasPermission('canEditTask')) {
+      addToast('No tienes permiso para cambiar el estado de tareas', 'error')
+      return
+    }
     updateTask(id, { status })
-    addToast(`Estado actualizado`, 'success')
+    addToast('Estado actualizado', 'success')
   }
 
   return (
@@ -72,16 +76,17 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
         <p className="text-sm text-[#434655] dark:text-[#c4c8e8]">
           <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{filtered.length}</span> {filtered.length === 1 ? 'tarea' : 'tareas'} encontradas
         </p>
-        {(isAdmin() || isLeader()) && (
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition shrink-0"
-            style={{ background: '#004ac6' }}
-          >
-            <span className="material-symbols-outlined text-lg">add</span>
-            Nueva Tarea
-          </button>
-        )}
+        <button
+          onClick={() => {
+            if (hasPermission('canCreateTask')) openCreate()
+            else addToast('No tienes permiso para crear tareas', 'error')
+          }}
+          className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition shrink-0"
+          style={{ background: '#004ac6' }}
+        >
+          <span className="material-symbols-outlined text-lg">add</span>
+          Nueva Tarea
+        </button>
       </div>
 
       <TaskFilters filters={filters} onChange={handleFilterChange} onClear={() => { setFilters(EMPTY_FILTERS); setPage(1) }} />
@@ -93,7 +98,7 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 text-[#434655]">
+        <div className="text-center py-16 text-[#434655] dark:text-[#c4c8e8]">
           <span className="material-symbols-outlined block mb-3 mx-auto text-5xl text-[#c3c6d7]">assignment</span>
           <p className="text-sm font-semibold">No hay tareas</p>
           <p className="text-xs mt-1">Crea una nueva tarea o ajusta los filtros</p>
@@ -132,7 +137,7 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
           <div className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 max-w-sm w-full">
             <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0] mb-4">¿Eliminar esta tarea? Esta acción no se puede deshacer.</p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteConfirm(null)} className="flex-1 h-10 rounded-lg border border-[#c3c6d7] text-sm font-semibold text-[#434655] hover:bg-[#edeef0] transition">Cancelar</button>
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 h-10 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition">Cancelar</button>
               <button onClick={confirmDelete} className="flex-1 h-10 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition" style={{ background: '#EF4444' }}>Eliminar</button>
             </div>
           </div>

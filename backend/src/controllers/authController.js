@@ -44,7 +44,7 @@ const login = async (req, res, next) => {
     const { email, password } = req.body;
 
     const result = await db.query(
-      'SELECT id, email, name, role, password_hash FROM users WHERE email = $1',
+      'SELECT id, email, name, role, password_hash, permissions FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
     const user = result.rows[0];
@@ -132,7 +132,7 @@ const logout = async (req, res, next) => {
 const me = async (req, res, next) => {
   try {
     const result = await db.query(
-      'SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1',
+      'SELECT id, email, name, role, permissions, created_at, updated_at FROM users WHERE id = $1',
       [req.user.userId]
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });

@@ -81,15 +81,25 @@ export default function SettingsPage() {
         <div className={cardCls}>
           <h3 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-4">Apariencia</h3>
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">Tema {theme === 'dark' ? 'Oscuro' : 'Claro'}</p>
-              <p className="text-xs text-[#434655] mt-0.5">Cambia entre modo claro y oscuro</p>
+            <div className="flex items-center gap-3">
+              <span className={`material-symbols-outlined text-2xl ${theme === 'dark' ? 'text-[#7ba8f0]' : 'text-[#FBBF24]'}`}>
+                {theme === 'dark' ? 'dark_mode' : 'light_mode'}
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">Modo {theme === 'dark' ? 'oscuro' : 'claro'}</p>
+                <p className="text-xs text-[#434655] dark:text-[#8b8fa8] mt-0.5">Cambia entre modo claro y oscuro</p>
+              </div>
             </div>
             <button
               onClick={toggleTheme}
-              className={`relative w-12 h-6 rounded-full transition-colors ${theme === 'dark' ? 'bg-[#004ac6]' : 'bg-[#c3c6d7]'}`}
+              aria-label="Cambiar tema"
+              className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-[#1e2030] ${theme === 'dark' ? 'bg-[#004ac6]' : 'bg-[#c3c6d7]'}`}
             >
-              <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${theme === 'dark' ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              <span className={`absolute top-1 w-5 h-5 rounded-full shadow transition-transform duration-300 flex items-center justify-center text-[10px] ${theme === 'dark' ? 'translate-x-7 bg-white text-[#004ac6]' : 'translate-x-1 bg-white text-[#FBBF24]'}`}>
+                <span className="material-symbols-outlined" style={{ fontSize: '13px' }}>
+                  {theme === 'dark' ? 'dark_mode' : 'light_mode'}
+                </span>
+              </span>
             </button>
           </div>
         </div>

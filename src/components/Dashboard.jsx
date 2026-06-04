@@ -68,7 +68,7 @@ export default function Dashboard() {
         <div className="card lg:col-span-1">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">Distribucion por Estado</h2>
-            <span className="material-symbols-outlined text-[#434655]" style={{ fontSize: 20 }}>more_vert</span>
+            <span className="material-symbols-outlined text-[#434655] dark:text-[#c4c8e8]" style={{ fontSize: 20 }}>more_vert</span>
           </div>
           {pieData.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
@@ -83,7 +83,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           ) : (
             <div className="h-[220px] flex items-center justify-center">
-              <p className="text-[14px] text-[#434655]">No hay tareas</p>
+              <p className="text-[14px] text-[#434655] dark:text-[#c4c8e8]">No hay tareas</p>
             </div>
           )}
           <div className="grid grid-cols-3 gap-2 mt-4">
@@ -94,7 +94,7 @@ export default function Dashboard() {
             ].map(({ label, color }) => (
               <div key={label} className="flex items-center gap-1.5">
                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                <span className="text-[11px] text-[#434655] leading-tight">{label}</span>
+                <span className="text-[11px] text-[#434655] dark:text-[#c4c8e8] leading-tight">{label}</span>
               </div>
             ))}
           </div>
@@ -103,7 +103,7 @@ export default function Dashboard() {
         <div className="card lg:col-span-2">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">Tareas por Prioridad</h2>
-            <span className="material-symbols-outlined text-[#434655]" style={{ fontSize: 20 }}>filter_list</span>
+            <span className="material-symbols-outlined text-[#434655] dark:text-[#c4c8e8]" style={{ fontSize: 20 }}>filter_list</span>
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={barData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -137,7 +137,7 @@ export default function Dashboard() {
               return (
                 <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border ${overdue ? "border-[#ffdad6] bg-[#fff5f5]" : "border-yellow-200 bg-yellow-50"}`}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-semibold text-[#191c1e] truncate">{task.title}</p>
+                    <p className="text-[14px] font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">{task.title}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={`text-[12px] font-semibold flex items-center gap-1 ${overdue ? "text-[#93000a]" : "text-yellow-700"}`}>
                         <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{overdue ? "warning" : "schedule"}</span>
@@ -160,8 +160,8 @@ export default function Dashboard() {
         ) : (
           <div className="text-center py-8">
             <span className="material-symbols-outlined block mb-2 mx-auto" style={{ fontSize: 40, color: "#c3c6d7" }}>check_circle</span>
-            <p className="text-[14px] font-semibold text-[#434655]">Todo al dia</p>
-            <p className="text-[12px] mt-1 text-[#434655]">No hay tareas urgentes por el momento</p>
+            <p className="text-[14px] font-semibold text-[#434655] dark:text-[#c4c8e8]">Todo al dia</p>
+            <p className="text-[12px] mt-1 text-[#434655] dark:text-[#c4c8e8]">No hay tareas urgentes por el momento</p>
           </div>
         )}
       </div>

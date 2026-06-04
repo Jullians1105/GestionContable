@@ -13,6 +13,7 @@ import { useTasks } from '../context/TaskContext'
 import { useGroups } from '../context/GroupContext'
 import { useTeam } from '../hooks/useTeam'
 import { useToast } from '../context/ToastContext'
+import { useAuth } from '../context/AuthContext'
 import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from '../utils/helpers'
 
 const COLUMNS = [
@@ -108,6 +109,7 @@ export default function KanbanPage() {
   const { currentGroupId } = useGroups()
   const { members } = useTeam()
   const { addToast } = useToast()
+  const { hasPermission } = useAuth()
   const [activeTask, setActiveTask] = useState(null)
 
   const filtered = useMemo(() =>
@@ -142,6 +144,10 @@ export default function KanbanPage() {
     const fromStatus = findStatus(active.id)
     const toStatus = COLUMNS.find((c) => c.id === over.id)?.id || findStatus(over.id)
     if (!fromStatus || !toStatus || fromStatus === toStatus) return
+    if (!hasPermission('canEditTask')) {
+      addToast('No tienes permiso para mover tareas', 'error')
+      return
+    }
     updateTask(active.id, { status: toStatus })
     const col = COLUMNS.find((c) => c.id === toStatus)
     addToast(`Tarea movida a "${col.label}"`, 'success')
@@ -152,7 +158,7 @@ export default function KanbanPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Tablero Kanban</h1>
-          <p className="text-sm text-[#434655] mt-0.5">{filtered.length} tareas en total</p>
+          <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">{filtered.length} tareas en total</p>
         </div>
       </div>
 

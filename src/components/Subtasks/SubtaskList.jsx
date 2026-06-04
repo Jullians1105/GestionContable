@@ -26,7 +26,7 @@ export default function SubtaskList({ task }) {
         <h3 className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] flex items-center gap-1.5">
           <span className="material-symbols-outlined text-base text-[#004ac6]">checklist</span>
           Subtareas
-          {total > 0 && <span className="text-xs text-[#434655] font-normal">({completed}/{total})</span>}
+          {total > 0 && <span className="text-xs text-[#434655] dark:text-[#c4c8e8] font-normal">({completed}/{total})</span>}
         </h3>
       </div>
 
@@ -38,7 +38,7 @@ export default function SubtaskList({ task }) {
               style={{ width: `${pct}%`, background: '#004ac6' }}
             />
           </div>
-          <p className="text-xs text-[#434655] mt-0.5">{pct}% completado</p>
+          <p className="text-xs text-[#434655] dark:text-[#c4c8e8] mt-0.5">{pct}% completado</p>
         </div>
       )}
 

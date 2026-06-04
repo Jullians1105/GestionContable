@@ -102,11 +102,12 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className={labelCls}>Asignado a</label>
-          <select value={form.assignedTo} onChange={(e) => handleChange('assignedTo', e.target.value)} className={inputCls}>
-            <option value="">Sin asignar</option>
+          <label className={labelCls}>Asignado a <span className="text-[#EF4444]">*</span></label>
+          <select value={form.assignedTo} onChange={(e) => handleChange('assignedTo', e.target.value)} className={`${inputCls} ${errors.assignedTo ? inputErrCls : ''}`}>
+            <option value="">Seleccionar...</option>
             {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
+          {errors.assignedTo && <p className="text-[#EF4444] text-xs mt-1">{errors.assignedTo}</p>}
         </div>
         <div>
           <label className={labelCls}>Fecha límite</label>

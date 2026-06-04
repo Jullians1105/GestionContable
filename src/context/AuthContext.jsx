@@ -3,6 +3,7 @@ import { api } from '../services/api'
 import { generateId, today } from '../utils/helpers'
 import { storage } from '../utils/storage'
 import { SAMPLE_MEMBERS } from '../utils/sampleData'
+import { getEffectivePermissions } from '../utils/permissions'
 
 export const AuthContext = createContext(null)
 
@@ -63,7 +64,7 @@ export function AuthProvider({ children }) {
           })
       }
     })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   const login = useCallback(async (email, password) => {
     const hasBackend = await checkBackend()
@@ -156,11 +157,12 @@ export function AuthProvider({ children }) {
   const canEdit = useCallback(() => !user ? false : user.role !== 'viewer', [user])
   const isAdmin = useCallback(() => user?.role === 'admin', [user])
   const isLeader = useCallback(() => ['admin', 'leader'].includes(user?.role), [user])
+  const hasPermission = useCallback((key) => getEffectivePermissions(user)[key] ?? false, [user])
 
   return (
     <AuthContext.Provider value={{
       user, token, isAuthenticated, useRealBackend,
-      login, logout, register, updateCurrentUser, canEdit, isAdmin, isLeader,
+      login, logout, register, updateCurrentUser, canEdit, isAdmin, isLeader, hasPermission,
     }}>
       {children}
     </AuthContext.Provider>

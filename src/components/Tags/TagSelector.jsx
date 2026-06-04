@@ -42,7 +42,7 @@ export default function TagSelector({ selectedIds = [], onChange }) {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border border-dashed border-[#c3c6d7] text-[#434655] hover:border-[#004ac6] hover:text-[#004ac6] transition"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border border-dashed border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] hover:border-[#004ac6] hover:text-[#004ac6] transition"
         >
           <span className="material-symbols-outlined text-xs">add</span>
           Etiqueta
@@ -66,7 +66,7 @@ export default function TagSelector({ selectedIds = [], onChange }) {
             ))}
           </div>
           <div className="border-t border-[#c3c6d7] dark:border-[#2e3148] pt-2">
-            <p className="text-xs font-semibold text-[#434655] mb-1.5">Nueva etiqueta</p>
+            <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Nueva etiqueta</p>
             <form onSubmit={handleCreate} className="flex gap-2 items-center">
               <div className="flex gap-1">
                 {PRESET_COLORS.map((c) => (

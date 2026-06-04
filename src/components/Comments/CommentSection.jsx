@@ -89,7 +89,7 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
       <h3 className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] flex items-center gap-1.5 mb-3">
         <span className="material-symbols-outlined text-base text-[#004ac6]">chat</span>
         Comentarios
-        {comments.length > 0 && <span className="text-xs text-[#434655] font-normal">({comments.length})</span>}
+        {comments.length > 0 && <span className="text-xs text-[#434655] dark:text-[#c4c8e8] font-normal">({comments.length})</span>}
       </h3>
 
       <div className="space-y-3 mb-4">
@@ -119,7 +119,7 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
                       autoFocus
                     />
                     <button type="submit" className="text-xs px-2 py-1 rounded-lg text-white font-semibold hover:opacity-90" style={{ background: '#004ac6' }}>Guardar</button>
-                    <button type="button" onClick={() => setEditId(null)} className="text-xs px-2 py-1 rounded-lg border border-[#c3c6d7] text-[#434655] hover:bg-[#edeef0]">Cancelar</button>
+                    <button type="button" onClick={() => setEditId(null)} className="text-xs px-2 py-1 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840]">Cancelar</button>
                   </form>
                 ) : (
                   <p className="text-sm text-[#434655] dark:text-[#c4c8e8] bg-[#edeef0] dark:bg-[#252840] rounded-xl px-3 py-2 inline-block max-w-full">{c.text}</p>

@@ -10,8 +10,8 @@ export default function TasksPage() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-[24px] font-bold text-[#191c1e]">Mis Tareas</h2>
-        <p className="text-[14px] text-[#434655] mt-1">Gestiona y organiza tus entregables activos</p>
+        <h2 className="text-[24px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">Mis Tareas</h2>
+        <p className="text-[14px] text-[#434655] dark:text-[#c4c8e8] mt-1">Gestiona y organiza tus entregables activos</p>
       </div>
       <TaskList
         initialFilters={search ? { search } : {}}

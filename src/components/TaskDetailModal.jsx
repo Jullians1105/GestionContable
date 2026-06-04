@@ -18,7 +18,7 @@ const STATUS_OPTIONS = [
 
 export default function TaskDetailModal({ task, onClose, onEdit, scrollToCommentId = null }) {
   const { getTaskById, updateTask } = useTasks()
-  const { user, isAdmin, isLeader } = useAuth()
+  const { hasPermission } = useAuth()
   const { getMemberById } = useTeam()
   const { getTagById } = useTags()
   const { addToast } = useToast()
@@ -37,10 +37,14 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
   const tags = (liveTask.tagIds || []).map(getTagById).filter(Boolean)
   const overdue = isDueDateOverdue(liveTask.dueDate) && liveTask.status !== 'completed'
   const soon = isDueDateSoon(liveTask.dueDate) && liveTask.status !== 'completed'
-  const canEdit = isAdmin() || isLeader()
-  const canComment = user?.role !== 'viewer'
+  const canEdit = hasPermission('canEditTask')
+  const canComment = hasPermission('canComment')
 
   const handleStatusChange = (e) => {
+    if (!hasPermission('canEditTask')) {
+      addToast('No tienes permiso para cambiar el estado de tareas', 'error')
+      return
+    }
     updateTask(liveTask.id, { status: e.target.value })
     addToast('Estado actualizado', 'success')
   }
@@ -72,15 +76,16 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {canEdit && (
-              <button
-                onClick={() => { onClose(); onEdit(liveTask) }}
-                className="flex items-center gap-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
-              >
-                <span className="material-symbols-outlined text-base">edit</span>
-                Editar
-              </button>
-            )}
+            <button
+              onClick={() => {
+                if (canEdit) { onClose(); onEdit(liveTask) }
+                else addToast('No tienes permiso para editar tareas', 'error')
+              }}
+              className="flex items-center gap-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+            >
+              <span className="material-symbols-outlined text-base">edit</span>
+              Editar
+            </button>
             <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-[#434655] dark:text-[#c4c8e8]">
               <span className="material-symbols-outlined text-xl">close</span>
             </button>
@@ -158,6 +163,12 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
 
           {/* Comentarios */}
           <div className="border-t border-[#edeef0] dark:border-[#2e3148] pt-4">
+            {!canComment && (
+              <p className="text-xs text-[#888] italic bg-[#f3f4f6] dark:bg-[#252840] rounded-lg px-3 py-2 mb-3 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm">lock</span>
+                No tienes permiso para agregar comentarios
+              </p>
+            )}
             <CommentSection task={liveTask} readOnly={!canComment} scrollToCommentId={scrollToCommentId} />
           </div>
         </div>

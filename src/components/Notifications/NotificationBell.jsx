@@ -71,7 +71,7 @@ export default function NotificationBell() {
               {recent.length === 0 ? (
                 <div className="px-4 py-8 text-center">
                   <span className="material-symbols-outlined text-3xl text-[#c3c6d7]">notifications_none</span>
-                  <p className="text-sm text-[#434655] mt-2">Sin notificaciones</p>
+                  <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-2">Sin notificaciones</p>
                 </div>
               ) : (
                 recent.map((n) => (

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import TaskModal from './TaskModal'
 
 const navItems = [
@@ -11,17 +12,20 @@ const navItems = [
   { to: '/team', label: 'Equipo', icon: 'group' },
   { to: '/groups', label: 'Grupos', icon: 'group_work' },
   { to: '/reports', label: 'Reportes', icon: 'bar_chart' },
+  { to: '/usuarios', label: 'Usuarios', icon: 'manage_accounts' },
   { to: '/notifications', label: 'Notificaciones', icon: 'notifications' },
   { to: '/settings', label: 'Configuración', icon: 'settings' },
 ]
 
 export default function Sidebar({ open, onClose }) {
-  const { isAdmin, isLeader, canEdit } = useAuth()
+  const { isAdmin, isLeader, hasPermission } = useAuth()
+  const { addToast } = useToast()
   const [showModal, setShowModal] = useState(false)
 
   const visible = navItems.filter((item) => {
     if (item.to === '/reports' && !isAdmin() && !isLeader()) return false
     if (item.to === '/groups' && !isAdmin() && !isLeader()) return false
+    if (item.to === '/usuarios' && !isAdmin()) return false
     return true
   })
 
@@ -64,16 +68,17 @@ export default function Sidebar({ open, onClose }) {
           ))}
         </nav>
 
-        {canEdit() && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="mt-2 w-full h-10 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-2 hover:opacity-90 transition active:scale-[0.97]"
-            style={{ background: '#004ac6' }}
-          >
-            <span className="material-symbols-outlined text-lg">add</span>
-            Nueva Tarea
-          </button>
-        )}
+        <button
+          onClick={() => {
+            if (hasPermission('canCreateTask')) setShowModal(true)
+            else addToast('No tienes permiso para crear tareas', 'error')
+          }}
+          className="mt-2 w-full h-10 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-2 hover:opacity-90 transition active:scale-[0.97]"
+          style={{ background: '#004ac6' }}
+        >
+          <span className="material-symbols-outlined text-lg">add</span>
+          Nueva Tarea
+        </button>
       </aside>
 
       {showModal && (

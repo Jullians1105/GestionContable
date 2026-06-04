@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useAuth } from './AuthContext'
 
-export const SocketContext = createContext(null)
+export const SocketContext = createContext({ socket: null, connected: false })
 
 export function SocketProvider({ children }) {
   const { token, isAuthenticated } = useAuth()
   const [socket, setSocket] = useState(null)
+  const [connected, setConnected] = useState(false)
   const socketRef = useRef(null)
 
   useEffect(() => {
@@ -14,6 +15,7 @@ export function SocketProvider({ children }) {
         socketRef.current.disconnect()
         socketRef.current = null
         setSocket(null)
+        setConnected(false)
       }
       return
     }
@@ -31,9 +33,9 @@ export function SocketProvider({ children }) {
         reconnectionDelay: 1000,
       })
 
-      s.on('connect', () => console.debug('[Socket] Connected:', s.id))
-      s.on('disconnect', () => console.debug('[Socket] Disconnected'))
-      s.on('connect_error', (err) => console.debug('[Socket] Error:', err.message))
+      s.on('connect', () => { console.debug('[Socket] Connected:', s.id); setConnected(true) })
+      s.on('disconnect', () => { console.debug('[Socket] Disconnected'); setConnected(false) })
+      s.on('connect_error', (err) => { console.debug('[Socket] Error:', err.message); setConnected(false) })
 
       socketRef.current = s
       setSocket(s)
@@ -45,12 +47,13 @@ export function SocketProvider({ children }) {
       if (socketRef.current) {
         socketRef.current.disconnect()
         socketRef.current = null
+        setConnected(false)
       }
     }
   }, [isAuthenticated, token])
 
   return (
-    <SocketContext.Provider value={socket}>
+    <SocketContext.Provider value={{ socket, connected }}>
       {children}
     </SocketContext.Provider>
   )
