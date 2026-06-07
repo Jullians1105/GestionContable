@@ -122,11 +122,16 @@ const createTask = async (req, res, next) => {
       const actor = await db.query('SELECT name FROM users WHERE id = $1', [req.user.userId]);
       const actorName = actor.rows[0]?.name ?? 'Alguien';
       const extraData = JSON.stringify({ actorId: req.user.userId, actorName });
+      const notifId = uuidv4();
+      const notifMsg = `${actorName} te asignó la tarea "${title}"`;
       await db.query(
         `INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'task_assigned', $3, $4, $5)`,
-        [uuidv4(), assignedTo, `${actorName} te asignó la tarea "${title}"`, id, extraData]
+        [notifId, assignedTo, notifMsg, id, extraData]
       );
-      req.io?.to(`user:${assignedTo}`).emit('notification:received', { type: 'task_assigned', taskId: id, extra: { actorId: req.user.userId, actorName } });
+      req.io?.to(`user:${assignedTo}`).emit('notification:received', {
+        id: notifId, type: 'task_assigned', message: notifMsg, taskId: id,
+        extra: { actorId: req.user.userId, actorName }, read: false, createdAt: new Date().toISOString(),
+      });
     }
 
     const full = { ...normalizeTask(task), subtasks: [], comments: [], tagIds };
@@ -179,11 +184,16 @@ const updateTask = async (req, res, next) => {
         const actor = await db.query('SELECT name FROM users WHERE id = $1', [req.user.userId]);
         const actorName = actor.rows[0]?.name ?? 'Alguien';
         const extraData = JSON.stringify({ actorId: req.user.userId, actorName });
+        const notifId = uuidv4();
+        const notifMsg = `${actorName} te asignó la tarea "${task.title}"`;
         await db.query(
           `INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'task_assigned', $3, $4, $5)`,
-          [uuidv4(), assignedTo, `${actorName} te asignó la tarea "${task.title}"`, id, extraData]
+          [notifId, assignedTo, notifMsg, id, extraData]
         );
-        req.io?.to(`user:${assignedTo}`).emit('notification:received', { type: 'task_assigned', taskId: id, extra: { actorId: req.user.userId, actorName } });
+        req.io?.to(`user:${assignedTo}`).emit('notification:received', {
+          id: notifId, type: 'task_assigned', message: notifMsg, taskId: id,
+          extra: { actorId: req.user.userId, actorName }, read: false, createdAt: new Date().toISOString(),
+        });
       }
     }
 
@@ -192,13 +202,18 @@ const updateTask = async (req, res, next) => {
       const actorName = actor.rows[0]?.name ?? 'Alguien';
       const extraData = JSON.stringify({ completedById: req.user.userId, completedByName: actorName });
       const leaders = await db.query(`SELECT id FROM users WHERE role IN ('admin','leader') AND id != $1`, [req.user.userId]);
-      await Promise.all(leaders.rows.map(l =>
-        db.query(`INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'task_completed', $3, $4, $5)`,
-          [uuidv4(), l.id, `"${task.title}" fue completada`, id, extraData])
+      await Promise.all(leaders.rows.map(l => {
+        const notifId = uuidv4();
+        const notifMsg = `"${task.title}" fue completada`;
+        return db.query(`INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'task_completed', $3, $4, $5)`,
+          [notifId, l.id, notifMsg, id, extraData])
         .then(() => {
-          req.io?.to(`user:${l.id}`).emit('notification:received', { type: 'task_completed', taskId: id, extra: { completedById: req.user.userId, completedByName: actorName } });
-        })
-      ));
+          req.io?.to(`user:${l.id}`).emit('notification:received', {
+            id: notifId, type: 'task_completed', message: notifMsg, taskId: id,
+            extra: { completedById: req.user.userId, completedByName: actorName }, read: false, createdAt: new Date().toISOString(),
+          });
+        });
+      }));
     }
 
     await auditLog(req.user.userId, 'UPDATE', 'tasks', id, changes);

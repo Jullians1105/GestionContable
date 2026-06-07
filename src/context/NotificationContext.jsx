@@ -75,6 +75,7 @@ export function NotificationProvider({ children }) {
   }, [userId, persist])
 
   const markAsRead = useCallback((notifId) => {
+    if (!notifId) return
     persist((prev) => prev.map((n) => (n.id === notifId ? { ...n, read: true } : n)))
     if (useRealBackend) api.markNotificationRead(notifId).catch(() => {})
   }, [persist, useRealBackend])

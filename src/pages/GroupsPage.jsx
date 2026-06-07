@@ -3,7 +3,7 @@ import { useGroups } from '../context/GroupContext'
 import { useTeam } from '../hooks/useTeam'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { useTasks } from '../context/TaskContext'
+import { useTasks } from '../hooks/useTasks'
 import GroupForm from '../components/Groups/GroupForm'
 
 function ConfirmModal({ message, onConfirm, onCancel }) {

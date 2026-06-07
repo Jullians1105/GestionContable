@@ -108,7 +108,11 @@ export function TaskProvider({ children }) {
     addingRef.current = true
     const payload = { groupId: null, tagIds: [], subtasks: [], comments: [], ...taskData, createdAt: today(), updatedAt: today() }
     try {
-      const newTask = await api.createTask(payload)
+      let newTask = await api.createTask(payload)
+      // Insertar subtareas una por una — el backend no las procesa en createTask
+      for (const sub of (taskData.subtasks ?? [])) {
+        if (sub.title?.trim()) newTask = await api.addSubtask(newTask.id, sub.title.trim())
+      }
       // Actualización local solo cuando NO hay socket conectado (el socket emitirá task:created)
       if (!connected) {
         setTasks(prev => [newTask, ...prev])

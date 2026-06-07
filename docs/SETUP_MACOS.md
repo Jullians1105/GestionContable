@@ -9,25 +9,50 @@ Prompt para ejecutar en Claude Code al abrir el proyecto en un Mac por primera v
 ```
 Estoy abriendo este proyecto por primera vez en macOS. Necesito que hagas lo siguiente en orden:
 
-1. Verifica que Node.js esté instalado corriendo `node -v` y `npm -v`. Si no están, indícame cómo instalarlos con Homebrew (`brew install node`).
+1. Verifica que Node.js y Docker estén instalados:
+   node -v && npm -v
+   docker -v
+
+   Si Node.js no está, indícame cómo instalarlo con Homebrew:
+     brew install node
+   Si Docker no está, indícame que descargue Docker Desktop desde https://www.docker.com/products/docker-desktop/
 
 2. Instala las dependencias del proyecto raíz:
    npm install
 
 3. Instala las dependencias del backend:
-   npm --prefix backend install
+   npm run backend:install
 
-4. Instala las dependencias del servidor MCP:
-   npm --prefix mcpServer install
+4. Crea el archivo .env del backend copiando el ejemplo:
+   cp backend/.env.example backend/.env
 
-5. Compila el servidor MCP (TypeScript → JavaScript):
-   npm --prefix mcpServer run build
+   Luego confirma que backend/.env existe y tiene al menos estas variables:
+     PORT=3000
+     DB_HOST=localhost
+     DB_PORT=5432
+     DB_NAME=taskflow
+     DB_USER=postgres
+     DB_PASSWORD=postgres
+     JWT_SECRET=<cualquier cadena larga>
 
-   Verifica que se haya generado la carpeta mcpServer/dist/ con el archivo index.js.
+5. Levanta PostgreSQL con Docker:
+   docker compose up -d postgres
 
-6. Verifica que el archivo .claude.json tenga la ruta relativa ./mcpServer/dist/index.js (no una ruta absoluta de Windows). Si tiene una ruta absoluta, cámbiala.
+   Espera a que el healthcheck pase (unos 10 segundos) y verifica:
+   docker compose ps
 
-7. Confirma que todo esté listo mostrando el contenido de mcpServer/dist/ y el estado de las dependencias.
+6. Ejecuta las migraciones y carga los datos de prueba:
+   npm run backend:migrate:seed
+
+   Verifica que el comando terminó sin errores. Debería aplicar:
+   - 001_initial_schema.sql
+   - 002_seed_data.sql
+   - 003_notification_extra.sql
+   - 004_user_permissions.sql
+
+7. Confirma que todo esté listo mostrando el resultado de:
+   docker compose ps
+   ls backend/migrations/
 ```
 
 ---
@@ -37,48 +62,82 @@ Estoy abriendo este proyecto por primera vez en macOS. Necesito que hagas lo sig
 ```
 Arranca el entorno de desarrollo completo:
 
-1. Levanta el frontend y el backend en paralelo:
+1. Asegúrate de que PostgreSQL esté corriendo:
+   docker compose ps
+
+   Si el contenedor postgres no está up, levántalo:
+   docker compose up -d postgres
+
+2. Levanta el backend y el frontend en paralelo:
    npm run start
 
    Esto arranca:
-   - MCP Server en modo dev (ts-node src/index.ts) 
-   - Backend Express en localhost:3000
+   - Backend Express (nodemon) en localhost:3000
+   - Frontend Vite en localhost:5173
 
-2. En otra terminal, levanta el servidor de desarrollo de Vite:
-   npm run dev
+   El frontend detecta automáticamente si el backend está disponible
+   y cambia a modo real (JWT + PostgreSQL). Si el backend no responde,
+   cae en modo localStorage.
 
-   El frontend queda disponible en localhost:5173.
-
-Avísame cuando los tres procesos estén corriendo y sin errores.
+Avísame cuando los dos procesos estén corriendo y sin errores en consola.
 ```
 
 ---
 
-## Prompt si el MCP server no carga en Claude Code
+## Prompt si necesitas el MCP Server (opcional)
 
 ```
-El servidor MCP "gestor-tareas" no está cargando. Haz lo siguiente:
+El MCP server de gestor-tareas es opcional desde la Fase 3.
+Si lo necesitas activo en Claude Code:
 
-1. Verifica que mcpServer/dist/index.js existe. Si no existe, compila:
+1. Instala sus dependencias (si no lo hiciste):
+   npm --prefix mcpServer install
+
+2. Compila TypeScript → JavaScript:
    npm --prefix mcpServer run build
 
-2. Revisa el contenido de .claude.json y confirma que args contiene:
+   Verifica que se haya generado mcpServer/dist/index.js.
+
+3. Revisa que .claude.json tenga la ruta relativa (no absoluta de Windows):
    "./mcpServer/dist/index.js"
-   (ruta relativa, sin barras invertidas de Windows)
 
-3. Si el archivo existe y la ruta es correcta, recarga Claude Code:
+4. Recarga el servidor MCP en Claude Code:
    Ve a Configuración → MCP Servers → reinicia "gestor-tareas"
-
-4. Si sigue sin cargar, muéstrame el error exacto del panel de MCP servers.
 ```
 
 ---
 
-## Prompt si hay errores al instalar dependencias
+## Prompt si el backend no conecta a PostgreSQL
 
 ```
-Tengo errores al correr npm install en este proyecto en macOS. El paquete better-sqlite3 
-requiere compilación nativa. Haz lo siguiente:
+El backend no puede conectarse a la base de datos. Haz lo siguiente:
+
+1. Verifica que el contenedor esté corriendo:
+   docker compose ps
+
+2. Si está detenido, reinícialo:
+   docker compose up -d postgres
+
+3. Confirma que backend/.env existe y tiene DB_HOST=localhost y DB_PORT=5432.
+   (No usar DB_HOST=postgres — eso es solo para Docker-to-Docker.)
+
+4. Si la base de datos no tiene tablas (primer arranque o reset):
+   npm run backend:migrate:seed
+
+5. Si el error es "password authentication failed", verifica que
+   DB_PASSWORD en backend/.env coincida con POSTGRES_PASSWORD en docker-compose.yml
+   (por defecto ambos son "postgres").
+
+6. Muéstrame el error exacto si sigue fallando.
+```
+
+---
+
+## Prompt si hay errores al instalar dependencias nativas
+
+```
+Tengo errores al correr npm install en este proyecto en macOS.
+El paquete better-sqlite3 (mcpServer) requiere compilación nativa.
 
 1. Verifica que Xcode Command Line Tools estén instalados:
    xcode-select --install
@@ -90,6 +149,9 @@ requiere compilación nativa. Haz lo siguiente:
    npm --prefix mcpServer install --build-from-source
 
 4. Si el error persiste, muéstrame el mensaje de error completo.
+
+Nota: el backend principal ya no usa better-sqlite3 (migrado a PostgreSQL),
+por lo que este problema solo afecta al MCP server opcional.
 ```
 
 ---
@@ -97,14 +159,37 @@ requiere compilación nativa. Haz lo siguiente:
 ## Prompt para detener todos los procesos
 
 ```
-Detén todos los procesos Node.js del proyecto:
+Detén todos los procesos del proyecto:
+
+1. Para Node.js (frontend + backend):
    npm run stop
 
-Si eso no funciona o mata procesos de otros proyectos, usa:
-   pkill -f "ts-node src/index.ts"
-   pkill -f "node server.js"
+   Si eso mata procesos de otros proyectos, usa selectivamente:
+   pkill -f "nodemon src/index.js"
    pkill -f "vite"
+
+2. Para PostgreSQL (Docker):
+   docker compose stop postgres
+
+   O si quieres detener y limpiar todo:
+   docker compose down
 ```
+
+---
+
+## Usuarios de prueba (seed en PostgreSQL)
+
+| Email | Password | Rol | Permisos |
+|---|---|---|---|
+| maria@empresa.com | admin123 | admin | todos |
+| carlos@empresa.com | leader123 | leader | todos |
+| ana@empresa.com | member123 | member | crear + comentar |
+| pedro@empresa.com | member123 | member | crear + comentar |
+| laura@empresa.com | viewer123 | viewer | ninguno |
+
+Los permisos granulares (`canCreateTask`, `canEditTask`, etc.) se gestionan
+desde `/usuarios` (solo admin). Si `permissions` es `null` en la BD,
+se aplican los defaults del rol.
 
 ---
 
@@ -112,10 +197,17 @@ Si eso no funciona o mata procesos de otros proyectos, usa:
 
 | Comando | Qué hace |
 |---|---|
-| `npm run dev` | Frontend Vite en localhost:5173 |
-| `npm run build` | Build de producción (verifica errores) |
+| `npm run dev` | Solo frontend Vite en localhost:5173 |
+| `npm run build` | Build de producción |
 | `npm run lint` | ESLint — falla si hay warnings |
-| `npm run start` | MCP server + Backend Express en paralelo |
+| `npm run start` | Backend (nodemon) + Frontend Vite en paralelo |
 | `npm run stop` | Mata todos los procesos node |
+| `npm run backend:install` | Instala dependencias del backend |
+| `npm run backend:migrate` | Aplica migraciones SQL (sin seed) |
+| `npm run backend:migrate:seed` | Aplica migraciones + carga datos de prueba |
+| `npm run backend:test` | Corre tests del backend (Jest) |
 | `npm --prefix mcpServer run build` | Compila TypeScript del MCP server |
 | `npm --prefix mcpServer run dev` | MCP server en modo dev con ts-node |
+| `docker compose up -d postgres` | Levanta PostgreSQL en Docker |
+| `docker compose stop postgres` | Detiene PostgreSQL |
+| `docker compose down` | Detiene y elimina contenedores |

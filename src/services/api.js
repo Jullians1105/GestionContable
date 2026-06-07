@@ -57,6 +57,7 @@ async function request(path, options = {}, retry = true) {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
+    if (body.details) console.error('[API]', path, body.details);
     throw new Error(body.error || `Error ${res.status}`);
   }
   return res.json();

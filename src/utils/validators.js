@@ -23,12 +23,14 @@ export const validators = {
   },
 
   validateTask: (task) => {
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     const errors = {}
     const titleError = validators.required(task.title) || validators.maxLength(255)(task.title)
     if (titleError) errors.title = titleError
     if (!task.priority) errors.priority = 'La prioridad es obligatoria'
     if (!task.status) errors.status = 'El estado es obligatorio'
     if (!task.assignedTo) errors.assignedTo = 'Debes asignar la tarea a alguien'
+    else if (!UUID_RE.test(task.assignedTo)) errors.assignedTo = 'Selecciona un miembro válido del equipo'
     return errors
   },
 

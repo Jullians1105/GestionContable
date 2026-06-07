@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import TaskForm from './TaskForm'
 import SubtaskList from './Subtasks/SubtaskList'
 import CommentSection from './Comments/CommentSection'
-import { useTasks } from '../context/TaskContext'
+import { useTasks } from '../hooks/useTasks'
 import { useToast } from '../context/ToastContext'
 
 export default function TaskModal({ isOpen, task, onClose }) {

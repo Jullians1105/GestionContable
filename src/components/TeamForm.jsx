@@ -1,11 +1,5 @@
-﻿import { useState } from "react"
+import { useState } from "react"
 import { validators } from "../utils/validators"
-
-const EMPTY_MEMBER = {
-  name: "",
-  email: "",
-  role: "member",
-}
 
 const labelCls = "block text-[12px] font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1"
 const inputCls = "w-full border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 h-10 text-[14px] text-[#191c1e] dark:text-[#e4e6f0] bg-white dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] hover:bg-[#f3f4f6] dark:hover:bg-[#2e3148] transition-colors"
@@ -26,7 +20,7 @@ const ROLE_HINT_COLORS = {
 }
 
 export default function TeamForm({ member, onSubmit, onCancel }) {
-  const [form, setForm] = useState(member ?? EMPTY_MEMBER)
+  const [form, setForm] = useState(member ?? { name: "", email: "", role: "member" })
   const [errors, setErrors] = useState({})
 
   const handleChange = (field, value) => {
@@ -58,17 +52,20 @@ export default function TeamForm({ member, onSubmit, onCancel }) {
         {errors.name && <p className="text-[#EF4444] text-[12px] mt-1">{errors.name}</p>}
       </div>
 
-      <div>
-        <label className={labelCls}>Email <span className="text-[#EF4444]">*</span></label>
-        <input
-          type="email"
-          value={form.email}
-          onChange={(e) => handleChange("email", e.target.value)}
-          placeholder="correo@empresa.com"
-          className={`${inputCls} ${errors.email ? inputErrCls : ""}`}
-        />
-        {errors.email && <p className="text-[#EF4444] text-[12px] mt-1">{errors.email}</p>}
-      </div>
+      {/* Email only shown when creating (localStorage mode) */}
+      {!member && (
+        <div>
+          <label className={labelCls}>Email <span className="text-[#EF4444]">*</span></label>
+          <input
+            type="email"
+            value={form.email}
+            onChange={(e) => handleChange("email", e.target.value)}
+            placeholder="correo@empresa.com"
+            className={`${inputCls} ${errors.email ? inputErrCls : ""}`}
+          />
+          {errors.email && <p className="text-[#EF4444] text-[12px] mt-1">{errors.email}</p>}
+        </div>
+      )}
 
       <div>
         <label className={labelCls}>Rol <span className="text-[#EF4444]">*</span></label>

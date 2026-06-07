@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useTasks } from '../context/TaskContext'
+import { useTasks } from '../hooks/useTasks'
 import { useAuth } from '../context/AuthContext'
 import { useTeam } from '../hooks/useTeam'
 import { useTags } from '../context/TagContext'

@@ -24,7 +24,6 @@ import CalendarPage from './pages/CalendarPage'
 import ReportsPage from './pages/ReportsPage'
 import NotificationsPage from './pages/NotificationsPage'
 import UsersPage from './pages/UsersPage'
-import './App.css'
 
 function Layout() {
   const { isAuthenticated } = useAuth()

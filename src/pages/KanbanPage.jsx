@@ -8,8 +8,9 @@ import {
   closestCorners,
 } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { useTasks } from '../context/TaskContext'
+import { useTasks } from '../hooks/useTasks'
 import { useGroups } from '../context/GroupContext'
 import { useTeam } from '../hooks/useTeam'
 import { useToast } from '../context/ToastContext'
@@ -80,8 +81,9 @@ function SortableKanbanCard({ task, members }) {
 }
 
 function KanbanColumn({ column, tasks, members }) {
+  const { setNodeRef } = useDroppable({ id: column.id })
   return (
-    <div className={`flex flex-col rounded-2xl border ${column.bg} ${column.border} min-h-[400px] flex-1`}>
+    <div ref={setNodeRef} className={`flex flex-col rounded-2xl border ${column.bg} ${column.border} min-h-[400px] flex-1`}>
       <div className="flex items-center gap-2 px-4 py-3 border-b border-inherit">
         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: column.dot }} />
         <span className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0]">{column.label}</span>

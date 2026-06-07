@@ -101,7 +101,7 @@ router.get('/:id/history', getTaskHistory);
 router.post('/',
   canEdit,
   body('title').trim().notEmpty().withMessage('El título es obligatorio').isLength({ max: 255 }),
-  body('assignedTo').notEmpty().withMessage('Debes asignar la tarea a alguien'),
+  body('assignedTo').notEmpty().withMessage('Debes asignar la tarea a alguien').matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).withMessage('assignedTo debe ser un UUID válido'),
   body('priority').optional().isIn(['high', 'medium', 'low']),
   body('status').optional().isIn(['pending', 'in_progress', 'completed']),
   validate,

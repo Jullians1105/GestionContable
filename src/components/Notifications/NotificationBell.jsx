@@ -74,9 +74,9 @@ export default function NotificationBell() {
                   <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-2">Sin notificaciones</p>
                 </div>
               ) : (
-                recent.map((n) => (
+                recent.map((n, i) => (
                   <button
-                    key={n.id}
+                    key={n.id ?? `notif-${i}`}
                     onClick={() => handleClick(n)}
                     className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-left ${!n.read ? 'bg-blue-50 dark:bg-[#1a2040]' : ''}`}
                   >

@@ -26,7 +26,7 @@ const inputCls = 'w-full border border-[#c3c6d7] dark:border-[#2e3148] rounded-l
 const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
 
 export default function UsersManager() {
-  const { members, addMember, updateMember, deleteMember } = useTeam()
+  const { members, createUser, updateMember, deleteMember } = useTeam()
   const { addToast } = useToast()
 
   const [search, setSearch] = useState('')
@@ -86,7 +86,7 @@ export default function UsersManager() {
         await updateMember(editingUser.id, updates)
         addToast('Usuario actualizado', 'success')
       } else {
-        await addMember({ name: form.name, email: form.email, role: form.role, password: form.password })
+        await createUser({ name: form.name, email: form.email, role: form.role, password: form.password })
         addToast('Usuario creado', 'success')
       }
       closeModal()

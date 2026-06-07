@@ -5,7 +5,7 @@ import {
   addMonths, subMonths,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { useTasks } from '../context/TaskContext'
+import { useTasks } from '../hooks/useTasks'
 import { useGroups } from '../context/GroupContext'
 import { isDueDateOverdue, isDueDateSoon, PRIORITY_LABELS } from '../utils/helpers'
 

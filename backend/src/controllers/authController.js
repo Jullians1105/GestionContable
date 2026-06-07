@@ -100,7 +100,7 @@ const refresh = async (req, res, next) => {
     const newRefreshToken = signRefresh({ userId: user.id });
 
     await db.query(
-      'INSERT INTO refresh_tokens (token, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
+      'INSERT INTO refresh_tokens (token, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\') ON CONFLICT (token) DO NOTHING',
       [newRefreshToken, user.id]
     );
 

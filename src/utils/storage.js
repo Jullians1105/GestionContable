@@ -40,6 +40,8 @@ export const storage = {
     const next = [notif, ...existing].slice(0, 50)
     set(key, next)
   },
+  getTeamMemberIds: () => get('team_member_ids'),
+  saveTeamMemberIds: (ids) => set('team_member_ids', ids),
   getSavedFilters: () => get(KEYS.SAVED_FILTERS) ?? [],
   saveSavedFilters: (filters) => set(KEYS.SAVED_FILTERS, filters),
   getTheme: () => localStorage.getItem(KEYS.THEME) ?? 'light',
