@@ -28,15 +28,15 @@ const SAMPLE_TAGS = [
 export const TagContext = createContext(null)
 
 export function TagProvider({ children }) {
-  const { useRealBackend } = useAuth()
+  const { user, useRealBackend } = useAuth()
   const [tags, setTags] = useState(() => load() ?? SAMPLE_TAGS)
 
   useEffect(() => {
-    if (!useRealBackend) return
+    if (!useRealBackend || !user) return
     api.getTags()
       .then(data => setTags(Array.isArray(data) ? data : []))
       .catch(() => {})
-  }, [useRealBackend])
+  }, [useRealBackend, user?.id])
 
   const persist = (updated) => {
     setTags(updated)

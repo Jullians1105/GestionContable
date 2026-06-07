@@ -55,16 +55,16 @@ function normalizeGroup(g) {
 export const GroupContext = createContext(null)
 
 export function GroupProvider({ children }) {
-  const { useRealBackend } = useAuth()
+  const { user, useRealBackend } = useAuth()
   const [groups, setGroups] = useState(() => loadGroups() ?? SAMPLE_GROUPS)
   const [currentGroupId, setCurrentGroupId] = useState(null)
 
   useEffect(() => {
-    if (!useRealBackend) return
+    if (!useRealBackend || !user) return
     api.getGroups()
       .then(data => setGroups(Array.isArray(data) ? data.map(normalizeGroup) : []))
       .catch(() => {})
-  }, [useRealBackend])
+  }, [useRealBackend, user?.id])
 
   const persist = (updated) => {
     setGroups(updated)

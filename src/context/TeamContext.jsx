@@ -8,7 +8,7 @@ import { useAuth } from './AuthContext'
 export const TeamContext = createContext(null)
 
 export function TeamProvider({ children }) {
-  const { useRealBackend } = useAuth()
+  const { user, useRealBackend } = useAuth()
   const [members, setMembers] = useState(() => {
     const saved = storage.getMembers()
     return saved ?? SAMPLE_MEMBERS
@@ -16,7 +16,7 @@ export function TeamProvider({ children }) {
   const [allUsers, setAllUsers] = useState([])
 
   useEffect(() => {
-    if (!useRealBackend) return
+    if (!useRealBackend || !user) return
 
     api.getEmployees()
       .then(data => {
@@ -35,7 +35,7 @@ export function TeamProvider({ children }) {
         }
       })
       .catch(() => {})
-  }, [useRealBackend])
+  }, [useRealBackend, user?.id])
 
   useEffect(() => {
     if (useRealBackend) return
