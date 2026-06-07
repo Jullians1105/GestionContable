@@ -13,10 +13,10 @@ export default function TagSelector({ selectedIds = [], onChange }) {
     onChange(selectedIds.includes(id) ? selectedIds.filter((t) => t !== id) : [...selectedIds, id])
   }
 
-  const handleCreate = (e) => {
-    e.preventDefault()
+  const handleCreate = async (e) => {
+    e.preventDefault?.()
     if (!newName.trim()) return
-    const tag = createTag(newName.trim(), newColor)
+    const tag = await createTag(newName.trim(), newColor)
     onChange([...selectedIds, tag.id])
     setNewName('')
     setNewColor('#004ac6')
@@ -67,7 +67,7 @@ export default function TagSelector({ selectedIds = [], onChange }) {
           </div>
           <div className="border-t border-[#c3c6d7] dark:border-[#2e3148] pt-2">
             <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Nueva etiqueta</p>
-            <form onSubmit={handleCreate} className="flex gap-2 items-center">
+            <div className="flex gap-2 items-center">
               <div className="flex gap-1">
                 {PRESET_COLORS.map((c) => (
                   <button
@@ -82,13 +82,14 @@ export default function TagSelector({ selectedIds = [], onChange }) {
               <input
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(e) }}
                 placeholder="nombre..."
                 className="flex-1 h-7 px-2 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-xs text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-1 focus:ring-[#004ac6]"
               />
-              <button type="submit" disabled={!newName.trim()} className="h-7 px-2 rounded-lg text-xs text-white font-semibold disabled:opacity-40" style={{ background: '#004ac6' }}>
+              <button type="button" onClick={handleCreate} disabled={!newName.trim()} className="h-7 px-2 rounded-lg text-xs text-white font-semibold disabled:opacity-40" style={{ background: '#004ac6' }}>
                 +
               </button>
-            </form>
+            </div>
           </div>
         </div>
       )}

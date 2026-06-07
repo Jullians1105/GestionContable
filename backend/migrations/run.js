@@ -31,8 +31,10 @@ async function run() {
       console.log('✓ Tables dropped');
     }
 
-    const migrations = ['001_initial_schema.sql'];
-    if (withSeed) migrations.push('002_seed_data.sql');
+    const migrations = fs.readdirSync(__dirname)
+      .filter((f) => /^\d+.*\.sql$/.test(f))
+      .filter((f) => withSeed || f !== '002_seed_data.sql')
+      .sort();
 
     for (const file of migrations) {
       const filePath = path.join(__dirname, file);

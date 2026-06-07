@@ -43,6 +43,15 @@ const SAMPLE_GROUPS = [
   },
 ]
 
+function normalizeGroup(g) {
+  return {
+    ...g,
+    leaderId: g.leaderId ?? g.leader_id ?? null,
+    memberIds: g.memberIds ?? (g.members || []).map((m) => m.id),
+    taskIds: g.taskIds ?? [],
+  }
+}
+
 export const GroupContext = createContext(null)
 
 export function GroupProvider({ children }) {
@@ -53,7 +62,7 @@ export function GroupProvider({ children }) {
   useEffect(() => {
     if (!useRealBackend) return
     api.getGroups()
-      .then(data => setGroups(Array.isArray(data) ? data : []))
+      .then(data => setGroups(Array.isArray(data) ? data.map(normalizeGroup) : []))
       .catch(() => {})
   }, [useRealBackend])
 

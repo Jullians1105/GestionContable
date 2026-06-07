@@ -43,19 +43,34 @@ export function TagProvider({ children }) {
     if (!useRealBackend) save(updated)
   }
 
-  const createTag = useCallback((name, color) => {
+  const createTag = useCallback(async (name, color) => {
+    if (useRealBackend) {
+      const newTag = await api.createTag({ name, color })
+      setTags((prev) => [...prev, newTag])
+      return newTag
+    }
     const newTag = { id: generateId('tag'), name, color, createdAt: today() }
     persist((prev) => [...prev, newTag])
     return newTag
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const updateTag = useCallback((id, updates) => {
+  const updateTag = useCallback(async (id, updates) => {
+    if (useRealBackend) {
+      const updated = await api.updateTag(id, updates)
+      setTags((prev) => prev.map((t) => (t.id === id ? updated : t)))
+      return
+    }
     persist((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const deleteTag = useCallback((id) => {
+  const deleteTag = useCallback(async (id) => {
+    if (useRealBackend) {
+      await api.deleteTag(id)
+      setTags((prev) => prev.filter((t) => t.id !== id))
+      return
+    }
     persist((prev) => prev.filter((t) => t.id !== id))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getTagById = useCallback((id) => tags.find((t) => t.id === id), [tags])
 

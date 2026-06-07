@@ -6,6 +6,7 @@ import {
 } from "recharts"
 import { useTasks } from "../hooks/useTasks"
 import { useTeam } from "../hooks/useTeam"
+import { useTheme } from "../context/ThemeContext"
 import StatsCard from "./StatsCard"
 import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from "../utils/helpers"
 
@@ -24,6 +25,17 @@ const PRIORITY_COLORS = {
 export default function Dashboard() {
   const { tasks } = useTasks()
   const { getMemberById } = useTeam()
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+  const axisColor = isDark ? '#c4c8e8' : '#434655'
+  const gridColor = isDark ? '#2e3148' : '#edeef0'
+  const tooltipStyle = {
+    borderRadius: 8,
+    border: `1px solid ${isDark ? '#2e3148' : '#c3c6d7'}`,
+    background: isDark ? '#1e2030' : '#ffffff',
+    color: isDark ? '#e4e6f0' : '#191c1e',
+    fontSize: 12,
+  }
 
   const stats = useMemo(() => {
     const total = tasks.length
@@ -78,7 +90,7 @@ export default function Dashboard() {
                     <Cell key={index} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #c3c6d7", fontSize: 12 }} formatter={(value, name) => [value, name]} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(value, name) => [value, name]} />
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -107,10 +119,10 @@ export default function Dashboard() {
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={barData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#edeef0" />
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#434655" }} />
-              <YAxis tick={{ fontSize: 12, fill: "#434655" }} allowDecimals={false} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #c3c6d7", fontSize: 12 }} />
+              <CartesianGrid vertical={false} stroke={gridColor} />
+              <XAxis dataKey="name" tick={{ fontSize: 12, fill: axisColor }} />
+              <YAxis tick={{ fontSize: 12, fill: axisColor }} allowDecimals={false} />
+              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }} />
               <Bar dataKey="value" name="Tareas" radius={[4, 4, 0, 0]}>
                 {barData.map((entry, index) => (
                   <Cell key={index} fill={entry.fill} />
@@ -135,15 +147,15 @@ export default function Dashboard() {
               const overdue = isDueDateOverdue(task.dueDate)
               const member = task.assignedTo ? getMemberById(task.assignedTo) : null
               return (
-                <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border ${overdue ? "border-[#ffdad6] bg-[#fff5f5]" : "border-yellow-200 bg-yellow-50"}`}>
+                <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border ${overdue ? "border-[#ffdad6] bg-[#fff5f5] dark:border-[#5c1a1a] dark:bg-[#2a1718]" : "border-yellow-200 bg-yellow-50 dark:border-[#5c4a1a] dark:bg-[#2a2417]"}`}>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">{task.title}</p>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[12px] font-semibold flex items-center gap-1 ${overdue ? "text-[#93000a]" : "text-yellow-700"}`}>
+                      <span className={`text-[12px] font-semibold flex items-center gap-1 ${overdue ? "text-[#93000a] dark:text-[#ff8a80]" : "text-yellow-700 dark:text-yellow-400"}`}>
                         <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{overdue ? "warning" : "schedule"}</span>
                         {overdue ? "Vencida" : "Proxima"} · {formatDate(task.dueDate)}
                       </span>
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${task.priority === "high" ? "bg-[#ffdad6] text-[#93000a]" : task.priority === "medium" ? "bg-yellow-100 text-yellow-800" : "bg-green-100 text-green-800"}`}>
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${task.priority === "high" ? "bg-[#ffdad6] text-[#93000a] dark:bg-[#5c1a1a] dark:text-[#ff8a80]" : task.priority === "medium" ? "bg-yellow-100 text-yellow-800 dark:bg-[#5c4a1a] dark:text-yellow-300" : "bg-green-100 text-green-800 dark:bg-[#16412c] dark:text-green-300"}`}>
                         {PRIORITY_LABELS[task.priority]}
                       </span>
                     </div>

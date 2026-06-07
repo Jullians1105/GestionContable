@@ -37,6 +37,22 @@ services:
     volumes:
       - ./backend/migrations:/app/migrations:ro
 
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskflow_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      VITE_BACKEND_URL: http://backend:3000
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+
   migrate:
     build:
       context: ./backend

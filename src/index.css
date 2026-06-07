@@ -60,6 +60,6 @@
 
   /* Card */
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-[#c3c6d7] p-6;
+    @apply bg-white dark:bg-[#1e2030] rounded-xl shadow-sm border border-[#c3c6d7] dark:border-[#2e3148] p-6;
   }
 }

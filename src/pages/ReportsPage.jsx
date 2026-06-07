@@ -8,7 +8,8 @@ import {
 } from 'recharts'
 import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
-import { isBefore, isAfter, parseISO } from 'date-fns'
+import { isBefore, isAfter, parseISO, format } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 const REPORT_TYPES = [
   { value: 'by_person', label: 'Tareas completadas por persona' },
@@ -81,20 +82,224 @@ export default function ReportsPage() {
     return applyFilters(tasks).filter((t) => t.status === 'completed').length
   }, [generated, tasks, applyFilters])
 
+  const reportFileName = useMemo(() => {
+    const slugify = (text) => text
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+
+    const member = filters.memberId ? members.find((m) => m.id === filters.memberId) : null
+    const base = member ? `reporte-${slugify(member.name)}` : 'reporte-general'
+    return `${base}-taskflow`
+  }, [filters.memberId, members])
+
   const handleExportPDF = () => {
     const doc = new jsPDF()
-    doc.setFontSize(18)
-    doc.text('Reporte TaskFlow Pro', 20, 20)
-    doc.setFontSize(12)
-    doc.text(`Tipo: ${REPORT_TYPES.find((r) => r.value === filters.type)?.label}`, 20, 35)
-    doc.text(`Total completadas: ${totalCompleted}`, 20, 45)
-    if (reportData && filters.type === 'by_person') {
-      doc.text('Detalle por persona:', 20, 60)
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const marginX = 18
+    const primary = [0, 74, 198]
+    const dark = [25, 28, 30]
+    const muted = [67, 70, 85]
+    const border = [195, 198, 215]
+    const reportLabel = REPORT_TYPES.find((r) => r.value === filters.type)?.label ?? ''
+
+    const addFooter = () => {
+      const pageCount = doc.internal.getNumberOfPages()
+      for (let p = 1; p <= pageCount; p += 1) {
+        doc.setPage(p)
+        doc.setDrawColor(...border)
+        doc.line(marginX, pageHeight - 16, pageWidth - marginX, pageHeight - 16)
+        doc.setFontSize(8.5)
+        doc.setTextColor(...muted)
+        doc.text('TaskFlow Pro · Reporte generado automáticamente', marginX, pageHeight - 10)
+        doc.text(`Página ${p} de ${pageCount}`, pageWidth - marginX, pageHeight - 10, { align: 'right' })
+      }
+    }
+
+    // Header band
+    doc.setFillColor(...primary)
+    doc.rect(0, 0, pageWidth, 36, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(20)
+    doc.setFont(undefined, 'bold')
+    doc.text('Reporte TaskFlow Pro', marginX, 18)
+    doc.setFontSize(11)
+    doc.setFont(undefined, 'normal')
+    doc.text(reportLabel, marginX, 27)
+    doc.setFontSize(9)
+    doc.text(format(new Date(), "d 'de' MMMM, yyyy · HH:mm", { locale: es }), pageWidth - marginX, 27, { align: 'right' })
+
+    let y = 52
+
+    // Filter chips
+    const chips = []
+    if (filters.dateFrom) chips.push(`Desde: ${filters.dateFrom}`)
+    if (filters.dateTo) chips.push(`Hasta: ${filters.dateTo}`)
+    if (filters.groupId) chips.push(`Grupo: ${groups.find((g) => g.id === filters.groupId)?.name ?? filters.groupId}`)
+    if (filters.memberId) chips.push(`Persona: ${members.find((m) => m.id === filters.memberId)?.name ?? filters.memberId}`)
+    if (chips.length) {
+      doc.setFontSize(9)
+      doc.setTextColor(...muted)
+      doc.text(`Filtros aplicados: ${chips.join('   ·   ')}`, marginX, y)
+      y += 10
+    }
+
+    // Summary card
+    const cardH = 26
+    doc.setFillColor(243, 244, 246)
+    doc.roundedRect(marginX, y, pageWidth - marginX * 2, cardH, 3, 3, 'F')
+    doc.setTextColor(...muted)
+    doc.setFontSize(9)
+    doc.text('TOTAL DE TAREAS COMPLETADAS', marginX + 10, y + 11)
+    doc.setTextColor(...primary)
+    doc.setFontSize(20)
+    doc.setFont(undefined, 'bold')
+    doc.text(String(totalCompleted), marginX + 10, y + 21)
+    doc.setFont(undefined, 'normal')
+    y += cardH + 14
+
+    const ensureSpace = (needed) => {
+      if (y + needed > pageHeight - 24) {
+        doc.addPage()
+        y = 24
+      }
+    }
+
+    const sectionTitle = (title) => {
+      ensureSpace(16)
+      doc.setTextColor(...dark)
+      doc.setFontSize(13)
+      doc.setFont(undefined, 'bold')
+      doc.text(title, marginX, y)
+      doc.setFont(undefined, 'normal')
+      y += 8
+    }
+
+    if (filters.type === 'by_person' && reportData?.length) {
+      sectionTitle('Detalle por persona')
+
+      const colName = marginX + 4
+      const colCompleted = marginX + 92
+      const colTotal = marginX + 122
+      const colPct = pageWidth - marginX - 26
+      const rowH = 11
+
+      ensureSpace(rowH)
+      doc.setFillColor(...primary)
+      doc.rect(marginX, y - 6, pageWidth - marginX * 2, rowH, 'F')
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(9)
+      doc.setFont(undefined, 'bold')
+      doc.text('Persona', colName, y + 1)
+      doc.text('Completadas', colCompleted, y + 1)
+      doc.text('Total', colTotal, y + 1)
+      doc.text('% Avance', colPct, y + 1)
+      doc.setFont(undefined, 'normal')
+      y += rowH
+
       reportData.forEach((r, i) => {
-        doc.text(`${r.name}: ${r.completed} completadas / ${r.total} total (${r.pct}%)`, 25, 70 + i * 8)
+        ensureSpace(rowH)
+        if (i % 2 === 0) {
+          doc.setFillColor(243, 244, 246)
+          doc.rect(marginX, y - 6, pageWidth - marginX * 2, rowH, 'F')
+        }
+        doc.setTextColor(...dark)
+        doc.setFontSize(9.5)
+        doc.text(r.name, colName, y + 1)
+        doc.text(String(r.completed), colCompleted, y + 1)
+        doc.text(String(r.total), colTotal, y + 1)
+
+        // Progress bar
+        const barX = colPct
+        const barW = 26
+        const barH = 3.2
+        doc.setFillColor(...border)
+        doc.roundedRect(barX, y - 2.5, barW, barH, 1.5, 1.5, 'F')
+        const pctColor = r.pct >= 75 ? [16, 185, 129] : r.pct >= 40 ? [251, 191, 36] : [239, 68, 68]
+        doc.setFillColor(...pctColor)
+        doc.roundedRect(barX, y - 2.5, Math.max((barW * r.pct) / 100, 1.5), barH, 1.5, 1.5, 'F')
+        doc.setFontSize(8.5)
+        doc.setTextColor(...muted)
+        doc.text(`${r.pct}%`, barX + barW + 3, y + 1)
+
+        y += rowH
       })
     }
-    doc.save('reporte-taskflow.pdf')
+
+    if (filters.type === 'productivity' && reportData?.length) {
+      sectionTitle('Tareas completadas por persona')
+
+      const maxValue = Math.max(...reportData.map((r) => r.completadas), 1)
+      const barAreaW = pageWidth - marginX * 2 - 70
+      const rowH = 12
+
+      reportData.forEach((r) => {
+        ensureSpace(rowH)
+        doc.setTextColor(...dark)
+        doc.setFontSize(9.5)
+        doc.text(r.name, marginX + 2, y + 1)
+
+        const barX = marginX + 56
+        const barH = 5
+        doc.setFillColor(243, 244, 246)
+        doc.roundedRect(barX, y - 3.5, barAreaW, barH, 2, 2, 'F')
+        const w = Math.max((barAreaW * r.completadas) / maxValue, 2)
+        doc.setFillColor(...primary)
+        doc.roundedRect(barX, y - 3.5, w, barH, 2, 2, 'F')
+
+        doc.setTextColor(...muted)
+        doc.setFontSize(9)
+        doc.text(String(r.completadas), barX + barAreaW + 6, y + 1)
+
+        y += rowH
+      })
+    }
+
+    if (filters.type === 'compliance' && reportData?.length) {
+      sectionTitle('Cumplimiento de fechas de entrega')
+
+      const total = reportData.reduce((acc, r) => acc + r.value, 0) || 1
+      const rowH = 14
+
+      reportData.forEach((r) => {
+        ensureSpace(rowH)
+        const hex = r.color.replace('#', '')
+        const rgb = [0, 2, 4].map((n) => parseInt(hex.slice(n, n + 2), 16))
+
+        doc.setFillColor(...rgb)
+        doc.circle(marginX + 4, y - 2, 2.4, 'F')
+
+        doc.setTextColor(...dark)
+        doc.setFontSize(10)
+        doc.text(r.name, marginX + 11, y)
+
+        const pct = Math.round((r.value / total) * 100)
+        const barX = marginX + 60
+        const barW = pageWidth - marginX * 2 - 60 - 36
+        const barH = 5
+        doc.setFillColor(243, 244, 246)
+        doc.roundedRect(barX, y - 4, barW, barH, 2, 2, 'F')
+        doc.setFillColor(...rgb)
+        doc.roundedRect(barX, y - 4, Math.max((barW * pct) / 100, 1.5), barH, 2, 2, 'F')
+
+        doc.setTextColor(...muted)
+        doc.setFontSize(9)
+        doc.text(`${r.value} (${pct}%)`, barX + barW + 4, y)
+
+        y += rowH
+      })
+    }
+
+    if (!reportData?.length) {
+      doc.setTextColor(...muted)
+      doc.setFontSize(10)
+      doc.text('No hay datos disponibles para los filtros seleccionados.', marginX, y)
+    }
+
+    addFooter()
+    doc.save(`${reportFileName}.pdf`)
     addToast('PDF descargado', 'success')
   }
 
@@ -102,7 +307,7 @@ export default function ReportsPage() {
     const ws = XLSX.utils.json_to_sheet(reportData || [])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Reporte')
-    XLSX.writeFile(wb, 'reporte-taskflow.xlsx')
+    XLSX.writeFile(wb, `${reportFileName}.xlsx`)
     addToast('Excel descargado', 'success')
   }
 

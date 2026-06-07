@@ -26,5 +26,9 @@ dist-ssr
 # Claude Code
 .claude/
 
+# Docker
+.env
+backups/
+
 # MCP config (contains API keys)
 .mcp.json

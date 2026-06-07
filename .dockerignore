@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-ssr
+.git
+.github
+.claude
+backend
+mcpServer
+docs
+*.log
+.env
+.env.local
