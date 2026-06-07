@@ -31,6 +31,7 @@ export const validators = {
     if (!task.status) errors.status = 'El estado es obligatorio'
     if (!task.assignedTo) errors.assignedTo = 'Debes asignar la tarea a alguien'
     else if (!UUID_RE.test(task.assignedTo)) errors.assignedTo = 'Selecciona un miembro válido del equipo'
+    if (!task.dueDate) errors.dueDate = 'La fecha límite es obligatoria'
     return errors
   },
 

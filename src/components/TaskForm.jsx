@@ -110,8 +110,9 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
           {errors.assignedTo && <p className="text-[#EF4444] text-xs mt-1">{errors.assignedTo}</p>}
         </div>
         <div>
-          <label className={labelCls}>Fecha límite</label>
-          <input type="date" value={form.dueDate} onChange={(e) => handleChange('dueDate', e.target.value)} className={inputCls} />
+          <label className={labelCls}>Fecha límite <span className="text-[#EF4444]">*</span></label>
+          <input type="date" value={form.dueDate} onChange={(e) => handleChange('dueDate', e.target.value)} className={`${inputCls} ${errors.dueDate ? inputErrCls : ''}`} />
+          {errors.dueDate && <p className="text-[#EF4444] text-xs mt-1">{errors.dueDate}</p>}
         </div>
       </div>
 

@@ -71,7 +71,14 @@ export function GroupProvider({ children }) {
     if (!useRealBackend) saveGroups(updated)
   }
 
-  const createGroup = useCallback((groupData) => {
+  const createGroup = useCallback(async (groupData) => {
+    if (useRealBackend) {
+      const created = await api.createGroup(groupData)
+      const memberIds = [...new Set([user.id, ...(groupData.memberIds || [])])]
+      const newGroup = normalizeGroup({ ...created, memberIds })
+      setGroups((prev) => [...prev, newGroup])
+      return newGroup
+    }
     const newGroup = {
       ...groupData,
       id: generateId('group'),
@@ -80,20 +87,42 @@ export function GroupProvider({ children }) {
     }
     persist((prev) => [...prev, newGroup])
     return newGroup
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const updateGroup = useCallback((id, updates) => {
+  const updateGroup = useCallback(async (id, updates) => {
+    if (useRealBackend) {
+      const updated = await api.updateGroup(id, updates)
+      setGroups((prev) => prev.map((g) => (g.id === id ? normalizeGroup(updated) : g)))
+      return
+    }
     persist((prev) =>
       prev.map((g) => (g.id === id ? { ...g, ...updates, updatedAt: today() } : g))
     )
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const deleteGroup = useCallback((id) => {
+  const deleteGroup = useCallback(async (id) => {
+    if (useRealBackend) {
+      await api.deleteGroup(id)
+      setGroups((prev) => prev.filter((g) => g.id !== id))
+      setCurrentGroupId((prev) => (prev === id ? null : prev))
+      return
+    }
     persist((prev) => prev.filter((g) => g.id !== id))
     setCurrentGroupId((prev) => (prev === id ? null : prev))
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const addMemberToGroup = useCallback((groupId, userId) => {
+  const addMemberToGroup = useCallback(async (groupId, userId) => {
+    if (useRealBackend) {
+      await api.addGroupMember(groupId, userId)
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === groupId && !g.memberIds.includes(userId)
+            ? { ...g, memberIds: [...g.memberIds, userId] }
+            : g
+        )
+      )
+      return
+    }
     persist((prev) =>
       prev.map((g) =>
         g.id === groupId && !g.memberIds.includes(userId)
@@ -101,9 +130,20 @@ export function GroupProvider({ children }) {
           : g
       )
     )
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const removeMemberFromGroup = useCallback((groupId, userId) => {
+  const removeMemberFromGroup = useCallback(async (groupId, userId) => {
+    if (useRealBackend) {
+      await api.removeGroupMember(groupId, userId)
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === groupId
+            ? { ...g, memberIds: g.memberIds.filter((id) => id !== userId) }
+            : g
+        )
+      )
+      return
+    }
     persist((prev) =>
       prev.map((g) =>
         g.id === groupId
@@ -111,7 +151,7 @@ export function GroupProvider({ children }) {
           : g
       )
     )
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const getGroupById = useCallback((id) => groups.find((g) => g.id === id), [groups])
 
