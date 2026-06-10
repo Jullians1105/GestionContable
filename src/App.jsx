@@ -18,6 +18,7 @@ import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import GroupsPage from './pages/GroupsPage'
 import KanbanPage from './pages/KanbanPage'
 import CalendarPage from './pages/CalendarPage'
@@ -73,6 +74,7 @@ export default function App() {
                         <Routes>
                           <Route path="/login" element={<LoginPage />} />
                           <Route path="/register" element={<RegisterPage />} />
+                          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                           <Route path="/*" element={<Layout />} />
                         </Routes>
                       </TagProvider>

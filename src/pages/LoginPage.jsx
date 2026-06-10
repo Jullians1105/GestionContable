@@ -58,7 +58,12 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Contraseña</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8]">Contraseña</label>
+              <Link to="/forgot-password" className="text-xs font-semibold" style={{ color: '#004ac6' }}>
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
             <input
               type="password"
               value={form.password}
@@ -84,22 +89,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        <div className="mt-6 pt-6 border-t border-[#c3c6d7] dark:border-[#2e3148]">
-          <p className="text-xs text-[#434655] dark:text-[#c4c8e8] text-center mb-3">Usuarios de prueba:</p>
-          <div className="grid grid-cols-2 gap-2 text-xs text-[#434655] dark:text-[#c4c8e8]">
-            <div className="bg-[#edeef0] dark:bg-[#252840] rounded-lg p-2">
-              <p className="font-semibold">Admin</p>
-              <p>maria@empresa.com</p>
-              <p>admin123</p>
-            </div>
-            <div className="bg-[#edeef0] dark:bg-[#252840] rounded-lg p-2">
-              <p className="font-semibold">Líder</p>
-              <p>carlos@empresa.com</p>
-              <p>leader123</p>
-            </div>
-          </div>
-        </div>
 
         <p className="text-sm text-center text-[#434655] dark:text-[#c4c8e8] mt-6">
           ¿No tienes cuenta?{' '}

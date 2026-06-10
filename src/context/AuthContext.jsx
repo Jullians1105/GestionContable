@@ -144,6 +144,20 @@ export function AuthProvider({ children }) {
     return { success: true }
   }, [])
 
+  const resetPassword = useCallback(async (email, newPassword) => {
+    const hasBackend = await checkBackend()
+    if (hasBackend) {
+      return { success: false, error: 'Funcionalidad no disponible. Contacta a un administrador para restablecer tu contraseña.' }
+    }
+    // Fallback localStorage
+    const members = storage.getMembers() ?? SAMPLE_MEMBERS
+    const found = members.find((m) => m.email.toLowerCase() === email.toLowerCase())
+    if (!found) return { success: false, error: 'No existe ninguna cuenta con ese email' }
+    const updatedMembers = members.map((m) => (m.id === found.id ? { ...m, password: newPassword } : m))
+    storage.saveMembers(updatedMembers)
+    return { success: true }
+  }, [])
+
   const updateCurrentUser = useCallback((updates) => {
     const updated = { ...user, ...updates }
     localStorage.setItem('auth_user', JSON.stringify(updated))
@@ -162,7 +176,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, token, isAuthenticated, useRealBackend,
-      login, logout, register, updateCurrentUser, canEdit, isAdmin, isLeader, hasPermission,
+      login, logout, register, resetPassword, updateCurrentUser, canEdit, isAdmin, isLeader, hasPermission,
     }}>
       {children}
     </AuthContext.Provider>
