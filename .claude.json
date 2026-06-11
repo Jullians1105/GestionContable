@@ -1,8 +1,0 @@
-{
-"mcpServers": {
-    "gestor-tareas": {
-    "command": "node",
-    "args": ["./mcpServer/dist/index.js"]
-    }
-    }
-}
