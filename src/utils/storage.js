@@ -8,6 +8,7 @@ const KEYS = {
   THEME: 'theme',
   AUTH_USER: 'auth_user',
   AUTH_TOKEN: 'auth_token',
+  PASSWORD_RESET_TOKENS: 'password_reset_tokens',
 }
 
 function get(key) {
@@ -44,6 +45,8 @@ export const storage = {
   saveTeamMemberIds: (ids) => set('team_member_ids', ids),
   getSavedFilters: () => get(KEYS.SAVED_FILTERS) ?? [],
   saveSavedFilters: (filters) => set(KEYS.SAVED_FILTERS, filters),
+  getPasswordResetTokens: () => get(KEYS.PASSWORD_RESET_TOKENS) ?? {},
+  savePasswordResetTokens: (tokens) => set(KEYS.PASSWORD_RESET_TOKENS, tokens),
   getTheme: () => localStorage.getItem(KEYS.THEME) ?? 'light',
   saveTheme: (theme) => localStorage.setItem(KEYS.THEME, theme),
   clearAll: () => Object.values(KEYS).forEach((k) => localStorage.removeItem(k)),

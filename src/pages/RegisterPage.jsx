@@ -8,6 +8,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [showSuccess, setShowSuccess] = useState(false)
 
   const validate = () => {
     const e = {}
@@ -20,19 +21,21 @@ export default function RegisterPage() {
     return e
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const errs = validate()
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
     setLoading(true)
-    const result = register(form.name.trim(), form.email.trim(), form.password)
+    const result = await register(form.name.trim(), form.email.trim(), form.password)
     setLoading(false)
     if (result.success) {
-      navigate('/')
+      setShowSuccess(true)
     } else {
       setErrors({ email: result.error })
     }
   }
+
+  const goToLogin = () => navigate('/login')
 
   const field = (name, label, type = 'text', placeholder = '') => (
     <div>
@@ -91,6 +94,28 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
+
+      {showSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="relative bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl w-full max-w-sm p-6 border border-[#c3c6d7] dark:border-[#2e3148] text-center">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ background: '#d1fae5' }}>
+              <span className="material-symbols-outlined text-3xl" style={{ color: '#10B981' }}>check_circle</span>
+            </div>
+            <h3 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">¡Cuenta creada!</h3>
+            <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-6">
+              El usuario se registró exitosamente. Ya puedes iniciar sesión.
+            </p>
+            <button
+              onClick={goToLogin}
+              className="w-full h-10 rounded-lg text-sm font-semibold text-white transition"
+              style={{ background: '#004ac6' }}
+            >
+              Ir a iniciar sesión
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

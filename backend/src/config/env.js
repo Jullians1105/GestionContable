@@ -21,4 +21,13 @@ module.exports = {
   SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
   FROM_EMAIL: process.env.FROM_EMAIL || 'noreply@taskflow.com',
   SLACK_WEBHOOK_URL: process.env.SLACK_WEBHOOK_URL || '',
+
+  SMTP_HOST: process.env.SMTP_HOST || '',
+  SMTP_PORT: process.env.SMTP_PORT || 1025,
+  SMTP_SECURE: process.env.SMTP_SECURE === 'true',
+  SMTP_USER: process.env.SMTP_USER || '',
+  SMTP_PASS: process.env.SMTP_PASS || '',
+
+  // Devuelve el token de recuperación en la respuesta del API (solo para entornos de desarrollo locales)
+  SHOW_RESET_TOKEN: process.env.SHOW_RESET_TOKEN === 'true',
 };

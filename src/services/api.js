@@ -79,6 +79,8 @@ export const api = {
     }
   },
   me: () => request('/auth/me'),
+  forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+  resetPassword: (token, password) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) }),
 
   // Tasks
   getTasks: (filters = {}) => {

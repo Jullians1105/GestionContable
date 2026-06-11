@@ -113,10 +113,7 @@ export function AuthProvider({ children }) {
     const hasBackend = await checkBackend()
     if (hasBackend) {
       try {
-        const data = await api.register({ name, email, password })
-        localStorage.setItem('auth_user', JSON.stringify(data.user))
-        setUser(data.user)
-        setToken(data.token)
+        await api.register({ name, email, password })
         return { success: true }
       } catch (err) {
         return { success: false, error: err.message }
@@ -136,25 +133,51 @@ export function AuthProvider({ children }) {
       createdAt: today(),
     }
     storage.saveMembers([...members, newMember])
-    const newToken = `token-${generateId('tk')}`
-    localStorage.setItem('auth_user', JSON.stringify(newMember))
-    localStorage.setItem('auth_token', newToken)
-    setUser(newMember)
-    setToken(newToken)
     return { success: true }
   }, [])
 
-  const resetPassword = useCallback(async (email, newPassword) => {
+  const requestPasswordReset = useCallback(async (email) => {
     const hasBackend = await checkBackend()
     if (hasBackend) {
-      return { success: false, error: 'Funcionalidad no disponible. Contacta a un administrador para restablecer tu contraseña.' }
+      let devToken
+      try {
+        const data = await api.forgotPassword(email)
+        devToken = data?.devToken
+      } catch { /* respuesta genérica de todas formas */ }
+      return { success: true, message: 'Si el email existe, se enviaron instrucciones para restablecer la contraseña', devToken }
     }
-    // Fallback localStorage
+    // Fallback localStorage: no hay servicio de email, generamos un token visible para pruebas
     const members = storage.getMembers() ?? SAMPLE_MEMBERS
     const found = members.find((m) => m.email.toLowerCase() === email.toLowerCase())
     if (!found) return { success: false, error: 'No existe ninguna cuenta con ese email' }
-    const updatedMembers = members.map((m) => (m.id === found.id ? { ...m, password: newPassword } : m))
+    const token = generateId('reset')
+    const tokens = storage.getPasswordResetTokens()
+    tokens[token] = { email: found.email, expires: Date.now() + 30 * 60 * 1000 }
+    storage.savePasswordResetTokens(tokens)
+    return { success: true, devToken: token }
+  }, [])
+
+  const confirmPasswordReset = useCallback(async (token, newPassword) => {
+    const hasBackend = await checkBackend()
+    if (hasBackend) {
+      try {
+        await api.resetPassword(token, newPassword)
+        return { success: true }
+      } catch (err) {
+        return { success: false, error: err.message }
+      }
+    }
+    // Fallback localStorage
+    const tokens = storage.getPasswordResetTokens()
+    const entry = tokens[token]
+    if (!entry || entry.expires < Date.now()) {
+      return { success: false, error: 'Token inválido o expirado' }
+    }
+    const members = storage.getMembers() ?? SAMPLE_MEMBERS
+    const updatedMembers = members.map((m) => (m.email.toLowerCase() === entry.email.toLowerCase() ? { ...m, password: newPassword } : m))
     storage.saveMembers(updatedMembers)
+    delete tokens[token]
+    storage.savePasswordResetTokens(tokens)
     return { success: true }
   }, [])
 
@@ -176,7 +199,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, token, isAuthenticated, useRealBackend,
-      login, logout, register, resetPassword, updateCurrentUser, canEdit, isAdmin, isLeader, hasPermission,
+      login, logout, register, requestPasswordReset, confirmPasswordReset, updateCurrentUser, canEdit, isAdmin, isLeader, hasPermission,
     }}>
       {children}
     </AuthContext.Provider>

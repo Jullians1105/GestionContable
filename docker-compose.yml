@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -19,6 +17,14 @@ services:
       timeout: 5s
       retries: 5
 
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: taskflow_mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   backend:
     build:
       context: ./backend
@@ -28,10 +34,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mailhog:
+        condition: service_started
     env_file: .env
     environment:
       NODE_ENV: production
       DB_HOST: postgres
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SHOW_RESET_TOKEN: "true"
     ports:
       - "${PORT:-3000}:3000"
     volumes:

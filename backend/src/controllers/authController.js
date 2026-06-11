@@ -1,8 +1,13 @@
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const { sign, signRefresh, verify, verifyRefresh } = require('../utils/jwt');
+const { sendPasswordResetEmail } = require('../utils/email');
 const logger = require('../utils/logger');
+const env = require('../config/env');
+
+const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
 const register = async (req, res, next) => {
   try {
@@ -142,4 +147,62 @@ const me = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, refresh, logout, me };
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const result = await db.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+    const user = result.rows[0];
+
+    // Respuesta genérica siempre, para no revelar si el email existe
+    let devToken;
+    if (user) {
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const tokenHash = hashToken(rawToken);
+
+      await db.query(
+        'INSERT INTO password_reset_tokens (token_hash, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'30 minutes\')',
+        [tokenHash, user.id]
+      );
+
+      await sendPasswordResetEmail(email.toLowerCase(), rawToken);
+      logger.info({ userId: user.id }, 'Password reset solicitado');
+
+      // En desarrollo devolvemos el token directamente para no depender del cliente de email
+      if (env.SHOW_RESET_TOKEN) devToken = rawToken;
+    }
+
+    res.json({ message: 'Si el email existe, se enviaron instrucciones para restablecer la contraseña', ...(devToken ? { devToken } : {}) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+    const tokenHash = hashToken(token);
+
+    const result = await db.query(
+      'SELECT user_id FROM password_reset_tokens WHERE token_hash = $1 AND used = false AND expires_at > NOW()',
+      [tokenHash]
+    );
+    const tokenRow = result.rows[0];
+    if (!tokenRow) {
+      return res.status(400).json({ error: 'Token inválido o expirado' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, tokenRow.user_id]);
+    await db.query('UPDATE password_reset_tokens SET used = true WHERE token_hash = $1', [tokenHash]);
+    await db.query('UPDATE refresh_tokens SET revoked = true WHERE user_id = $1', [tokenRow.user_id]);
+
+    logger.info({ userId: tokenRow.user_id }, 'Password reseteada');
+    res.json({ message: 'Contraseña actualizada correctamente' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { register, login, refresh, logout, me, forgotPassword, resetPassword };

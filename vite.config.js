@@ -7,6 +7,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
+    watch: {
+      usePolling: true,
+      interval: 300,
+    },
     proxy: {
       '/api': {
         target: backendTarget,

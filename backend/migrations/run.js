@@ -23,7 +23,7 @@ async function run() {
     if (withReset) {
       console.log('⚠️  Resetting database...');
       await client.query(`
-        DROP TABLE IF EXISTS token_blacklist, refresh_tokens, audit_log, notifications,
+        DROP TABLE IF EXISTS password_reset_tokens, token_blacklist, refresh_tokens, audit_log, notifications,
           task_tag_assignment, task_tags, task_comments, task_subtasks,
           tasks, group_members, groups, users CASCADE;
         DROP FUNCTION IF EXISTS update_updated_at CASCADE;

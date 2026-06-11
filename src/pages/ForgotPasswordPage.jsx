@@ -1,51 +1,33 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function ForgotPasswordPage() {
-  const { resetPassword } = useAuth()
-  const [form, setForm] = useState({ email: '', password: '', confirm: '' })
-  const [errors, setErrors] = useState({})
+  const { requestPasswordReset } = useAuth()
+  const navigate = useNavigate()
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [success, setSuccess] = useState(false)
-
-  const validate = () => {
-    const e = {}
-    if (!form.email.trim()) e.email = 'El email es requerido'
-    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Email inválido'
-    if (!form.password) e.password = 'La nueva contraseña es requerida'
-    else if (form.password.length < 6) e.password = 'Mínimo 6 caracteres'
-    if (form.password !== form.confirm) e.confirm = 'Las contraseñas no coinciden'
-    return e
-  }
+  const [sent, setSent] = useState(false)
+  const [devToken, setDevToken] = useState(null)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const errs = validate()
-    if (Object.keys(errs).length > 0) { setErrors(errs); return }
+    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) {
+      setError('Ingresa un email válido')
+      return
+    }
     setLoading(true)
-    const result = await resetPassword(form.email.trim(), form.password)
+    setError('')
+    const result = await requestPasswordReset(email.trim())
     setLoading(false)
     if (result.success) {
-      setSuccess(true)
+      setSent(true)
+      if (result.devToken) setDevToken(result.devToken)
     } else {
-      setErrors({ email: result.error })
+      setError(result.error)
     }
   }
-
-  const field = (name, label, type = 'text', placeholder = '') => (
-    <div>
-      <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">{label}</label>
-      <input
-        type={type}
-        value={form[name]}
-        onChange={(e) => { setForm({ ...form, [name]: e.target.value }); setErrors({ ...errors, [name]: '' }) }}
-        placeholder={placeholder}
-        className={`w-full h-10 px-3 rounded-lg border bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition ${errors[name] ? 'border-[#EF4444]' : 'border-[#c3c6d7] dark:border-[#2e3148]'}`}
-      />
-      {errors[name] && <p className="text-xs text-[#EF4444] mt-1">{errors[name]}</p>}
-    </div>
-  )
 
   return (
     <div className="min-h-screen bg-[#f3f4f6] dark:bg-[#0f1117] flex items-center justify-center p-4">
@@ -58,18 +40,54 @@ export default function ForgotPasswordPage() {
         </div>
 
         <h2 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">Recuperar contraseña</h2>
-        <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-6">Ingresa tu email y la nueva contraseña</p>
+        <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-6">
+          Ingresa tu email y te enviaremos instrucciones para restablecer tu contraseña
+        </p>
 
-        {success ? (
-          <div className="bg-[#d1fae5] text-[#10B981] rounded-lg px-4 py-3 text-sm flex items-center gap-2">
-            <span className="material-symbols-outlined text-base">check_circle</span>
-            Contraseña actualizada. Ya puedes iniciar sesión.
+        {error && (
+          <div className="bg-[#ffdad6] text-[#EF4444] rounded-lg px-4 py-3 text-sm mb-4 flex items-center gap-2">
+            <span className="material-symbols-outlined text-base">error</span>
+            {error}
+          </div>
+        )}
+
+        {sent ? (
+          <div className="space-y-4">
+            <div className="bg-[#d1fae5] text-[#10B981] rounded-lg px-4 py-3 text-sm flex items-center gap-2">
+              <span className="material-symbols-outlined text-base">check_circle</span>
+              Si el email existe, se enviaron instrucciones para restablecer la contraseña.
+            </div>
+            {devToken ? (
+              <button
+                onClick={() => navigate(`/reset-password?token=${devToken}`)}
+                className="w-full h-10 rounded-lg text-sm font-semibold text-white transition flex items-center justify-center gap-2"
+                style={{ background: '#004ac6' }}
+              >
+                <span className="material-symbols-outlined text-base">lock_reset</span>
+                Restablecer contraseña ahora
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/reset-password')}
+                className="w-full h-10 rounded-lg text-sm font-semibold text-white transition"
+                style={{ background: '#004ac6' }}
+              >
+                Ya tengo mi token
+              </button>
+            )}
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {field('email', 'Email', 'email', 'tu@empresa.com')}
-            {field('password', 'Nueva contraseña', 'password', '••••••••')}
-            {field('confirm', 'Confirmar contraseña', 'password', '••••••••')}
+            <div>
+              <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => { setEmail(e.target.value); setError('') }}
+                placeholder="tu@empresa.com"
+                className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition"
+              />
+            </div>
 
             <button
               type="submit"
@@ -81,8 +99,8 @@ export default function ForgotPasswordPage() {
                 <span className="material-symbols-outlined animate-spin text-base">refresh</span>
               ) : (
                 <>
-                  <span className="material-symbols-outlined text-base">lock_reset</span>
-                  Restablecer contraseña
+                  <span className="material-symbols-outlined text-base">send</span>
+                  Enviar instrucciones
                 </>
               )}
             </button>
