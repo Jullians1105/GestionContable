@@ -25,6 +25,8 @@ dist-ssr
 
 # Claude Code
 .claude/
+.claude.json
+CLAUDE.md
 
 # Docker
 .env
