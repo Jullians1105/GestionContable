@@ -65,7 +65,7 @@ app.use('/api/auth/register', authLimiter);
 const swaggerSpec = swaggerJsdoc({
   definition: {
     openapi: '3.0.0',
-    info: { title: 'TaskFlow Pro API', version: '3.0.0', description: 'API REST para gestión de tareas empresarial' },
+    info: { title: 'Gestor de Tareas API', version: '3.0.0', description: 'API REST para gestión de tareas empresarial' },
     servers: [{ url: `http://localhost:${env.PORT}`, description: 'Desarrollo' }],
     components: {
       securitySchemes: {
@@ -115,7 +115,7 @@ app.use(notFound);
 app.use(errorHandler);
 
 server.listen(env.PORT, () => {
-  logger.info(`TaskFlow Pro backend v3.0 corriendo en http://localhost:${env.PORT}`);
+  logger.info(`Gestor de Tareas backend v3.0 corriendo en http://localhost:${env.PORT}`);
   logger.info(`Docs: http://localhost:${env.PORT}/api/docs`);
   logger.info(`Ambiente: ${env.NODE_ENV}`);
 });

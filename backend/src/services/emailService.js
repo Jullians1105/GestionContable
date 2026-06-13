@@ -36,8 +36,8 @@ const emailService = {
     sendEmail({
       to,
       subject: `Nueva tarea asignada: ${taskTitle}`,
-      text: `${assignerName} te asignó la tarea "${taskTitle}". Revísala en TaskFlow Pro.`,
-      html: `<p>${assignerName} te asignó la tarea <strong>"${taskTitle}"</strong>.</p><p>Revísala en TaskFlow Pro.</p>`,
+      text: `${assignerName} te asignó la tarea "${taskTitle}". Revísala en Gestor de Tareas.`,
+      html: `<p>${assignerName} te asignó la tarea <strong>"${taskTitle}"</strong>.</p><p>Revísala en Gestor de Tareas.</p>`,
     }),
 
   taskCompleted: (to, completedBy, taskTitle) =>

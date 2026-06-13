@@ -27,7 +27,7 @@ const sendPasswordResetEmail = async (to, token) => {
   await tx.sendMail({
     from: env.FROM_EMAIL,
     to,
-    subject: 'Recuperar contraseña - TaskFlow Pro',
+    subject: 'Recuperar contraseña - Gestor de Tareas',
     html: `
       <p>Recibimos una solicitud para restablecer tu contraseña.</p>
       <p><a href="${resetUrl}">Haz clic aquí para crear una nueva contraseña</a></p>

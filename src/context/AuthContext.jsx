@@ -181,14 +181,33 @@ export function AuthProvider({ children }) {
     return { success: true }
   }, [])
 
-  const updateCurrentUser = useCallback((updates) => {
-    const updated = { ...user, ...updates }
+  const updateCurrentUser = useCallback(async (updates) => {
+    const { currentPassword, newPassword, ...rest } = updates
+
+    if (useRealBackend) {
+      try {
+        const data = await api.updateMe({ ...rest, currentPassword, newPassword })
+        const updated = { ...user, ...data.user }
+        localStorage.setItem('auth_user', JSON.stringify(updated))
+        setUser(updated)
+        return { success: true }
+      } catch (err) {
+        return { success: false, error: err.message }
+      }
+    }
+
+    // Fallback localStorage
+    if (newPassword) {
+      if (user?.password !== currentPassword) {
+        return { success: false, error: 'La contraseña actual es incorrecta' }
+      }
+    }
+    const updated = { ...user, ...rest, ...(newPassword ? { password: newPassword } : {}) }
     localStorage.setItem('auth_user', JSON.stringify(updated))
     setUser(updated)
-    if (!useRealBackend) {
-      const members = storage.getMembers() ?? []
-      storage.saveMembers(members.map((m) => (m.id === updated.id ? updated : m)))
-    }
+    const members = storage.getMembers() ?? []
+    storage.saveMembers(members.map((m) => (m.id === updated.id ? updated : m)))
+    return { success: true }
   }, [user, useRealBackend])
 
   const canEdit = useCallback(() => !user ? false : user.role !== 'viewer', [user])

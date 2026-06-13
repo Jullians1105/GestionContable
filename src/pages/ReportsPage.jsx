@@ -91,7 +91,7 @@ export default function ReportsPage() {
 
     const member = filters.memberId ? members.find((m) => m.id === filters.memberId) : null
     const base = member ? `reporte-${slugify(member.name)}` : 'reporte-general'
-    return `${base}-taskflow`
+    return `${base}-gestor-tareas`
   }, [filters.memberId, members])
 
   const handleExportPDF = () => {
@@ -113,7 +113,7 @@ export default function ReportsPage() {
         doc.line(marginX, pageHeight - 16, pageWidth - marginX, pageHeight - 16)
         doc.setFontSize(8.5)
         doc.setTextColor(...muted)
-        doc.text('TaskFlow Pro · Reporte generado automáticamente', marginX, pageHeight - 10)
+        doc.text('Gestor de Tareas · Reporte generado automáticamente', marginX, pageHeight - 10)
         doc.text(`Página ${p} de ${pageCount}`, pageWidth - marginX, pageHeight - 10, { align: 'right' })
       }
     }
@@ -124,7 +124,7 @@ export default function ReportsPage() {
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(20)
     doc.setFont(undefined, 'bold')
-    doc.text('Reporte TaskFlow Pro', marginX, 18)
+    doc.text('Reporte Gestor de Tareas', marginX, 18)
     doc.setFontSize(11)
     doc.setFont(undefined, 'normal')
     doc.text(reportLabel, marginX, 27)

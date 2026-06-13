@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
+import { useNotifications } from '../context/NotificationContext'
 import TaskModal from './TaskModal'
 
 const navItems = [
@@ -20,6 +21,7 @@ const navItems = [
 export default function Sidebar({ open, onClose }) {
   const { isAdmin, isLeader, hasPermission } = useAuth()
   const { addToast } = useToast()
+  const { unreadCount } = useNotifications()
   const [showModal, setShowModal] = useState(false)
 
   const visible = navItems.filter((item) => {
@@ -33,15 +35,13 @@ export default function Sidebar({ open, onClose }) {
     <>
       <aside className={`fixed left-0 top-0 h-full w-[250px] z-50 bg-white dark:bg-[#1e2030] border-r border-[#c3c6d7] dark:border-[#2e3148] flex flex-col p-4 gap-1 transition-transform duration-300 ease-in-out ${open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="flex items-center justify-between px-2 py-4 mb-2">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white flex-shrink-0" style={{ background: '#004ac6' }}>
-              <span className="material-symbols-outlined text-xl">task_alt</span>
-            </div>
+          <Link to="/" onClick={onClose} className="flex items-center gap-3 rounded-lg transition hover:opacity-80">
+            <img src="/logo.jpeg" alt="Gestor de Tareas" className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
             <div>
-              <h1 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">TaskFlow Pro</h1>
+              <h1 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">Gestor de Tareas</h1>
               <p className="text-xs text-[#434655] dark:text-[#c4c8e8]">Fase 2</p>
             </div>
-          </div>
+          </Link>
           <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] transition">
             <span className="material-symbols-outlined text-xl">close</span>
           </button>
@@ -62,7 +62,14 @@ export default function Sidebar({ open, onClose }) {
                 }`
               }
             >
-              <span className="material-symbols-outlined text-xl">{icon}</span>
+              <span className="relative inline-flex">
+                <span className="material-symbols-outlined text-xl">{icon}</span>
+                {to === '/notifications' && unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#EF4444' }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </span>
               {label}
             </NavLink>
           ))}

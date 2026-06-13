@@ -6,6 +6,7 @@ import {
 } from "recharts"
 import { useTasks } from "../hooks/useTasks"
 import { useTeam } from "../hooks/useTeam"
+import { useAuth } from "../context/AuthContext"
 import { useTheme } from "../context/ThemeContext"
 import StatsCard from "./StatsCard"
 import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from "../utils/helpers"
@@ -25,7 +26,9 @@ const PRIORITY_COLORS = {
 export default function Dashboard() {
   const { tasks } = useTasks()
   const { getMemberById } = useTeam()
+  const { user, isAdmin, isLeader } = useAuth()
   const { theme } = useTheme()
+  const visibleTasks = (isAdmin() || isLeader()) ? tasks : tasks.filter((t) => t.assignedTo === user?.id)
   const isDark = theme === 'dark'
   const axisColor = isDark ? '#c4c8e8' : '#434655'
   const gridColor = isDark ? '#2e3148' : '#edeef0'
@@ -38,12 +41,12 @@ export default function Dashboard() {
   }
 
   const stats = useMemo(() => {
-    const total = tasks.length
-    const completed = tasks.filter((t) => t.status === "completed").length
-    const inProgress = tasks.filter((t) => t.status === "in_progress").length
-    const pending = tasks.filter((t) => t.status === "pending").length
+    const total = visibleTasks.length
+    const completed = visibleTasks.filter((t) => t.status === "completed").length
+    const inProgress = visibleTasks.filter((t) => t.status === "in_progress").length
+    const pending = visibleTasks.filter((t) => t.status === "pending").length
     return { total, completed, inProgress, pending }
-  }, [tasks])
+  }, [visibleTasks])
 
   const pieData = useMemo(() => [
     { name: "Pendientes", value: stats.pending, color: STATUS_COLORS.pending },
@@ -52,17 +55,17 @@ export default function Dashboard() {
   ].filter((d) => d.value > 0), [stats])
 
   const barData = useMemo(() => [
-    { name: "Alta", value: tasks.filter((t) => t.priority === "high").length, fill: PRIORITY_COLORS.high },
-    { name: "Media", value: tasks.filter((t) => t.priority === "medium").length, fill: PRIORITY_COLORS.medium },
-    { name: "Baja", value: tasks.filter((t) => t.priority === "low").length, fill: PRIORITY_COLORS.low },
-  ], [tasks])
+    { name: "Alta", value: visibleTasks.filter((t) => t.priority === "high").length, fill: PRIORITY_COLORS.high },
+    { name: "Media", value: visibleTasks.filter((t) => t.priority === "medium").length, fill: PRIORITY_COLORS.medium },
+    { name: "Baja", value: visibleTasks.filter((t) => t.priority === "low").length, fill: PRIORITY_COLORS.low },
+  ], [visibleTasks])
 
   const urgentTasks = useMemo(() =>
-    tasks
+    visibleTasks
       .filter((t) => t.status !== "completed" && t.dueDate && (isDueDateOverdue(t.dueDate) || isDueDateSoon(t.dueDate)))
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
       .slice(0, 5),
-    [tasks]
+    [visibleTasks]
   )
 
   const completionPct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0

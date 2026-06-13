@@ -147,6 +147,52 @@ const me = async (req, res, next) => {
   }
 };
 
+const updateMe = async (req, res, next) => {
+  try {
+    const { name, email, currentPassword, newPassword } = req.body;
+    const userId = req.user.userId;
+
+    const result = await db.query('SELECT id, email, password_hash FROM users WHERE id = $1', [userId]);
+    const current = result.rows[0];
+    if (!current) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+    if (email && email.toLowerCase() !== current.email) {
+      const existing = await db.query('SELECT id FROM users WHERE email = $1 AND id != $2', [email.toLowerCase(), userId]);
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ error: 'El email ya está registrado' });
+      }
+    }
+
+    let passwordHash;
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Debes indicar tu contraseña actual' });
+      }
+      const valid = await bcrypt.compare(currentPassword, current.password_hash);
+      if (!valid) {
+        return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+      }
+      passwordHash = await bcrypt.hash(newPassword, 10);
+    }
+
+    const updated = await db.query(
+      `UPDATE users SET
+        name = COALESCE($1, name),
+        email = COALESCE($2, email),
+        password_hash = COALESCE($3, password_hash),
+        updated_at = NOW()
+       WHERE id = $4
+       RETURNING id, email, name, role, permissions, created_at, updated_at`,
+      [name?.trim() || null, email?.toLowerCase() || null, passwordHash || null, userId]
+    );
+
+    logger.info({ userId }, 'Usuario actualizó su perfil');
+    res.json({ user: updated.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const forgotPassword = async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -205,4 +251,4 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, refresh, logout, me, forgotPassword, resetPassword };
+module.exports = { register, login, refresh, logout, me, updateMe, forgotPassword, resetPassword };

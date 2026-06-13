@@ -118,6 +118,62 @@ describe('GET /api/auth/me', () => {
   });
 });
 
+describe('PUT /api/auth/me', () => {
+  test('actualiza nombre y email del usuario autenticado', async () => {
+    if (skipTests || !authToken) return;
+    const newName = 'Test User Updated';
+    const newEmail = `updated_${Date.now()}@test.com`;
+    const res = await request(app)
+      .put('/api/auth/me')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ name: newName, email: newEmail });
+    expect(res.status).toBe(200);
+    expect(res.body.user.name).toBe(newName);
+    expect(res.body.user.email).toBe(newEmail);
+    expect(res.body.user).not.toHaveProperty('password_hash');
+    testUser.email = newEmail;
+  });
+
+  test('rechaza cambio de contraseña sin indicar la contraseña actual', async () => {
+    if (skipTests || !authToken) return;
+    const res = await request(app)
+      .put('/api/auth/me')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ newPassword: 'newpassword123' });
+    expect(res.status).toBe(400);
+  });
+
+  test('rechaza cambio de contraseña con la contraseña actual incorrecta', async () => {
+    if (skipTests || !authToken) return;
+    const res = await request(app)
+      .put('/api/auth/me')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ currentPassword: 'wrongpassword', newPassword: 'newpassword123' });
+    expect(res.status).toBe(401);
+  });
+
+  test('actualiza la contraseña con la contraseña actual correcta', async () => {
+    if (skipTests || !authToken) return;
+    const res = await request(app)
+      .put('/api/auth/me')
+      .set('Authorization', `Bearer ${authToken}`)
+      .send({ currentPassword: testUser.password, newPassword: 'newpassword123' });
+    expect(res.status).toBe(200);
+
+    const loginRes = await request(app).post('/api/auth/login').send({
+      email: testUser.email,
+      password: 'newpassword123',
+    });
+    expect(loginRes.status).toBe(200);
+  });
+
+  test('rechaza request sin token', async () => {
+    if (skipTests) return;
+    const res = await request(app).put('/api/auth/me').send({ name: 'Nope' });
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('POST /api/auth/refresh', () => {
   test('genera nuevo token con refresh token válido', async () => {
     if (skipTests || !refreshToken) return;

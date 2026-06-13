@@ -10,7 +10,7 @@ import GroupSelector from './Groups/GroupSelector'
 export default function Header({ onMenuToggle }) {
   const [search, setSearch] = useState('')
   const { tasks } = useTasks()
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin, isLeader } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -24,6 +24,9 @@ export default function Header({ onMenuToggle }) {
   }
 
   const avatarBg = user ? getAvatarColor(user.name) : 'bg-[#004ac6]'
+  const visibleTaskCount = (isAdmin() || isLeader())
+    ? tasks.length
+    : tasks.filter((t) => t.assignedTo === user?.id).length
 
   return (
     <header className="fixed top-0 right-0 left-0 lg:left-[250px] h-16 z-40 bg-white dark:bg-[#1e2030] border-b border-[#c3c6d7] dark:border-[#2e3148] shadow-sm flex items-center justify-between px-4 gap-3">
@@ -50,7 +53,7 @@ export default function Header({ onMenuToggle }) {
         <span className="hidden sm:block"><GroupSelector /></span>
 
         <span className="hidden lg:block text-xs font-semibold px-3 py-1 bg-[#edeef0] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] rounded-full">
-          {tasks.length} tareas
+          {visibleTaskCount} tareas
         </span>
 
         <button
@@ -80,6 +83,13 @@ export default function Header({ onMenuToggle }) {
             <>
               <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
               <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-[#1e2030] rounded-xl shadow-xl border border-[#c3c6d7] dark:border-[#2e3148] min-w-[160px] overflow-hidden">
+                <button
+                  onClick={() => { navigate('/profile'); setUserMenuOpen(false) }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+                >
+                  <span className="material-symbols-outlined text-base">person</span>
+                  Mi Perfil
+                </button>
                 <button
                   onClick={() => { navigate('/settings'); setUserMenuOpen(false) }}
                   className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"

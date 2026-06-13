@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { register, login, refresh, logout, me, forgotPassword, resetPassword } = require('../controllers/authController');
+const { register, login, refresh, logout, me, updateMe, forgotPassword, resetPassword } = require('../controllers/authController');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 
@@ -114,6 +114,45 @@ router.post('/logout', authMiddleware, logout);
  *         description: Datos del usuario actual
  */
 router.get('/me', authMiddleware, me);
+
+/**
+ * @openapi
+ * /api/auth/me:
+ *   put:
+ *     tags: [Auth]
+ *     summary: Actualizar el perfil del usuario autenticado
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               email: { type: string, format: email }
+ *               currentPassword: { type: string }
+ *               newPassword: { type: string, minLength: 8 }
+ *     responses:
+ *       200:
+ *         description: Perfil actualizado
+ *       400:
+ *         description: Datos inválidos o falta la contraseña actual
+ *       401:
+ *         description: Contraseña actual incorrecta
+ *       409:
+ *         description: Email ya registrado
+ */
+router.put('/me',
+  authMiddleware,
+  body('name').optional().trim().notEmpty().withMessage('El nombre no puede estar vacío'),
+  body('email').optional().isEmail().normalizeEmail(),
+  body('currentPassword').optional().notEmpty(),
+  body('newPassword').optional().isLength({ min: 8 }).withMessage('La nueva contraseña debe tener al menos 8 caracteres'),
+  validate,
+  updateMe
+);
 
 /**
  * @openapi
