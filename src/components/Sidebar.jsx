@@ -39,7 +39,6 @@ export default function Sidebar({ open, onClose }) {
             <img src="/logo.jpeg" alt="Gestor de Tareas" className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
             <div>
               <h1 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">Gestor de Tareas</h1>
-              <p className="text-xs text-[#434655] dark:text-[#c4c8e8]">Fase 2</p>
             </div>
           </Link>
           <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] transition">
