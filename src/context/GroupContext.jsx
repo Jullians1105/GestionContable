@@ -64,7 +64,7 @@ export function GroupProvider({ children }) {
     api.getGroups()
       .then(data => setGroups(Array.isArray(data) ? data.map(normalizeGroup) : []))
       .catch(() => {})
-  }, [useRealBackend, user?.id])
+  }, [useRealBackend, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const persist = (updated) => {
     setGroups(updated)

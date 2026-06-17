@@ -35,7 +35,7 @@ export function TeamProvider({ children }) {
         }
       })
       .catch(() => {})
-  }, [useRealBackend, user?.id])
+  }, [useRealBackend, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (useRealBackend) return

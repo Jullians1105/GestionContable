@@ -36,7 +36,7 @@ export function TagProvider({ children }) {
     api.getTags()
       .then(data => setTags(Array.isArray(data) ? data : []))
       .catch(() => {})
-  }, [useRealBackend, user?.id])
+  }, [useRealBackend, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const persist = (updated) => {
     setTags(updated)

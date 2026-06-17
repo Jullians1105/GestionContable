@@ -51,7 +51,7 @@ export const SAMPLE_MEMBERS = [
   },
 ]
 
-const SAMPLE_TASKS = [
+const _SAMPLE_TASKS = [
   {
     id: 'task-1',
     title: 'Diseñar Dashboard',

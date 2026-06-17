@@ -4,7 +4,7 @@
  */
 const request = require('supertest');
 
-let app, authToken;
+let app, authToken, server;
 let skipTests = false;
 
 beforeAll(async () => {
@@ -12,6 +12,7 @@ beforeAll(async () => {
   try {
     const module = require('../../src/index');
     app = module.app;
+    server = module.server;
     const db = require('../../src/config/database');
     await db.query('SELECT 1');
 
@@ -24,6 +25,10 @@ beforeAll(async () => {
   } catch {
     skipTests = true;
   }
+});
+
+afterAll(async () => {
+  if (server) server.close();
 });
 
 describe('GET /api/tasks', () => {

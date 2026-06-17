@@ -1,4 +1,4 @@
-const { sign, verify } = require('../../src/utils/jwt');
+const { sign, verify, signRefresh, verifyRefresh } = require('../../src/utils/jwt');
 
 describe('JWT Utils', () => {
   const payload = { userId: 'test-id', email: 'test@test.com', role: 'member' };
@@ -24,6 +24,23 @@ describe('JWT Utils', () => {
   test('verify lanza error con token corrupto', () => {
     const token = sign(payload);
     expect(() => verify(token + 'corrupto')).toThrow();
+  });
+
+  test('signRefresh genera un refresh token válido', () => {
+    const token = signRefresh({ userId: payload.userId });
+    expect(typeof token).toBe('string');
+    expect(token.split('.')).toHaveLength(3);
+  });
+
+  test('verifyRefresh decodifica el refresh token correctamente', () => {
+    const token = signRefresh({ userId: payload.userId });
+    const decoded = verifyRefresh(token);
+    expect(decoded.userId).toBe(payload.userId);
+  });
+
+  test('verifyRefresh lanza error con token de acceso (secret incorrecto)', () => {
+    const accessToken = sign(payload);
+    expect(() => verifyRefresh(accessToken)).toThrow();
   });
 });
 

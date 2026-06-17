@@ -114,10 +114,12 @@ if (env.NODE_ENV === 'production') {
 app.use(notFound);
 app.use(errorHandler);
 
-server.listen(env.PORT, () => {
-  logger.info(`Gestor de Tareas backend v3.0 corriendo en http://localhost:${env.PORT}`);
-  logger.info(`Docs: http://localhost:${env.PORT}/api/docs`);
-  logger.info(`Ambiente: ${env.NODE_ENV}`);
-});
+if (env.NODE_ENV !== 'test') {
+  server.listen(env.PORT, () => {
+    logger.info(`Gestor de Tareas backend v3.0 corriendo en http://localhost:${env.PORT}`);
+    logger.info(`Docs: http://localhost:${env.PORT}/api/docs`);
+    logger.info(`Ambiente: ${env.NODE_ENV}`);
+  });
+}
 
 module.exports = { app, server, io };
