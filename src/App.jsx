@@ -40,7 +40,7 @@ function Layout() {
       )}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <Header onMenuToggle={() => setSidebarOpen(v => !v)} />
-      <main className="lg:ml-[250px] pt-16 min-h-screen">
+      <main className="lg:ml-[314px] pt-16 min-h-screen">
         <div className="p-4 sm:p-6">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
