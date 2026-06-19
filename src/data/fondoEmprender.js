@@ -87,6 +87,7 @@ export function buildDefaultCompanies(processes) {
   return INITIAL_COMPANY_NAMES.map((name, i) => ({
     id: `c${i}`,
     name,
+    categoria: 'contable',
     cells: Object.fromEntries(processes.map(p => [p.name, { status: 'pending', note: '' }])),
     confirmed: null,
   }))
@@ -95,6 +96,7 @@ export function buildDefaultCompanies(processes) {
 export function ensureCells(companies, processes) {
   return companies.map(c => ({
     ...c,
+    categoria: c.categoria ?? 'contable',   // backward-compat for data without the field
     cells: Object.fromEntries(
       processes.map(p => [p.name, c.cells?.[p.name] ?? { status: 'pending', note: '' }])
     ),

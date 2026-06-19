@@ -99,9 +99,9 @@ export default function Sidebar({ open, onClose }) {
           {/* Logo wrapper same width as buttons so items align on the same axis */}
           <div className="w-10 h-10 flex items-center justify-center mb-3 flex-shrink-0">
             <img
-              src="/logo.jpeg"
+              src="/src/assets/logo-icono-blanco.png"
               alt="Logo"
-              className="w-9 h-9 rounded-xl object-cover"
+              className="w-9 h-9 object-contain"
             />
           </div>
           {modules.map(({ id, label, icon }) => (

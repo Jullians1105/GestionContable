@@ -14,6 +14,11 @@ const SEM_COLOR = {
   red:    '#ef4444',
 }
 
+const CATEGORIAS = [
+  { key: 'contable',   label: 'Contable' },
+  { key: 'tributario', label: 'Tributario' },
+]
+
 function loadCurrentCompanies() {
   const today = new Date()
   const procs = loadProcesses() ?? buildDefaultProcesses()
@@ -28,9 +33,18 @@ function loadCurrentCompanies() {
 
 export default function FondoEmprenderEmpresasPage() {
   const [{ companies, year, month, procs }, setData] = useState(loadCurrentCompanies)
-  const [search, setSearch]  = useState('')
-  const [adding, setAdding]  = useState(false)
-  const [newName, setNewName] = useState('')
+
+  // ── filter state ─────────────────────────────────────────────────────────
+  const [search, setSearch]     = useState('')
+  const [activeTab, setActiveTab] = useState('todas')
+
+  // ── add-company form state ────────────────────────────────────────────────
+  const [adding, setAdding]         = useState(false)
+  const [newName, setNewName]       = useState('')
+  const [newCategoria, setNewCat]   = useState('contable')
+
+  function openForm()  { setAdding(true) }
+  function closeForm() { setAdding(false); setNewName(''); setNewCat('contable') }
 
   // ── add company ──────────────────────────────────────────────────────────
   function handleAddCompany() {
@@ -39,31 +53,50 @@ export default function FondoEmprenderEmpresasPage() {
     const newCompany = {
       id: `c${Date.now()}`,
       name,
+      categoria: newCategoria,
       cells: Object.fromEntries(procs.map(p => [p.name, { status: 'pending', note: '' }])),
       confirmed: null,
     }
     const updated = [...companies, newCompany]
     saveMonthData(year, month, { companies: updated })
     setData(prev => ({ ...prev, companies: updated }))
-    setNewName('')
-    setAdding(false)
+    closeForm()
   }
 
-  // ── derived stats (all companies, not filtered) ──────────────────────────
+  // ── derived stats — scoped to the active category tab ───────────────────
   const summary = useMemo(() => {
-    const allStats = companies.map(c => getMacroStats(c))
+    const scope = activeTab === 'todas'
+      ? companies
+      : companies.filter(c => (c.categoria ?? 'contable') === activeTab)
+    const allStats  = scope.map(c => getMacroStats(c))
     const completadas = allStats.filter(s => s.semaphore === 'green').length
     const enProgreso  = allStats.filter(s => s.semaphore === 'yellow').length
     const pendientes  = allStats.filter(s => s.semaphore === 'red').length
-    const pct = companies.length > 0 ? Math.round((completadas / companies.length) * 100) : 0
-    return { total: companies.length, completadas, enProgreso, pendientes, pct }
-  }, [companies])
+    const pct = scope.length > 0 ? Math.round((completadas / scope.length) * 100) : 0
+    return { total: scope.length, completadas, enProgreso, pendientes, pct }
+  }, [companies, activeTab])
 
-  const filtered = useMemo(
-    () => companies.filter(c => c.name.toLowerCase().includes(search.toLowerCase())),
-    [companies, search]
-  )
+  const catCounts = useMemo(() => ({
+    contable:   companies.filter(c => (c.categoria ?? 'contable') === 'contable').length,
+    tributario: companies.filter(c => (c.categoria ?? 'contable') === 'tributario').length,
+  }), [companies])
 
+  const tabs = [
+    { key: 'todas',      label: 'Todas',      count: companies.length },
+    { key: 'contable',   label: 'Contable',   count: catCounts.contable },
+    { key: 'tributario', label: 'Tributario', count: catCounts.tributario },
+  ]
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    return companies.filter(c => {
+      const matchSearch = !q || c.name.toLowerCase().includes(q)
+      const matchCat    = activeTab === 'todas' || (c.categoria ?? 'contable') === activeTab
+      return matchSearch && matchCat
+    })
+  }, [companies, search, activeTab])
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5 min-w-0">
 
@@ -76,7 +109,7 @@ export default function FondoEmprenderEmpresasPage() {
           </p>
         </div>
         <button
-          onClick={() => setAdding(true)}
+          onClick={openForm}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
           style={{ background: '#004ac6' }}
         >
@@ -87,35 +120,78 @@ export default function FondoEmprenderEmpresasPage() {
 
       {/* ── Add company form ──────────────────────────────────────────────── */}
       {adding && (
-        <div className="bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl p-4 shadow-sm flex flex-wrap gap-2 items-center">
-          <input
-            autoFocus
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter')  handleAddCompany()
-              if (e.key === 'Escape') { setAdding(false); setNewName('') }
-            }}
-            placeholder="Nombre de la empresa..."
-            className="flex-1 min-w-[220px] px-3 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
-          />
-          <button
-            onClick={handleAddCompany}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-            style={{ background: '#004ac6' }}
-          >
-            Agregar
-          </button>
-          <button
-            onClick={() => { setAdding(false); setNewName('') }}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-[#6b7280] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
-          >
-            Cancelar
-          </button>
+        <div className="bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl p-5 shadow-sm flex flex-col gap-4">
+
+          {/* Name */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
+              Nombre de la empresa
+            </label>
+            <input
+              autoFocus
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter')  handleAddCompany()
+                if (e.key === 'Escape') closeForm()
+              }}
+              placeholder="Ej. CAPROVIVA S.A.S"
+              className="px-3 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+            />
+          </div>
+
+          {/* Category selector */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
+              Categoría <span className="text-[#ef4444]">*</span>
+            </label>
+            <div className="flex gap-2">
+              {CATEGORIAS.map(({ key, label }) => {
+                const active = newCategoria === key
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setNewCat(key)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all duration-150"
+                    style={{
+                      borderColor:      active ? '#004ac6' : '#e2e4ef',
+                      background:       active ? '#f0f4ff' : 'transparent',
+                      color:            active ? '#004ac6' : '#6b7280',
+                    }}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0 transition-colors"
+                      style={{ background: active ? '#004ac6' : '#d1d5db' }}
+                    />
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 justify-end pt-1">
+            <button
+              onClick={closeForm}
+              className="px-4 py-2 rounded-lg text-sm font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleAddCompany}
+              disabled={!newName.trim()}
+              className="px-5 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 transition active:scale-[0.97]"
+              style={{ background: '#004ac6' }}
+            >
+              Agregar empresa
+            </button>
+          </div>
         </div>
       )}
 
-      {/* ── Summary cards (same pattern as Dashboard) ────────────────────── */}
+      {/* ── Summary cards ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatsCard
           title="Total empresas"
@@ -155,20 +231,54 @@ export default function FondoEmprenderEmpresasPage() {
         />
       </div>
 
-      {/* ── Search ───────────────────────────────────────────────────────── */}
-      <div className="relative max-w-sm">
-        <span
-          className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#8890b5]"
-          style={{ fontSize: 18 }}
-        >
-          search
-        </span>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar empresa..."
-          className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
-        />
+      {/* ── Filters row: pills + search ──────────────────────────────────── */}
+      <div className="flex items-center gap-3 flex-wrap">
+
+        {/* Segment control / pills */}
+        <div className="flex items-center bg-[#f0f2f8] dark:bg-[#252840] rounded-xl p-1 gap-0.5 flex-shrink-0">
+          {tabs.map(({ key, label, count }) => {
+            const active = activeTab === key
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
+                  active
+                    ? 'bg-white dark:bg-[#1e2030] text-[#004ac6] dark:text-[#7ba8f0] shadow-sm'
+                    : 'text-[#6b7280] dark:text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0]'
+                }`}
+              >
+                {label}
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors"
+                  style={
+                    active
+                      ? { background: '#004ac6', color: '#fff' }
+                      : { background: '#e2e4ef', color: '#6b7280' }
+                  }
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Search */}
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <span
+            className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#8890b5]"
+            style={{ fontSize: 17 }}
+          >
+            search
+          </span>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar empresa..."
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+          />
+        </div>
       </div>
 
       {/* ── Compact table ────────────────────────────────────────────────── */}
@@ -197,9 +307,21 @@ export default function FondoEmprenderEmpresasPage() {
                   {company.name}
                 </span>
 
+                {/* Category badge */}
+                <span
+                  className="hidden sm:inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 uppercase tracking-wide"
+                  style={
+                    (company.categoria ?? 'contable') === 'contable'
+                      ? { background: '#f0f4ff', color: '#004ac6' }
+                      : { background: '#f0fdf4', color: '#16a34a' }
+                  }
+                >
+                  {company.categoria ?? 'contable'}
+                </span>
+
                 {/* Progress bar + count */}
                 <div className="flex items-center gap-2.5 flex-shrink-0">
-                  <div className="w-28 h-1.5 rounded-full bg-[#e8eaf0] dark:bg-[#2e3148] overflow-hidden">
+                  <div className="w-24 h-1.5 rounded-full bg-[#e8eaf0] dark:bg-[#2e3148] overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-300"
                       style={{ width: `${pct}%`, background: color }}
@@ -226,7 +348,9 @@ export default function FondoEmprenderEmpresasPage() {
         </div>
       ) : (
         <div className="text-center py-16 text-[#8890b5] dark:text-[#5a5f7a] text-sm">
-          No se encontraron empresas
+          {search || activeTab !== 'todas'
+            ? 'No hay empresas que coincidan con el filtro'
+            : 'No se encontraron empresas'}
         </div>
       )}
     </div>
