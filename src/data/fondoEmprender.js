@@ -54,7 +54,9 @@ export function loadProcesses() {
   try {
     const r = localStorage.getItem(PROC_KEY)
     if (r) return JSON.parse(r)
-  } catch {}
+  } catch {
+    // ignore localStorage read/parse errors
+  }
   return null
 }
 
@@ -75,7 +77,9 @@ export function loadMonthData(year, month) {
     if (!r) return null
     const parsed = JSON.parse(r)
     return Array.isArray(parsed) ? { companies: parsed } : parsed   // back-compat
-  } catch {}
+  } catch {
+    // ignore localStorage read/parse errors
+  }
   return null
 }
 
@@ -110,7 +114,9 @@ export function loadEmpresaDetail(companyId) {
   try {
     const r = localStorage.getItem(`${DATA_PFX}_empresa_${companyId}`)
     if (r) return JSON.parse(r)
-  } catch {}
+  } catch {
+    // ignore localStorage read/parse errors
+  }
   return null
 }
 

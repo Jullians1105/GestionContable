@@ -174,7 +174,9 @@ export default function FondoEmprenderPage() {
     try {
       const s = localStorage.getItem(`noteTooltipSize_${cellKey}`)
       if (s) return JSON.parse(s)
-    } catch {}
+    } catch {
+      // ignore localStorage read/parse errors
+    }
     return { width: 220, height: 80 }
   }
 
@@ -678,7 +680,7 @@ export default function FondoEmprenderPage() {
                 ¿Eliminar {deleteConfirm.type === 'process' ? 'proceso' : 'empresa'}?
               </p>
             </div>
-            <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-4 truncate">"{deleteConfirm.name}"</p>
+            <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-4 truncate">&ldquo;{deleteConfirm.name}&rdquo;</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}

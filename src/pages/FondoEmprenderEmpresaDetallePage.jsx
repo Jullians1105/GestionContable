@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
-  loadProcesses, buildDefaultProcesses,
   loadMonthData,
   loadEmpresaDetail, saveEmpresaDetail, buildDefaultEmpresaDetail,
-  MACRO_PROCESSES,
 } from '../data/fondoEmprender'
 
 const MONTHS = [

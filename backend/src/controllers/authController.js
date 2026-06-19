@@ -33,7 +33,7 @@ const register = async (req, res, next) => {
     const refreshToken = signRefresh({ userId: user.id });
 
     await db.query(
-      'INSERT INTO refresh_tokens (token, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
+      'INSERT INTO refresh_tokens (token, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\') ON CONFLICT (token) DO NOTHING',
       [refreshToken, user.id]
     );
 
@@ -66,7 +66,7 @@ const login = async (req, res, next) => {
     const refreshToken = signRefresh({ userId: user.id });
 
     await db.query(
-      'INSERT INTO refresh_tokens (token, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\')',
+      'INSERT INTO refresh_tokens (token, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\') ON CONFLICT (token) DO NOTHING',
       [refreshToken, user.id]
     );
 
