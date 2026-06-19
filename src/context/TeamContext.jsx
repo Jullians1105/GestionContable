@@ -85,11 +85,12 @@ export function TeamProvider({ children }) {
     if (useRealBackend) {
       const payload = {}
       if (updates.name !== undefined) payload.name = updates.name
+      if (updates.email !== undefined) payload.email = updates.email
       if (updates.role !== undefined) payload.role = updates.role
       if (updates.password) payload.password = updates.password
       if (updates.permissions !== undefined) payload.permissions = updates.permissions
       const updated = await api.updateEmployee(id, payload)
-      const patch = { name: updated.name, role: updated.role }
+      const patch = { name: updated.name, email: updated.email, role: updated.role }
       setMembers(prev => prev.map(m => m.id === id ? { ...m, ...patch } : m))
       setAllUsers(prev => prev.map(u => u.id === id ? { ...u, ...patch } : u))
       return

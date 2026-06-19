@@ -52,31 +52,29 @@ export default function TeamForm({ member, onSubmit, onCancel }) {
         {errors.name && <p className="text-[#EF4444] text-[12px] mt-1">{errors.name}</p>}
       </div>
 
+      <div>
+        <label className={labelCls}>Email <span className="text-[#EF4444]">*</span></label>
+        <input
+          type="email"
+          value={form.email ?? ""}
+          onChange={(e) => handleChange("email", e.target.value)}
+          placeholder="correo@empresa.com"
+          className={`${inputCls} ${errors.email ? inputErrCls : ""}`}
+        />
+        {errors.email && <p className="text-[#EF4444] text-[12px] mt-1">{errors.email}</p>}
+      </div>
       {!member && (
-        <>
-          <div>
-            <label className={labelCls}>Email <span className="text-[#EF4444]">*</span></label>
-            <input
-              type="email"
-              value={form.email ?? ""}
-              onChange={(e) => handleChange("email", e.target.value)}
-              placeholder="correo@empresa.com"
-              className={`${inputCls} ${errors.email ? inputErrCls : ""}`}
-            />
-            {errors.email && <p className="text-[#EF4444] text-[12px] mt-1">{errors.email}</p>}
-          </div>
-          <div>
-            <label className={labelCls}>Contraseña <span className="text-[#EF4444]">*</span></label>
-            <input
-              type="password"
-              value={form.password ?? ""}
-              onChange={(e) => handleChange("password", e.target.value)}
-              placeholder="Mínimo 8 caracteres"
-              className={`${inputCls} ${errors.password ? inputErrCls : ""}`}
-            />
-            {errors.password && <p className="text-[#EF4444] text-[12px] mt-1">{errors.password}</p>}
-          </div>
-        </>
+        <div>
+          <label className={labelCls}>Contraseña <span className="text-[#EF4444]">*</span></label>
+          <input
+            type="password"
+            value={form.password ?? ""}
+            onChange={(e) => handleChange("password", e.target.value)}
+            placeholder="Mínimo 8 caracteres"
+            className={`${inputCls} ${errors.password ? inputErrCls : ""}`}
+          />
+          {errors.password && <p className="text-[#EF4444] text-[12px] mt-1">{errors.password}</p>}
+        </div>
       )}
 
       <div>
