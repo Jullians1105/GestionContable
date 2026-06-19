@@ -7,17 +7,6 @@ import { getEffectivePermissions } from '../utils/permissions'
 
 export const AuthContext = createContext(null)
 
-// Limpia tokens del sistema anterior (no son JWT reales)
-;(function purgeStaleTokens() {
-  const token = localStorage.getItem('auth_token')
-  const isJWT = token && token.split('.').length === 3
-  if (token && !isJWT) {
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('auth_refresh_token')
-    localStorage.removeItem('auth_user')
-  }
-})()
-
 // Detecta si el backend real está disponible
 let backendAvailable = null
 async function checkBackend() {
@@ -43,24 +32,17 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     checkBackend().then(available => {
-      setUseRealBackend(available)
-      // Leer token actual de localStorage (no del closure — evita condición de carrera con login)
+      // useRealBackend solo se activa si el backend valida el token — no solo por el health check
       const tokenToValidate = localStorage.getItem('auth_token')
       if (available && tokenToValidate) {
         api.me()
           .then(({ user: serverUser }) => {
+            setUseRealBackend(true)
             localStorage.setItem('auth_user', JSON.stringify(serverUser))
             setUser(serverUser)
           })
           .catch(() => {
-            // Solo limpiar si el token no fue reemplazado por un login concurrente
-            if (localStorage.getItem('auth_token') === tokenToValidate) {
-              localStorage.removeItem('auth_user')
-              localStorage.removeItem('auth_token')
-              localStorage.removeItem('auth_refresh_token')
-              setUser(null)
-              setToken(null)
-            }
+            // Token inválido para el backend → permanecer en modo localStorage (no limpiar sesión)
           })
       }
     })
@@ -79,8 +61,8 @@ export function AuthProvider({ children }) {
         setToken(data.token)
         setUseRealBackend(true)
         return { success: true }
-      } catch (err) {
-        return { success: false, error: err.message }
+      } catch {
+        // Backend corriendo pero sin este usuario → caer a localStorage
       }
     }
     // Fallback localStorage

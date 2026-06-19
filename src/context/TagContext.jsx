@@ -34,13 +34,16 @@ export function TagProvider({ children }) {
   useEffect(() => {
     if (!useRealBackend || !user) return
     api.getTags()
-      .then(data => setTags(Array.isArray(data) ? data : []))
+      .then(data => { const loaded = Array.isArray(data) ? data : []; if (loaded.length > 0) setTags(loaded) })
       .catch(() => {})
   }, [useRealBackend, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const persist = (updated) => {
-    setTags(updated)
-    if (!useRealBackend) save(updated)
+  const persist = (updater) => {
+    setTags((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      if (!useRealBackend) save(next)
+      return next
+    })
   }
 
   const createTag = useCallback(async (name, color) => {

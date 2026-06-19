@@ -11,7 +11,7 @@ export function TeamProvider({ children }) {
   const { user, useRealBackend } = useAuth()
   const [members, setMembers] = useState(() => {
     const saved = storage.getMembers()
-    return saved ?? SAMPLE_MEMBERS
+    return (saved && saved.length > 0) ? saved : SAMPLE_MEMBERS
   })
   const [allUsers, setAllUsers] = useState([])
 
@@ -22,6 +22,7 @@ export function TeamProvider({ children }) {
       .then(data => {
         const users = Array.isArray(data) ? data : []
         setAllUsers(users)
+        if (users.length === 0) return  // backend vacío → no sobreescribir datos locales
 
         // teamMemberIds persists which users are on the team across sessions.
         // On first load (no saved ids) every existing user is included so the

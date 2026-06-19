@@ -62,13 +62,20 @@ export function GroupProvider({ children }) {
   useEffect(() => {
     if (!useRealBackend || !user) return
     api.getGroups()
-      .then(data => setGroups(Array.isArray(data) ? data.map(normalizeGroup) : []))
+      .then(data => {
+        const loaded = Array.isArray(data) ? data.map(normalizeGroup) : []
+        if (loaded.length > 0) setGroups(loaded)
+        // backend vacío → mantener estado actual (localStorage o muestra)
+      })
       .catch(() => {})
   }, [useRealBackend, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const persist = (updated) => {
-    setGroups(updated)
-    if (!useRealBackend) saveGroups(updated)
+  const persist = (updater) => {
+    setGroups((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      if (!useRealBackend) saveGroups(next)
+      return next
+    })
   }
 
   const createGroup = useCallback(async (groupData) => {
@@ -91,14 +98,32 @@ export function GroupProvider({ children }) {
 
   const updateGroup = useCallback(async (id, updates) => {
     if (useRealBackend) {
+      const current = groups.find((g) => g.id === id)
+      const oldIds = new Set(current?.memberIds ?? [])
+      const newIds = new Set(updates.memberIds ?? oldIds)
+
+      // updateGroup endpoint only handles metadata; member changes need separate calls
       const updated = await api.updateGroup(id, updates)
-      setGroups((prev) => prev.map((g) => (g.id === id ? normalizeGroup(updated) : g)))
+      await Promise.all([
+        ...[...newIds].filter((uid) => !oldIds.has(uid)).map((uid) =>
+          api.addGroupMember(id, uid).catch(() => {})
+        ),
+        ...[...oldIds].filter((uid) => !newIds.has(uid)).map((uid) =>
+          api.removeGroupMember(id, uid).catch(() => {})
+        ),
+      ])
+
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === id ? normalizeGroup({ ...updated, memberIds: [...newIds] }) : g
+        )
+      )
       return
     }
     persist((prev) =>
       prev.map((g) => (g.id === id ? { ...g, ...updates, updatedAt: today() } : g))
     )
-  }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [useRealBackend, groups]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteGroup = useCallback(async (id) => {
     if (useRealBackend) {
