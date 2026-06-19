@@ -22,18 +22,9 @@ export function TeamProvider({ children }) {
       .then(data => {
         const users = Array.isArray(data) ? data : []
         setAllUsers(users)
-        if (users.length === 0) return  // backend vacío → no sobreescribir datos locales
-
-        // teamMemberIds persists which users are on the team across sessions.
-        // On first load (no saved ids) every existing user is included so the
-        // team page doesn't appear empty on a fresh install.
-        const savedIds = storage.getTeamMemberIds()
-        if (savedIds !== null) {
-          setMembers(users.filter(u => savedIds.includes(u.id)))
-        } else {
-          setMembers(users)
-          storage.saveTeamMemberIds(users.map(u => u.id))
-        }
+        // In backend mode localStorage is not the source of truth — always
+        // reflect exactly what the backend returns, even if the list is empty.
+        setMembers(users)
       })
       .catch(() => {})
   }, [useRealBackend, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -57,9 +48,6 @@ export function TeamProvider({ children }) {
         preferences: { theme: 'light', notifications: true },
       }
       setAllUsers(prev => [...prev, newUser])
-      // Also add to team view and persist the id
-      const savedIds = storage.getTeamMemberIds() ?? []
-      storage.saveTeamMemberIds([...savedIds, newUser.id])
       setMembers(prev => [...prev, newUser])
       return newUser
     }
@@ -79,10 +67,6 @@ export function TeamProvider({ children }) {
     if (useRealBackend) {
       const user = allUsers.find(u => u.id === memberData.id)
       if (!user) return null
-      const savedIds = storage.getTeamMemberIds() ?? []
-      if (!savedIds.includes(user.id)) {
-        storage.saveTeamMemberIds([...savedIds, user.id])
-      }
       setMembers(prev => prev.some(m => m.id === user.id) ? prev : [...prev, user])
       return user
     }
