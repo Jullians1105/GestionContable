@@ -27,6 +27,9 @@ import CalendarPage from './pages/CalendarPage'
 import ReportsPage from './pages/ReportsPage'
 import NotificationsPage from './pages/NotificationsPage'
 import UsersPage from './pages/UsersPage'
+import FondoEmprenderPage from './pages/FondoEmprenderPage'
+import FondoEmprenderEmpresasPage from './pages/FondoEmprenderEmpresasPage'
+import FondoEmprenderEmpresaDetallePage from './pages/FondoEmprenderEmpresaDetallePage'
 
 function Layout() {
   const { isAuthenticated } = useAuth()
@@ -40,8 +43,8 @@ function Layout() {
       )}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <Header onMenuToggle={() => setSidebarOpen(v => !v)} />
-      <main className="lg:ml-[250px] pt-16 min-h-screen">
-        <div className="p-4 sm:p-6">
+      <main className="lg:ml-[var(--sidebar-w,112px)] pt-16 min-h-screen transition-[margin-left] duration-200">
+        <div className="p-6">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/tasks" element={<TasksPage />} />
@@ -54,6 +57,9 @@ function Layout() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/usuarios" element={<UsersPage />} />
+            <Route path="/fondo-emprender" element={<FondoEmprenderPage />} />
+            <Route path="/fondo-emprender/empresas" element={<FondoEmprenderEmpresasPage />} />
+            <Route path="/fondo-emprender/empresas/:empresaId" element={<FondoEmprenderEmpresaDetallePage />} />
           </Routes>
         </div>
       </main>
