@@ -29,7 +29,7 @@ export default function Header({ onMenuToggle }) {
     : tasks.filter((t) => t.assignedTo === user?.id).length
 
   return (
-    <header className="fixed top-0 right-0 left-0 lg:left-[250px] h-16 z-40 bg-white dark:bg-[#1e2030] border-b border-[#c3c6d7] dark:border-[#2e3148] shadow-sm flex items-center justify-between px-4 gap-3">
+    <header className="fixed top-0 right-0 left-0 lg:left-[var(--sidebar-w,112px)] h-16 z-40 bg-white dark:bg-[#1e2030] border-b border-[#c3c6d7] dark:border-[#2e3148] shadow-sm flex items-center justify-between px-4 gap-3 transition-[left] duration-200">
       <button
         onClick={onMenuToggle}
         className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-[#434655] dark:text-[#c4c8e8] flex-shrink-0"
