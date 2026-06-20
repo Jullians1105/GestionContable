@@ -15,8 +15,4 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 
 CREATE INDEX IF NOT EXISTS idx_login_attempts_email_time ON login_attempts (email, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_time   ON login_attempts (ip_address, created_at DESC);
-
--- Limpiar intentos con más de 24 horas mediante un job (ver scripts/cleanup-login-attempts.sh)
--- El índice parcial mejora el rendimiento de las consultas de bloqueo recientes
-CREATE INDEX IF NOT EXISTS idx_login_attempts_recent ON login_attempts (email, success, created_at)
-  WHERE created_at > NOW() - INTERVAL '24 hours';
+CREATE INDEX IF NOT EXISTS idx_login_attempts_success   ON login_attempts (email, success, created_at DESC);

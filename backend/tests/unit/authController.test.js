@@ -3,7 +3,7 @@ jest.mock('bcrypt');
 jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
 jest.mock('../../src/utils/jwt');
 jest.mock('../../src/utils/email', () => ({ sendPasswordResetEmail: jest.fn().mockResolvedValue(true) }));
-jest.mock('../../src/utils/logger', () => ({ info: jest.fn(), error: jest.fn() }));
+jest.mock('../../src/utils/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../../src/config/env', () => ({
   JWT_SECRET: 'test-secret',
   JWT_EXPIRES_IN: '1h',
@@ -32,6 +32,8 @@ const baseUser = {
   name: 'Test User',
   role: 'member',
   password_hash: 'hashed',
+  is_active: true,
+  permissions: null,
   created_at: new Date(),
 };
 
@@ -81,10 +83,13 @@ describe('register', () => {
 });
 
 describe('login', () => {
+  // login ahora llama isLockedOut() primero → 1 query COUNT por email (ip es undefined en tests)
+  // luego SELECT user, luego recordLoginAttempt (non-fatal, puede recibir undefined) y refresh_tokens insert
+
   test('retorna 200 con token para credenciales válidas', async () => {
     db.query
-      .mockResolvedValueOnce({ rows: [baseUser] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [{ count: '0' }] }) // isLockedOut: intentos fallidos por email
+      .mockResolvedValueOnce({ rows: [baseUser] });       // SELECT user
     bcrypt.compare.mockResolvedValue(true);
 
     const req = { body: { email: 'test@test.com', password: 'password123' } };
@@ -95,7 +100,9 @@ describe('login', () => {
   });
 
   test('retorna 401 si el usuario no existe', async () => {
-    db.query.mockResolvedValueOnce({ rows: [] });
+    db.query
+      .mockResolvedValueOnce({ rows: [{ count: '0' }] }) // isLockedOut: no bloqueado
+      .mockResolvedValueOnce({ rows: [] });               // SELECT user → vacío
 
     const req = { body: { email: 'noexiste@test.com', password: 'password123' } };
     const res = mockRes();
@@ -105,7 +112,9 @@ describe('login', () => {
   });
 
   test('retorna 401 si la contraseña es incorrecta', async () => {
-    db.query.mockResolvedValueOnce({ rows: [baseUser] });
+    db.query
+      .mockResolvedValueOnce({ rows: [{ count: '0' }] }) // isLockedOut: no bloqueado
+      .mockResolvedValueOnce({ rows: [baseUser] });       // SELECT user
     bcrypt.compare.mockResolvedValue(false);
 
     const req = { body: { email: 'test@test.com', password: 'wrong' } };
@@ -113,6 +122,16 @@ describe('login', () => {
     await login(req, res, mockNext);
 
     expect(res.status).toHaveBeenCalledWith(401);
+  });
+
+  test('retorna 429 si la cuenta está bloqueada por demasiados intentos', async () => {
+    db.query.mockResolvedValueOnce({ rows: [{ count: '5' }] }); // isLockedOut: bloqueado
+
+    const req = { body: { email: 'test@test.com', password: 'password123' } };
+    const res = mockRes();
+    await login(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(429);
   });
 
   test('llama a next en caso de error', async () => {

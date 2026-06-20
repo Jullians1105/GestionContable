@@ -1,6 +1,6 @@
 jest.mock('../../src/config/database');
 jest.mock('../../src/utils/jwt');
-jest.mock('../../src/utils/logger', () => ({ info: jest.fn(), error: jest.fn() }));
+jest.mock('../../src/utils/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 
 const db = require('../../src/config/database');
 const jwtUtils = require('../../src/utils/jwt');
