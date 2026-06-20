@@ -31,8 +31,11 @@ const router = Router();
  */
 router.post('/register',
   body('email').isEmail().normalizeEmail(),
-  body('password').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres'),
-  body('name').trim().notEmpty().withMessage('El nombre es obligatorio'),
+  body('password')
+    .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
+    .matches(/[A-Z]/).withMessage('La contraseña debe tener al menos una mayúscula')
+    .matches(/[0-9]/).withMessage('La contraseña debe tener al menos un número'),
+  body('name').trim().notEmpty().isLength({ max: 100 }).withMessage('El nombre es obligatorio'),
   validate,
   register
 );
@@ -203,7 +206,10 @@ router.post('/forgot-password',
  */
 router.post('/reset-password',
   body('token').notEmpty(),
-  body('password').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres'),
+  body('password')
+    .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
+    .matches(/[A-Z]/).withMessage('La contraseña debe tener al menos una mayúscula')
+    .matches(/[0-9]/).withMessage('La contraseña debe tener al menos un número'),
   validate,
   resetPassword
 );

@@ -42,11 +42,17 @@ services:
       DB_HOST: postgres
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
-      SHOW_RESET_TOKEN: "true"
+      # SHOW_RESET_TOKEN debe estar ausente en producción — solo activar en desarrollo local
     ports:
       - "${PORT:-3000}:3000"
     volumes:
       - ./backend/migrations:/app/migrations:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   frontend:
     build:
@@ -55,14 +61,10 @@ services:
     container_name: taskflow_frontend
     restart: unless-stopped
     depends_on:
-      - backend
-    environment:
-      VITE_BACKEND_URL: http://backend:3000
+      backend:
+        condition: service_healthy
     ports:
-      - "5173:5173"
-    volumes:
-      - .:/app
-      - /app/node_modules
+      - "5173:80"
 
   migrate:
     build:
