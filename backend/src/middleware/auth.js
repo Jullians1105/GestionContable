@@ -1,5 +1,6 @@
 const { verify } = require('../utils/jwt');
 const db = require('../config/database');
+const logger = require('../utils/logger');
 
 const authMiddleware = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -27,6 +28,10 @@ const authMiddleware = async (req, res, next) => {
 const roleMiddleware = (...roles) => (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: 'No autenticado' });
   if (!roles.includes(req.user.role)) {
+    logger.warn(
+      { userId: req.user.userId, role: req.user.role, required: roles, path: req.path },
+      'Role check failed — access denied'
+    );
     return res.status(403).json({ error: 'Permisos insuficientes' });
   }
   next();
@@ -35,6 +40,10 @@ const roleMiddleware = (...roles) => (req, res, next) => {
 const canEdit = (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: 'No autenticado' });
   if (req.user.role === 'viewer') {
+    logger.warn(
+      { userId: req.user.userId, path: req.path, method: req.method },
+      'canEdit check failed — viewer attempted write'
+    );
     return res.status(403).json({ error: 'Los viewers no pueden modificar datos' });
   }
   next();

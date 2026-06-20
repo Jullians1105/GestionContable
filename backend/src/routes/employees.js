@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
+const { validateUUIDParam } = require('../middleware/security');
 
 const router = Router();
 router.use(authMiddleware);
@@ -29,7 +30,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', validateUUIDParam('id'), async (req, res, next) => {
   try {
     const result = await db.query(
       'SELECT id, email, name, role, permissions, created_at, updated_at FROM users WHERE id = $1',
@@ -78,6 +79,7 @@ router.post('/',
 );
 
 router.put('/:id',
+  validateUUIDParam('id'),
   roleMiddleware('admin'),
   body('role').optional().isIn(['admin', 'leader', 'member', 'viewer']),
   body('name').optional().trim().notEmpty(),
@@ -132,7 +134,7 @@ router.put('/:id',
   }
 );
 
-router.delete('/:id', roleMiddleware('admin'), async (req, res, next) => {
+router.delete('/:id', validateUUIDParam('id'), roleMiddleware('admin'), async (req, res, next) => {
   try {
     if (req.params.id === req.user.userId) {
       return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta' });
