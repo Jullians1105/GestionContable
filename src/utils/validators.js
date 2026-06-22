@@ -29,8 +29,9 @@ export const validators = {
     if (titleError) errors.title = titleError
     if (!task.priority) errors.priority = 'La prioridad es obligatoria'
     if (!task.status) errors.status = 'El estado es obligatorio'
-    if (!task.assignedTo) errors.assignedTo = 'Debes asignar la tarea a alguien'
-    else if (!UUID_RE.test(task.assignedTo)) errors.assignedTo = 'Selecciona un miembro válido del equipo'
+    const assignedArr = Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo ? [task.assignedTo] : [])
+    if (assignedArr.length === 0) errors.assignedTo = 'Debes asignar la tarea a alguien'
+    else if (!assignedArr.every(id => UUID_RE.test(id))) errors.assignedTo = 'Selecciona miembros válidos del equipo'
     if (!task.dueDate) errors.dueDate = 'La fecha límite es obligatoria'
     return errors
   },

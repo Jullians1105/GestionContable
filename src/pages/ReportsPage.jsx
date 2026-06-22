@@ -10,7 +10,7 @@ import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
 import { isBefore, isAfter, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { getInitials, getAvatarColor } from '../utils/helpers'
+import { getInitials, getAvatarColor, normalizeAssignedTo } from '../utils/helpers'
 
 const REPORT_TYPES = [
   { value: 'by_person', label: 'Tareas completadas por persona' },
@@ -43,7 +43,7 @@ export default function ReportsPage() {
   const applyFilters = useCallback((taskList) => {
     return taskList.filter((t) => {
       if (filters.groupId && t.groupId !== filters.groupId) return false
-      if (filters.memberId && t.assignedTo !== filters.memberId) return false
+      if (filters.memberId && !normalizeAssignedTo(t.assignedTo).includes(filters.memberId)) return false
       if (filters.dateFrom && t.dueDate && isBefore(parseISO(t.dueDate), parseISO(filters.dateFrom))) return false
       if (filters.dateTo && t.dueDate && isAfter(parseISO(t.dueDate), parseISO(filters.dateTo))) return false
       return true
@@ -56,7 +56,7 @@ export default function ReportsPage() {
 
     if (filters.type === 'by_person') {
       return members.map((m) => {
-        const memberTasks = filtered.filter((t) => t.assignedTo === m.id)
+        const memberTasks = filtered.filter((t) => normalizeAssignedTo(t.assignedTo).includes(m.id))
         const completed = memberTasks.filter((t) => t.status === 'completed').length
         const inProgress = memberTasks.filter((t) => t.status === 'in_progress').length
         const pending = memberTasks.filter((t) => t.status === 'pending').length
@@ -68,7 +68,7 @@ export default function ReportsPage() {
     if (filters.type === 'productivity') {
       return members.map((m) => ({
         name: m.name.split(' ')[0],
-        completadas: filtered.filter((t) => t.assignedTo === m.id && t.status === 'completed').length,
+        completadas: filtered.filter((t) => normalizeAssignedTo(t.assignedTo).includes(m.id) && t.status === 'completed').length,
       })).filter((r) => r.completadas > 0)
     }
 
@@ -95,7 +95,7 @@ export default function ReportsPage() {
     const filtered = applyFilters(tasks)
     return members
       .map((m) => {
-        const all = filtered.filter((t) => t.assignedTo === m.id)
+        const all = filtered.filter((t) => normalizeAssignedTo(t.assignedTo).includes(m.id))
         if (!all.length) return null
         return {
           id: m.id,

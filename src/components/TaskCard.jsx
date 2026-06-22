@@ -1,4 +1,4 @@
-import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS } from '../utils/helpers'
+import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo } from '../utils/helpers'
 import { useTeam } from '../hooks/useTeam'
 import { useTags } from '../context/TagContext'
 import { useAuth } from '../context/AuthContext'
@@ -12,7 +12,8 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
   const { getTagById } = useTags()
   const { hasPermission } = useAuth()
   const { addToast } = useToast()
-  const member = task.assignedTo ? getMemberById(task.assignedTo) : null
+  const assignedIds = normalizeAssignedTo(task.assignedTo)
+  const assignedMembers = assignedIds.map(id => getMemberById(id)).filter(Boolean)
   const overdue = isDueDateOverdue(task.dueDate, task.dueTime) && task.status !== 'completed'
   const soon = isDueDateSoon(task.dueDate, task.dueTime) && task.status !== 'completed'
 
@@ -69,12 +70,23 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
       )}
 
       <div className="flex items-center justify-between pt-2 border-t border-[#edeef0] dark:border-[#252840]">
-        {member ? (
+        {assignedMembers.length > 0 ? (
           <div className="flex items-center gap-1.5">
-            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold ${getAvatarColor(member.name)}`}>
-              {getInitials(member.name)}
+            <div className="flex -space-x-1.5">
+              {assignedMembers.slice(0, 3).map((m) => (
+                <div key={m.id} title={m.name} className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold ring-2 ring-white dark:ring-[#1e2030] ${getAvatarColor(m.name)}`}>
+                  {getInitials(m.name)}
+                </div>
+              ))}
+              {assignedMembers.length > 3 && (
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-semibold bg-[#434655] ring-2 ring-white dark:ring-[#1e2030]">
+                  +{assignedMembers.length - 3}
+                </div>
+              )}
             </div>
-            <span className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate max-w-[90px]">{member.name}</span>
+            {assignedMembers.length === 1 && (
+              <span className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate max-w-[80px]">{assignedMembers[0].name}</span>
+            )}
           </div>
         ) : (
           <span className="text-xs text-[#888] italic">Sin asignar</span>

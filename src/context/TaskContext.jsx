@@ -3,7 +3,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { api } from '../services/api'
 import { storage } from '../utils/storage'
-import { generateId, today } from '../utils/helpers'
+import { generateId, today, normalizeAssignedTo } from '../utils/helpers'
 import { useAuth } from './AuthContext'
 import { useTeam } from './TeamContext'
 import { useSocket } from './SocketContext'
@@ -92,7 +92,7 @@ export function TaskProvider({ children }) {
         const todayStr = today()
         fresh.forEach(task => {
           if (
-            task.assignedTo === user.id &&
+            normalizeAssignedTo(task.assignedTo).includes(user.id) &&
             task.status !== 'completed' &&
             task.dueDate && task.dueDate < todayStr &&
             !sentOverdueRef.current.has(task.id)
@@ -123,9 +123,11 @@ export function TaskProvider({ children }) {
         setTasks(prev => [newTask, ...prev])
       }
       addingRef.current = false
-      if (!useRealBackend && newTask.assignedTo && newTask.assignedTo !== user?.id) {
-        push(newTask.assignedTo, 'task_assigned',
-          `${user?.name ?? 'Alguien'} te asignó la tarea "${newTask.title}"`, newTask.id)
+      if (!useRealBackend) {
+        normalizeAssignedTo(newTask.assignedTo)
+          .filter(id => id !== user?.id)
+          .forEach(id => push(id, 'task_assigned',
+            `${user?.name ?? 'Alguien'} te asignó la tarea "${newTask.title}"`, newTask.id))
       }
       return newTask
     } catch (e) {
@@ -139,9 +141,13 @@ export function TaskProvider({ children }) {
     if (!current) return
 
     if (!useRealBackend) {
-      if (updates.assignedTo && updates.assignedTo !== current.assignedTo && updates.assignedTo !== user?.id) {
-        push(updates.assignedTo, 'task_assigned',
-          `${user?.name ?? 'Alguien'} te asignó la tarea "${current.title}"`, id)
+      if (updates.assignedTo !== undefined) {
+        const prevIds = normalizeAssignedTo(current.assignedTo)
+        const newIds = normalizeAssignedTo(updates.assignedTo)
+        newIds
+          .filter(uid => !prevIds.includes(uid) && uid !== user?.id)
+          .forEach(uid => push(uid, 'task_assigned',
+            `${user?.name ?? 'Alguien'} te asignó la tarea "${current.title}"`, id))
       }
       if (updates.status === 'completed' && current.status !== 'completed') {
         const cuando = format(new Date(), "dd/MM/yyyy 'a las' HH:mm", { locale: es })
@@ -168,7 +174,7 @@ export function TaskProvider({ children }) {
   }, [])
 
   const getTaskById = useCallback((id) => tasksRef.current.find(t => t.id === id), [])
-  const getTasksByMember = useCallback((memberId) => tasksRef.current.filter(t => t.assignedTo === memberId), [])
+  const getTasksByMember = useCallback((memberId) => tasksRef.current.filter(t => normalizeAssignedTo(t.assignedTo).includes(memberId)), [])
   const getTasksByGroup = useCallback((groupId) => tasksRef.current.filter(t => t.groupId === groupId), [])
 
   const addSubtask = useCallback((taskId, title) => {
@@ -256,9 +262,9 @@ export function TaskProvider({ children }) {
     const message = `${user?.name ?? 'Alguien'} comentó en "${task.title}": "${snippet}"`
     const extra = { commentId: comment.id }
     notifyLeaders(members, 'comment_added', message, taskId, authorId, extra)
-    if (task.assignedTo && task.assignedTo !== authorId) {
-      push(task.assignedTo, 'comment_added', message, taskId, extra)
-    }
+    normalizeAssignedTo(task.assignedTo)
+      .filter(id => id !== authorId)
+      .forEach(id => push(id, 'comment_added', message, taskId, extra))
     return comment
   }, [useRealBackend, connected, members, user])
 

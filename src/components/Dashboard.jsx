@@ -1,4 +1,5 @@
 ﻿import { useMemo } from "react"
+import { normalizeAssignedTo } from "../utils/helpers"
 import { Link } from "react-router-dom"
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -28,7 +29,7 @@ export default function Dashboard() {
   const { getMemberById } = useTeam()
   const { user, isAdmin, isLeader } = useAuth()
   const { theme } = useTheme()
-  const visibleTasks = (isAdmin() || isLeader()) ? tasks : tasks.filter((t) => t.assignedTo === user?.id)
+  const visibleTasks = (isAdmin() || isLeader()) ? tasks : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id))
   const isDark = theme === 'dark'
   const axisColor = isDark ? '#c4c8e8' : '#434655'
   const gridColor = isDark ? '#2e3148' : '#edeef0'
@@ -148,7 +149,8 @@ export default function Dashboard() {
           <div className="space-y-3">
             {urgentTasks.map((task) => {
               const overdue = isDueDateOverdue(task.dueDate, task.dueTime)
-              const member = task.assignedTo ? getMemberById(task.assignedTo) : null
+              const firstId = normalizeAssignedTo(task.assignedTo)[0]
+              const member = firstId ? getMemberById(firstId) : null
               return (
                 <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border ${overdue ? "border-[#ffdad6] bg-[#fff5f5] dark:border-[#5c1a1a] dark:bg-[#2a1718]" : "border-yellow-200 bg-yellow-50 dark:border-[#5c4a1a] dark:bg-[#2a2417]"}`}>
                   <div className="flex-1 min-w-0">

@@ -4,6 +4,13 @@ import { es } from 'date-fns/locale'
 export const generateId = (prefix = 'id') =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
+// Normaliza assignedTo a array — soporta datos viejos con string
+export const normalizeAssignedTo = (val) => {
+  if (!val) return []
+  if (Array.isArray(val)) return val
+  return [val]
+}
+
 export const formatDate = (dateStr, timeStr = '') => {
   if (!dateStr) return '—'
   try {

@@ -7,6 +7,7 @@ import { useTasks } from '../hooks/useTasks'
 import { useGroups } from '../context/GroupContext'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
+import { normalizeAssignedTo } from '../utils/helpers'
 
 const PAGE_SIZE = 9
 const EMPTY_FILTERS = { search: '', status: '', priority: '', assignedTo: '', groupId: '', tagId: '' }
@@ -41,7 +42,7 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
     }
     if (filters.status && t.status !== filters.status) return false
     if (filters.priority && t.priority !== filters.priority) return false
-    if (filters.assignedTo && t.assignedTo !== filters.assignedTo) return false
+    if (filters.assignedTo && !normalizeAssignedTo(t.assignedTo).includes(filters.assignedTo)) return false
     if (filters.groupId && t.groupId !== filters.groupId) return false
     if (filters.tagId && !(t.tagIds || []).includes(filters.tagId)) return false
     return true
