@@ -32,7 +32,7 @@ afterAll(async () => {
 
 const testUser = {
   email: `test_${Date.now()}@test.com`,
-  password: 'testpassword123',
+  password: 'Testpassword1',
   name: 'Test User',
 };
 let authToken;

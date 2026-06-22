@@ -46,13 +46,19 @@ async function request(path, options = {}, retry = true) {
 
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
 
-  if (res.status === 401 && retry && getRefreshToken()) {
-    try {
-      await refreshAccessToken();
-      return request(path, options, false);
-    } catch {
-      throw new Error('Sesión expirada');
+  if (res.status === 401 && retry) {
+    if (getRefreshToken()) {
+      try {
+        await refreshAccessToken();
+        return request(path, options, false);
+      } catch {
+        throw new Error('Sesión expirada');
+      }
     }
+    // 401 sin refresh token → sesión inválida, forzar re-login
+    clearTokens();
+    window.location.href = '/login';
+    throw new Error('Sesión expirada');
   }
 
   if (!res.ok) {

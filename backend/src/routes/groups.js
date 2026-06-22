@@ -1,8 +1,9 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
 const { getGroups, createGroup, updateGroup, deleteGroup, addMember, removeMember } = require('../controllers/groupController');
-const { authMiddleware, roleMiddleware, canEdit } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
+const { validateUUIDParam } = require('../middleware/security');
 
 const router = Router();
 router.use(authMiddleware);
@@ -27,21 +28,28 @@ router.post('/',
 );
 
 router.put('/:id',
+  validateUUIDParam('id'),
   roleMiddleware('admin', 'leader'),
   body('name').optional().trim().notEmpty(),
   validate,
   updateGroup
 );
 
-router.delete('/:id', roleMiddleware('admin'), deleteGroup);
+router.delete('/:id', validateUUIDParam('id'), roleMiddleware('admin'), deleteGroup);
 
 router.post('/:id/members',
+  validateUUIDParam('id'),
   roleMiddleware('admin', 'leader'),
   body('userId').notEmpty(),
   validate,
   addMember
 );
 
-router.delete('/:id/members/:userId', roleMiddleware('admin', 'leader'), removeMember);
+router.delete('/:id/members/:userId',
+  validateUUIDParam('id'),
+  validateUUIDParam('userId'),
+  roleMiddleware('admin', 'leader'),
+  removeMember
+);
 
 module.exports = router;

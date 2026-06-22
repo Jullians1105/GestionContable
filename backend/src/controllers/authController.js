@@ -44,23 +44,79 @@ const register = async (req, res, next) => {
   }
 };
 
+const LOCKOUT_WINDOW_MS = 15 * 60 * 1000; // 15 min
+const LOCKOUT_MAX_ATTEMPTS = 5;
+
+const recordLoginAttempt = async (email, ip, success) => {
+  try {
+    await db.query(
+      'INSERT INTO login_attempts (email, ip_address, success) VALUES ($1, $2, $3)',
+      [email.toLowerCase(), ip || null, success]
+    );
+  } catch {
+    // Non-fatal — never let audit failure block login
+  }
+};
+
+const isLockedOut = async (email, ip) => {
+  const windowStart = new Date(Date.now() - LOCKOUT_WINDOW_MS).toISOString();
+
+  // Check by email
+  const byEmail = await db.query(
+    'SELECT COUNT(*) FROM login_attempts WHERE email = $1 AND success = false AND created_at > $2',
+    [email.toLowerCase(), windowStart]
+  );
+  if (parseInt(byEmail.rows[0].count) >= LOCKOUT_MAX_ATTEMPTS) return true;
+
+  // Check by IP (protect against credential stuffing from same source)
+  if (ip) {
+    const byIp = await db.query(
+      'SELECT COUNT(*) FROM login_attempts WHERE ip_address = $1 AND success = false AND created_at > $2',
+      [ip, windowStart]
+    );
+    if (parseInt(byIp.rows[0].count) >= LOCKOUT_MAX_ATTEMPTS * 3) return true;
+  }
+
+  return false;
+};
+
 const login = async (req, res, next) => {
+  const ip = req.ip || req.connection?.remoteAddress;
   try {
     const { email, password } = req.body;
+    const normalizedEmail = email.toLowerCase();
+
+    // A07: Brute-force lockout check before any DB user lookup
+    if (await isLockedOut(normalizedEmail, ip)) {
+      logger.warn({ email: normalizedEmail, ip }, 'Login blocked — too many failed attempts');
+      return res.status(429).json({ error: 'Demasiados intentos fallidos. Intenta de nuevo en 15 minutos.' });
+    }
 
     const result = await db.query(
-      'SELECT id, email, name, role, password_hash, permissions FROM users WHERE email = $1',
-      [email.toLowerCase()]
+      'SELECT id, email, name, role, password_hash, permissions, is_active FROM users WHERE email = $1',
+      [normalizedEmail]
     );
     const user = result.rows[0];
+
     if (!user) {
+      await recordLoginAttempt(normalizedEmail, ip, false);
+      logger.warn({ email: normalizedEmail, ip }, 'Login failed — user not found');
       return res.status(401).json({ error: 'Email o contraseña incorrectos' });
+    }
+
+    if (!user.is_active) {
+      logger.warn({ userId: user.id, ip }, 'Login blocked — account inactive');
+      return res.status(403).json({ error: 'Cuenta desactivada. Contacta al administrador.' });
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
+      await recordLoginAttempt(normalizedEmail, ip, false);
+      logger.warn({ userId: user.id, ip }, 'Login failed — wrong password');
       return res.status(401).json({ error: 'Email o contraseña incorrectos' });
     }
+
+    await recordLoginAttempt(normalizedEmail, ip, true);
 
     const token = sign({ userId: user.id, email: user.email, role: user.role });
     const refreshToken = signRefresh({ userId: user.id });
@@ -70,8 +126,8 @@ const login = async (req, res, next) => {
       [refreshToken, user.id]
     );
 
-    const { password_hash, ...safeUser } = user;
-    logger.info({ userId: user.id }, 'User logged in');
+    const { password_hash, is_active, ...safeUser } = user;
+    logger.info({ userId: user.id, ip }, 'User logged in');
     res.json({ token, refreshToken, user: safeUser });
   } catch (err) {
     next(err);

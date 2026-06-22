@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
+const { validateUUIDParam } = require('../middleware/security');
 
 const router = Router();
 router.use(authMiddleware);
@@ -29,7 +30,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', validateUUIDParam('id'), async (req, res, next) => {
   try {
     const result = await db.query(
       'SELECT id, email, name, role, permissions, created_at, updated_at FROM users WHERE id = $1',
@@ -78,15 +79,25 @@ router.post('/',
 );
 
 router.put('/:id',
+  validateUUIDParam('id'),
   roleMiddleware('admin'),
   body('role').optional().isIn(['admin', 'leader', 'member', 'viewer']),
   body('name').optional().trim().notEmpty(),
+  body('email').optional().isEmail().normalizeEmail(),
   body('password').optional().isLength({ min: 8 }),
   body('permissions').optional(),
   validate,
   async (req, res, next) => {
     try {
-      const { name, role, password, permissions } = req.body;
+      const { name, role, email, password, permissions } = req.body;
+
+      if (email) {
+        const existing = await db.query(
+          'SELECT id FROM users WHERE email = $1 AND id != $2',
+          [email, req.params.id]
+        );
+        if (existing.rows[0]) return res.status(409).json({ error: 'El email ya está registrado' });
+      }
 
       let result;
       if (password) {
@@ -95,21 +106,23 @@ router.put('/:id',
           `UPDATE users SET
             name = COALESCE($1, name),
             role = COALESCE($2, role),
-            password_hash = $3,
-            permissions = COALESCE($4, permissions),
+            email = COALESCE($3, email),
+            password_hash = $4,
+            permissions = COALESCE($5, permissions),
             updated_at = NOW()
-           WHERE id = $5 RETURNING id, email, name, role, permissions, updated_at`,
-          [name, role, passwordHash, permissions ? JSON.stringify(permissions) : null, req.params.id]
+           WHERE id = $6 RETURNING id, email, name, role, permissions, updated_at`,
+          [name, role, email, passwordHash, permissions ? JSON.stringify(permissions) : null, req.params.id]
         );
       } else {
         result = await db.query(
           `UPDATE users SET
             name = COALESCE($1, name),
             role = COALESCE($2, role),
-            permissions = COALESCE($3, permissions),
+            email = COALESCE($3, email),
+            permissions = COALESCE($4, permissions),
             updated_at = NOW()
-           WHERE id = $4 RETURNING id, email, name, role, permissions, updated_at`,
-          [name, role, permissions ? JSON.stringify(permissions) : null, req.params.id]
+           WHERE id = $5 RETURNING id, email, name, role, permissions, updated_at`,
+          [name, role, email, permissions ? JSON.stringify(permissions) : null, req.params.id]
         );
       }
 
@@ -121,7 +134,7 @@ router.put('/:id',
   }
 );
 
-router.delete('/:id', roleMiddleware('admin'), async (req, res, next) => {
+router.delete('/:id', validateUUIDParam('id'), roleMiddleware('admin'), async (req, res, next) => {
   try {
     if (req.params.id === req.user.userId) {
       return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta' });

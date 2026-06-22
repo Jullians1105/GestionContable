@@ -10,8 +10,11 @@ const swaggerUi = require('swagger-ui-express');
 
 const env = require('./config/env');
 const logger = require('./utils/logger');
+const { validateProductionEnv } = require('./middleware/security');
 const { setupSocket } = require('./socket/events');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
+
+validateProductionEnv();
 
 const authRoutes = require('./routes/auth');
 const taskRoutes = require('./routes/tasks');
@@ -47,21 +50,22 @@ app.use(express.urlencoded({ extended: true }));
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiadas solicitudes, intenta más tarde' },
 });
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 20,
+  max: 50,
   message: { error: 'Demasiados intentos de login' },
 });
 app.use('/api/', limiter);
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
 
-// Swagger
+// Swagger — solo en desarrollo (A05: no exponer docs en producción)
+if (env.NODE_ENV !== 'production') {
 const swaggerSpec = swaggerJsdoc({
   definition: {
     openapi: '3.0.0',
@@ -91,6 +95,7 @@ const swaggerSpec = swaggerJsdoc({
   apis: ['./src/routes/*.js'],
 });
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+} // end swagger dev-only block
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ status: 'OK', timestamp: new Date().toISOString() }));
@@ -104,11 +109,14 @@ app.use('/api/tags', tagRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/notifications', notificationRoutes);
 
-// Serve React build in production
-if (env.NODE_ENV === 'production') {
+// Frontend is served by nginx in production — this block only runs locally
+if (env.NODE_ENV === 'development') {
   const path = require('path');
-  app.use(express.static(path.join(__dirname, '../../dist')));
-  app.get('*', (_req, res) => res.sendFile(path.join(__dirname, '../../dist/index.html')));
+  const distPath = path.join(__dirname, '../../dist');
+  if (require('fs').existsSync(distPath)) {
+    app.use(express.static(distPath));
+    app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
+  }
 }
 
 app.use(notFound);

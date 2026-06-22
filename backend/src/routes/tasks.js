@@ -7,6 +7,7 @@ const {
 } = require('../controllers/taskController');
 const { authMiddleware, canEdit, roleMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
+const { validateUUIDParam, sanitizePagination } = require('../middleware/security');
 
 const router = Router();
 
@@ -32,7 +33,7 @@ router.use(authMiddleware);
  *       200:
  *         description: Lista de tareas paginada
  */
-router.get('/', getTasks);
+router.get('/', sanitizePagination, getTasks);
 
 /**
  * @openapi
@@ -67,7 +68,7 @@ router.get('/search', searchTasks);
  *       404:
  *         description: Tarea no encontrada
  */
-router.get('/:id', getTask);
+router.get('/:id', validateUUIDParam('id'), getTask);
 
 /**
  * @openapi
@@ -78,7 +79,7 @@ router.get('/:id', getTask);
  *     security:
  *       - bearerAuth: []
  */
-router.get('/:id/history', getTaskHistory);
+router.get('/:id/history', validateUUIDParam('id'), getTaskHistory);
 
 /**
  * @openapi
@@ -118,6 +119,7 @@ router.post('/',
  *       - bearerAuth: []
  */
 router.put('/:id',
+  validateUUIDParam('id'),
   canEdit,
   body('title').optional().trim().notEmpty().isLength({ max: 255 }),
   body('priority').optional().isIn(['high', 'medium', 'low']),
@@ -135,16 +137,16 @@ router.put('/:id',
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/:id', roleMiddleware('admin', 'leader'), deleteTask);
+router.delete('/:id', validateUUIDParam('id'), roleMiddleware('admin', 'leader'), deleteTask);
 
 // Subtareas
-router.post('/:id/subtasks', canEdit, addSubtask);
-router.put('/:id/subtasks/:subtaskId', canEdit, updateSubtask);
-router.delete('/:id/subtasks/:subtaskId', canEdit, deleteSubtask);
+router.post('/:id/subtasks', validateUUIDParam('id'), canEdit, addSubtask);
+router.put('/:id/subtasks/:subtaskId', validateUUIDParam('id'), validateUUIDParam('subtaskId'), canEdit, updateSubtask);
+router.delete('/:id/subtasks/:subtaskId', validateUUIDParam('id'), validateUUIDParam('subtaskId'), canEdit, deleteSubtask);
 
 // Comentarios
-router.post('/:id/comments', canEdit, addComment);
-router.put('/:id/comments/:commentId', canEdit, updateComment);
-router.delete('/:id/comments/:commentId', canEdit, deleteComment);
+router.post('/:id/comments', validateUUIDParam('id'), canEdit, addComment);
+router.put('/:id/comments/:commentId', validateUUIDParam('id'), validateUUIDParam('commentId'), canEdit, updateComment);
+router.delete('/:id/comments/:commentId', validateUUIDParam('id'), validateUUIDParam('commentId'), canEdit, deleteComment);
 
 module.exports = router;

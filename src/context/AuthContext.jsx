@@ -42,7 +42,13 @@ export function AuthProvider({ children }) {
             setUser(serverUser)
           })
           .catch(() => {
-            // Token inválido para el backend → permanecer en modo localStorage (no limpiar sesión)
+            // Token inválido para el backend activo → limpiar sesión y forzar re-login
+            // para que ambos PCs usen la misma BD en vez de localStorage local
+            localStorage.removeItem('auth_token')
+            localStorage.removeItem('auth_refresh_token')
+            localStorage.removeItem('auth_user')
+            setUser(null)
+            setToken(null)
           })
       }
     })

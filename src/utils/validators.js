@@ -35,12 +35,17 @@ export const validators = {
     return errors
   },
 
-  validateMember: (member) => {
+  validateMember: (member, isNew = false) => {
     const errors = {}
     const nameError = validators.required(member.name) || validators.maxLength(100)(member.name)
     if (nameError) errors.name = nameError
-    const emailError = validators.email(member.email)
-    if (emailError) errors.email = emailError
+    if (isNew || member.email) {
+      const emailError = validators.email(member.email)
+      if (emailError) errors.email = emailError
+    }
+    if (isNew && (!member.password || member.password.length < 8)) {
+      errors.password = 'La contraseña debe tener al menos 8 caracteres'
+    }
     if (!member.role) errors.role = 'El rol es obligatorio'
     return errors
   },
