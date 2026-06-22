@@ -36,6 +36,8 @@ services:
         condition: service_healthy
       mailhog:
         condition: service_started
+      migrate:
+        condition: service_completed_successfully
     env_file: .env
     environment:
       NODE_ENV: production
@@ -75,7 +77,7 @@ services:
     environment:
       DB_HOST: postgres
     command: ["node", "migrations/run.js", "--seed"]
-    profiles: ["migrate"]
+    restart: "no"
 
 volumes:
   postgres_data:
