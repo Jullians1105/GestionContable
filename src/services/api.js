@@ -37,14 +37,15 @@ async function refreshAccessToken() {
 }
 
 async function request(path, options = {}, retry = true) {
+  const { skipAuthRedirect, ...fetchOptions } = options;
   const token = getToken();
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
+    ...fetchOptions.headers,
   };
 
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${BASE}${path}`, { ...fetchOptions, headers });
 
   if (res.status === 401 && retry) {
     if (getRefreshToken()) {
@@ -55,10 +56,12 @@ async function request(path, options = {}, retry = true) {
         throw new Error('Sesión expirada');
       }
     }
-    // 401 sin refresh token → sesión inválida, forzar re-login
-    clearTokens();
-    window.location.href = '/login';
-    throw new Error('Sesión expirada');
+    if (!skipAuthRedirect) {
+      clearTokens();
+      window.location.href = '/login';
+    }
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error || 'Credenciales incorrectas');
   }
 
   if (!res.ok) {
@@ -73,7 +76,7 @@ export const api = {
   // Auth
   register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: async (email, password) => {
-    const data = await request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    const data = await request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }), skipAuthRedirect: true });
     setTokens(data.token, data.refreshToken);
     return data;
   },

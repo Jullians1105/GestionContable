@@ -40,9 +40,10 @@ export default function TaskModal({ isOpen, task, onClose }) {
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-[#c3c6d7] dark:border-[#2e3148]">
+      <div className="absolute inset-0 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="relative bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-[#c3c6d7] dark:border-[#2e3148]" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#edeef0] dark:border-[#2e3148]">
           <h2 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0]">
             {isEdit ? 'Editar tarea' : 'Nueva tarea'}
@@ -78,6 +79,7 @@ export default function TaskModal({ isOpen, task, onClose }) {
             <CommentSection task={liveTask} />
           )}
         </div>
+      </div>
       </div>
     </div>
   )

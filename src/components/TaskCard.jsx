@@ -13,8 +13,8 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
   const { hasPermission } = useAuth()
   const { addToast } = useToast()
   const member = task.assignedTo ? getMemberById(task.assignedTo) : null
-  const overdue = isDueDateOverdue(task.dueDate) && task.status !== 'completed'
-  const soon = isDueDateSoon(task.dueDate) && task.status !== 'completed'
+  const overdue = isDueDateOverdue(task.dueDate, task.dueTime) && task.status !== 'completed'
+  const soon = isDueDateSoon(task.dueDate, task.dueTime) && task.status !== 'completed'
 
   const guard = (key, fn) => {
     if (hasPermission(key)) fn()
@@ -90,7 +90,7 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
             <span className={`text-xs font-semibold flex items-center gap-0.5 ${overdue ? 'text-[#EF4444]' : soon ? 'text-[#FBBF24]' : 'text-[#434655] dark:text-[#c4c8e8]'}`}>
               {overdue && <span className="material-symbols-outlined text-xs">warning</span>}
               {soon && !overdue && <span className="material-symbols-outlined text-xs">schedule</span>}
-              {formatDate(task.dueDate)}
+              {formatDate(task.dueDate, task.dueTime)}
             </span>
           )}
         </div>

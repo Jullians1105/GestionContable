@@ -192,30 +192,29 @@ export function TaskProvider({ children }) {
   const toggleSubtask = useCallback((taskId, subtaskId) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return
-    if (useRealBackend) {
-      const subtask = (task.subtasks || []).find(s => s.id === subtaskId)
-      if (!subtask) return
-      api.updateSubtask(taskId, subtaskId, { completed: !subtask.completed })
-        .then(fullTask => {
-          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
-        })
-        .catch(() => {})
-      return
-    }
     const subtask = (task.subtasks || []).find(s => s.id === subtaskId)
-    const completing = subtask && !subtask.completed
-    const updated = {
+    if (!subtask) return
+
+    const optimistic = {
       ...task,
       subtasks: (task.subtasks || []).map(s => s.id === subtaskId ? { ...s, completed: !s.completed } : s),
       updatedAt: today(),
     }
-    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
-    api.updateTask(taskId, updated).catch(() => {})
-    if (completing) {
+    setTasks(prev => prev.map(t => t.id === taskId ? optimistic : t))
+
+    if (useRealBackend) {
+      api.updateSubtask(taskId, subtaskId, { completed: !subtask.completed })
+        .then(fullTask => setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t)))
+        .catch(() => setTasks(prev => prev.map(t => t.id === taskId ? task : t)))
+      return
+    }
+
+    api.updateTask(taskId, optimistic).catch(() => {})
+    if (!subtask.completed) {
       notifyLeaders(members, 'subtask_done',
         `Subtarea completada en "${task.title}": ${subtask.title}`, taskId, user?.id)
     }
-  }, [useRealBackend, connected, members, user])
+  }, [useRealBackend, members, user])
 
   const deleteSubtask = useCallback((taskId, subtaskId) => {
     const task = tasksRef.current.find(t => t.id === taskId)

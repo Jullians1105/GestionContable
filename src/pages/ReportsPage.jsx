@@ -10,6 +10,7 @@ import jsPDF from 'jspdf'
 import * as XLSX from 'xlsx'
 import { isBefore, isAfter, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { getInitials, getAvatarColor } from '../utils/helpers'
 
 const REPORT_TYPES = [
   { value: 'by_person', label: 'Tareas completadas por persona' },
@@ -31,6 +32,13 @@ export default function ReportsPage() {
     memberId: '',
   })
   const [generated, setGenerated] = useState(false)
+  const [openMembers, setOpenMembers] = useState(new Set())
+
+  const toggleMember = (id) => setOpenMembers((prev) => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
 
   const applyFilters = useCallback((taskList) => {
     return taskList.filter((t) => {
@@ -81,6 +89,24 @@ export default function ReportsPage() {
     if (!generated) return 0
     return applyFilters(tasks).filter((t) => t.status === 'completed').length
   }, [generated, tasks, applyFilters])
+
+  const memberDetails = useMemo(() => {
+    if (!generated) return null
+    const filtered = applyFilters(tasks)
+    return members
+      .map((m) => {
+        const all = filtered.filter((t) => t.assignedTo === m.id)
+        if (!all.length) return null
+        return {
+          id: m.id,
+          name: m.name,
+          completedTasks: all.filter((t) => t.status === 'completed'),
+          inProgressTasks: all.filter((t) => t.status === 'in_progress'),
+          pendingTasks: all.filter((t) => t.status === 'pending'),
+        }
+      })
+      .filter(Boolean)
+  }, [generated, tasks, members, applyFilters])
 
   const reportFileName = useMemo(() => {
     const slugify = (text) => text
@@ -365,7 +391,7 @@ export default function ReportsPage() {
           </div>
         </div>
         <button
-          onClick={() => setGenerated(true)}
+          onClick={() => { setGenerated(true); setOpenMembers(new Set()) }}
           className="mt-4 flex items-center gap-2 h-10 px-5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition"
           style={{ background: '#004ac6' }}
         >
@@ -440,6 +466,94 @@ export default function ReportsPage() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          )}
+
+          {memberDetails?.length > 0 && (
+            <div className="mt-5 border-t border-[#edeef0] dark:border-[#2e3148] pt-4">
+              <p className="text-[10px] font-bold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-widest mb-3">Tareas por persona</p>
+              <div className="space-y-1.5">
+                {memberDetails.map((m) => (
+                  <div key={m.id} className="rounded-xl border border-[#edeef0] dark:border-[#2e3148] overflow-hidden">
+                    <button
+                      onClick={() => toggleMember(m.id)}
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#f8f9ff] dark:hover:bg-[#252840] transition text-left"
+                    >
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 ${getAvatarColor(m.name)}`}>
+                        {getInitials(m.name)}
+                      </div>
+                      <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] flex-1">{m.name}</span>
+                      <div className="flex items-center gap-3 text-xs">
+                        {m.completedTasks.length > 0 && (
+                          <span className="flex items-center gap-1 font-semibold text-[#10B981]">
+                            <span className="material-symbols-outlined text-xs">check_circle</span>
+                            {m.completedTasks.length}
+                          </span>
+                        )}
+                        {m.inProgressTasks.length > 0 && (
+                          <span className="flex items-center gap-1 font-semibold text-[#004ac6]">
+                            <span className="material-symbols-outlined text-xs">pending</span>
+                            {m.inProgressTasks.length}
+                          </span>
+                        )}
+                        {m.pendingTasks.length > 0 && (
+                          <span className="flex items-center gap-1 font-semibold text-[#888]">
+                            <span className="material-symbols-outlined text-xs">radio_button_unchecked</span>
+                            {m.pendingTasks.length}
+                          </span>
+                        )}
+                      </div>
+                      <span className="material-symbols-outlined text-[#888] text-base ml-1">
+                        {openMembers.has(m.id) ? 'expand_less' : 'expand_more'}
+                      </span>
+                    </button>
+
+                    {openMembers.has(m.id) && (
+                      <div className="px-4 pb-3 pt-2 border-t border-[#edeef0] dark:border-[#2e3148] space-y-3">
+                        {m.completedTasks.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-bold text-[#10B981] uppercase tracking-widest mb-1.5">Completadas</p>
+                            <div className="space-y-0.5">
+                              {m.completedTasks.map((t) => (
+                                <div key={t.id} className="flex items-center gap-2 text-xs text-[#888] dark:text-[#6b7280] line-through">
+                                  <span className="material-symbols-outlined text-[#10B981] text-xs shrink-0" style={{ textDecoration: 'none' }}>check</span>
+                                  {t.title}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {m.inProgressTasks.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-bold text-[#004ac6] uppercase tracking-widest mb-1.5">En Progreso</p>
+                            <div className="space-y-0.5">
+                              {m.inProgressTasks.map((t) => (
+                                <div key={t.id} className="flex items-center gap-2 text-xs text-[#191c1e] dark:text-[#e4e6f0]">
+                                  <span className="material-symbols-outlined text-[#004ac6] text-xs shrink-0">arrow_right</span>
+                                  {t.title}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {m.pendingTasks.length > 0 && (
+                          <div>
+                            <p className="text-[9px] font-bold text-[#888] uppercase tracking-widest mb-1.5">Pendientes</p>
+                            <div className="space-y-0.5">
+                              {m.pendingTasks.map((t) => (
+                                <div key={t.id} className="flex items-center gap-2 text-xs text-[#434655] dark:text-[#c4c8e8]">
+                                  <span className="material-symbols-outlined text-[#888] text-xs shrink-0">circle</span>
+                                  {t.title}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       )}

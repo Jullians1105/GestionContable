@@ -4,10 +4,11 @@ import { es } from 'date-fns/locale'
 export const generateId = (prefix = 'id') =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
 
-export const formatDate = (dateStr) => {
+export const formatDate = (dateStr, timeStr = '') => {
   if (!dateStr) return '—'
   try {
-    return format(parseISO(dateStr), 'dd/MM/yyyy', { locale: es })
+    const formatted = format(parseISO(dateStr), 'dd/MM/yyyy', { locale: es })
+    return timeStr ? `${formatted}, ${timeStr}` : formatted
   } catch {
     return dateStr
   }
@@ -15,19 +16,21 @@ export const formatDate = (dateStr) => {
 
 export const today = () => format(new Date(), 'yyyy-MM-dd')
 
-export const isDueDateOverdue = (dateStr) => {
+const toDatetime = (dateStr, timeStr = '') => parseISO(`${dateStr}T${timeStr || '19:00'}`)
+
+export const isDueDateOverdue = (dateStr, timeStr = '') => {
   if (!dateStr) return false
   try {
-    return isBefore(parseISO(dateStr), new Date())
+    return isBefore(toDatetime(dateStr, timeStr), new Date())
   } catch {
     return false
   }
 }
 
-export const isDueDateSoon = (dateStr, days = 3) => {
+export const isDueDateSoon = (dateStr, timeStr = '', days = 3) => {
   if (!dateStr) return false
   try {
-    const due = parseISO(dateStr)
+    const due = toDatetime(dateStr, timeStr)
     const now = new Date()
     return isAfter(due, now) && isBefore(due, addDays(now, days))
   } catch {

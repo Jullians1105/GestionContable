@@ -12,6 +12,7 @@ const EMPTY_TASK = {
   priority: 'medium',
   assignedTo: '',
   dueDate: '',
+  dueTime: '',
   groupId: '',
   tagIds: [],
   subtasks: [],
@@ -24,7 +25,7 @@ const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
 export default function TaskForm({ task, onSubmit, onCancel }) {
   const { members } = useTeam()
   const { groups } = useGroups()
-  const [form, setForm] = useState(task ?? EMPTY_TASK)
+  const [form, setForm] = useState(task ? { ...task, dueTime: task.dueTime ?? '' } : EMPTY_TASK)
   const [errors, setErrors] = useState({})
   const [subtaskInput, setSubtaskInput] = useState('')
 
@@ -114,6 +115,18 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
           <input type="date" value={form.dueDate} onChange={(e) => handleChange('dueDate', e.target.value)} className={`${inputCls} ${errors.dueDate ? inputErrCls : ''}`} />
           {errors.dueDate && <p className="text-[#EF4444] text-xs mt-1">{errors.dueDate}</p>}
         </div>
+      </div>
+
+      <div className="flex flex-col items-center gap-1">
+        <label className="text-[10px] text-[#888]">
+          Hora límite <span className="italic text-[#EF4444]">(opcional de lo contario hasta las 7:00 p.m.)</span>
+        </label>
+        <input
+          type="time"
+          value={form.dueTime}
+          onChange={(e) => handleChange('dueTime', e.target.value)}
+          className="border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 h-9 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-[#edeef0] dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+        />
       </div>
 
       <div>
