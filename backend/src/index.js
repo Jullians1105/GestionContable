@@ -23,6 +23,7 @@ const groupRoutes = require('./routes/groups');
 const tagRoutes = require('./routes/tags');
 const statsRoutes = require('./routes/stats');
 const notificationRoutes = require('./routes/notifications');
+const fondoEmpresasRoutes = require('./routes/fondoEmpresas');
 
 const app = express();
 const server = http.createServer(app);
@@ -108,6 +109,7 @@ app.use('/api/groups', groupRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/fondo/empresas', fondoEmpresasRoutes);
 
 // Frontend is served by nginx in production — this block only runs locally
 if (env.NODE_ENV === 'development') {
