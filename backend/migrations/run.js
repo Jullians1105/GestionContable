@@ -48,8 +48,9 @@ async function run() {
       const filePath = path.join(__dirname, file);
       if (!fs.existsSync(filePath)) { console.log(`⚠️  ${file} not found, skipping`); continue; }
 
-      // Saltar si ya fue aplicada (excepto con --reset, que ya limpió todo)
-      if (!withReset) {
+      // Seed file always re-runs when --seed is passed (idempotent via ON CONFLICT DO NOTHING)
+      const isSeedFile = file === '002_seed_data.sql';
+      if (!withReset && !(isSeedFile && withSeed)) {
         const { rows } = await client.query(
           'SELECT 1 FROM schema_migrations WHERE filename = $1', [file]
         );
@@ -62,9 +63,12 @@ async function run() {
       console.log(`Running migration: ${file}...`);
       const sql = fs.readFileSync(filePath, 'utf8');
       await client.query(sql);
-      await client.query(
-        'INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [file]
-      );
+      // Seed file is always re-run (ON CONFLICT DO NOTHING makes it idempotent) — don't track it
+      if (file !== '002_seed_data.sql') {
+        await client.query(
+          'INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [file]
+        );
+      }
       console.log(`✓ ${file} done`);
     }
 

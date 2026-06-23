@@ -44,7 +44,6 @@ services:
       DB_HOST: postgres
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
-      SHOW_RESET_TOKEN: "true"
     ports:
       - "${PORT:-3000}:3000"
     volumes:
@@ -58,13 +57,8 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    environment:
-      VITE_BACKEND_URL: http://backend:3000
     ports:
-      - "5173:5173"
-    volumes:
-      - .:/app
-      - /app/node_modules
+      - "5173:80"
 
   migrate:
     build:
