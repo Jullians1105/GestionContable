@@ -64,8 +64,11 @@ async function request(path, options = {}, retry = true) {
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     if (body.details) console.error('[API]', path, body.details);
-    throw new Error(body.error || `Error ${res.status}`);
+    const err = new Error(body.error || `Error ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
+  if (res.status === 204) return null;
   return res.json();
 }
 
@@ -139,6 +142,16 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/audit${qs ? `?${qs}` : ''}`);
   },
+
+  // Fondo Emprender — Empresas
+  getFondoEmpresas: (categoria) => {
+    const qs = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
+    return request(`/fondo/empresas${qs}`);
+  },
+  getFondoEmpresa: (id) => request(`/fondo/empresas/${id}`),
+  createFondoEmpresa: (data) => request('/fondo/empresas', { method: 'POST', body: JSON.stringify(data) }),
+  updateFondoEmpresa: (id, data) => request(`/fondo/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteFondoEmpresa: (id) => request(`/fondo/empresas/${id}`, { method: 'DELETE' }),
 
   // Notifications
   getNotifications: () => request('/notifications'),
