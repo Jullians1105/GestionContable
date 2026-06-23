@@ -102,7 +102,12 @@ router.get('/:id/history', validateUUIDParam('id'), getTaskHistory);
 router.post('/',
   canEdit,
   body('title').trim().notEmpty().withMessage('El título es obligatorio').isLength({ max: 255 }),
-  body('assignedTo').optional().matches(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i).withMessage('assignedTo debe ser un UUID válido'),
+  body('assignedTo').optional().custom((val) => {
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const arr = Array.isArray(val) ? val : (val ? [val] : []);
+    if (!arr.every(id => uuidRe.test(id))) throw new Error('assignedTo debe contener UUIDs válidos');
+    return true;
+  }),
   body('priority').optional().isIn(['high', 'medium', 'low']),
   body('status').optional().isIn(['pending', 'in_progress', 'completed']),
   validate,
