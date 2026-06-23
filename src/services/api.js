@@ -143,6 +143,22 @@ export const api = {
     return request(`/audit${qs ? `?${qs}` : ''}`);
   },
 
+  // Fondo Emprender — Checklist mensual por empresa
+  getFondoChecklist: (empresaId, anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/${empresaId}?${qs}`);
+  },
+  updateFondoChecklistItem: (empresaId, procesoId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/${empresaId}/item/${procesoId}?${qs}`,
+      { method: 'PUT', body: JSON.stringify(data) });
+  },
+  updateFondoChecklistConfirmado: (empresaId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/${empresaId}/confirmado?${qs}`,
+      { method: 'PUT', body: JSON.stringify(data) });
+  },
+
   // Fondo Emprender — Detalle macroprocesos
   getFondoDetalle: (empresaId, anio, mes) => {
     const qs = new URLSearchParams({ anio, mes }).toString();
