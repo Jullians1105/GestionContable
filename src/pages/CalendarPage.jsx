@@ -10,8 +10,8 @@ import { useGroups } from '../context/GroupContext'
 import { isDueDateOverdue, isDueDateSoon, PRIORITY_LABELS } from '../utils/helpers'
 
 const DOT_COLOR = (task) => {
-  if (isDueDateOverdue(task.dueDate)) return '#EF4444'
-  if (isDueDateSoon(task.dueDate)) return '#FBBF24'
+  if (isDueDateOverdue(task.dueDate, task.dueTime)) return '#EF4444'
+  if (isDueDateSoon(task.dueDate, task.dueTime)) return '#FBBF24'
   return '#004ac6'
 }
 
@@ -143,8 +143,8 @@ export default function CalendarPage() {
                         <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{t.title}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-xs text-[#888]">{PRIORITY_LABELS[t.priority]}</span>
-                          {isDueDateOverdue(t.dueDate) && <span className="text-xs text-[#EF4444] font-semibold">Vencida</span>}
-                          {isDueDateSoon(t.dueDate) && !isDueDateOverdue(t.dueDate) && <span className="text-xs text-[#FBBF24] font-semibold">Próxima</span>}
+                          {isDueDateOverdue(t.dueDate, t.dueTime) && <span className="text-xs text-[#EF4444] font-semibold">Vencida</span>}
+                          {isDueDateSoon(t.dueDate, t.dueTime) && !isDueDateOverdue(t.dueDate, t.dueTime) && <span className="text-xs text-[#FBBF24] font-semibold">Próxima</span>}
                         </div>
                       </div>
                     ))}

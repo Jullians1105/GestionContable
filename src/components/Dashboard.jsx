@@ -1,4 +1,5 @@
 ﻿import { useMemo } from "react"
+import { normalizeAssignedTo } from "../utils/helpers"
 import { Link } from "react-router-dom"
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
@@ -28,7 +29,7 @@ export default function Dashboard() {
   const { getMemberById } = useTeam()
   const { user, isAdmin, isLeader } = useAuth()
   const { theme } = useTheme()
-  const visibleTasks = (isAdmin() || isLeader()) ? tasks : tasks.filter((t) => t.assignedTo === user?.id)
+  const visibleTasks = (isAdmin() || isLeader()) ? tasks : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id))
   const isDark = theme === 'dark'
   const axisColor = isDark ? '#c4c8e8' : '#434655'
   const gridColor = isDark ? '#2e3148' : '#edeef0'
@@ -62,7 +63,7 @@ export default function Dashboard() {
 
   const urgentTasks = useMemo(() =>
     visibleTasks
-      .filter((t) => t.status !== "completed" && t.dueDate && (isDueDateOverdue(t.dueDate) || isDueDateSoon(t.dueDate)))
+      .filter((t) => t.status !== "completed" && t.dueDate && (isDueDateOverdue(t.dueDate, t.dueTime) || isDueDateSoon(t.dueDate, t.dueTime)))
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
       .slice(0, 5),
     [visibleTasks]
@@ -147,8 +148,9 @@ export default function Dashboard() {
         {urgentTasks.length > 0 ? (
           <div className="space-y-3">
             {urgentTasks.map((task) => {
-              const overdue = isDueDateOverdue(task.dueDate)
-              const member = task.assignedTo ? getMemberById(task.assignedTo) : null
+              const overdue = isDueDateOverdue(task.dueDate, task.dueTime)
+              const firstId = normalizeAssignedTo(task.assignedTo)[0]
+              const member = firstId ? getMemberById(firstId) : null
               return (
                 <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border ${overdue ? "border-[#ffdad6] bg-[#fff5f5] dark:border-[#5c1a1a] dark:bg-[#2a1718]" : "border-yellow-200 bg-yellow-50 dark:border-[#5c4a1a] dark:bg-[#2a2417]"}`}>
                   <div className="flex-1 min-w-0">
@@ -156,7 +158,7 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={`text-[12px] font-semibold flex items-center gap-1 ${overdue ? "text-[#93000a] dark:text-[#ff8a80]" : "text-yellow-700 dark:text-yellow-400"}`}>
                         <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{overdue ? "warning" : "schedule"}</span>
-                        {overdue ? "Vencida" : "Proxima"} · {formatDate(task.dueDate)}
+                        {overdue ? "Vencida" : "Proxima"} · {formatDate(task.dueDate, task.dueTime)}
                       </span>
                       <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${task.priority === "high" ? "bg-[#ffdad6] text-[#93000a] dark:bg-[#5c1a1a] dark:text-[#ff8a80]" : task.priority === "medium" ? "bg-yellow-100 text-yellow-800 dark:bg-[#5c4a1a] dark:text-yellow-300" : "bg-green-100 text-green-800 dark:bg-[#16412c] dark:text-green-300"}`}>
                         {PRIORITY_LABELS[task.priority]}

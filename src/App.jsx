@@ -63,7 +63,6 @@ function Layout() {
           </Routes>
         </div>
       </main>
-      <Toast />
     </div>
   )
 }
@@ -94,6 +93,7 @@ export default function App() {
               </TeamProvider>
             </SocketProvider>
           </AuthProvider>
+          <Toast />
         </ToastProvider>
       </ThemeProvider>
     </BrowserRouter>

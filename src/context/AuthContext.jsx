@@ -67,8 +67,8 @@ export function AuthProvider({ children }) {
         setToken(data.token)
         setUseRealBackend(true)
         return { success: true }
-      } catch {
-        // Backend corriendo pero sin este usuario → caer a localStorage
+      } catch (err) {
+        return { success: false, error: err.message || 'Email o contraseña incorrectos' }
       }
     }
     // Fallback localStorage

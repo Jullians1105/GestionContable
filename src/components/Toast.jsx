@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useToast } from '../context/ToastContext'
 
 const ICONS = {
@@ -17,8 +18,8 @@ const COLORS = {
 export default function Toast() {
   const { toasts, removeToast } = useToast()
 
-  return (
-    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none">
+  return createPortal(
+    <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none" style={{ transform: 'translateZ(0)' }}>
       {toasts.map((t) => {
         const c = COLORS[t.type] || COLORS.info
         return (
@@ -37,6 +38,7 @@ export default function Toast() {
           </div>
         )
       })}
-    </div>
+    </div>,
+    document.body
   )
 }

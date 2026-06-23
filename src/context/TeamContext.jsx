@@ -20,10 +20,17 @@ export function TeamProvider({ children }) {
 
     api.getEmployees()
       .then(data => {
-        const users = Array.isArray(data) ? data : []
+        const raw = Array.isArray(data) ? data : []
+        const users = raw.map(u => ({
+          ...u,
+          createdAt: u.createdAt ?? u.created_at,
+          // permissions viene como JSONB parseado por pg; si es string (migración
+          // anterior sin cast) lo parseamos manualmente
+          permissions: typeof u.permissions === 'string'
+            ? (() => { try { return JSON.parse(u.permissions) } catch { return null } })()
+            : (u.permissions ?? null),
+        }))
         setAllUsers(users)
-        // In backend mode localStorage is not the source of truth — always
-        // reflect exactly what the backend returns, even if the list is empty.
         setMembers(users)
       })
       .catch(() => {})
@@ -89,8 +96,20 @@ export function TeamProvider({ children }) {
       if (updates.role !== undefined) payload.role = updates.role
       if (updates.password) payload.password = updates.password
       if (updates.permissions !== undefined) payload.permissions = updates.permissions
+
+      // Actualización optimista inmediata para que el checkbox cambie de una
+      setMembers(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m))
+      setAllUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u))
+
       const updated = await api.updateEmployee(id, payload)
+      // Reconciliar: nombre/email/rol vienen del servidor; permisos usan el
+      // valor enviado si el servidor devuelve null (garantiza persistencia)
       const patch = { name: updated.name, email: updated.email, role: updated.role }
+      if (updates.permissions !== undefined) {
+        patch.permissions = updated.permissions ?? updates.permissions
+      } else if (updated.permissions !== undefined) {
+        patch.permissions = updated.permissions
+      }
       setMembers(prev => prev.map(m => m.id === id ? { ...m, ...patch } : m))
       setAllUsers(prev => prev.map(u => u.id === id ? { ...u, ...patch } : u))
       return
