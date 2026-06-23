@@ -26,6 +26,7 @@ const notificationRoutes = require('./routes/notifications');
 const fondoEmpresasRoutes   = require('./routes/fondoEmpresas');
 const fondoProcesosRoutes   = require('./routes/fondoProcesos');
 const fondoChecklistRoutes  = require('./routes/fondoChecklist');
+const fondoDetalleRoutes    = require('./routes/fondoDetalle');
 
 const app = express();
 const server = http.createServer(app);
@@ -114,6 +115,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/fondo/empresas',   fondoEmpresasRoutes);
 app.use('/api/fondo/procesos',   fondoProcesosRoutes);
 app.use('/api/fondo/checklist',  fondoChecklistRoutes);
+app.use('/api/fondo/detalle',    fondoDetalleRoutes);
 
 // Frontend is served by nginx in production — this block only runs locally
 if (env.NODE_ENV === 'development') {
