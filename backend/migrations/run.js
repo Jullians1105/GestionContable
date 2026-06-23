@@ -31,6 +31,14 @@ async function run() {
       console.log('✓ Tables dropped');
     }
 
+    // Tabla de control — registra qué migraciones ya se aplicaron
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS schema_migrations (
+        filename   VARCHAR(255) PRIMARY KEY,
+        applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
     const migrations = fs.readdirSync(__dirname)
       .filter((f) => /^\d+.*\.sql$/.test(f))
       .filter((f) => withSeed || f !== '002_seed_data.sql')
@@ -39,9 +47,24 @@ async function run() {
     for (const file of migrations) {
       const filePath = path.join(__dirname, file);
       if (!fs.existsSync(filePath)) { console.log(`⚠️  ${file} not found, skipping`); continue; }
+
+      // Saltar si ya fue aplicada (excepto con --reset, que ya limpió todo)
+      if (!withReset) {
+        const { rows } = await client.query(
+          'SELECT 1 FROM schema_migrations WHERE filename = $1', [file]
+        );
+        if (rows.length > 0) {
+          console.log(`⏭  ${file} already applied, skipping`);
+          continue;
+        }
+      }
+
       console.log(`Running migration: ${file}...`);
       const sql = fs.readFileSync(filePath, 'utf8');
       await client.query(sql);
+      await client.query(
+        'INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [file]
+      );
       console.log(`✓ ${file} done`);
     }
 

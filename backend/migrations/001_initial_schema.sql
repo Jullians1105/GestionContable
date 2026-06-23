@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 
 -- Grupos
 CREATE TABLE IF NOT EXISTS groups (
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS groups (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_groups_leader ON groups(leader_id);
+CREATE INDEX IF NOT EXISTS idx_groups_leader ON groups(leader_id);
 
 -- Miembros de grupos
 CREATE TABLE IF NOT EXISTS group_members (
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS group_members (
   PRIMARY KEY (group_id, user_id)
 );
 
-CREATE INDEX idx_group_members_user ON group_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
 
 -- Tareas
 CREATE TABLE IF NOT EXISTS tasks (
@@ -58,12 +58,12 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_tasks_user_id ON tasks(user_id);
-CREATE INDEX idx_tasks_assigned_to ON tasks(assigned_to);
-CREATE INDEX idx_tasks_group_id ON tasks(group_id);
-CREATE INDEX idx_tasks_status ON tasks(status);
-CREATE INDEX idx_tasks_due_date ON tasks(due_date);
-CREATE INDEX idx_tasks_search ON tasks USING gin(
+CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_tasks_group_id ON tasks(group_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_search ON tasks USING gin(
   to_tsvector('spanish', title || ' ' || COALESCE(description, ''))
 );
 
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS task_subtasks (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_subtasks_task ON task_subtasks(task_id);
+CREATE INDEX IF NOT EXISTS idx_subtasks_task ON task_subtasks(task_id);
 
 -- Comentarios
 CREATE TABLE IF NOT EXISTS task_comments (
@@ -89,8 +89,8 @@ CREATE TABLE IF NOT EXISTS task_comments (
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_comments_task ON task_comments(task_id);
-CREATE INDEX idx_comments_user ON task_comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_comments_task ON task_comments(task_id);
+CREATE INDEX IF NOT EXISTS idx_comments_user ON task_comments(user_id);
 
 -- Tags
 CREATE TABLE IF NOT EXISTS task_tags (
@@ -118,8 +118,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_notifications_user ON notifications(user_id);
-CREATE INDEX idx_notifications_read ON notifications(user_id, read);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(user_id, read);
 
 -- Audit log
 CREATE TABLE IF NOT EXISTS audit_log (
@@ -132,9 +132,9 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_audit_user ON audit_log(user_id);
-CREATE INDEX idx_audit_table ON audit_log(table_name, record_id);
-CREATE INDEX idx_audit_created ON audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_table ON audit_log(table_name, record_id);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
 
 -- Tokens JWT (blacklist y refresh)
 CREATE TABLE IF NOT EXISTS token_blacklist (
@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_refresh_tokens_user ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
 
 -- Función para actualizar updated_at automáticamente
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -162,8 +162,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER groups_updated_at BEFORE UPDATE ON groups FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER subtasks_updated_at BEFORE UPDATE ON task_subtasks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
-CREATE TRIGGER comments_updated_at BEFORE UPDATE ON task_comments FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'users_updated_at') THEN
+    CREATE TRIGGER users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'groups_updated_at') THEN
+    CREATE TRIGGER groups_updated_at BEFORE UPDATE ON groups FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'tasks_updated_at') THEN
+    CREATE TRIGGER tasks_updated_at BEFORE UPDATE ON tasks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'subtasks_updated_at') THEN
+    CREATE TRIGGER subtasks_updated_at BEFORE UPDATE ON task_subtasks FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'comments_updated_at') THEN
+    CREATE TRIGGER comments_updated_at BEFORE UPDATE ON task_comments FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  END IF;
+END $$;
