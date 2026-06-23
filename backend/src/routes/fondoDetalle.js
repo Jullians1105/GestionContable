@@ -84,6 +84,8 @@ router.put('/:empresaId/:macroId',
   ...validateUUIDParam('empresaId'),
   ...validateMacroId,
   requireFondoAccess,
+  body('estado').optional().isIn(['pending', 'in_progress', 'done'])
+    .withMessage('estado debe ser pending, in_progress o done'),
   body('responsableId').optional({ nullable: true }).isUUID().withMessage('responsableId debe ser un UUID válido'),
   body('nota').optional({ nullable: true }).isString(),
   validate,

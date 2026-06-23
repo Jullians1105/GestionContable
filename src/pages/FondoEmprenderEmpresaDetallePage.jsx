@@ -1,9 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import {
-  loadMonthData,
-  loadEmpresaDetail, saveEmpresaDetail, buildDefaultEmpresaDetail,
-} from '../data/fondoEmprender'
+import { api } from '../services/api'
 
 const MONTHS = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -16,47 +13,93 @@ const MACRO_STATUS = {
   done:        { label: 'Completado',  icon: 'check_circle',           color: '#16a34a', bg: '#dcfce7' },
 }
 
-const CONTABILIDAD_ID = 'mp5'
-
 export default function FondoEmprenderEmpresaDetallePage() {
   const { empresaId } = useParams()
   const today = new Date()
-  const month = today.getMonth()
-  const year  = today.getFullYear()
+  const mes   = today.getMonth() + 1   // API expects 1-12
+  const anio  = today.getFullYear()
 
-  // Company data from the monthly checklist (name + confirmed status)
-  const [company, setCompany] = useState(null)
+  const [company, setCompany]           = useState(null)
+  const [macroprocesos, setMacros]      = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState(null)
+  // notasDraft tracks in-progress edits; saves on blur to avoid per-keystroke API calls
+  const [notasDraft, setNotasDraft]     = useState({})
 
-  // The 7 macro processes for this company
-  const [macros, setMacros] = useState(
-    () => loadEmpresaDetail(empresaId) ?? buildDefaultEmpresaDetail()
-  )
-
-  useEffect(() => {
-    const d = loadMonthData(year, month)
-    if (d?.companies) {
-      setCompany(d.companies.find(c => c.id === empresaId) ?? null)
+  const fetchDetalle = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const [empresaData, detalleData] = await Promise.all([
+        api.getFondoEmpresa(empresaId),
+        api.getFondoDetalle(empresaId, anio, mes),
+      ])
+      setCompany(empresaData)
+      setMacros(detalleData.macroprocesos)
+      const drafts = {}
+      detalleData.macroprocesos.forEach(m => { drafts[m.id] = m.nota ?? '' })
+      setNotasDraft(drafts)
+    } catch (err) {
+      setError(err.message || 'Error al cargar detalle')
+    } finally {
+      setLoading(false)
     }
-  }, [empresaId, year, month])
+  }, [empresaId, anio, mes])
 
-  // Contabilidad status is derived — never edited here
-  const contabilidadConfirmed = company?.confirmed ?? null
+  useEffect(() => { fetchDetalle() }, [fetchDetalle])
 
-  function updateMacro(id, updates) {
-    setMacros(prev => {
-      const next = prev.map(p => p.id === id ? { ...p, ...updates } : p)
-      saveEmpresaDetail(empresaId, next)
-      return next
-    })
-  }
-
-  const companyName = company?.name ?? '...'
+  const handleEditarMacro = useCallback(async (macroId, updates) => {
+    if (macroId === 5) {
+      alert('mp5/Contabilidad no se puede editar directamente')
+      return
+    }
+    try {
+      const actualizado = await api.updateFondoDetalle(empresaId, macroId, updates)
+      setMacros(prev => prev.map(m => m.id === macroId ? { ...m, ...actualizado } : m))
+      if ('nota' in updates) {
+        setNotasDraft(prev => ({ ...prev, [macroId]: actualizado.nota ?? '' }))
+      }
+    } catch (err) {
+      if (err.status === 403) {
+        alert('No tienes permiso para editar macroprocesos')
+      } else {
+        alert('Error: ' + err.message)
+      }
+    }
+  }, [empresaId])
 
   // Progress summary
-  const contabDone  = !!contabilidadConfirmed
-  const manualDone  = macros.filter(p => p.id !== CONTABILIDAD_ID && p.status === 'done').length
-  const totalDone   = manualDone + (contabDone ? 1 : 0)
+  const mp5        = macroprocesos.find(m => m.id === 5)
+  const contabDone = mp5?.confirmed ?? false
+  const manualDone = macroprocesos.filter(m => m.id !== 5 && m.estado === 'done').length
+  const totalDone  = manualDone + (contabDone ? 1 : 0)
 
+  // ── Loading / error ───────────────────────────────────────────────────────
+  if (loading) return (
+    <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
+      <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
+        progress_activity
+      </span>
+      Cargando macroprocesos…
+    </div>
+  )
+
+  if (error) return (
+    <div className="flex flex-col items-center gap-3 py-20">
+      <span className="material-symbols-outlined text-[#ef4444]" style={{ fontSize: 32 }}>error</span>
+      <p className="text-sm text-[#ef4444]">{error}</p>
+      <button
+        onClick={fetchDetalle}
+        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+      >
+        Reintentar
+      </button>
+    </div>
+  )
+
+  const companyName = company?.name ?? '…'
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col gap-5 min-w-0">
 
@@ -76,7 +119,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
         <div>
           <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">{companyName}</h1>
           <p className="text-sm text-[#6b7280] dark:text-[#8890b5] mt-0.5">
-            Procesos macro · {MONTHS[month]} {year}
+            Procesos macro · {MONTHS[mes - 1]} {anio}
           </p>
         </div>
         {/* Progress pill */}
@@ -96,11 +139,11 @@ export default function FondoEmprenderEmpresaDetallePage() {
 
       {/* ── Macro process cards ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {macros.map(proc => {
-          const isContabilidad = proc.id === CONTABILIDAD_ID
+        {macroprocesos.map(proc => {
+          const isContabilidad = proc.id === 5
           const cfgStatus = isContabilidad
-            ? (contabilidadConfirmed ? MACRO_STATUS.done : MACRO_STATUS.pending)
-            : (MACRO_STATUS[proc.status] ?? MACRO_STATUS.pending)
+            ? (proc.confirmed ? MACRO_STATUS.done : MACRO_STATUS.pending)
+            : (MACRO_STATUS[proc.estado] ?? MACRO_STATUS.pending)
 
           return (
             <div
@@ -117,7 +160,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     {cfgStatus.icon}
                   </span>
                   <h3 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">
-                    {proc.name}
+                    {proc.nombre}
                   </h3>
                 </div>
                 {isContabilidad && (
@@ -127,12 +170,12 @@ export default function FondoEmprenderEmpresaDetallePage() {
                 )}
               </div>
 
-              {/* Status — manual selector or auto display */}
+              {/* Status — readonly for mp5, buttons for the rest */}
               {isContabilidad ? (
                 <div className="rounded-lg p-2.5 text-xs leading-relaxed" style={{ background: cfgStatus.bg }}>
-                  {contabilidadConfirmed ? (
+                  {proc.confirmed ? (
                     <p className="font-semibold" style={{ color: '#16a34a' }}>
-                      Confirmado el {contabilidadConfirmed.date}
+                      Confirmado
                     </p>
                   ) : (
                     <p className="text-[#6b7280] dark:text-[#8890b5]">
@@ -153,11 +196,11 @@ export default function FondoEmprenderEmpresaDetallePage() {
               ) : (
                 <div className="grid grid-cols-3 gap-1">
                   {Object.entries(MACRO_STATUS).map(([key, cfg]) => {
-                    const active = proc.status === key
+                    const active = proc.estado === key
                     return (
                       <button
                         key={key}
-                        onClick={() => updateMacro(proc.id, { status: key })}
+                        onClick={() => handleEditarMacro(proc.id, { estado: key })}
                         className="py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:opacity-90 active:scale-95"
                         style={{
                           background: active ? cfg.bg : 'transparent',
@@ -172,32 +215,41 @@ export default function FondoEmprenderEmpresaDetallePage() {
                 </div>
               )}
 
-              {/* Responsable */}
-              <div>
-                <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1">
-                  Responsable
-                </label>
-                <input
-                  value={proc.responsable}
-                  onChange={e => updateMacro(proc.id, { responsable: e.target.value })}
-                  placeholder="Sin asignar"
-                  className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
-                />
-              </div>
+              {/* Responsable — display only (API stores UUID; text entry requires user picker) */}
+              {!isContabilidad && (
+                <div>
+                  <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1">
+                    Responsable
+                  </label>
+                  <div className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#9ca3af] min-h-[30px]">
+                    {proc.responsableId
+                      ? `${proc.responsableId.slice(0, 8)}…`
+                      : 'Sin asignar'}
+                  </div>
+                </div>
+              )}
 
-              {/* Nota */}
-              <div>
-                <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1">
-                  Nota
-                </label>
-                <textarea
-                  value={proc.nota}
-                  onChange={e => updateMacro(proc.id, { nota: e.target.value })}
-                  placeholder="Notas adicionales..."
-                  rows={2}
-                  className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
-                />
-              </div>
+              {/* Nota — saves on blur */}
+              {!isContabilidad && (
+                <div>
+                  <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1">
+                    Nota
+                  </label>
+                  <textarea
+                    value={notasDraft[proc.id] ?? ''}
+                    onChange={e => setNotasDraft(prev => ({ ...prev, [proc.id]: e.target.value }))}
+                    onBlur={e => {
+                      const newNota = e.target.value
+                      if (newNota !== (proc.nota ?? '')) {
+                        handleEditarMacro(proc.id, { nota: newNota })
+                      }
+                    }}
+                    placeholder="Notas adicionales..."
+                    rows={2}
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+                  />
+                </div>
+              )}
             </div>
           )
         })}

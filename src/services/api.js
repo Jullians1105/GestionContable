@@ -143,6 +143,14 @@ export const api = {
     return request(`/audit${qs ? `?${qs}` : ''}`);
   },
 
+  // Fondo Emprender — Detalle macroprocesos
+  getFondoDetalle: (empresaId, anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/detalle/${empresaId}?${qs}`);
+  },
+  updateFondoDetalle: (empresaId, macroId, data) =>
+    request(`/fondo/detalle/${empresaId}/${macroId}`, { method: 'PUT', body: JSON.stringify(data) }),
+
   // Fondo Emprender — Empresas
   getFondoEmpresas: (categoria) => {
     const qs = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';

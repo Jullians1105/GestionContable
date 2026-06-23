@@ -83,22 +83,24 @@ const updateDetalle = async (req, res, next) => {
       return res.status(400).json({ error: 'mp5/Contabilidad no se edita directamente' });
     }
 
-    const { responsableId, nota } = req.body;
+    const { responsableId, nota, estado } = req.body;
     const mpKey = `mp${macroNum}`;
 
     const result = await db.query(
-      `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, responsable_id, nota)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, estado, responsable_id, nota)
+       VALUES ($1, $2, $3, COALESCE($4, 'pending'), $5, $6)
        ON CONFLICT (empresa_id, macroproceso_id) DO UPDATE
-       SET responsable_id = COALESCE(EXCLUDED.responsable_id, fondo_detalle_macroprocesos.responsable_id),
+       SET estado         = COALESCE(EXCLUDED.estado,         fondo_detalle_macroprocesos.estado),
+           responsable_id = COALESCE(EXCLUDED.responsable_id, fondo_detalle_macroprocesos.responsable_id),
            nota           = COALESCE(EXCLUDED.nota,           fondo_detalle_macroprocesos.nota)
        RETURNING *`,
-      [uuidv4(), empresaId, mpKey, responsableId ?? null, nota ?? null]
+      [uuidv4(), empresaId, mpKey, estado ?? null, responsableId ?? null, nota ?? null]
     );
 
     await auditLog(req.user.userId, 'UPDATE', 'fondo_detalle_macroprocesos', result.rows[0].id, {
       empresaId,
       macroId: mpKey,
+      estado,
       responsableId,
       nota,
     });
