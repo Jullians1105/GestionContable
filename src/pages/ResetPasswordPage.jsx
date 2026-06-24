@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import logoIcono from '../assets/logo-icono.png'
 import logo from '../assets/logo.jpeg'
 
 export default function ResetPasswordPage() {
@@ -43,7 +44,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen bg-[#f3f4f6] dark:bg-[#0f1117] flex items-center justify-center p-4">
       <div className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-lg p-8 w-full max-w-md border border-[#c3c6d7] dark:border-[#2e3148]">
         <div className="flex items-center gap-3 mb-8">
-          <img src={logo} alt="Gestor de Tareas" className="w-10 h-10 rounded-xl object-cover" />
+          <img src={logoIcono} alt="Gestor de Tareas" className="w-10 h-10 rounded-xl object-cover" />
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Gestor de Tareas</h1>
         </div>
 
