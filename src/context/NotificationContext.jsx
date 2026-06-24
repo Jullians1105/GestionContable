@@ -1,15 +1,28 @@
 import { createContext, useState, useCallback, useContext, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { generateId } from '../utils/helpers'
 import { storage } from '../utils/storage'
 import { api } from '../services/api'
 import { useAuth } from './AuthContext'
 import { useSocket } from './SocketContext'
+import { useToast } from './ToastContext'
+
+const NOTIF_TITLES = {
+  task_assigned:   'Tarea asignada',
+  task_completed:  'Tarea completada',
+  task_overdue:    'Tarea vencida',
+  task_in_progress:'Tarea en progreso',
+  comment_added:   'Nuevo comentario',
+  subtask_done:    'Subtarea completada',
+}
 
 export const NotificationContext = createContext(null)
 
 export function NotificationProvider({ children }) {
   const { user, useRealBackend } = useAuth()
   const { socket, connected } = useSocket()
+  const { addToast } = useToast()
+  const navigate = useNavigate()
   const userId = user?.id ?? null
 
   const [notifications, setNotifications] = useState(() =>
@@ -18,6 +31,14 @@ export function NotificationProvider({ children }) {
 
   useEffect(() => {
     setNotifications(storage.getNotifications(userId))
+  }, [userId])
+
+  // Solicitar permiso de notificaciones del SO al iniciar sesión
+  useEffect(() => {
+    if (!userId) return
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
   }, [userId])
 
   // Cargar desde API real cuando backend disponible
@@ -34,6 +55,26 @@ export function NotificationProvider({ children }) {
 
     const onNotification = (notif) => {
       setNotifications(prev => [{ ...notif, read: false }, ...prev].slice(0, 50))
+
+      // Toast in-app con botón "Ver" si hay tarea asociada
+      addToast(notif.message, 'info', 6000, notif.taskId
+        ? { label: 'Ver', onClick: () => navigate('/tasks') }
+        : null
+      )
+
+      // Notificación del SO (cuando la app está en background o en otra pestaña)
+      if ('Notification' in window && Notification.permission === 'granted') {
+        const title = NOTIF_TITLES[notif.type] || 'Notificación'
+        const osNotif = new Notification(title, {
+          body: notif.message,
+          icon: '/app-icon.png',
+          tag: notif.id,
+        })
+        osNotif.onclick = () => {
+          window.focus()
+          if (notif.taskId) navigate('/tasks')
+        }
+      }
     }
 
     socket.on('notification:received', onNotification)

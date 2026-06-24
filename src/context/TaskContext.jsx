@@ -3,7 +3,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { api } from '../services/api'
 import { storage } from '../utils/storage'
-import { generateId, today, normalizeAssignedTo } from '../utils/helpers'
+import { generateId, today, normalizeAssignedTo, isDueDateOverdue } from '../utils/helpers'
 import { useAuth } from './AuthContext'
 import { useTeam } from './TeamContext'
 import { useSocket } from './SocketContext'
@@ -89,12 +89,11 @@ export function TaskProvider({ children }) {
           if (fresh.length !== prev.length || fresh[0]?.updatedAt !== prev[0]?.updatedAt) return fresh
           return prev
         })
-        const todayStr = today()
         fresh.forEach(task => {
           if (
             normalizeAssignedTo(task.assignedTo).includes(user.id) &&
             task.status !== 'completed' &&
-            task.dueDate && task.dueDate < todayStr &&
+            isDueDateOverdue(task.dueDate, task.dueTime ?? '') &&
             !sentOverdueRef.current.has(task.id)
           ) {
             sentOverdueRef.current.add(task.id)

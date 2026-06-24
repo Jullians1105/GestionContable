@@ -32,10 +32,11 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
   const [errors, setErrors] = useState({})
   const [subtaskInput, setSubtaskInput] = useState('')
   const [assigneeOpen, setAssigneeOpen] = useState(false)
+  const [assigneeSearch, setAssigneeSearch] = useState('')
   const assigneeRef = useRef(null)
 
   useEffect(() => {
-    if (!assigneeOpen) return
+    if (!assigneeOpen) { setAssigneeSearch(''); return }
     const handler = (e) => {
       if (assigneeRef.current && !assigneeRef.current.contains(e.target)) setAssigneeOpen(false)
     }
@@ -159,8 +160,21 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
         {/* Dropdown */}
         {assigneeOpen && (
           <div className="absolute z-20 mt-1 w-full bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] rounded-xl shadow-xl overflow-hidden">
+            <div className="px-2 pt-2 pb-1">
+              <div className="relative">
+                <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[#434655] dark:text-[#c4c8e8] text-base pointer-events-none">search</span>
+                <input
+                  type="text"
+                  value={assigneeSearch}
+                  onChange={e => setAssigneeSearch(e.target.value)}
+                  placeholder="Buscar persona..."
+                  autoFocus
+                  className="w-full h-8 pl-7 pr-2 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+                />
+              </div>
+            </div>
             <div className="max-h-48 overflow-y-auto">
-              {members.map((m) => {
+              {members.filter(m => m.name.toLowerCase().includes(assigneeSearch.toLowerCase())).map((m) => {
                 const selected = (form.assignedTo || []).includes(m.id)
                 return (
                   <label

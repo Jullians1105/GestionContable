@@ -105,16 +105,16 @@ const normalizeAssignedTo = (val) => {
 
 const createTask = async (req, res, next) => {
   try {
-    const { title, description, priority = 'medium', assignedTo: assignedToRaw, dueDate, groupId, tagIds = [] } = req.body;
+    const { title, description, priority = 'medium', assignedTo: assignedToRaw, dueDate, dueTime, groupId, tagIds = [] } = req.body;
     const assignedToArr = normalizeAssignedTo(assignedToRaw);
     const assignedTo = assignedToArr[0] ?? null;
     const id = uuidv4();
 
     const result = await db.query(
-      `INSERT INTO tasks (id, user_id, group_id, title, description, status, priority, assigned_to, due_date)
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8)
+      `INSERT INTO tasks (id, user_id, group_id, title, description, status, priority, assigned_to, due_date, due_time)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9)
        RETURNING *`,
-      [id, req.user.userId, groupId || null, title, description || null, priority, assignedTo, dueDate || null]
+      [id, req.user.userId, groupId || null, title, description || null, priority, assignedTo, dueDate || null, dueTime || null]
     );
     const task = result.rows[0];
 
@@ -162,7 +162,7 @@ const updateTask = async (req, res, next) => {
     if (!current.rows[0]) return res.status(404).json({ error: 'Tarea no encontrada' });
 
     const old = current.rows[0];
-    const { title, description, status, priority, assignedTo: assignedToRaw, dueDate, groupId, tagIds } = req.body;
+    const { title, description, status, priority, assignedTo: assignedToRaw, dueDate, dueTime, groupId, tagIds } = req.body;
     const assignedToArr = assignedToRaw !== undefined ? normalizeAssignedTo(assignedToRaw) : null;
     const assignedTo = assignedToArr !== null ? (assignedToArr[0] ?? null) : undefined;
 
@@ -174,10 +174,11 @@ const updateTask = async (req, res, next) => {
         priority = COALESCE($4, priority),
         assigned_to = $5,
         due_date = $6,
-        group_id = $7,
+        due_time = $7,
+        group_id = $8,
         updated_at = NOW()
-       WHERE id = $8 RETURNING *`,
-      [title, description, status, priority, assignedTo ?? old.assigned_to, dueDate ?? old.due_date, groupId ?? old.group_id, id]
+       WHERE id = $9 RETURNING *`,
+      [title, description, status, priority, assignedTo ?? old.assigned_to, dueDate ?? old.due_date, dueTime !== undefined ? (dueTime || null) : old.due_time, groupId ?? old.group_id, id]
     );
     const task = result.rows[0];
 
@@ -308,6 +309,7 @@ function normalizeTask(t) {
     assignedTo: t.assigned_to || null,
     assignedToName: t.assigned_to_name || null,
     dueDate: t.due_date ? t.due_date.toISOString().slice(0, 10) : null,
+    dueTime: t.due_time || null,
     groupId: t.group_id || null,
     groupName: t.group_name || null,
     subtasks: (t.subtasks || []).map(s => ({
