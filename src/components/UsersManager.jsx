@@ -21,6 +21,8 @@ const ROLE_COLORS = {
 
 const EMPTY_FORM = { name: '', email: '', role: '', password: '' }
 
+const ROLE_ORDER = { admin: 0, leader: 1, member: 2, viewer: 3 }
+
 const labelCls = 'block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5'
 const inputCls = 'w-full border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 h-10 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-[#edeef0] dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
 const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
@@ -38,8 +40,6 @@ export default function UsersManager() {
   const [errors, setErrors] = useState({})
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [expandedPermsId, setExpandedPermsId] = useState(null)
-
-  const ROLE_ORDER = { admin: 0, leader: 1, member: 2, viewer: 3 }
 
   const handleSort = (col) => {
     if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')

@@ -79,7 +79,7 @@ export function NotificationProvider({ children }) {
 
     socket.on('notification:received', onNotification)
     return () => socket.off('notification:received', onNotification)
-  }, [socket])
+  }, [socket, addToast, navigate])
 
   // Polling fallback (solo sin socket activo y sin backend real)
   useEffect(() => {
