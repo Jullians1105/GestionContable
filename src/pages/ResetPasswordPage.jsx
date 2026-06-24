@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import logoIcono from '../assets/logo-icono.png'
-import logo from '../assets/logo.jpeg'
 
 export default function ResetPasswordPage() {
   const { confirmPasswordReset } = useAuth()
