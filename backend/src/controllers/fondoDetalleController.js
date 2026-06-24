@@ -105,6 +105,8 @@ const updateDetalle = async (req, res, next) => {
       nota,
     });
 
+    req.io.emit('empresa:updated', { empresaId, tipo: 'detalle' });
+
     const catalogEntry = MP_CATALOG.find(m => m.id === macroNum);
     const row = result.rows[0];
     res.json({

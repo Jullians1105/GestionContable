@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import StatsCard from '../components/StatsCard'
 import { getMacroStats } from '../data/fondoEmprender'
 import { api } from '../services/api'
+import { useSocket } from '../context/SocketContext'
 
 const SEM_COLOR = {
   green:  '#16a34a',
@@ -17,6 +18,7 @@ const CATEGORIAS = [
 
 export default function FondoEmprenderEmpresasPage() {
   const navigate = useNavigate()
+  const { socket } = useSocket()
 
   // ── server state ──────────────────────────────────────────────────────────
   const [empresas, setEmpresas] = useState([])
@@ -69,6 +71,15 @@ export default function FondoEmprenderEmpresasPage() {
   }, [])
 
   useEffect(() => { fetchEmpresas() }, [fetchEmpresas])
+
+  useEffect(() => {
+    window.addEventListener('focus', fetchEmpresas)
+    if (socket) socket.on('empresa:updated', fetchEmpresas)
+    return () => {
+      window.removeEventListener('focus', fetchEmpresas)
+      if (socket) socket.off('empresa:updated', fetchEmpresas)
+    }
+  }, [fetchEmpresas, socket])
 
   // ── create ────────────────────────────────────────────────────────────────
   async function handleAddCompany() {

@@ -3,14 +3,17 @@ const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 
 const normalizeEmpresa = (row) => ({
-  id:         row.id,
-  name:       row.name,
-  categoria:  row.categoria,
-  monthlyFee: row.monthly_fee !== null && row.monthly_fee !== undefined
-                ? parseFloat(row.monthly_fee)
-                : null,
-  createdAt:  row.created_at,
-  updatedAt:  row.updated_at,
+  id:               row.id,
+  name:             row.name,
+  categoria:        row.categoria,
+  monthlyFee:       row.monthly_fee !== null && row.monthly_fee !== undefined
+                      ? parseFloat(row.monthly_fee)
+                      : null,
+  macrosDone:       row.macros_done       ?? 0,
+  macrosInProgress: row.macros_in_progress ?? 0,
+  confirmed:        row.confirmed         ?? false,
+  createdAt:        row.created_at,
+  updatedAt:        row.updated_at,
 });
 
 const getEmpresas = async (req, res, next) => {
@@ -19,11 +22,29 @@ const getEmpresas = async (req, res, next) => {
     const params = [];
     let where = '';
     if (categoria) {
-      where = 'WHERE categoria = $1';
+      where = 'WHERE e.categoria = $1';
       params.push(categoria);
     }
     const result = await db.query(
-      `SELECT * FROM fondo_empresas ${where} ORDER BY name ASC`,
+      `SELECT e.*,
+              COALESCE((
+                SELECT COUNT(*)::int FROM fondo_detalle_macroprocesos d
+                WHERE d.empresa_id = e.id AND d.estado = 'done'
+              ), 0) AS macros_done,
+              COALESCE((
+                SELECT COUNT(*)::int FROM fondo_detalle_macroprocesos d
+                WHERE d.empresa_id = e.id AND d.estado = 'in_progress'
+              ), 0) AS macros_in_progress,
+              COALESCE((
+                SELECT m.confirmed FROM fondo_checklist_meses m
+                WHERE m.empresa_id = e.id
+                  AND m.anio = EXTRACT(YEAR  FROM CURRENT_DATE)::int
+                  AND m.mes  = EXTRACT(MONTH FROM CURRENT_DATE)::int
+                LIMIT 1
+              ), false) AS confirmed
+       FROM fondo_empresas e
+       ${where}
+       ORDER BY e.name ASC`,
       params
     );
     res.json(result.rows.map(normalizeEmpresa));

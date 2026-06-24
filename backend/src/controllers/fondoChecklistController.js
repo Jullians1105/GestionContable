@@ -74,6 +74,8 @@ const updateChecklistItem = async (req, res, next) => {
       empresaId, anio, mes, procesoId, estado, nota,
     });
 
+    req.io.emit('empresa:updated', { empresaId, anio, mes, tipo: 'checklist' });
+
     res.json({
       id:        result.rows[0].id,
       mesId:     result.rows[0].mes_id,
@@ -106,6 +108,8 @@ const updateChecklistConfirmado = async (req, res, next) => {
     await auditLog(req.user.userId, 'UPDATE', 'fondo_checklist_meses', result.rows[0].id, {
       empresaId, anio, mes, confirmed,
     });
+
+    req.io.emit('empresa:updated', { empresaId, anio, mes, tipo: 'checklist' });
 
     res.json({
       id:        result.rows[0].id,

@@ -137,22 +137,15 @@ export function buildDefaultEmpresaDetail() {
 // ── Quick macro-stats for a company (used in card views) ──────────────────────
 
 export function getMacroStats(company) {
-  const detail = loadEmpresaDetail(company.id)
+  const macrosDone       = company.macrosDone       ?? 0
+  const macrosInProgress = company.macrosInProgress ?? 0
   const contabilidadDone = !!company.confirmed
 
-  if (!detail) {
-    const done = contabilidadDone ? 1 : 0
-    return { done, total: 7, semaphore: done > 0 ? 'yellow' : 'red' }
-  }
-
-  const nonAuto = detail.filter(p => p.id !== 'mp5')
-  const manualDone = nonAuto.filter(p => p.status === 'done').length
-  const totalDone  = manualDone + (contabilidadDone ? 1 : 0)
-  const hasInProgress = nonAuto.some(p => p.status === 'in_progress')
+  const totalDone = macrosDone + (contabilidadDone ? 1 : 0)
 
   let semaphore = 'red'
-  if (totalDone === 7) semaphore = 'green'
-  else if (hasInProgress || totalDone > 0) semaphore = 'yellow'
+  if (totalDone === 7)                             semaphore = 'green'
+  else if (macrosInProgress > 0 || totalDone > 0) semaphore = 'yellow'
 
   return { done: totalDone, total: 7, semaphore }
 }
