@@ -32,7 +32,16 @@ export default function Toast() {
               {ICONS[t.type] || 'info'}
             </span>
             <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0] flex-1">{t.message}</p>
-            <button onClick={() => removeToast(t.id)} className="text-[#434655] hover:text-[#191c1e] ml-1">
+            {t.action && (
+              <button
+                onClick={() => { t.action.onClick(); removeToast(t.id) }}
+                className="flex-shrink-0 text-xs font-semibold px-2.5 h-6 rounded-lg border transition hover:opacity-80"
+                style={{ color: c.bg, borderColor: c.bg }}
+              >
+                {t.action.label}
+              </button>
+            )}
+            <button onClick={() => removeToast(t.id)} className="text-[#434655] hover:text-[#191c1e] ml-1 flex-shrink-0">
               <span className="material-symbols-outlined text-base">close</span>
             </button>
           </div>
