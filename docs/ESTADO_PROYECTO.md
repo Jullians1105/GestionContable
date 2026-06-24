@@ -1,6 +1,6 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-06-23 (sesión 5 — fixes deploy + migraciones)  
+**Última actualización:** 2026-06-24 (sesión 6 — fixes frontend producción)  
 **Rama activa:** `main`  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅  
@@ -239,6 +239,8 @@ migrate:    Perfil "migrate" — corre run.js --seed y termina
 
 **Backend Dockerfile:** multi-stage ✅ · usuario no-root (`appuser`) ✅ · `HEALTHCHECK` en imagen ✅
 
+**Frontend build:** Se construye en la Mac con `--platform linux/amd64` y se transfiere al servidor con `docker save | scp | docker load`. El servidor (amd64) no tiene RAM suficiente para que esbuild compile el bundle sin SIGSEGV.
+
 ### Documentación y scripts
 
 - `docs/SETUP_MACOS.md` — instrucciones de primer setup completas
@@ -369,3 +371,6 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 19 | OWASP Top 10 hardening | ✅ Implementado sesión 4 |
 | 20 | assignedTo multi-usuario (string→array + normalizeAssignedTo) | ✅ Implementado 2026-06-23 |
 | 21 | Fix migraciones idempotentes (schema_migrations tracking + IF NOT EXISTS) | ✅ Resuelto 2026-06-23 |
+| 22 | Fix backend crash SHOW_RESET_TOKEN en producción | ✅ Resuelto 2026-06-24 |
+| 23 | Fix frontend Docker: puerto 5173:80, CSP nginx una línea, logos como imports ES | ✅ Resuelto 2026-06-24 |
+| 24 | Build frontend desde Mac (--platform linux/amd64) por SIGSEGV esbuild en servidor | ✅ Documentado 2026-06-24 |
