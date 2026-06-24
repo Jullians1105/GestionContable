@@ -55,12 +55,10 @@ const TD_EMPTY_CLS = 'border border-[#E5E7EB] bg-[#F9FAFB]'
 const TD_PEND_CLS  = 'border border-[#E5E7EB] bg-[#F9FAFB]'
 const TD_ENV_CLS   = 'border border-[#93C5FD] bg-[#DBEAFE]'
 const TD_PAG_CLS   = 'border border-[#86EFAC] bg-[#DCFCE7]'
-const TD_RECH_CLS  = 'border border-[#FECACA] bg-[#FEE2E2]'
 const TD_ENV_RES_CLS = 'border border-[#93C5FD] bg-[#F0F9FF]'
 
 // Wrappers flex para usar DENTRO de cada td
 const ROW = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }
-const COL = { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }
 
 // ─── PagoCell ─────────────────────────────────────────────────────────────────
 
@@ -139,7 +137,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
     return <td colSpan={2} className={TD_EMPTY_CLS} style={{ ...TD_STYLE, color: '#c8c5bc' }}>—</td>
   }
 
-  const { estado, pagoId, nota } = debito
+  const { estado, nota } = debito
 
   // ── Pendiente ────────────────────────────────────────────────────────────────
   if (estado === 'pendiente') {
