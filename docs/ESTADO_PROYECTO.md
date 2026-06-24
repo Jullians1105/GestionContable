@@ -1,9 +1,10 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-06-20 (sesión 4 — OWASP)  
-**Rama activa:** `feat/Fase3`  
+**Última actualización:** 2026-06-24 (sesión 6 — fixes frontend producción)  
+**Rama activa:** `main`  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅  
+**Ramas activas en remoto:** `main` · `feat/arregloBugsYAdiciones` · `feat/modulo-pagos`  
 **Servidor de producción:** `192.168.1.12:5173`
 
 ---
@@ -60,13 +61,14 @@ GestionTareasOficina/
 │   │   ├── socket/events.js    # setupSocket — autenticación JWT, rooms, user:online/offline
 │   │   ├── services/           # emailService
 │   │   └── utils/              # jwt.js, logger.js, ...
-│   ├── migrations/             # 5 archivos SQL + run.js
+│   ├── migrations/             # 6 archivos SQL + run.js
 │   │   ├── 001_initial_schema.sql
 │   │   ├── 002_seed_data.sql
 │   │   ├── 003_notification_extra.sql
 │   │   ├── 004_user_permissions.sql
 │   │   ├── 005_password_reset.sql
-│   │   └── run.js              # CLI: --seed, --reset
+│   │   ├── 006_security_hardening.sql
+│   │   └── run.js              # CLI: --seed, --reset + tabla schema_migrations (tracking)
 │   ├── tests/
 │   │   ├── unit/               # 8 archivos (auth, tasks, groups, middleware, routes, stats, helpers, validators)
 │   │   ├── integration/        # auth.test.js, tasks.test.js
@@ -214,6 +216,9 @@ GET    /api/stats/audit                    → solo admin/leader
 | 003 | Columnas extra en notifications |
 | 004 | Tabla user_permissions |
 | 005 | Tabla password_reset_tokens |
+| 006 | OWASP hardening: columna `is_active` en users, tabla `login_attempts` (detección fuerza bruta) |
+
+**Sistema de tracking:** `run.js` crea tabla `schema_migrations` (PRIMARY KEY filename). Saltar migraciones ya aplicadas con `⏭ already applied`. Opción `--reset` para limpiar y reaplicar todo. Todos los `CREATE INDEX` deben usar `IF NOT EXISTS` para ser idempotentes.
 
 **Tests:**
 - Cobertura actual: **~84% statements / ~73% functions** (umbral: 70%)
@@ -233,6 +238,8 @@ migrate:    Perfil "migrate" — corre run.js --seed y termina
 ```
 
 **Backend Dockerfile:** multi-stage ✅ · usuario no-root (`appuser`) ✅ · `HEALTHCHECK` en imagen ✅
+
+**Frontend build:** Se construye en la Mac con `--platform linux/amd64` y se transfiere al servidor con `docker save | scp | docker load`. El servidor (amd64) no tiene RAM suficiente para que esbuild compile el bundle sin SIGSEGV.
 
 ### Documentación y scripts
 
@@ -362,3 +369,8 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 17 | Backup automático documentado (cron) | ✅ Resuelto sesión 3 |
 | 18 | Stress test 14 usuarios simultáneos | ⏳ Pendiente (requiere servidor real) |
 | 19 | OWASP Top 10 hardening | ✅ Implementado sesión 4 |
+| 20 | assignedTo multi-usuario (string→array + normalizeAssignedTo) | ✅ Implementado 2026-06-23 |
+| 21 | Fix migraciones idempotentes (schema_migrations tracking + IF NOT EXISTS) | ✅ Resuelto 2026-06-23 |
+| 22 | Fix backend crash SHOW_RESET_TOKEN en producción | ✅ Resuelto 2026-06-24 |
+| 23 | Fix frontend Docker: puerto 5173:80, CSP nginx una línea, logos como imports ES | ✅ Resuelto 2026-06-24 |
+| 24 | Build frontend desde Mac (--platform linux/amd64) por SIGSEGV esbuild en servidor | ✅ Documentado 2026-06-24 |

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { useNotifications } from '../context/NotificationContext'
 import TaskModal from './TaskModal'
+import logoBlanco from '../assets/logo-icono-blanco.png'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: 'dashboard', end: true },
@@ -100,7 +101,7 @@ export default function Sidebar({ open, onClose }) {
           {/* Logo wrapper same width as buttons so items align on the same axis */}
           <div className="w-10 h-10 flex items-center justify-center mb-3 flex-shrink-0">
             <img
-              src="/src/assets/logo-icono-blanco.png"
+              src={logoBlanco}
               alt="Logo"
               className="w-9 h-9 object-contain"
             />

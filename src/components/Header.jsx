@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTasks } from '../hooks/useTasks'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
-import { getInitials, getAvatarColor, ROLE_LABELS } from '../utils/helpers'
+import { getInitials, getAvatarColor, ROLE_LABELS, normalizeAssignedTo } from '../utils/helpers'
 import NotificationBell from './Notifications/NotificationBell'
 import GroupSelector from './Groups/GroupSelector'
 
@@ -26,7 +26,7 @@ export default function Header({ onMenuToggle }) {
   const avatarBg = user ? getAvatarColor(user.name) : 'bg-[#004ac6]'
   const visibleTaskCount = (isAdmin() || isLeader())
     ? tasks.length
-    : tasks.filter((t) => t.assignedTo === user?.id).length
+    : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id)).length
 
   return (
     <header className="fixed top-0 right-0 left-0 lg:left-[var(--sidebar-w,112px)] h-16 z-40 bg-white dark:bg-[#1e2030] border-b border-[#c3c6d7] dark:border-[#2e3148] shadow-sm flex items-center justify-between px-4 gap-3 transition-[left] duration-200">

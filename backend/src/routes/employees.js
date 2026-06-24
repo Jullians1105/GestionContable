@@ -99,6 +99,7 @@ router.put('/:id',
         if (existing.rows[0]) return res.status(409).json({ error: 'El email ya está registrado' });
       }
 
+      const permJson = permissions != null ? JSON.stringify(permissions) : null;
       let result;
       if (password) {
         const passwordHash = await bcrypt.hash(password, 10);
@@ -108,10 +109,10 @@ router.put('/:id',
             role = COALESCE($2, role),
             email = COALESCE($3, email),
             password_hash = $4,
-            permissions = COALESCE($5, permissions),
+            permissions = COALESCE($5::jsonb, permissions),
             updated_at = NOW()
            WHERE id = $6 RETURNING id, email, name, role, permissions, updated_at`,
-          [name, role, email, passwordHash, permissions ? JSON.stringify(permissions) : null, req.params.id]
+          [name, role, email, passwordHash, permJson, req.params.id]
         );
       } else {
         result = await db.query(
@@ -119,10 +120,10 @@ router.put('/:id',
             name = COALESCE($1, name),
             role = COALESCE($2, role),
             email = COALESCE($3, email),
-            permissions = COALESCE($4, permissions),
+            permissions = COALESCE($4::jsonb, permissions),
             updated_at = NOW()
            WHERE id = $5 RETURNING id, email, name, role, permissions, updated_at`,
-          [name, role, email, permissions ? JSON.stringify(permissions) : null, req.params.id]
+          [name, role, email, permJson, req.params.id]
         );
       }
 

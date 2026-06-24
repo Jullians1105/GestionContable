@@ -41,7 +41,6 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
     if (!scrollToCommentId) return
     const el = commentRefs.current[scrollToCommentId]
     if (el) {
-      // Scroll within the modal body only — stop before reaching any fixed container
       let scrollable = el.parentElement
       while (scrollable) {
         if (window.getComputedStyle(scrollable).position === 'fixed') { scrollable = null; break }
@@ -146,7 +145,7 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Escribe un comentario..."
-              className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+              className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3248] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
             />
             <button
               type="submit"

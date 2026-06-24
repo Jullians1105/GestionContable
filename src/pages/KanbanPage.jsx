@@ -13,6 +13,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useTasks } from '../hooks/useTasks'
 import { useGroups } from '../context/GroupContext'
 import { useTeam } from '../hooks/useTeam'
+import { normalizeAssignedTo } from '../utils/helpers'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from '../utils/helpers'
@@ -26,9 +27,10 @@ const COLUMNS = [
 const PRIORITY_COLORS = { high: '#EF4444', medium: '#FBBF24', low: '#10B981' }
 
 function KanbanCard({ task, members, isDragging }) {
-  const member = members.find((m) => m.id === task.assignedTo)
-  const overdue = isDueDateOverdue(task.dueDate)
-  const soon = isDueDateSoon(task.dueDate)
+  const assignedIds = normalizeAssignedTo(task.assignedTo)
+  const member = members.find((m) => m.id === assignedIds[0])
+  const overdue = isDueDateOverdue(task.dueDate, task.dueTime)
+  const soon = isDueDateSoon(task.dueDate, task.dueTime)
   const subtasks = task.subtasks || []
   const completed = subtasks.filter((s) => s.completed).length
 
@@ -57,7 +59,7 @@ function KanbanCard({ task, members, isDragging }) {
         {task.dueDate ? (
           <span className={`text-[10px] font-semibold flex items-center gap-0.5 ${overdue ? 'text-[#EF4444]' : soon ? 'text-[#FBBF24]' : 'text-[#888]'}`}>
             <span className="material-symbols-outlined text-xs">calendar_today</span>
-            {formatDate(task.dueDate)}
+            {formatDate(task.dueDate, task.dueTime)}
           </span>
         ) : <span />}
         {member && (

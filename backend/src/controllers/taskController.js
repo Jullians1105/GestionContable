@@ -87,16 +87,24 @@ const getTask = async (req, res, next) => {
   }
 };
 
+const normalizeAssignedTo = (val) => {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.filter(Boolean);
+  return [val];
+};
+
 const createTask = async (req, res, next) => {
   try {
-    const { title, description, priority = 'medium', assignedTo, dueDate, groupId, tagIds = [] } = req.body;
+    const { title, description, priority = 'medium', assignedTo: assignedToRaw, dueDate, groupId, tagIds = [] } = req.body;
+    const assignedToArr = normalizeAssignedTo(assignedToRaw);
+    const assignedTo = assignedToArr[0] ?? null;
     const id = uuidv4();
 
     const result = await db.query(
       `INSERT INTO tasks (id, user_id, group_id, title, description, status, priority, assigned_to, due_date)
        VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8)
        RETURNING *`,
-      [id, req.user.userId, groupId || null, title, description || null, priority, assignedTo || null, dueDate || null]
+      [id, req.user.userId, groupId || null, title, description || null, priority, assignedTo, dueDate || null]
     );
     const task = result.rows[0];
 
@@ -106,22 +114,26 @@ const createTask = async (req, res, next) => {
       ));
     }
 
-    await auditLog(req.user.userId, 'CREATE', 'tasks', id, { title, priority, assignedTo });
+    await auditLog(req.user.userId, 'CREATE', 'tasks', id, { title, priority, assignedTo: assignedToArr });
 
-    if (assignedTo && assignedTo !== req.user.userId) {
+    const notifTargets = assignedToArr.filter(uid => uid !== req.user.userId);
+    if (notifTargets.length > 0) {
       const actor = await db.query('SELECT name FROM users WHERE id = $1', [req.user.userId]);
       const actorName = actor.rows[0]?.name ?? 'Alguien';
       const extraData = JSON.stringify({ actorId: req.user.userId, actorName });
-      const notifId = uuidv4();
       const notifMsg = `${actorName} te asignó la tarea "${title}"`;
-      await db.query(
-        `INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'task_assigned', $3, $4, $5)`,
-        [notifId, assignedTo, notifMsg, id, extraData]
-      );
-      req.io?.to(`user:${assignedTo}`).emit('notification:received', {
-        id: notifId, type: 'task_assigned', message: notifMsg, taskId: id,
-        extra: { actorId: req.user.userId, actorName }, read: false, createdAt: new Date().toISOString(),
-      });
+      await Promise.all(notifTargets.map(uid => {
+        const notifId = uuidv4();
+        return db.query(
+          `INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'task_assigned', $3, $4, $5)`,
+          [notifId, uid, notifMsg, id, extraData]
+        ).then(() => {
+          req.io?.to(`user:${uid}`).emit('notification:received', {
+            id: notifId, type: 'task_assigned', message: notifMsg, taskId: id,
+            extra: { actorId: req.user.userId, actorName }, read: false, createdAt: new Date().toISOString(),
+          });
+        });
+      }));
     }
 
     const full = { ...normalizeTask(task), subtasks: [], comments: [], tagIds };
@@ -140,7 +152,9 @@ const updateTask = async (req, res, next) => {
     if (!current.rows[0]) return res.status(404).json({ error: 'Tarea no encontrada' });
 
     const old = current.rows[0];
-    const { title, description, status, priority, assignedTo, dueDate, groupId, tagIds } = req.body;
+    const { title, description, status, priority, assignedTo: assignedToRaw, dueDate, groupId, tagIds } = req.body;
+    const assignedToArr = assignedToRaw !== undefined ? normalizeAssignedTo(assignedToRaw) : null;
+    const assignedTo = assignedToArr !== null ? (assignedToArr[0] ?? null) : undefined;
 
     const result = await db.query(
       `UPDATE tasks SET
@@ -168,22 +182,26 @@ const updateTask = async (req, res, next) => {
     if (title && title !== old.title) changes.title = { from: old.title, to: title };
     if (status && status !== old.status) changes.status = { from: old.status, to: status };
     if (priority && priority !== old.priority) changes.priority = { from: old.priority, to: priority };
-    if (assignedTo !== undefined && assignedTo !== old.assigned_to) {
+    if (assignedToArr !== null && assignedTo !== old.assigned_to) {
       changes.assignedTo = { from: old.assigned_to, to: assignedTo };
-      if (assignedTo && assignedTo !== req.user.userId) {
+      const notifTargets = assignedToArr.filter(uid => uid !== req.user.userId);
+      if (notifTargets.length > 0) {
         const actor = await db.query('SELECT name FROM users WHERE id = $1', [req.user.userId]);
         const actorName = actor.rows[0]?.name ?? 'Alguien';
         const extraData = JSON.stringify({ actorId: req.user.userId, actorName });
-        const notifId = uuidv4();
         const notifMsg = `${actorName} te asignó la tarea "${task.title}"`;
-        await db.query(
-          `INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'task_assigned', $3, $4, $5)`,
-          [notifId, assignedTo, notifMsg, id, extraData]
-        );
-        req.io?.to(`user:${assignedTo}`).emit('notification:received', {
-          id: notifId, type: 'task_assigned', message: notifMsg, taskId: id,
-          extra: { actorId: req.user.userId, actorName }, read: false, createdAt: new Date().toISOString(),
-        });
+        await Promise.all(notifTargets.map(uid => {
+          const notifId = uuidv4();
+          return db.query(
+            `INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'task_assigned', $3, $4, $5)`,
+            [notifId, uid, notifMsg, id, extraData]
+          ).then(() => {
+            req.io?.to(`user:${uid}`).emit('notification:received', {
+              id: notifId, type: 'task_assigned', message: notifMsg, taskId: id,
+              extra: { actorId: req.user.userId, actorName }, read: false, createdAt: new Date().toISOString(),
+            });
+          });
+        }));
       }
     }
 
