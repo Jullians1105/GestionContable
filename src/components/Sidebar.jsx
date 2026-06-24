@@ -33,6 +33,7 @@ const MODULE_TITLES = {
 const FONDO_NAV = [
   { to: '/fondo-emprender',          label: 'Seguimiento mensual', icon: 'table_chart',    end: true },
   { to: '/fondo-emprender/empresas', label: 'Empresas',            icon: 'corporate_fare' },
+  { to: '/fondo-emprender/pagos',    label: 'Pagos',               icon: 'payments' },
 ]
 
 function setSidebarCssVar(pinned) {

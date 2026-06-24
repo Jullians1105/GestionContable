@@ -167,6 +167,11 @@ export const api = {
   updateFondoDetalle: (empresaId, macroId, data) =>
     request(`/fondo/detalle/${empresaId}/${macroId}`, { method: 'PUT', body: JSON.stringify(data) }),
 
+  // Fondo Emprender — Pagos
+  getFondoPagos:    (empresaId)         => request(`/fondo/pagos/${empresaId}`),
+  createFondoPago:  (empresaId, data)   => request(`/fondo/pagos/${empresaId}`, { method: 'POST', body: JSON.stringify(data) }),
+  updateFondoPago:  (empresaId, pagoId, data) => request(`/fondo/pagos/${empresaId}/${pagoId}`, { method: 'PUT', body: JSON.stringify(data) }),
+
   // Fondo Emprender — Empresas
   getFondoEmpresas: (categoria) => {
     const qs = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
