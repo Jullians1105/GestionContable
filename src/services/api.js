@@ -67,8 +67,11 @@ async function request(path, options = {}, retry = true) {
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     if (body.details) console.error('[API]', path, body.details);
-    throw new Error(body.error || `Error ${res.status}`);
+    const err = new Error(body.error || `Error ${res.status}`);
+    err.status = res.status;
+    throw err;
   }
+  if (res.status === 204) return null;
   return res.json();
 }
 
@@ -142,6 +145,45 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return request(`/audit${qs ? `?${qs}` : ''}`);
   },
+
+  // Fondo Emprender — Checklist mensual por empresa
+  getFondoChecklist: (empresaId, anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/${empresaId}?${qs}`);
+  },
+  updateFondoChecklistItem: (empresaId, procesoId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/${empresaId}/item/${procesoId}?${qs}`,
+      { method: 'PUT', body: JSON.stringify(data) });
+  },
+  updateFondoChecklistConfirmado: (empresaId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/${empresaId}/confirmado?${qs}`,
+      { method: 'PUT', body: JSON.stringify(data) });
+  },
+
+  // Fondo Emprender — Detalle macroprocesos
+  getFondoDetalle: (empresaId, anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/detalle/${empresaId}?${qs}`);
+  },
+  updateFondoDetalle: (empresaId, macroId, data) =>
+    request(`/fondo/detalle/${empresaId}/${macroId}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Fondo Emprender — Pagos
+  getFondoPagos:    (empresaId)         => request(`/fondo/pagos/${empresaId}`),
+  createFondoPago:  (empresaId, data)   => request(`/fondo/pagos/${empresaId}`, { method: 'POST', body: JSON.stringify(data) }),
+  updateFondoPago:  (empresaId, pagoId, data) => request(`/fondo/pagos/${empresaId}/${pagoId}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Fondo Emprender — Empresas
+  getFondoEmpresas: (categoria) => {
+    const qs = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
+    return request(`/fondo/empresas${qs}`);
+  },
+  getFondoEmpresa: (id) => request(`/fondo/empresas/${id}`),
+  createFondoEmpresa: (data) => request('/fondo/empresas', { method: 'POST', body: JSON.stringify(data) }),
+  updateFondoEmpresa: (id, data) => request(`/fondo/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteFondoEmpresa: (id) => request(`/fondo/empresas/${id}`, { method: 'DELETE' }),
 
   // Notifications
   getNotifications: () => request('/notifications'),

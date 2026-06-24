@@ -3,6 +3,7 @@ import {
   loadProcesses, saveProcesses, buildDefaultProcesses,
   loadMonthData, saveMonthData, buildDefaultCompanies, ensureCells,
 } from '../data/fondoEmprender'
+import { api } from '../services/api'
 
 // ─── page-level constants ─────────────────────────────────────────────────────
 
@@ -62,11 +63,23 @@ export default function FondoEmprenderPage() {
   // delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState(null) // { type, id, name }
 
+  // Mapa name→UUID real de la BD (para persistir confirmed a la API)
+  const [empresaUUIDs, setEmpresaUUIDs] = useState({}) // { [name]: uuid }
+
   // load/save guards
   const isFirstRender = useRef(true)
   const skipSave      = useRef(false)
 
   // ── effects ──────────────────────────────────────────────────────────────
+
+  // Cargar UUIDs reales de la BD para poder persistir confirmed a la API
+  useEffect(() => {
+    api.getFondoEmpresas().then(lista => {
+      const map = {}
+      lista.forEach(e => { map[e.name] = e.id })
+      setEmpresaUUIDs(map)
+    }).catch(() => {})
+  }, [])
 
   // Save processes whenever they change
   useEffect(() => { saveProcesses(processes) }, [processes])
@@ -158,14 +171,37 @@ export default function FondoEmprenderPage() {
     setEditingCompany(null)
   }
 
-  function toggleConfirmed(companyId) {
+  async function toggleConfirmed(companyId) {
+    const company = companies.find(c => c.id === companyId)
+    const newConfirmed = !company?.confirmed
+
+    // Actualizar estado local inmediatamente
     setCompanies(prev =>
       prev.map(c =>
         c.id === companyId
-          ? { ...c, confirmed: c.confirmed ? null : { date: new Date().toISOString().slice(0, 10) } }
+          ? { ...c, confirmed: newConfirmed ? { date: new Date().toISOString().slice(0, 10) } : null }
           : c
       )
     )
+
+    // Buscar el UUID real por nombre (las empresas localStorage usan IDs locales tipo "c14")
+    const realId = empresaUUIDs[company?.name]
+    if (!realId) return  // empresa no sincronizada con la BD, solo actualiza localStorage
+
+    // Persistir en la BD (mes es 1-indexado en la API, month es 0-indexado en JS)
+    try {
+      await api.updateFondoChecklistConfirmado(realId, year, month + 1, { confirmed: newConfirmed })
+    } catch (err) {
+      // Revertir si falla
+      setCompanies(prev =>
+        prev.map(c =>
+          c.id === companyId
+            ? { ...c, confirmed: company?.confirmed ?? null }
+            : c
+        )
+      )
+      console.error('Error al confirmar contabilidad:', err.message)
+    }
   }
 
   // ── tooltip helpers ──────────────────────────────────────────────────────

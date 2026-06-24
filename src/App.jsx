@@ -30,6 +30,7 @@ import UsersPage from './pages/UsersPage'
 import FondoEmprenderPage from './pages/FondoEmprenderPage'
 import FondoEmprenderEmpresasPage from './pages/FondoEmprenderEmpresasPage'
 import FondoEmprenderEmpresaDetallePage from './pages/FondoEmprenderEmpresaDetallePage'
+import FondoEmprenderPagosPage from './pages/FondoEmprenderPagosPage'
 
 function Layout() {
   const { isAuthenticated } = useAuth()
@@ -60,6 +61,7 @@ function Layout() {
             <Route path="/fondo-emprender" element={<FondoEmprenderPage />} />
             <Route path="/fondo-emprender/empresas" element={<FondoEmprenderEmpresasPage />} />
             <Route path="/fondo-emprender/empresas/:empresaId" element={<FondoEmprenderEmpresaDetallePage />} />
+            <Route path="/fondo-emprender/pagos" element={<FondoEmprenderPagosPage />} />
           </Routes>
         </div>
       </main>

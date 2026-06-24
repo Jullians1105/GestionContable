@@ -23,6 +23,7 @@ async function run() {
     if (withReset) {
       console.log('⚠️  Resetting database...');
       await client.query(`
+        DROP TABLE IF EXISTS schema_migrations CASCADE;
         DROP TABLE IF EXISTS password_reset_tokens, token_blacklist, refresh_tokens, audit_log, notifications,
           task_tag_assignment, task_tags, task_comments, task_subtasks,
           tasks, group_members, groups, users CASCADE;
@@ -31,45 +32,77 @@ async function run() {
       console.log('✓ Tables dropped');
     }
 
-    // Tabla de control — registra qué migraciones ya se aplicaron
+    // Ensure tracking table exists
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
-        filename   VARCHAR(255) PRIMARY KEY,
+        version    VARCHAR(255) PRIMARY KEY,
         applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
+      );
     `);
 
-    const migrations = fs.readdirSync(__dirname)
+    // Collect all candidate migration files (sorted)
+    const allMigrationFiles = fs.readdirSync(__dirname)
       .filter((f) => /^\d+.*\.sql$/.test(f))
-      .filter((f) => withSeed || f !== '002_seed_data.sql')
       .sort();
 
+    const migrations = allMigrationFiles
+      .filter((f) => withSeed || f !== '002_seed_data.sql');
+
+    // Backfill: if schema_migrations is empty and users table already exists,
+    // mark all current .sql files as applied without running them
+    const { rows: existingRows } = await client.query(
+      'SELECT COUNT(*) AS cnt FROM schema_migrations'
+    );
+    if (Number(existingRows[0].cnt) === 0) {
+      const { rows: usersCheck } = await client.query(`
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'users'
+      `);
+      if (usersCheck.length > 0) {
+        console.log('↷ Base existente detectada — registrando migraciones previas sin re-ejecutarlas...');
+        for (const file of allMigrationFiles) {
+          await client.query(
+            'INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING',
+            [file]
+          );
+          console.log(`  ✓ registrada: ${file}`);
+        }
+      }
+    }
+
+    // Run pending migrations
     for (const file of migrations) {
       const filePath = path.join(__dirname, file);
-      if (!fs.existsSync(filePath)) { console.log(`⚠️  ${file} not found, skipping`); continue; }
+      if (!fs.existsSync(filePath)) {
+        console.log(`⚠️  ${file} not found, skipping`);
+        continue;
+      }
 
-      // Seed file always re-runs when --seed is passed (idempotent via ON CONFLICT DO NOTHING)
-      const isSeedFile = file === '002_seed_data.sql';
-      if (!withReset && !(isSeedFile && withSeed)) {
-        const { rows } = await client.query(
-          'SELECT 1 FROM schema_migrations WHERE filename = $1', [file]
-        );
-        if (rows.length > 0) {
-          console.log(`⏭  ${file} already applied, skipping`);
-          continue;
-        }
+      const { rows: applied } = await client.query(
+        'SELECT 1 FROM schema_migrations WHERE version = $1',
+        [file]
+      );
+      if (applied.length > 0) {
+        console.log(`↷ ${file} ya aplicada, omitiendo`);
+        continue;
       }
 
       console.log(`Running migration: ${file}...`);
       const sql = fs.readFileSync(filePath, 'utf8');
-      await client.query(sql);
-      // Seed file is always re-run (ON CONFLICT DO NOTHING makes it idempotent) — don't track it
-      if (file !== '002_seed_data.sql') {
+
+      await client.query('BEGIN');
+      try {
+        await client.query(sql);
         await client.query(
-          'INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [file]
+          'INSERT INTO schema_migrations (version) VALUES ($1)',
+          [file]
         );
+        await client.query('COMMIT');
+        console.log(`✓ ${file} done`);
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
       }
-      console.log(`✓ ${file} done`);
     }
 
     console.log('\n✅ Migrations completed successfully');
