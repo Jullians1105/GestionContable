@@ -32,7 +32,8 @@ const getTasks = async (req, res, next) => {
         g.name AS group_name,
         (SELECT json_agg(s ORDER BY s.created_at) FROM task_subtasks s WHERE s.task_id = t.id) AS subtasks,
         (SELECT json_agg(c ORDER BY c.created_at) FROM task_comments c WHERE c.task_id = t.id) AS comments,
-        (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids
+        (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids,
+        (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link
       FROM tasks t
       LEFT JOIN users u ON u.id = t.assigned_to
       LEFT JOIN groups g ON g.id = t.group_id
@@ -65,7 +66,8 @@ const FULL_TASK_QUERY = `
     g.name AS group_name,
     (SELECT json_agg(s ORDER BY s.created_at) FROM task_subtasks s WHERE s.task_id = t.id) AS subtasks,
     (SELECT json_agg(c ORDER BY c.created_at) FROM task_comments c WHERE c.task_id = t.id) AS comments,
-    (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids
+    (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids,
+    (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link
   FROM tasks t
   LEFT JOIN users u ON u.id = t.assigned_to
   LEFT JOIN groups g ON g.id = t.group_id
@@ -362,6 +364,7 @@ function normalizeTask(t) {
       updatedAt: c.updated_at,
     })),
     tagIds: t.tag_ids || [],
+    hasFondoLink: t.has_fondo_link ?? false,
     createdAt: t.created_at,
     updatedAt: t.updated_at,
   };

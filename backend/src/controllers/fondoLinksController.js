@@ -80,6 +80,9 @@ const upsertLink = async (req, res, next) => {
       [result.rows[0].id]
     );
 
+    const io = req.app.get('io')
+    if (io) io.emit('task:updated', { id: taskId, hasFondoLink: true })
+
     res.json(normalizeLink(enriched.rows[0]));
   } catch (err) {
     next(err);
@@ -91,6 +94,10 @@ const deleteLink = async (req, res, next) => {
     const { id: taskId } = req.params;
     const result = await db.query('DELETE FROM task_fondo_links WHERE task_id = $1 RETURNING id', [taskId]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Sin vínculo' });
+
+    const io = req.app.get('io')
+    if (io) io.emit('task:updated', { id: taskId, hasFondoLink: false })
+
     res.status(204).end();
   } catch (err) {
     next(err);

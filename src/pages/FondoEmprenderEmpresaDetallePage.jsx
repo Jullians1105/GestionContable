@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
-import { getInitials, getAvatarColor } from '../utils/helpers'
+import { getInitials, getAvatarColor, PRIORITY_LABELS } from '../utils/helpers'
 
 const MONTHS = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -13,6 +13,14 @@ const MACRO_STATUS = {
   in_progress: { label: 'En progreso', icon: 'timelapse',              color: '#d97706', bg: '#fef9c3' },
   done:        { label: 'Completado',  icon: 'check_circle',           color: '#16a34a', bg: '#dcfce7' },
 }
+
+const TASK_STATUS = {
+  pending:    { icon: 'radio_button_unchecked', color: '#6b7280' },
+  in_progress:{ icon: 'timelapse',              color: '#d97706' },
+  completed:  { icon: 'check_circle',           color: '#16a34a' },
+}
+
+const PRIORITY_COLORS = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' }
 
 // Responsables fijos por macroproceso (id numérico → lista de { name, note? })
 const MACRO_RESPONSABLES = {
@@ -90,6 +98,26 @@ export default function FondoEmprenderEmpresaDetallePage() {
   }, [empresaId, anio, mes])
 
   useEffect(() => { fetchDetalle() }, [fetchDetalle])
+
+  const handleToggleTarea = useCallback(async (macroId, tareaId, currentStatus) => {
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
+    setMacros(prev => prev.map(m => m.id !== macroId ? m : {
+      ...m,
+      tareasVinculadas: m.tareasVinculadas.map(t =>
+        t.id === tareaId ? { ...t, status: newStatus } : t
+      ),
+    }))
+    try {
+      await api.updateTask(tareaId, { status: newStatus })
+    } catch {
+      setMacros(prev => prev.map(m => m.id !== macroId ? m : {
+        ...m,
+        tareasVinculadas: m.tareasVinculadas.map(t =>
+          t.id === tareaId ? { ...t, status: currentStatus } : t
+        ),
+      }))
+    }
+  }, [])
 
   const handleEditarMacro = useCallback(async (macroId, updates) => {
     if (macroId === 5) {
@@ -260,6 +288,70 @@ export default function FondoEmprenderEmpresaDetallePage() {
 
               {/* Responsables */}
               <ResponsableBadges macroId={proc.id} />
+
+              {/* Tareas vinculadas desde el Gestor de Tareas */}
+              {proc.tareasVinculadas?.length > 0 && (
+                <div>
+                  <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1.5">
+                    Tareas vinculadas
+                  </label>
+                  <div className="space-y-1">
+                    {proc.tareasVinculadas.map(tarea => {
+                      const ts = TASK_STATUS[tarea.status] ?? TASK_STATUS.pending
+                      return (
+                        <div
+                          key={tarea.id}
+                          className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-[#f8f9fc] dark:bg-[#252840]"
+                        >
+                          <button
+                            onClick={() => handleToggleTarea(proc.id, tarea.id, tarea.status)}
+                            className="flex-shrink-0 mt-0.5 hover:scale-110 transition-transform"
+                            title={tarea.status === 'completed' ? 'Marcar pendiente' : 'Marcar completada'}
+                          >
+                            <span
+                              className="material-symbols-outlined"
+                              style={{ fontSize: 13, color: ts.color }}
+                            >
+                              {ts.icon}
+                            </span>
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-semibold line-clamp-1 transition-colors ${
+                              tarea.status === 'completed'
+                                ? 'line-through text-[#9ca3af] dark:text-[#5a5f7a]'
+                                : 'text-[#434655] dark:text-[#c4c8e8]'
+                            }`}>
+                              {tarea.title}
+                            </p>
+                            {tarea.description && (
+                              <p className={`text-[10px] line-clamp-2 mt-0.5 ${
+                                tarea.status === 'completed' ? 'text-[#c3c6d7]' : 'text-[#8890b5]'
+                              }`}>
+                                {tarea.description}
+                              </p>
+                            )}
+                          </div>
+                          {tarea.priority && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5"
+                              style={{ background: PRIORITY_COLORS[tarea.priority] }}
+                              title={PRIORITY_LABELS[tarea.priority]}
+                            />
+                          )}
+                          {tarea.assignedToName && (
+                            <span
+                              title={tarea.assignedToName}
+                              className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0 ${getAvatarColor(tarea.assignedToName)}`}
+                            >
+                              {getInitials(tarea.assignedToName)}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Nota — saves on blur */}
               {!isContabilidad && (

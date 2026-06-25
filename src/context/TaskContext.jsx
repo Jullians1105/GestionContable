@@ -61,7 +61,7 @@ export function TaskProvider({ children }) {
     if (!socket) return
 
     const onTaskCreated = (task) => setTasks(prev => [task, ...prev.filter(t => t.id !== task.id)])
-    const onTaskUpdated = (task) => setTasks(prev => prev.map(t => t.id === task.id ? task : t))
+    const onTaskUpdated = (task) => setTasks(prev => prev.map(t => t.id === task.id ? { ...t, ...task } : t))
     const onTaskDeleted = ({ id }) => setTasks(prev => prev.filter(t => t.id !== id))
 
     socket.on('task:created', onTaskCreated)

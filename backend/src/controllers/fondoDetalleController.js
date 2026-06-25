@@ -12,12 +12,21 @@ const MP_CATALOG = [
 ];
 
 const normalizeDetalle = (row) => ({
-  id:            row.id,
-  nombre:        row.nombre,
-  estado:        row.estado ?? 'pending',
-  responsableId: row.responsable_id ?? null,
-  nota:          row.nota ?? null,
-  updatedAt:     row.updated_at ?? null,
+  id:               row.id,
+  nombre:           row.nombre,
+  estado:           row.estado ?? 'pending',
+  responsableId:    row.responsable_id ?? null,
+  nota:             row.nota ?? null,
+  updatedAt:        row.updated_at ?? null,
+  tareasVinculadas: (row.tareas_vinculadas || []).map(t => ({
+    id:             t.id,
+    title:          t.title,
+    description:    t.description || null,
+    status:         t.status,
+    priority:       t.priority,
+    assignedTo:     t.assignedTo,
+    assignedToName: t.assignedToName,
+  })),
 });
 
 const getDetalle = async (req, res, next) => {
@@ -28,7 +37,24 @@ const getDetalle = async (req, res, next) => {
 
     const [mpResult, mp5Result] = await Promise.all([
       db.query(
-        `SELECT mp.id, mp.nombre, d.estado, d.responsable_id, d.nota, d.updated_at
+        `SELECT mp.id, mp.nombre, d.estado, d.responsable_id, d.nota, d.updated_at,
+                (
+                  SELECT json_agg(json_build_object(
+                    'id',             t.id,
+                    'title',          t.title,
+                    'description',    t.description,
+                    'status',         t.status,
+                    'priority',       t.priority,
+                    'assignedTo',     t.assigned_to,
+                    'assignedToName', u.name
+                  ) ORDER BY t.created_at)
+                  FROM task_fondo_links fl
+                  JOIN tasks t ON t.id = fl.task_id
+                  LEFT JOIN users u ON u.id = t.assigned_to
+                  WHERE fl.empresa_id = $1
+                    AND fl.macro_id   = 'mp' || mp.id::text
+                    AND fl.link_type  = 'macroproceso'
+                ) AS tareas_vinculadas
          FROM (SELECT 1 AS id, 'Facturación'                  AS nombre UNION ALL
                SELECT 2,       'Nómina'                                 UNION ALL
                SELECT 3,       'Nómina electrónica'                     UNION ALL
@@ -57,14 +83,15 @@ const getDetalle = async (req, res, next) => {
 
     // mp5 (Contabilidad) es readonly — se deriva de fondo_checklist_meses.confirmed
     const mp5 = {
-      id:            5,
-      nombre:        'Contabilidad',
-      estado:        mp5Confirmed ? 'done' : 'pending',
-      confirmed:     mp5Confirmed,
-      responsableId: null,
-      nota:          null,
-      updatedAt:     null,
-      readonly:      true,
+      id:               5,
+      nombre:           'Contabilidad',
+      estado:           mp5Confirmed ? 'done' : 'pending',
+      confirmed:        mp5Confirmed,
+      responsableId:    null,
+      nota:             null,
+      updatedAt:        null,
+      readonly:         true,
+      tareasVinculadas: [],
     };
 
     // Insertar mp5 entre mp4 (index 3) y mp6 (index 4)

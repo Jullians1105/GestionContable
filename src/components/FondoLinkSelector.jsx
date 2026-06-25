@@ -78,9 +78,13 @@ export default function FondoLinkSelector({ taskId = null, readOnly = false, onD
     setError(null)
     const payload = buildPayload()
 
-    // Modo draft: no hay taskId todavía
+    // Modo draft: no hay taskId todavía — guardar nombres para mostrar el badge
     if (!taskId) {
-      setLink({ ...payload, _draft: true })
+      const empresaNombre = empresas.find(e => e.id === empresaId)?.name ?? empresaId
+      const macroNombre = linkType === 'macroproceso'
+        ? (MACROS.find(m => m.id === macroId)?.nombre ?? macroId)
+        : procesos.find(p => p.id === procesoId)?.name ?? procesoId
+      setLink({ ...payload, empresaNombre, macroNombre, _draft: true })
       setEditing(false)
       onDraftChange?.(payload)
       return
