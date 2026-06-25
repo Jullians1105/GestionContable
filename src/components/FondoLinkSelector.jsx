@@ -15,28 +15,27 @@ const MACROS = [
   { id: 'mp7', nombre: 'Producción y ventas' },
 ]
 
-export default function FondoLinkSelector({ taskId, readOnly = false }) {
+// taskId: presente → guarda en API; ausente → modo draft (llama onDraftChange con los datos)
+export default function FondoLinkSelector({ taskId = null, readOnly = false, onDraftChange = null }) {
   const today = new Date()
 
-  const [link, setLink]           = useState(null)
-  const [loadingLink, setLoadLink]= useState(true)
-  const [editing, setEditing]     = useState(false)
-  const [saving, setSaving]       = useState(false)
-  const [error, setError]         = useState(null)
+  const [link, setLink]            = useState(null)
+  const [loadingLink, setLoadLink] = useState(!!taskId)
+  const [editing, setEditing]      = useState(false)
+  const [saving, setSaving]        = useState(false)
+  const [error, setError]          = useState(null)
 
-  // Form state
-  const [linkType, setLinkType]   = useState('macroproceso')
-  const [empresaId, setEmpresaId] = useState('')
-  const [macroId, setMacroId]     = useState('mp1')
-  const [procesoId, setProcesoId] = useState('')
-  const [anio, setAnio]           = useState(today.getFullYear())
-  const [mes, setMes]             = useState(today.getMonth() + 1)
+  const [linkType, setLinkType]    = useState('macroproceso')
+  const [empresaId, setEmpresaId]  = useState('')
+  const [macroId, setMacroId]      = useState('mp1')
+  const [procesoId, setProcesoId]  = useState('')
+  const [anio, setAnio]            = useState(today.getFullYear())
+  const [mes, setMes]              = useState(today.getMonth() + 1)
 
-  // Catalogues
-  const [empresas, setEmpresas]   = useState([])
-  const [procesos, setProcesos]   = useState([])
+  const [empresas, setEmpresas]    = useState([])
+  const [procesos, setProcesos]    = useState([])
 
-  // Load current link
+  // Cargar link actual (solo si existe taskId)
   useEffect(() => {
     if (!taskId) return
     setLoadLink(true)
@@ -46,7 +45,7 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
       .finally(() => setLoadLink(false))
   }, [taskId])
 
-  // Load catalogues when opening form
+  // Cargar catálogos al abrir el form
   useEffect(() => {
     if (!editing) return
     Promise.all([api.getFondoEmpresas(), api.getFondoProcesos()])
@@ -68,18 +67,27 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
       .catch(() => setError('Error cargando catálogos'))
   }, [editing]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const buildPayload = () => {
+    const payload = { empresaId, linkType }
+    if (linkType === 'macroproceso') payload.macroId = macroId
+    else { payload.procesoId = procesoId; payload.anio = anio; payload.mes = mes }
+    return payload
+  }
+
   const handleSave = async () => {
     setError(null)
+    const payload = buildPayload()
+
+    // Modo draft: no hay taskId todavía
+    if (!taskId) {
+      setLink({ ...payload, _draft: true })
+      setEditing(false)
+      onDraftChange?.(payload)
+      return
+    }
+
     setSaving(true)
     try {
-      const payload = { empresaId, linkType }
-      if (linkType === 'macroproceso') {
-        payload.macroId = macroId
-      } else {
-        payload.procesoId = procesoId
-        payload.anio = anio
-        payload.mes = mes
-      }
       const saved = await api.setFondoLink(taskId, payload)
       setLink(saved)
       setEditing(false)
@@ -91,6 +99,12 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
   }
 
   const handleDelete = async () => {
+    if (!taskId) {
+      setLink(null)
+      setEditing(false)
+      onDraftChange?.(null)
+      return
+    }
     setSaving(true)
     try {
       await api.deleteFondoLink(taskId)
@@ -105,11 +119,12 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
 
   if (loadingLink) return null
 
-  // ── Compact link badge (read or edit trigger) ─────────────────────────────
+  // ── Badge con link activo ─────────────────────────────────────────────────
   if (link && !editing) {
+    const macroLabel = MACROS.find(m => m.id === link.macroId)?.nombre ?? link.macroNombre ?? link.macroId
     const desc = link.linkType === 'macroproceso'
-      ? `${link.empresaNombre} → ${link.macroNombre}`
-      : `${link.empresaNombre} → ${link.procesoNombre} (${MONTHS[link.mes - 1]} ${link.anio})`
+      ? `${link.empresaNombre ?? empresaId} → ${macroLabel}`
+      : `${link.empresaNombre ?? empresaId} → ${link.procesoNombre ?? procesoId} (${MONTHS[link.mes - 1]} ${link.anio})`
 
     return (
       <div className="flex items-center gap-2 flex-wrap">
@@ -140,7 +155,7 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
     )
   }
 
-  // ── No link — show "Vincular" button ─────────────────────────────────────
+  // ── Sin link — botón "Vincular" ───────────────────────────────────────────
   if (!link && !editing) {
     if (readOnly) return null
     return (
@@ -154,7 +169,7 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
     )
   }
 
-  // ── Edit form ─────────────────────────────────────────────────────────────
+  // ── Formulario de edición ─────────────────────────────────────────────────
   return (
     <div className="rounded-xl border border-[#c4b5fd] bg-[#faf5ff] dark:bg-[#1e1530] p-3 space-y-3">
       <div className="flex items-center justify-between">
@@ -170,11 +185,11 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
         </button>
       </div>
 
-      {/* Tipo */}
       <div className="flex gap-2">
         {[{ v: 'macroproceso', label: 'Macroproceso' }, { v: 'checklist', label: 'Checklist' }].map(opt => (
           <button
             key={opt.v}
+            type="button"
             onClick={() => setLinkType(opt.v)}
             className="flex-1 py-1.5 text-xs font-semibold rounded-lg border-2 transition"
             style={
@@ -188,7 +203,6 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
         ))}
       </div>
 
-      {/* Empresa */}
       <div>
         <label className="block text-[10px] font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1 uppercase tracking-wide">Empresa</label>
         <select
@@ -201,7 +215,6 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
         </select>
       </div>
 
-      {/* Macroproceso fields */}
       {linkType === 'macroproceso' && (
         <div>
           <label className="block text-[10px] font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1 uppercase tracking-wide">Macroproceso</label>
@@ -215,7 +228,6 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
         </div>
       )}
 
-      {/* Checklist fields */}
       {linkType === 'checklist' && (
         <>
           <div>
@@ -264,6 +276,7 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
 
       <div className="flex gap-2">
         <button
+          type="button"
           onClick={handleSave}
           disabled={saving || !empresaId || (linkType === 'macroproceso' && !macroId) || (linkType === 'checklist' && !procesoId)}
           className="flex-1 py-1.5 text-xs font-semibold rounded-lg text-white transition disabled:opacity-50"
@@ -273,6 +286,7 @@ export default function FondoLinkSelector({ taskId, readOnly = false }) {
         </button>
         {link && (
           <button
+            type="button"
             onClick={handleDelete}
             disabled={saving}
             className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition disabled:opacity-50"

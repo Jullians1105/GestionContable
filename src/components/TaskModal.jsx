@@ -4,6 +4,7 @@ import SubtaskList from './Subtasks/SubtaskList'
 import CommentSection from './Comments/CommentSection'
 import { useTasks } from '../hooks/useTasks'
 import { useToast } from '../context/ToastContext'
+import { api } from '../services/api'
 
 export default function TaskModal({ isOpen, task, onClose }) {
   const { addTask, updateTask, getTaskById } = useTasks()
@@ -20,15 +21,23 @@ export default function TaskModal({ isOpen, task, onClose }) {
 
   if (isOpen === false) return null
 
-  const handleSubmit = (formData) => {
+  const handleSubmit = async (formData, fondoLink) => {
     if (isEdit) {
       updateTask(task.id, formData)
       addToast('Tarea actualizada', 'success')
+      onClose()
     } else {
-      addTask(formData)
-      addToast('Tarea creada', 'success')
+      try {
+        const newTask = await addTask(formData)
+        if (fondoLink && newTask?.id) {
+          await api.setFondoLink(newTask.id, fondoLink).catch(() => {})
+        }
+        addToast('Tarea creada', 'success')
+        onClose()
+      } catch {
+        addToast('Error al crear la tarea', 'error')
+      }
     }
-    onClose()
   }
 
   const tabs = [
