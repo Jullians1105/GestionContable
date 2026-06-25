@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTasks } from '../hooks/useTasks'
 import { useTeam } from '../hooks/useTeam'
 import { useGroups } from '../context/GroupContext'
@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx'
 import { isBefore, isAfter, parseISO, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getInitials, getAvatarColor, normalizeAssignedTo } from '../utils/helpers'
+import { api } from '../services/api'
 
 const REPORT_TYPES = [
   { value: 'by_person', label: 'Tareas completadas por persona' },
@@ -33,6 +34,16 @@ export default function ReportsPage() {
   })
   const [generated, setGenerated] = useState(false)
   const [openMembers, setOpenMembers] = useState(new Set())
+  const [macroTareas, setMacroTareas] = useState([])
+
+  useEffect(() => {
+    if (!generated) return
+    api.getFondoMacroTareas()
+      .then(setMacroTareas)
+      .catch(() => setMacroTareas([]))
+  }, [generated])
+
+  const allTasks = useMemo(() => [...tasks, ...macroTareas], [tasks, macroTareas])
 
   const toggleMember = (id) => setOpenMembers((prev) => {
     const next = new Set(prev)
@@ -52,7 +63,7 @@ export default function ReportsPage() {
 
   const reportData = useMemo(() => {
     if (!generated) return null
-    const filtered = applyFilters(tasks)
+    const filtered = applyFilters(allTasks)
 
     if (filters.type === 'by_person') {
       return members.map((m) => {
@@ -83,16 +94,16 @@ export default function ReportsPage() {
       ]
     }
     return null
-  }, [generated, tasks, members, filters, applyFilters])
+  }, [generated, allTasks, members, filters, applyFilters])
 
   const totalCompleted = useMemo(() => {
     if (!generated) return 0
-    return applyFilters(tasks).filter((t) => t.status === 'completed').length
-  }, [generated, tasks, applyFilters])
+    return applyFilters(allTasks).filter((t) => t.status === 'completed').length
+  }, [generated, allTasks, applyFilters])
 
   const memberDetails = useMemo(() => {
     if (!generated) return null
-    const filtered = applyFilters(tasks)
+    const filtered = applyFilters(allTasks)
     return members
       .map((m) => {
         const all = filtered.filter((t) => normalizeAssignedTo(t.assignedTo).includes(m.id))
@@ -106,7 +117,7 @@ export default function ReportsPage() {
         }
       })
       .filter(Boolean)
-  }, [generated, tasks, members, applyFilters])
+  }, [generated, allTasks, members, applyFilters])
 
   const reportFileName = useMemo(() => {
     const slugify = (text) => text
@@ -318,6 +329,48 @@ export default function ReportsPage() {
       })
     }
 
+    if (filters.type === 'by_person' && memberDetails?.length) {
+      sectionTitle('Detalle de tareas por persona')
+
+      for (const m of memberDetails) {
+        ensureSpace(20)
+        doc.setFillColor(237, 238, 240)
+        doc.roundedRect(marginX, y - 6, pageWidth - marginX * 2, 10, 2, 2, 'F')
+        doc.setTextColor(...dark)
+        doc.setFontSize(10)
+        doc.setFont(undefined, 'bold')
+        doc.text(m.name, marginX + 4, y + 1)
+        doc.setFont(undefined, 'normal')
+        y += 12
+
+        const printTaskGroup = (taskList, label, color) => {
+          if (!taskList.length) return
+          ensureSpace(10)
+          doc.setFontSize(8)
+          doc.setTextColor(...color)
+          doc.setFont(undefined, 'bold')
+          doc.text(label.toUpperCase(), marginX + 6, y)
+          doc.setFont(undefined, 'normal')
+          y += 6
+          for (const t of taskList) {
+            ensureSpace(8)
+            doc.setFontSize(8.5)
+            doc.setTextColor(...muted)
+            const prefix = t.source === 'fondo' ? '[Fondo] ' : ''
+            const line = doc.splitTextToSize(`• ${prefix}${t.title}`, pageWidth - marginX * 2 - 14)
+            doc.text(line, marginX + 10, y)
+            y += line.length * 5.5
+          }
+          y += 2
+        }
+
+        printTaskGroup(m.completedTasks, 'Completadas', [16, 185, 129])
+        printTaskGroup(m.inProgressTasks, 'En Progreso', [0, 74, 198])
+        printTaskGroup(m.pendingTasks, 'Pendientes', [136, 136, 136])
+        y += 4
+      }
+    }
+
     if (!reportData?.length) {
       doc.setTextColor(...muted)
       doc.setFontSize(10)
@@ -516,6 +569,11 @@ export default function ReportsPage() {
                               {m.completedTasks.map((t) => (
                                 <div key={t.id} className="flex items-center gap-2 text-xs text-[#888] dark:text-[#6b7280] line-through">
                                   <span className="material-symbols-outlined text-[#10B981] text-xs shrink-0" style={{ textDecoration: 'none' }}>check</span>
+                                  <span style={{ textDecoration: 'none' }} className="no-underline">
+                                    {t.source === 'fondo' && (
+                                      <span className="inline-block text-[9px] font-bold px-1 py-0.5 rounded mr-1 align-middle" style={{ background: '#e0f2fe', color: '#0369a1', textDecoration: 'none' }}>Fondo</span>
+                                    )}
+                                  </span>
                                   {t.title}
                                 </div>
                               ))}
@@ -529,6 +587,9 @@ export default function ReportsPage() {
                               {m.inProgressTasks.map((t) => (
                                 <div key={t.id} className="flex items-center gap-2 text-xs text-[#191c1e] dark:text-[#e4e6f0]">
                                   <span className="material-symbols-outlined text-[#004ac6] text-xs shrink-0">arrow_right</span>
+                                  {t.source === 'fondo' && (
+                                    <span className="inline-block text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: '#e0f2fe', color: '#0369a1' }}>Fondo</span>
+                                  )}
                                   {t.title}
                                 </div>
                               ))}
@@ -542,6 +603,9 @@ export default function ReportsPage() {
                               {m.pendingTasks.map((t) => (
                                 <div key={t.id} className="flex items-center gap-2 text-xs text-[#434655] dark:text-[#c4c8e8]">
                                   <span className="material-symbols-outlined text-[#888] text-xs shrink-0">circle</span>
+                                  {t.source === 'fondo' && (
+                                    <span className="inline-block text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: '#e0f2fe', color: '#0369a1' }}>Fondo</span>
+                                  )}
                                   {t.title}
                                 </div>
                               ))}

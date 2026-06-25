@@ -16,7 +16,8 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
   const { tasks, updateTask, deleteTask } = useTasks()
   const { currentGroupId } = useGroups()
   const { addToast } = useToast()
-  const { hasPermission } = useAuth()
+  const { user, hasPermission, isLeader } = useAuth()
+  const canSeeAll = isLeader()
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS, ...initialFilters })
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
@@ -35,6 +36,7 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
   }, [openTaskId, openCommentId, tasks])
 
   const filtered = tasks.filter((t) => {
+    if (!canSeeAll && !normalizeAssignedTo(t.assignedTo).includes(user?.id)) return false
     if (currentGroupId && t.groupId !== currentGroupId) return false
     if (filters.search) {
       const q = filters.search.toLowerCase()
@@ -90,7 +92,9 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
         </button>
       </div>
 
-      <TaskFilters filters={filters} onChange={handleFilterChange} onClear={() => { setFilters(EMPTY_FILTERS); setPage(1) }} />
+      {canSeeAll && (
+        <TaskFilters filters={filters} onChange={handleFilterChange} onClear={() => { setFilters(EMPTY_FILTERS); setPage(1) }} />
+      )}
 
       {paginated.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">

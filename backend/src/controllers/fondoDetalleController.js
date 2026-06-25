@@ -124,4 +124,43 @@ const updateDetalle = async (req, res, next) => {
   }
 };
 
-module.exports = { getDetalle, updateDetalle };
+const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+const MP_NAMES = {
+  mp1: 'Facturación',
+  mp2: 'Nómina',
+  mp3: 'Nómina electrónica',
+  mp4: 'Documentos contador - Pagos',
+  mp6: 'Información tributaria',
+  mp7: 'Producción y ventas',
+};
+
+const getMacroTareas = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT d.id, d.empresa_id, e.nombre AS empresa_nombre,
+              d.macroproceso_id, d.anio, d.mes, d.estado, d.responsable_id
+       FROM fondo_detalle_macroprocesos d
+       JOIN fondo_empresas e ON e.id = d.empresa_id
+       ORDER BY d.anio DESC, d.mes DESC, e.nombre, d.macroproceso_id`
+    );
+
+    const tareas = result.rows.map(row => ({
+      id:            `fondo-${row.empresa_id}-${row.macroproceso_id}-${row.anio}-${row.mes}`,
+      title:         `${row.empresa_nombre} — ${MP_NAMES[row.macroproceso_id] ?? row.macroproceso_id} (${MONTHS_ES[row.mes - 1]} ${row.anio})`,
+      status:        row.estado === 'done' ? 'completed' : (row.estado ?? 'pending'),
+      assignedTo:    row.responsable_id ? [row.responsable_id] : [],
+      dueDate:       null,
+      groupId:       null,
+      tagIds:        [],
+      source:        'fondo',
+    }));
+
+    res.json(tareas);
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getDetalle, updateDetalle, getMacroTareas };
