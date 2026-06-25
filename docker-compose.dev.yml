@@ -1,0 +1,92 @@
+# Entorno de desarrollo local — hot-reload en todos los servicios
+# Arrancar:  docker compose --env-file ./backend/.env -f docker-compose.dev.yml up -d
+# Detener:   docker compose -f docker-compose.dev.yml down
+# Solo BD:   docker compose --env-file ./backend/.env -f docker-compose.dev.yml up -d postgres mailhog
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: taskflow_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-taskflow}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: taskflow_mailhog_dev
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  migrate:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - migrate_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: ./backend/.env
+    environment:
+      DB_HOST: postgres
+    command: ["sh", "-c", "[ -d node_modules/pg ] || npm install --quiet; node migrations/run.js --seed"]
+    restart: "no"
+
+  backend:
+    image: node:20-alpine
+    working_dir: /app
+    container_name: taskflow_backend_dev
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+      - backend_modules:/app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+    env_file: ./backend/.env
+    environment:
+      DB_HOST: postgres
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+    ports:
+      - "${PORT:-3000}:3000"
+    command: ["sh", "-c", "[ -d node_modules/express ] || npm install --quiet; npx nodemon src/index.js"]
+
+  frontend:
+    image: node:20-slim
+    working_dir: /app
+    container_name: taskflow_frontend_dev
+    restart: unless-stopped
+    volumes:
+      - .:/app
+      - frontend_modules:/app/node_modules
+    environment:
+      VITE_BACKEND_URL: http://backend:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    command: ["sh", "-c", "[ -d node_modules/vite ] || npm install --quiet; npm run dev"]
+
+volumes:
+  postgres_dev_data:
+  backend_modules:
+  migrate_modules:
+  frontend_modules:
