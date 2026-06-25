@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
 
 const MONTHS = [
@@ -15,9 +15,10 @@ const MACRO_STATUS = {
 
 export default function FondoEmprenderEmpresaDetallePage() {
   const { empresaId } = useParams()
+  const [searchParams] = useSearchParams()
   const today = new Date()
-  const mes   = today.getMonth() + 1   // API expects 1-12
-  const anio  = today.getFullYear()
+  const mes  = parseInt(searchParams.get('mes')  ?? today.getMonth() + 1, 10)
+  const anio = parseInt(searchParams.get('anio') ?? today.getFullYear(),   10)
 
   const [company, setCompany]           = useState(null)
   const [macroprocesos, setMacros]      = useState([])
@@ -54,7 +55,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
       return
     }
     try {
-      const actualizado = await api.updateFondoDetalle(empresaId, macroId, updates)
+      const actualizado = await api.updateFondoDetalle(empresaId, macroId, anio, mes, updates)
       setMacros(prev => prev.map(m => m.id === macroId ? { ...m, ...actualizado } : m))
       if ('nota' in updates) {
         setNotasDraft(prev => ({ ...prev, [macroId]: actualizado.nota ?? '' }))
@@ -106,7 +107,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
       {/* ── Breadcrumb ───────────────────────────────────────────────────── */}
       <div>
         <Link
-          to="/fondo-emprender/empresas"
+          to={`/fondo-emprender/empresas?anio=${anio}&mes=${mes}`}
           className="inline-flex items-center gap-1 text-sm text-[#6b7280] dark:text-[#8890b5] hover:text-[#004ac6] dark:hover:text-[#7ba8f0] transition"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span>

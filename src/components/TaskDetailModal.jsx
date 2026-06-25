@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext'
 import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo } from '../utils/helpers'
 import SubtaskList from './Subtasks/SubtaskList'
 import CommentSection from './Comments/CommentSection'
+import FondoLinkSelector from './FondoLinkSelector'
 
 const PRIORITY_COLORS = { high: '#EF4444', medium: '#FBBF24', low: '#10B981' }
 const STATUS_COLORS = { pending: '#888', in_progress: '#004ac6', completed: '#10B981' }
@@ -160,6 +161,12 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
               </p>
             </div>
           )}
+
+          {/* Vínculo Fondo Emprender */}
+          <div className="border-t border-[#edeef0] dark:border-[#2e3148] pt-4">
+            <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide mb-2">Fondo Emprender</p>
+            <FondoLinkSelector taskId={liveTask.id} readOnly={!canEdit} />
+          </div>
 
           {/* Subtareas */}
           <div className="border-t border-[#edeef0] dark:border-[#2e3148] pt-4">

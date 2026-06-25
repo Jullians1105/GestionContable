@@ -37,7 +37,7 @@ export const MACRO_PROCESSES = [
   { id: 'mp1', name: 'Facturación' },
   { id: 'mp2', name: 'Nómina' },
   { id: 'mp3', name: 'Nómina electrónica' },
-  { id: 'mp4', name: 'Documentos contador' },
+  { id: 'mp4', name: 'Documentos contador - Pagos' },
   { id: 'mp5', name: 'Contabilidad' },        // auto — read-only status
   { id: 'mp6', name: 'Información tributaria' },
   { id: 'mp7', name: 'Producción y ventas' },

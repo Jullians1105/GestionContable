@@ -19,10 +19,14 @@ const normalizeEmpresa = (row) => ({
 const getEmpresas = async (req, res, next) => {
   try {
     const { categoria } = req.query;
-    const params = [];
+    const now  = new Date();
+    const anio = req.query.anio ? parseInt(req.query.anio, 10) : now.getFullYear();
+    const mes  = req.query.mes  ? parseInt(req.query.mes,  10) : now.getMonth() + 1;
+
+    const params = [anio, mes];
     let where = '';
     if (categoria) {
-      where = 'WHERE e.categoria = $1';
+      where = 'WHERE e.categoria = $3';
       params.push(categoria);
     }
     const result = await db.query(
@@ -30,16 +34,18 @@ const getEmpresas = async (req, res, next) => {
               COALESCE((
                 SELECT COUNT(*)::int FROM fondo_detalle_macroprocesos d
                 WHERE d.empresa_id = e.id AND d.estado = 'done'
+                  AND d.anio = $1 AND d.mes = $2
               ), 0) AS macros_done,
               COALESCE((
                 SELECT COUNT(*)::int FROM fondo_detalle_macroprocesos d
                 WHERE d.empresa_id = e.id AND d.estado = 'in_progress'
+                  AND d.anio = $1 AND d.mes = $2
               ), 0) AS macros_in_progress,
               COALESCE((
                 SELECT m.confirmed FROM fondo_checklist_meses m
                 WHERE m.empresa_id = e.id
-                  AND m.anio = EXTRACT(YEAR  FROM CURRENT_DATE)::int
-                  AND m.mes  = EXTRACT(MONTH FROM CURRENT_DATE)::int
+                  AND m.anio = $1
+                  AND m.mes  = $2
                 LIMIT 1
               ), false) AS confirmed
        FROM fondo_empresas e

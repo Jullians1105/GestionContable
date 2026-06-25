@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import StatsCard from '../components/StatsCard'
 import { getMacroStats } from '../data/fondoEmprender'
 import { api } from '../services/api'
@@ -11,6 +11,11 @@ const SEM_COLOR = {
   red:    '#ef4444',
 }
 
+const MONTHS = [
+  'Enero','Febrero','Marzo','Abril','Mayo','Junio',
+  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
+]
+
 const CATEGORIAS = [
   { key: 'contable',   label: 'Contable' },
   { key: 'tributario', label: 'Tributario' },
@@ -19,6 +24,26 @@ const CATEGORIAS = [
 export default function FondoEmprenderEmpresasPage() {
   const navigate = useNavigate()
   const { socket } = useSocket()
+
+  const [searchParams] = useSearchParams()
+  const today = new Date()
+  const [month, setMonth] = useState(() => {
+    const m = parseInt(searchParams.get('mes') ?? '', 10)
+    return m >= 1 && m <= 12 ? m - 1 : today.getMonth()
+  })
+  const [year, setYear] = useState(() => {
+    const y = parseInt(searchParams.get('anio') ?? '', 10)
+    return y >= 2000 ? y : today.getFullYear()
+  })
+
+  function prevMonth() {
+    if (month === 0) { setMonth(11); setYear(y => y - 1) }
+    else setMonth(m => m - 1)
+  }
+  function nextMonth() {
+    if (month === 11) { setMonth(0); setYear(y => y + 1) }
+    else setMonth(m => m + 1)
+  }
 
   // ── server state ──────────────────────────────────────────────────────────
   const [empresas, setEmpresas] = useState([])
@@ -57,7 +82,7 @@ export default function FondoEmprenderEmpresasPage() {
     try {
       setLoading(true)
       setError(null)
-      const data = await api.getFondoEmpresas()
+      const data = await api.getFondoEmpresas(undefined, year, month + 1)
       setEmpresas(data)
     } catch (err) {
       if (err.status === 403) {
@@ -68,7 +93,7 @@ export default function FondoEmprenderEmpresasPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [month, year])
 
   useEffect(() => { fetchEmpresas() }, [fetchEmpresas])
 
@@ -205,14 +230,28 @@ export default function FondoEmprenderEmpresasPage() {
             Fondo Emprender · {empresas.length} empresas
           </p>
         </div>
-        <button
-          onClick={openForm}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-          style={{ background: '#004ac6' }}
-        >
-          <span className="material-symbols-outlined text-lg">domain_add</span>
-          Crear empresa
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Month navigator */}
+          <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2 shadow-sm">
+            <button onClick={prevMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280]">
+              <span className="material-symbols-outlined text-xl">chevron_left</span>
+            </button>
+            <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] px-2 min-w-[130px] text-center">
+              {MONTHS[month]} {year}
+            </span>
+            <button onClick={nextMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280]">
+              <span className="material-symbols-outlined text-xl">chevron_right</span>
+            </button>
+          </div>
+          <button
+            onClick={openForm}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
+            style={{ background: '#004ac6' }}
+          >
+            <span className="material-symbols-outlined text-lg">domain_add</span>
+            Crear empresa
+          </button>
+        </div>
       </div>
 
       {/* ── Add company form ──────────────────────────────────────────────── */}
@@ -410,7 +449,7 @@ export default function FondoEmprenderEmpresasPage() {
                   className={`flex items-center gap-4 px-4 py-3 hover:bg-[#f0f4ff] dark:hover:bg-[#252840] transition-colors group cursor-pointer${
                     idx > 0 ? ' border-t border-[#f0f2f8] dark:border-[#2e3148]' : ''
                   }`}
-                  onClick={() => navigate(`/fondo-emprender/empresas/${company.id}`)}
+                  onClick={() => navigate(`/fondo-emprender/empresas/${company.id}?anio=${year}&mes=${month + 1}`)}
                 >
                   {/* Status dot */}
                   <span

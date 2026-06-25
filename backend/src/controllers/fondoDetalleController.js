@@ -3,12 +3,12 @@ const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 
 const MP_CATALOG = [
-  { id: 1, nombre: 'Revisión documental' },
-  { id: 2, nombre: 'Análisis contable' },
-  { id: 3, nombre: 'Seguimiento tributario' },
-  { id: 4, nombre: 'Asesoría integral' },
-  { id: 6, nombre: 'Generación de reportes' },
-  { id: 7, nombre: 'Aprobación final' },
+  { id: 1, nombre: 'Facturación' },
+  { id: 2, nombre: 'Nómina' },
+  { id: 3, nombre: 'Nómina electrónica' },
+  { id: 4, nombre: 'Documentos contador - Pagos' },
+  { id: 6, nombre: 'Información tributaria' },
+  { id: 7, nombre: 'Producción y ventas' },
 ];
 
 const normalizeDetalle = (row) => ({
@@ -29,17 +29,19 @@ const getDetalle = async (req, res, next) => {
     const [mpResult, mp5Result] = await Promise.all([
       db.query(
         `SELECT mp.id, mp.nombre, d.estado, d.responsable_id, d.nota, d.updated_at
-         FROM (SELECT 1 AS id, 'Revisión documental'   AS nombre UNION ALL
-               SELECT 2,       'Análisis contable'              UNION ALL
-               SELECT 3,       'Seguimiento tributario'         UNION ALL
-               SELECT 4,       'Asesoría integral'              UNION ALL
-               SELECT 6,       'Generación de reportes'         UNION ALL
-               SELECT 7,       'Aprobación final') mp
+         FROM (SELECT 1 AS id, 'Facturación'                  AS nombre UNION ALL
+               SELECT 2,       'Nómina'                                 UNION ALL
+               SELECT 3,       'Nómina electrónica'                     UNION ALL
+               SELECT 4,       'Documentos contador - Pagos'            UNION ALL
+               SELECT 6,       'Información tributaria'                  UNION ALL
+               SELECT 7,       'Producción y ventas') mp
          LEFT JOIN fondo_detalle_macroprocesos d
                 ON d.empresa_id = $1
                AND d.macroproceso_id = 'mp' || mp.id::text
+               AND d.anio = $2
+               AND d.mes  = $3
          ORDER BY mp.id`,
-        [empresaId]
+        [empresaId, anio, mes]
       ),
       db.query(
         `SELECT confirmed FROM fondo_checklist_meses
@@ -83,18 +85,18 @@ const updateDetalle = async (req, res, next) => {
       return res.status(400).json({ error: 'mp5/Contabilidad no se edita directamente' });
     }
 
-    const { responsableId, nota, estado } = req.body;
+    const { responsableId, nota, estado, anio, mes } = req.body;
     const mpKey = `mp${macroNum}`;
 
     const result = await db.query(
-      `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, estado, responsable_id, nota)
-       VALUES ($1, $2, $3, COALESCE($4, 'pending'), $5, $6)
-       ON CONFLICT (empresa_id, macroproceso_id) DO UPDATE
+      `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, anio, mes, estado, responsable_id, nota)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'pending'), $7, $8)
+       ON CONFLICT (empresa_id, macroproceso_id, anio, mes) DO UPDATE
        SET estado         = COALESCE(EXCLUDED.estado,         fondo_detalle_macroprocesos.estado),
            responsable_id = COALESCE(EXCLUDED.responsable_id, fondo_detalle_macroprocesos.responsable_id),
            nota           = COALESCE(EXCLUDED.nota,           fondo_detalle_macroprocesos.nota)
        RETURNING *`,
-      [uuidv4(), empresaId, mpKey, estado ?? null, responsableId ?? null, nota ?? null]
+      [uuidv4(), empresaId, mpKey, anio, mes, estado ?? null, responsableId ?? null, nota ?? null]
     );
 
     await auditLog(req.user.userId, 'UPDATE', 'fondo_detalle_macroprocesos', result.rows[0].id, {
