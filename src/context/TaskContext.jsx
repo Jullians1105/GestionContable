@@ -181,9 +181,7 @@ export function TaskProvider({ children }) {
     if (!task) return null
     if (useRealBackend) {
       api.addSubtask(taskId, title)
-        .then(fullTask => {
-          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
-        })
+        .then(fullTask => setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t)))
         .catch(() => {})
       return null
     }
@@ -192,7 +190,7 @@ export function TaskProvider({ children }) {
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
     api.updateTask(taskId, updated).catch(() => {})
     return subtask
-  }, [useRealBackend, connected])
+  }, [useRealBackend])
 
   const toggleSubtask = useCallback((taskId, subtaskId) => {
     const task = tasksRef.current.find(t => t.id === taskId)
@@ -224,27 +222,23 @@ export function TaskProvider({ children }) {
   const deleteSubtask = useCallback((taskId, subtaskId) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return
+    const optimistic = { ...task, subtasks: (task.subtasks || []).filter(s => s.id !== subtaskId), updatedAt: today() }
+    setTasks(prev => prev.map(t => t.id === taskId ? optimistic : t))
     if (useRealBackend) {
       api.deleteSubtask(taskId, subtaskId)
-        .then(fullTask => {
-          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
-        })
-        .catch(() => {})
+        .then(fullTask => setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t)))
+        .catch(() => setTasks(prev => prev.map(t => t.id === taskId ? task : t)))
       return
     }
-    const updated = { ...task, subtasks: (task.subtasks || []).filter(s => s.id !== subtaskId), updatedAt: today() }
-    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
-    api.updateTask(taskId, updated).catch(() => {})
-  }, [useRealBackend, connected])
+    api.updateTask(taskId, optimistic).catch(() => {})
+  }, [useRealBackend])
 
   const addComment = useCallback((taskId, authorId, text) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return null
     if (useRealBackend) {
       api.addComment(taskId, text)
-        .then(fullTask => {
-          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
-        })
+        .then(fullTask => setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t)))
         .catch(() => {})
       return null
     }
@@ -265,16 +259,14 @@ export function TaskProvider({ children }) {
       .filter(id => id !== authorId)
       .forEach(id => push(id, 'comment_added', message, taskId, extra))
     return comment
-  }, [useRealBackend, connected, members, user])
+  }, [useRealBackend, members, user])
 
   const updateComment = useCallback((taskId, commentId, text) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return
     if (useRealBackend) {
       api.updateComment(taskId, commentId, text)
-        .then(fullTask => {
-          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
-        })
+        .then(fullTask => setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t)))
         .catch(() => {})
       return
     }
@@ -287,23 +279,21 @@ export function TaskProvider({ children }) {
     }
     setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
     api.updateTask(taskId, updated).catch(() => {})
-  }, [useRealBackend, connected])
+  }, [useRealBackend])
 
   const deleteComment = useCallback((taskId, commentId) => {
     const task = tasksRef.current.find(t => t.id === taskId)
     if (!task) return
+    const optimistic = { ...task, comments: (task.comments || []).filter(c => c.id !== commentId), updatedAt: today() }
+    setTasks(prev => prev.map(t => t.id === taskId ? optimistic : t))
     if (useRealBackend) {
       api.deleteComment(taskId, commentId)
-        .then(fullTask => {
-          if (!connected) setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t))
-        })
-        .catch(() => {})
+        .then(fullTask => setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t)))
+        .catch(() => setTasks(prev => prev.map(t => t.id === taskId ? task : t)))
       return
     }
-    const updated = { ...task, comments: (task.comments || []).filter(c => c.id !== commentId), updatedAt: today() }
-    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
-    api.updateTask(taskId, updated).catch(() => {})
-  }, [useRealBackend, connected])
+    api.updateTask(taskId, optimistic).catch(() => {})
+  }, [useRealBackend])
 
   return (
     <TaskContext.Provider value={{

@@ -163,4 +163,54 @@ const getMacroTareas = async (req, res, next) => {
   }
 };
 
-module.exports = { getDetalle, updateDetalle, getMacroTareas };
+const getResponsables = async (req, res, next) => {
+  try {
+    const anio = parseInt(req.query.anio, 10) || new Date().getFullYear();
+    const mes  = parseInt(req.query.mes,  10) || new Date().getMonth() + 1;
+
+    // Miembros del grupo Fondo Emprender + sus macros pendientes/en_progreso del mes
+    const result = await db.query(
+      `SELECT
+         u.id   AS user_id,
+         u.name AS user_name,
+         d.macroproceso_id,
+         d.estado,
+         e.id     AS empresa_id,
+         e.nombre AS empresa_nombre
+       FROM group_members gm
+       JOIN groups g ON g.id = gm.group_id AND g.name = 'Fondo Emprender'
+       JOIN users  u ON u.id = gm.user_id
+       LEFT JOIN fondo_detalle_macroprocesos d
+              ON d.responsable_id = u.id
+             AND d.anio  = $1
+             AND d.mes   = $2
+             AND d.estado <> 'done'
+       LEFT JOIN fondo_empresas e ON e.id = d.empresa_id
+       ORDER BY u.name, e.nombre, d.macroproceso_id`,
+      [anio, mes]
+    );
+
+    // Agrupar por usuario
+    const byUser = {};
+    for (const row of result.rows) {
+      if (!byUser[row.user_id]) {
+        byUser[row.user_id] = { userId: row.user_id, userName: row.user_name, tareas: [] };
+      }
+      if (row.macroproceso_id) {
+        byUser[row.user_id].tareas.push({
+          macroId:       row.macroproceso_id,
+          macroNombre:   MP_NAMES[row.macroproceso_id] ?? row.macroproceso_id,
+          estado:        row.estado,
+          empresaId:     row.empresa_id,
+          empresaNombre: row.empresa_nombre,
+        });
+      }
+    }
+
+    res.json({ anio, mes, responsables: Object.values(byUser) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getDetalle, updateDetalle, getMacroTareas, getResponsables };

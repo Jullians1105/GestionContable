@@ -195,6 +195,7 @@ export const api = {
   deleteFondoLink: (taskId) => request(`/tasks/${taskId}/fondo-link`, { method: 'DELETE' }),
 
   getFondoMacroTareas: () => request('/fondo/detalle/tareas-macro'),
+  getFondoResponsables: (anio, mes) => request(`/fondo/detalle/responsables?anio=${anio}&mes=${mes}`),
 
   // Fondo Emprender — Catálogo de procesos (checklist)
   getFondoProcesos: () => request('/fondo/procesos'),

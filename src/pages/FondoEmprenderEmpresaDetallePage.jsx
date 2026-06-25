@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
+import { getInitials, getAvatarColor } from '../utils/helpers'
 
 const MONTHS = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -11,6 +12,47 @@ const MACRO_STATUS = {
   pending:     { label: 'Pendiente',   icon: 'radio_button_unchecked', color: '#6b7280', bg: '#f3f4f6' },
   in_progress: { label: 'En progreso', icon: 'timelapse',              color: '#d97706', bg: '#fef9c3' },
   done:        { label: 'Completado',  icon: 'check_circle',           color: '#16a34a', bg: '#dcfce7' },
+}
+
+// Responsables fijos por macroproceso (id numérico → lista de { name, note? })
+const MACRO_RESPONSABLES = {
+  1: [{ name: 'Diego Quintero' }],
+  2: [{ name: 'Katerin Pineda' }],
+  3: [{ name: 'Diego Quintero' }, { name: 'Daniela Ruiz', note: 'temporal' }],
+  4: [{ name: 'Diego Quintero' }],
+  5: [{ name: 'Katerin Pineda' }, { name: 'Ruben Parada' }],
+  6: [{ name: 'Diana Gutierrez' }],
+  7: [{ name: 'Diana Gutierrez', note: 'Producción' }, { name: 'Mauricio Gutierrez', note: 'Ventas' }],
+}
+
+function ResponsableBadges({ macroId }) {
+  const lista = MACRO_RESPONSABLES[macroId] ?? []
+  if (!lista.length) return null
+  return (
+    <div>
+      <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1.5">
+        {lista.length > 1 ? 'Responsables' : 'Responsable'}
+      </label>
+      <div className="flex flex-wrap gap-1.5">
+        {lista.map(({ name, note }) => (
+          <span
+            key={name}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#f3f4f6] dark:bg-[#252840]"
+          >
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 ${getAvatarColor(name)}`}>
+              {getInitials(name)}
+            </span>
+            <span className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8]">
+              {name.split(' ')[0]}
+            </span>
+            {note && (
+              <span className="text-[9px] text-[#8890b5] italic">{note}</span>
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function FondoEmprenderEmpresaDetallePage() {
@@ -216,19 +258,8 @@ export default function FondoEmprenderEmpresaDetallePage() {
                 </div>
               )}
 
-              {/* Responsable — display only (API stores UUID; text entry requires user picker) */}
-              {!isContabilidad && (
-                <div>
-                  <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1">
-                    Responsable
-                  </label>
-                  <div className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#9ca3af] min-h-[30px]">
-                    {proc.responsableId
-                      ? `${proc.responsableId.slice(0, 8)}…`
-                      : 'Sin asignar'}
-                  </div>
-                </div>
-              )}
+              {/* Responsables */}
+              <ResponsableBadges macroId={proc.id} />
 
               {/* Nota — saves on blur */}
               {!isContabilidad && (
