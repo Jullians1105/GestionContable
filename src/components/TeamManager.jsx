@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext"
 import TeamForm from "./TeamForm"
 import { getInitials, getAvatarColor, ROLE_LABELS } from "../utils/helpers"
 import { useToast } from "../context/ToastContext"
+import { useSocket } from "../context/SocketContext"
 
 const ROLE_BADGE = {
   admin: "bg-[#ffdad6] text-[#93000a]",
@@ -84,6 +85,7 @@ export default function TeamManager() {
   const { getTasksByMember } = useTasks()
   const { useRealBackend } = useAuth()
   const { addToast } = useToast()
+  const { onlineUserIds } = useSocket()
   const [modalOpen, setModalOpen] = useState(false)
   const [editingMember, setEditingMember] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
@@ -143,13 +145,18 @@ export default function TeamManager() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {members.map((m) => {
             const taskCount = getTasksByMember(m.id).length
+            const isOnline = onlineUserIds.has(m.id)
             return (
               <div key={m.id} className="bg-white dark:bg-[#1e2030] p-4 rounded-xl shadow-sm border border-[#c3c6d7] dark:border-[#2e3148] hover:shadow-md transition-shadow flex flex-col items-center text-center">
                 <div className="relative mb-3">
                   <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold border-4 border-white dark:border-[#1e2030] shadow-sm ${getAvatarColor(m.name)}`}>
                     {getInitials(m.name)}
                   </div>
-                  <div className="absolute bottom-0 right-0 w-4 h-4 bg-[#10B981] border-2 border-white dark:border-[#1e2030] rounded-full" />
+                  <div
+                    className="absolute bottom-0 right-0 w-4 h-4 border-2 border-white dark:border-[#1e2030] rounded-full transition-colors"
+                    style={{ background: isOnline ? '#10B981' : '#9ca3af' }}
+                    title={isOnline ? 'En línea' : 'Desconectado'}
+                  />
                 </div>
                 <h3 className="text-[15px] font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">{m.name}</h3>
                 <p className="text-[12px] text-[#434655] dark:text-[#c4c8e8] mb-2 truncate w-full">{m.email}</p>
