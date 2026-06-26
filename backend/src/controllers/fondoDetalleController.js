@@ -166,7 +166,7 @@ const MP_NAMES = {
 const getMacroTareas = async (req, res, next) => {
   try {
     const result = await db.query(
-      `SELECT d.id, d.empresa_id, e.nombre AS empresa_nombre,
+      `SELECT d.id, d.empresa_id, e.name AS empresa_nombre,
               d.macroproceso_id, d.anio, d.mes, d.estado, d.responsable_id
        FROM fondo_detalle_macroprocesos d
        JOIN fondo_empresas e ON e.id = d.empresa_id
@@ -203,7 +203,7 @@ const getResponsables = async (req, res, next) => {
          d.macroproceso_id,
          d.estado,
          e.id     AS empresa_id,
-         e.nombre AS empresa_nombre
+         e.name AS empresa_nombre
        FROM group_members gm
        JOIN groups g ON g.id = gm.group_id AND g.name = 'Fondo Emprender'
        JOIN users  u ON u.id = gm.user_id
