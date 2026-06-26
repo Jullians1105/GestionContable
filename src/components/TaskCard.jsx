@@ -75,6 +75,12 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
         </div>
       )}
 
+      {task.createdByName && (
+        <p className="text-[10px] text-[#aaa] dark:text-[#5a5f7a] -mt-1">
+          por {task.createdByName.split(' ')[0]}
+        </p>
+      )}
+
       <div className="flex items-center justify-between pt-2 border-t border-[#edeef0] dark:border-[#252840]">
         {assignedMembers.length > 0 ? (
           <div className="flex items-center gap-1.5">

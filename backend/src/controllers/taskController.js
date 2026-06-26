@@ -29,6 +29,7 @@ const getTasks = async (req, res, next) => {
     const tasksQuery = `
       SELECT t.*,
         u.name AS assigned_to_name,
+        creator.name AS created_by_name,
         g.name AS group_name,
         (SELECT json_agg(s ORDER BY s.created_at) FROM task_subtasks s WHERE s.task_id = t.id) AS subtasks,
         (SELECT json_agg(c ORDER BY c.created_at) FROM task_comments c WHERE c.task_id = t.id) AS comments,
@@ -36,6 +37,7 @@ const getTasks = async (req, res, next) => {
         (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link
       FROM tasks t
       LEFT JOIN users u ON u.id = t.assigned_to
+      LEFT JOIN users creator ON creator.id = t.user_id
       LEFT JOIN groups g ON g.id = t.group_id
       ${where}
       ORDER BY t.created_at DESC
@@ -63,6 +65,7 @@ const getTasks = async (req, res, next) => {
 const FULL_TASK_QUERY = `
   SELECT t.*,
     u.name AS assigned_to_name,
+    creator.name AS created_by_name,
     g.name AS group_name,
     (SELECT json_agg(s ORDER BY s.created_at) FROM task_subtasks s WHERE s.task_id = t.id) AS subtasks,
     (SELECT json_agg(c ORDER BY c.created_at) FROM task_comments c WHERE c.task_id = t.id) AS comments,
@@ -70,6 +73,7 @@ const FULL_TASK_QUERY = `
     (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link
   FROM tasks t
   LEFT JOIN users u ON u.id = t.assigned_to
+  LEFT JOIN users creator ON creator.id = t.user_id
   LEFT JOIN groups g ON g.id = t.group_id
   WHERE t.id = $1
 `;
@@ -365,6 +369,7 @@ function normalizeTask(t) {
     })),
     tagIds: t.tag_ids || [],
     hasFondoLink: t.has_fondo_link ?? false,
+    createdByName: t.created_by_name || null,
     createdAt: t.created_at,
     updatedAt: t.updated_at,
   };
