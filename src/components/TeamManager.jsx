@@ -144,22 +144,22 @@ export default function TeamManager() {
           {members.map((m) => {
             const taskCount = getTasksByMember(m.id).length
             return (
-              <div key={m.id} className="bg-white dark:bg-[#1e2030] p-6 rounded-xl shadow-sm border border-[#c3c6d7] dark:border-[#2e3148] hover:shadow-md transition-shadow flex flex-col items-center text-center">
-                <div className="relative mb-4">
-                  <div className={`w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold border-4 border-white dark:border-[#1e2030] shadow-sm ${getAvatarColor(m.name)}`}>
+              <div key={m.id} className="bg-white dark:bg-[#1e2030] p-4 rounded-xl shadow-sm border border-[#c3c6d7] dark:border-[#2e3148] hover:shadow-md transition-shadow flex flex-col items-center text-center">
+                <div className="relative mb-3">
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold border-4 border-white dark:border-[#1e2030] shadow-sm ${getAvatarColor(m.name)}`}>
                     {getInitials(m.name)}
                   </div>
-                  <div className="absolute bottom-0 right-0 w-5 h-5 bg-[#10B981] border-2 border-white dark:border-[#1e2030] rounded-full" />
+                  <div className="absolute bottom-0 right-0 w-4 h-4 bg-[#10B981] border-2 border-white dark:border-[#1e2030] rounded-full" />
                 </div>
-                <h3 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">{m.name}</h3>
-                <p className="text-[14px] text-[#434655] dark:text-[#c4c8e8] mb-3">{m.email}</p>
-                <span className={`text-[11px] font-semibold px-3 py-1 rounded-full mb-4 ${ROLE_BADGE[m.role]}`}>
+                <h3 className="text-[15px] font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">{m.name}</h3>
+                <p className="text-[12px] text-[#434655] dark:text-[#c4c8e8] mb-2 truncate w-full">{m.email}</p>
+                <span className={`text-[11px] font-semibold px-3 py-0.5 rounded-full mb-3 ${ROLE_BADGE[m.role]}`}>
                   {ROLE_LABELS[m.role]}
                 </span>
-                <div className="w-full flex justify-around items-center border-t border-[#edeef0] dark:border-[#2e3148] pt-4 mb-4">
+                <div className="w-full flex justify-around items-center border-t border-[#edeef0] dark:border-[#2e3148] pt-3 mb-3">
                   <div className="text-center">
-                    <span className="block text-[18px] font-bold text-[#004ac6]">{taskCount}</span>
-                    <span className="text-[12px] text-[#434655] dark:text-[#c4c8e8]">Tareas</span>
+                    <span className="block text-[16px] font-bold text-[#004ac6]">{taskCount}</span>
+                    <span className="text-[11px] text-[#434655] dark:text-[#c4c8e8]">Tareas</span>
                   </div>
                 </div>
                 <div className="flex w-full gap-2">

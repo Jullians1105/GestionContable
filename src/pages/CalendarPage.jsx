@@ -54,8 +54,8 @@ export default function CalendarPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0] capitalize">{monthLabel}</h1>
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0] capitalize">{monthLabel}</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => { setCurrentDate(new Date()); setSelectedDay(new Date()) }}
@@ -72,8 +72,8 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      <div className="flex gap-6">
-        <div className="flex-1">
+      <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex-1 min-w-0">
           <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] overflow-hidden">
             <div className="grid grid-cols-7">
               {DAY_LABELS.map((d) => (
@@ -95,7 +95,7 @@ export default function CalendarPage() {
                   <button
                     key={key}
                     onClick={() => setSelectedDay(day)}
-                    className={`min-h-[80px] p-2 border-b border-r border-[#edeef0] dark:border-[#252840] text-left transition hover:bg-[#f8f9ff] dark:hover:bg-[#252840] ${!isCurrentMonth ? 'opacity-30' : ''} ${isSelected ? 'bg-blue-50 dark:bg-[#1a2040]' : ''}`}
+                    className={`min-h-[52px] sm:min-h-[80px] p-1 sm:p-2 border-b border-r border-[#edeef0] dark:border-[#252840] text-left transition hover:bg-[#f8f9ff] dark:hover:bg-[#252840] ${!isCurrentMonth ? 'opacity-30' : ''} ${isSelected ? 'bg-blue-50 dark:bg-[#1a2040]' : ''}`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className={`text-sm font-semibold rounded-full w-7 h-7 flex items-center justify-center ${isTodayDay ? 'text-white' : 'text-[#191c1e] dark:text-[#e4e6f0]'}`} style={isTodayDay ? { background: '#004ac6' } : {}}>
@@ -124,7 +124,7 @@ export default function CalendarPage() {
           </div>
         </div>
 
-        <div className="w-72 flex-shrink-0">
+        <div className="w-full lg:w-72 lg:flex-shrink-0">
           <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-4">
             {selectedDay ? (
               <>

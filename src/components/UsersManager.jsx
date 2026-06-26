@@ -213,8 +213,8 @@ export default function UsersManager() {
         />
       </div>
 
-      <div className="rounded-xl border border-[#c3c6d7] dark:border-[#2e3148] overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="rounded-xl border border-[#c3c6d7] dark:border-[#2e3148] overflow-hidden overflow-x-auto">
+        <table className="w-full min-w-[480px] text-sm">
           <thead className="bg-[#edeef0] dark:bg-[#252840]">
             <tr>
               {[
@@ -348,7 +348,7 @@ export default function UsersManager() {
                             title="Permisos"
                           >
                             <span className="material-symbols-outlined text-sm">shield</span>
-                            Permisos
+                            <span className="hidden sm:inline">Permisos</span>
                           </button>
                         )}
                         <button

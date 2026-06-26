@@ -85,7 +85,7 @@ function SortableKanbanCard({ task, members }) {
 function KanbanColumn({ column, tasks, members }) {
   const { setNodeRef } = useDroppable({ id: column.id })
   return (
-    <div ref={setNodeRef} className={`flex flex-col rounded-2xl border ${column.bg} ${column.border} min-h-[400px] flex-1`}>
+    <div ref={setNodeRef} className={`flex flex-col rounded-2xl border ${column.bg} ${column.border} min-h-[400px] w-full`}>
       <div className="flex items-center gap-2 px-4 py-3 border-b border-inherit">
         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: column.dot }} />
         <span className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0]">{column.label}</span>
@@ -167,9 +167,11 @@ export default function KanbanPage() {
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 items-start">
+        <div className="flex gap-4 items-start overflow-x-auto pb-2 -mx-1 px-1">
           {COLUMNS.map((col) => (
-            <KanbanColumn key={col.id} column={col} tasks={byStatus[col.id]} members={members} />
+            <div key={col.id} className="min-w-[280px] flex-1">
+              <KanbanColumn column={col} tasks={byStatus[col.id]} members={members} />
+            </div>
           ))}
         </div>
         <DragOverlay>
