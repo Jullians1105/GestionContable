@@ -170,7 +170,7 @@ const getMacroTareas = async (req, res, next) => {
               d.macroproceso_id, d.anio, d.mes, d.estado, d.responsable_id
        FROM fondo_detalle_macroprocesos d
        JOIN fondo_empresas e ON e.id = d.empresa_id
-       ORDER BY d.anio DESC, d.mes DESC, e.nombre, d.macroproceso_id`
+       ORDER BY d.anio DESC, d.mes DESC, e.name, d.macroproceso_id`
     );
 
     const tareas = result.rows.map(row => ({
@@ -213,7 +213,7 @@ const getResponsables = async (req, res, next) => {
              AND d.mes   = $2
              AND d.estado <> 'done'
        LEFT JOIN fondo_empresas e ON e.id = d.empresa_id
-       ORDER BY u.name, e.nombre, d.macroproceso_id`,
+       ORDER BY u.name, e.name, d.macroproceso_id`,
       [anio, mes]
     );
 
