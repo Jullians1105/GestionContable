@@ -3,21 +3,30 @@ const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 
 const MP_CATALOG = [
-  { id: 1, nombre: 'Revisión documental' },
-  { id: 2, nombre: 'Análisis contable' },
-  { id: 3, nombre: 'Seguimiento tributario' },
-  { id: 4, nombre: 'Asesoría integral' },
-  { id: 6, nombre: 'Generación de reportes' },
-  { id: 7, nombre: 'Aprobación final' },
+  { id: 1, nombre: 'Facturación' },
+  { id: 2, nombre: 'Nómina' },
+  { id: 3, nombre: 'Nómina electrónica' },
+  { id: 4, nombre: 'Documentos contador - Pagos' },
+  { id: 6, nombre: 'Información tributaria' },
+  { id: 7, nombre: 'Producción y ventas' },
 ];
 
 const normalizeDetalle = (row) => ({
-  id:            row.id,
-  nombre:        row.nombre,
-  estado:        row.estado ?? 'pending',
-  responsableId: row.responsable_id ?? null,
-  nota:          row.nota ?? null,
-  updatedAt:     row.updated_at ?? null,
+  id:               row.id,
+  nombre:           row.nombre,
+  estado:           row.estado ?? 'pending',
+  responsableId:    row.responsable_id ?? null,
+  nota:             row.nota ?? null,
+  updatedAt:        row.updated_at ?? null,
+  tareasVinculadas: (row.tareas_vinculadas || []).map(t => ({
+    id:             t.id,
+    title:          t.title,
+    description:    t.description || null,
+    status:         t.status,
+    priority:       t.priority,
+    assignedTo:     t.assignedTo,
+    assignedToName: t.assignedToName,
+  })),
 });
 
 const getDetalle = async (req, res, next) => {
@@ -28,18 +37,37 @@ const getDetalle = async (req, res, next) => {
 
     const [mpResult, mp5Result] = await Promise.all([
       db.query(
-        `SELECT mp.id, mp.nombre, d.estado, d.responsable_id, d.nota, d.updated_at
-         FROM (SELECT 1 AS id, 'Revisión documental'   AS nombre UNION ALL
-               SELECT 2,       'Análisis contable'              UNION ALL
-               SELECT 3,       'Seguimiento tributario'         UNION ALL
-               SELECT 4,       'Asesoría integral'              UNION ALL
-               SELECT 6,       'Generación de reportes'         UNION ALL
-               SELECT 7,       'Aprobación final') mp
+        `SELECT mp.id, mp.nombre, d.estado, d.responsable_id, d.nota, d.updated_at,
+                (
+                  SELECT json_agg(json_build_object(
+                    'id',             t.id,
+                    'title',          t.title,
+                    'description',    t.description,
+                    'status',         t.status,
+                    'priority',       t.priority,
+                    'assignedTo',     t.assigned_to,
+                    'assignedToName', u.name
+                  ) ORDER BY t.created_at)
+                  FROM task_fondo_links fl
+                  JOIN tasks t ON t.id = fl.task_id
+                  LEFT JOIN users u ON u.id = t.assigned_to
+                  WHERE fl.empresa_id = $1
+                    AND fl.macro_id   = 'mp' || mp.id::text
+                    AND fl.link_type  = 'macroproceso'
+                ) AS tareas_vinculadas
+         FROM (SELECT 1 AS id, 'Facturación'                  AS nombre UNION ALL
+               SELECT 2,       'Nómina'                                 UNION ALL
+               SELECT 3,       'Nómina electrónica'                     UNION ALL
+               SELECT 4,       'Documentos contador - Pagos'            UNION ALL
+               SELECT 6,       'Información tributaria'                  UNION ALL
+               SELECT 7,       'Producción y ventas') mp
          LEFT JOIN fondo_detalle_macroprocesos d
                 ON d.empresa_id = $1
                AND d.macroproceso_id = 'mp' || mp.id::text
+               AND d.anio = $2
+               AND d.mes  = $3
          ORDER BY mp.id`,
-        [empresaId]
+        [empresaId, anio, mes]
       ),
       db.query(
         `SELECT confirmed FROM fondo_checklist_meses
@@ -55,14 +83,15 @@ const getDetalle = async (req, res, next) => {
 
     // mp5 (Contabilidad) es readonly — se deriva de fondo_checklist_meses.confirmed
     const mp5 = {
-      id:            5,
-      nombre:        'Contabilidad',
-      estado:        mp5Confirmed ? 'done' : 'pending',
-      confirmed:     mp5Confirmed,
-      responsableId: null,
-      nota:          null,
-      updatedAt:     null,
-      readonly:      true,
+      id:               5,
+      nombre:           'Contabilidad',
+      estado:           mp5Confirmed ? 'done' : 'pending',
+      confirmed:        mp5Confirmed,
+      responsableId:    null,
+      nota:             null,
+      updatedAt:        null,
+      readonly:         true,
+      tareasVinculadas: [],
     };
 
     // Insertar mp5 entre mp4 (index 3) y mp6 (index 4)
@@ -83,18 +112,18 @@ const updateDetalle = async (req, res, next) => {
       return res.status(400).json({ error: 'mp5/Contabilidad no se edita directamente' });
     }
 
-    const { responsableId, nota, estado } = req.body;
+    const { responsableId, nota, estado, anio, mes } = req.body;
     const mpKey = `mp${macroNum}`;
 
     const result = await db.query(
-      `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, estado, responsable_id, nota)
-       VALUES ($1, $2, $3, COALESCE($4, 'pending'), $5, $6)
-       ON CONFLICT (empresa_id, macroproceso_id) DO UPDATE
+      `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, anio, mes, estado, responsable_id, nota)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'pending'), $7, $8)
+       ON CONFLICT (empresa_id, macroproceso_id, anio, mes) DO UPDATE
        SET estado         = COALESCE(EXCLUDED.estado,         fondo_detalle_macroprocesos.estado),
            responsable_id = COALESCE(EXCLUDED.responsable_id, fondo_detalle_macroprocesos.responsable_id),
            nota           = COALESCE(EXCLUDED.nota,           fondo_detalle_macroprocesos.nota)
        RETURNING *`,
-      [uuidv4(), empresaId, mpKey, estado ?? null, responsableId ?? null, nota ?? null]
+      [uuidv4(), empresaId, mpKey, anio, mes, estado ?? null, responsableId ?? null, nota ?? null]
     );
 
     await auditLog(req.user.userId, 'UPDATE', 'fondo_detalle_macroprocesos', result.rows[0].id, {
@@ -122,4 +151,93 @@ const updateDetalle = async (req, res, next) => {
   }
 };
 
-module.exports = { getDetalle, updateDetalle };
+const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+const MP_NAMES = {
+  mp1: 'Facturación',
+  mp2: 'Nómina',
+  mp3: 'Nómina electrónica',
+  mp4: 'Documentos contador - Pagos',
+  mp6: 'Información tributaria',
+  mp7: 'Producción y ventas',
+};
+
+const getMacroTareas = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `SELECT d.id, d.empresa_id, e.nombre AS empresa_nombre,
+              d.macroproceso_id, d.anio, d.mes, d.estado, d.responsable_id
+       FROM fondo_detalle_macroprocesos d
+       JOIN fondo_empresas e ON e.id = d.empresa_id
+       ORDER BY d.anio DESC, d.mes DESC, e.nombre, d.macroproceso_id`
+    );
+
+    const tareas = result.rows.map(row => ({
+      id:            `fondo-${row.empresa_id}-${row.macroproceso_id}-${row.anio}-${row.mes}`,
+      title:         `${row.empresa_nombre} — ${MP_NAMES[row.macroproceso_id] ?? row.macroproceso_id} (${MONTHS_ES[row.mes - 1]} ${row.anio})`,
+      status:        row.estado === 'done' ? 'completed' : (row.estado ?? 'pending'),
+      assignedTo:    row.responsable_id ? [row.responsable_id] : [],
+      dueDate:       null,
+      groupId:       null,
+      tagIds:        [],
+      source:        'fondo',
+    }));
+
+    res.json(tareas);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getResponsables = async (req, res, next) => {
+  try {
+    const anio = parseInt(req.query.anio, 10) || new Date().getFullYear();
+    const mes  = parseInt(req.query.mes,  10) || new Date().getMonth() + 1;
+
+    // Miembros del grupo Fondo Emprender + sus macros pendientes/en_progreso del mes
+    const result = await db.query(
+      `SELECT
+         u.id   AS user_id,
+         u.name AS user_name,
+         d.macroproceso_id,
+         d.estado,
+         e.id     AS empresa_id,
+         e.nombre AS empresa_nombre
+       FROM group_members gm
+       JOIN groups g ON g.id = gm.group_id AND g.name = 'Fondo Emprender'
+       JOIN users  u ON u.id = gm.user_id
+       LEFT JOIN fondo_detalle_macroprocesos d
+              ON d.responsable_id = u.id
+             AND d.anio  = $1
+             AND d.mes   = $2
+             AND d.estado <> 'done'
+       LEFT JOIN fondo_empresas e ON e.id = d.empresa_id
+       ORDER BY u.name, e.nombre, d.macroproceso_id`,
+      [anio, mes]
+    );
+
+    // Agrupar por usuario
+    const byUser = {};
+    for (const row of result.rows) {
+      if (!byUser[row.user_id]) {
+        byUser[row.user_id] = { userId: row.user_id, userName: row.user_name, tareas: [] };
+      }
+      if (row.macroproceso_id) {
+        byUser[row.user_id].tareas.push({
+          macroId:       row.macroproceso_id,
+          macroNombre:   MP_NAMES[row.macroproceso_id] ?? row.macroproceso_id,
+          estado:        row.estado,
+          empresaId:     row.empresa_id,
+          empresaNombre: row.empresa_nombre,
+        });
+      }
+    }
+
+    res.json({ anio, mes, responsables: Object.values(byUser) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getDetalle, updateDetalle, getMacroTareas, getResponsables };

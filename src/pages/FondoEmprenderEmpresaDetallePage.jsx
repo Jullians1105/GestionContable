@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
+import { getInitials, getAvatarColor, PRIORITY_LABELS } from '../utils/helpers'
 
 const MONTHS = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -13,11 +14,61 @@ const MACRO_STATUS = {
   done:        { label: 'Completado',  icon: 'check_circle',           color: '#16a34a', bg: '#dcfce7' },
 }
 
+const TASK_STATUS = {
+  pending:    { icon: 'radio_button_unchecked', color: '#6b7280' },
+  in_progress:{ icon: 'timelapse',              color: '#d97706' },
+  completed:  { icon: 'check_circle',           color: '#16a34a' },
+}
+
+const PRIORITY_COLORS = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' }
+
+// Responsables fijos por macroproceso (id numérico → lista de { name, note? })
+const MACRO_RESPONSABLES = {
+  1: [{ name: 'Diego Quintero' }],
+  2: [{ name: 'Katerin Pineda' }],
+  3: [{ name: 'Diego Quintero' }, { name: 'Daniela Ruiz', note: 'temporal' }],
+  4: [{ name: 'Diego Quintero' }],
+  5: [{ name: 'Katerin Pineda' }, { name: 'Ruben Parada' }],
+  6: [{ name: 'Diana Gutierrez' }],
+  7: [{ name: 'Diana Gutierrez', note: 'Producción' }, { name: 'Mauricio Gutierrez', note: 'Ventas' }],
+}
+
+function ResponsableBadges({ macroId }) {
+  const lista = MACRO_RESPONSABLES[macroId] ?? []
+  if (!lista.length) return null
+  return (
+    <div>
+      <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1.5">
+        {lista.length > 1 ? 'Responsables' : 'Responsable'}
+      </label>
+      <div className="flex flex-wrap gap-1.5">
+        {lista.map(({ name, note }) => (
+          <span
+            key={name}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#f3f4f6] dark:bg-[#252840]"
+          >
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 ${getAvatarColor(name)}`}>
+              {getInitials(name)}
+            </span>
+            <span className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8]">
+              {name.split(' ')[0]}
+            </span>
+            {note && (
+              <span className="text-[9px] text-[#8890b5] italic">{note}</span>
+            )}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function FondoEmprenderEmpresaDetallePage() {
   const { empresaId } = useParams()
+  const [searchParams] = useSearchParams()
   const today = new Date()
-  const mes   = today.getMonth() + 1   // API expects 1-12
-  const anio  = today.getFullYear()
+  const mes  = parseInt(searchParams.get('mes')  ?? today.getMonth() + 1, 10)
+  const anio = parseInt(searchParams.get('anio') ?? today.getFullYear(),   10)
 
   const [company, setCompany]           = useState(null)
   const [macroprocesos, setMacros]      = useState([])
@@ -48,13 +99,33 @@ export default function FondoEmprenderEmpresaDetallePage() {
 
   useEffect(() => { fetchDetalle() }, [fetchDetalle])
 
+  const handleToggleTarea = useCallback(async (macroId, tareaId, currentStatus) => {
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
+    setMacros(prev => prev.map(m => m.id !== macroId ? m : {
+      ...m,
+      tareasVinculadas: m.tareasVinculadas.map(t =>
+        t.id === tareaId ? { ...t, status: newStatus } : t
+      ),
+    }))
+    try {
+      await api.updateTask(tareaId, { status: newStatus })
+    } catch {
+      setMacros(prev => prev.map(m => m.id !== macroId ? m : {
+        ...m,
+        tareasVinculadas: m.tareasVinculadas.map(t =>
+          t.id === tareaId ? { ...t, status: currentStatus } : t
+        ),
+      }))
+    }
+  }, [])
+
   const handleEditarMacro = useCallback(async (macroId, updates) => {
     if (macroId === 5) {
       alert('mp5/Contabilidad no se puede editar directamente')
       return
     }
     try {
-      const actualizado = await api.updateFondoDetalle(empresaId, macroId, updates)
+      const actualizado = await api.updateFondoDetalle(empresaId, macroId, anio, mes, updates)
       setMacros(prev => prev.map(m => m.id === macroId ? { ...m, ...actualizado } : m))
       if ('nota' in updates) {
         setNotasDraft(prev => ({ ...prev, [macroId]: actualizado.nota ?? '' }))
@@ -66,7 +137,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
         alert('Error: ' + err.message)
       }
     }
-  }, [empresaId])
+  }, [empresaId, anio, mes])
 
   // Progress summary
   const mp5        = macroprocesos.find(m => m.id === 5)
@@ -106,7 +177,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
       {/* ── Breadcrumb ───────────────────────────────────────────────────── */}
       <div>
         <Link
-          to="/fondo-emprender/empresas"
+          to={`/fondo-emprender/empresas?anio=${anio}&mes=${mes}`}
           className="inline-flex items-center gap-1 text-sm text-[#6b7280] dark:text-[#8890b5] hover:text-[#004ac6] dark:hover:text-[#7ba8f0] transition"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span>
@@ -215,16 +286,69 @@ export default function FondoEmprenderEmpresaDetallePage() {
                 </div>
               )}
 
-              {/* Responsable — display only (API stores UUID; text entry requires user picker) */}
-              {!isContabilidad && (
+              {/* Responsables */}
+              <ResponsableBadges macroId={proc.id} />
+
+              {/* Tareas vinculadas desde el Gestor de Tareas */}
+              {proc.tareasVinculadas?.length > 0 && (
                 <div>
-                  <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1">
-                    Responsable
+                  <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1.5">
+                    Tareas vinculadas
                   </label>
-                  <div className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#9ca3af] min-h-[30px]">
-                    {proc.responsableId
-                      ? `${proc.responsableId.slice(0, 8)}…`
-                      : 'Sin asignar'}
+                  <div className="space-y-1">
+                    {proc.tareasVinculadas.map(tarea => {
+                      const ts = TASK_STATUS[tarea.status] ?? TASK_STATUS.pending
+                      return (
+                        <div
+                          key={tarea.id}
+                          className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-[#f8f9fc] dark:bg-[#252840]"
+                        >
+                          <button
+                            onClick={() => handleToggleTarea(proc.id, tarea.id, tarea.status)}
+                            className="flex-shrink-0 mt-0.5 hover:scale-110 transition-transform"
+                            title={tarea.status === 'completed' ? 'Marcar pendiente' : 'Marcar completada'}
+                          >
+                            <span
+                              className="material-symbols-outlined"
+                              style={{ fontSize: 13, color: ts.color }}
+                            >
+                              {ts.icon}
+                            </span>
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-semibold line-clamp-1 transition-colors ${
+                              tarea.status === 'completed'
+                                ? 'line-through text-[#9ca3af] dark:text-[#5a5f7a]'
+                                : 'text-[#434655] dark:text-[#c4c8e8]'
+                            }`}>
+                              {tarea.title}
+                            </p>
+                            {tarea.description && (
+                              <p className={`text-[10px] line-clamp-2 mt-0.5 ${
+                                tarea.status === 'completed' ? 'text-[#c3c6d7]' : 'text-[#8890b5]'
+                              }`}>
+                                {tarea.description}
+                              </p>
+                            )}
+                          </div>
+                          {tarea.priority && (
+                            <span
+                              className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5"
+                              style={{ background: PRIORITY_COLORS[tarea.priority] }}
+                              title={PRIORITY_LABELS[tarea.priority]}
+                            />
+                          )}
+                          {tarea.assignedToName && (
+                            <span
+                              title={tarea.assignedToName}
+                              className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0 ${getAvatarColor(tarea.assignedToName)}`}
+                            >
+                              {getInitials(tarea.assignedToName)}
+                            </span>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}

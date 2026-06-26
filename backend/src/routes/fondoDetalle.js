@@ -4,7 +4,7 @@ const { authMiddleware } = require('../middleware/auth');
 const { requireFondoAccess } = require('../middleware/fondoAccess');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
-const { getDetalle, updateDetalle } = require('../controllers/fondoDetalleController');
+const { getDetalle, updateDetalle, getMacroTareas, getResponsables } = require('../controllers/fondoDetalleController');
 
 const router = Router();
 router.use(authMiddleware);
@@ -28,6 +28,9 @@ const validateMacroId = [
     .toInt(),
   validate,
 ];
+
+router.get('/tareas-macro', getMacroTareas);
+router.get('/responsables', getResponsables);
 
 /**
  * @openapi
@@ -84,6 +87,8 @@ router.put('/:empresaId/:macroId',
   ...validateUUIDParam('empresaId'),
   ...validateMacroId,
   requireFondoAccess,
+  body('anio').notEmpty().isInt({ min: 2000, max: 2100 }).toInt().withMessage('anio requerido'),
+  body('mes').notEmpty().isInt({ min: 1, max: 12 }).toInt().withMessage('mes requerido'),
   body('estado').optional().isIn(['pending', 'in_progress', 'done'])
     .withMessage('estado debe ser pending, in_progress o done'),
   body('responsableId').optional({ nullable: true }).isUUID().withMessage('responsableId debe ser un UUID válido'),

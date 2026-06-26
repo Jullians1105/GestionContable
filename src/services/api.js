@@ -167,8 +167,8 @@ export const api = {
     const qs = new URLSearchParams({ anio, mes }).toString();
     return request(`/fondo/detalle/${empresaId}?${qs}`);
   },
-  updateFondoDetalle: (empresaId, macroId, data) =>
-    request(`/fondo/detalle/${empresaId}/${macroId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateFondoDetalle: (empresaId, macroId, anio, mes, data) =>
+    request(`/fondo/detalle/${empresaId}/${macroId}`, { method: 'PUT', body: JSON.stringify({ anio, mes, ...data }) }),
 
   // Fondo Emprender — Pagos
   getFondoPagos:    (empresaId)         => request(`/fondo/pagos/${empresaId}`),
@@ -176,14 +176,29 @@ export const api = {
   updateFondoPago:  (empresaId, pagoId, data) => request(`/fondo/pagos/${empresaId}/${pagoId}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Fondo Emprender — Empresas
-  getFondoEmpresas: (categoria) => {
-    const qs = categoria ? `?categoria=${encodeURIComponent(categoria)}` : '';
+  getFondoEmpresas: (categoria, anio, mes) => {
+    const p = {};
+    if (categoria) p.categoria = categoria;
+    if (anio) p.anio = anio;
+    if (mes)  p.mes  = mes;
+    const qs = Object.keys(p).length ? `?${new URLSearchParams(p)}` : '';
     return request(`/fondo/empresas${qs}`);
   },
   getFondoEmpresa: (id) => request(`/fondo/empresas/${id}`),
   createFondoEmpresa: (data) => request('/fondo/empresas', { method: 'POST', body: JSON.stringify(data) }),
   updateFondoEmpresa: (id, data) => request(`/fondo/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteFondoEmpresa: (id) => request(`/fondo/empresas/${id}`, { method: 'DELETE' }),
+
+  // Fondo Emprender — Vínculo tarea↔fondo
+  getFondoLink: (taskId) => request(`/tasks/${taskId}/fondo-link`),
+  setFondoLink: (taskId, data) => request(`/tasks/${taskId}/fondo-link`, { method: 'POST', body: JSON.stringify(data) }),
+  deleteFondoLink: (taskId) => request(`/tasks/${taskId}/fondo-link`, { method: 'DELETE' }),
+
+  getFondoMacroTareas: () => request('/fondo/detalle/tareas-macro'),
+  getFondoResponsables: (anio, mes) => request(`/fondo/detalle/responsables?anio=${anio}&mes=${mes}`),
+
+  // Fondo Emprender — Catálogo de procesos (checklist)
+  getFondoProcesos: () => request('/fondo/procesos'),
 
   // Notifications
   getNotifications: () => request('/notifications'),

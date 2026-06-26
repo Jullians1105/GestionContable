@@ -4,6 +4,7 @@ import { today, generateId, getInitials, getAvatarColor, normalizeAssignedTo } f
 import { useTeam } from '../hooks/useTeam'
 import { useGroups } from '../context/GroupContext'
 import TagSelector from './Tags/TagSelector'
+import FondoLinkSelector from './FondoLinkSelector'
 
 const EMPTY_TASK = {
   title: '',
@@ -34,6 +35,7 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
   const [assigneeOpen, setAssigneeOpen] = useState(false)
   const [assigneeSearch, setAssigneeSearch] = useState('')
   const assigneeRef = useRef(null)
+  const [fondoLink, setFondoLink] = useState(null)
 
   useEffect(() => {
     if (!assigneeOpen) { setAssigneeSearch(''); return }
@@ -66,7 +68,7 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
     e.preventDefault()
     const validationErrors = validators.validateTask(form)
     if (Object.keys(validationErrors).length > 0) { setErrors(validationErrors); return }
-    onSubmit(form)
+    onSubmit(form, fondoLink)
   }
 
   return (
@@ -279,6 +281,15 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
             <span className="material-symbols-outlined text-base">add</span>
           </button>
         </div>
+      </div>
+
+      {/* Vínculo Fondo Emprender */}
+      <div>
+        <label className={labelCls}>Para tener en cuenta (Fondo Emprender)</label>
+        {task?.id
+          ? <FondoLinkSelector taskId={task.id} />
+          : <FondoLinkSelector onDraftChange={setFondoLink} />
+        }
       </div>
 
       <div className="flex justify-end gap-3 pt-2">

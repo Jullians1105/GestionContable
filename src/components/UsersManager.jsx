@@ -1,9 +1,30 @@
 import React, { useState, useMemo } from 'react'
 import { useTeam } from '../hooks/useTeam'
 import { useToast } from '../context/ToastContext'
+import { useAuth } from '../context/AuthContext'
+import { useGroups } from '../context/GroupContext'
 import { validators } from '../utils/validators'
 import { getAvatarColor, ROLE_LABELS } from '../utils/helpers'
 import { PERMISSIONS, getEffectivePermissions } from '../utils/permissions'
+
+const TASK_PERMS = [
+  { key: 'canCreateTask',   icon: 'add_task',        label: 'Crear tareas' },
+  { key: 'canEditTask',     icon: 'edit_note',       label: 'Editar tareas' },
+  { key: 'canDeleteTask',   icon: 'delete',          label: 'Eliminar tareas' },
+  { key: 'canComment',      icon: 'chat',            label: 'Comentar' },
+  { key: 'canViewReports',  icon: 'bar_chart',       label: 'Ver reportes' },
+  { key: 'canManageGroups', icon: 'group_work',      label: 'Gestionar grupos' },
+]
+
+const FONDO_PERMS = [
+  { key: 'canEditar',      icon: 'edit',            label: 'Editar macroprocesos' },
+  { key: 'canGestionar',   icon: 'corporate_fare',  label: 'Gestionar empresas' },
+  { key: 'canEditarPagos', icon: 'payments',        label: 'Editar pagos' },
+]
+
+function getFondoPerm(user, key) {
+  return user.permissions?.modulos?.fondoEmprender?.[key] ?? false
+}
 
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Administrador' },
@@ -30,6 +51,12 @@ const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
 export default function UsersManager() {
   const { members, createUser, updateMember, deleteMember } = useTeam()
   const { addToast } = useToast()
+  const { isAdmin } = useAuth()
+  const { groups } = useGroups()
+  const showPermCols = isAdmin()
+
+  const fondoGroup = groups?.find(g => g.name === 'Fondo Emprender')
+  const isFondoMember = (userId) => fondoGroup?.memberIds?.includes(userId) ?? false
 
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState(null)
@@ -115,12 +142,34 @@ export default function UsersManager() {
   }
 
   const handleTogglePermission = async (user, key) => {
-    const current = getEffectivePermissions(user)
-    const updated = { ...current, [key]: !current[key] }
+    const effective = getEffectivePermissions(user)
+    const updated = {
+      ...effective,
+      [key]: !effective[key],
+      // preservar permisos de módulos externos (ej: Fondo Emprender)
+      ...(user.permissions?.modulos ? { modulos: user.permissions.modulos } : {}),
+    }
     try {
       await updateMember(user.id, { permissions: updated })
     } catch (err) {
       addToast(err.message || 'Error al actualizar permisos', 'error')
+    }
+  }
+
+  const handleToggleFondoPerm = async (user, key) => {
+    const currentModulos = user.permissions?.modulos ?? {}
+    const current = currentModulos.fondoEmprender?.[key] ?? false
+    const updated = {
+      ...(user.permissions ?? {}),
+      modulos: {
+        ...currentModulos,
+        fondoEmprender: { ...currentModulos.fondoEmprender, [key]: !current },
+      },
+    }
+    try {
+      await updateMember(user.id, { permissions: updated })
+    } catch (err) {
+      addToast(err.message || 'Error al actualizar permisos de Fondo', 'error')
     }
   }
 
@@ -186,13 +235,23 @@ export default function UsersManager() {
                   </span>
                 </th>
               ))}
+              {showPermCols && (
+                <th className="px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] text-left hidden lg:table-cell">
+                  Gestor de Tareas
+                </th>
+              )}
+              {showPermCols && (
+                <th className="px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] text-left hidden lg:table-cell">
+                  Fondo Emprender
+                </th>
+              )}
               <th className="px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#edeef0] dark:divide-[#2e3148]">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={4} className="text-center py-10 text-sm text-[#434655] dark:text-[#c4c8e8]">
+                <td colSpan={showPermCols ? 6 : 4} className="text-center py-10 text-sm text-[#434655] dark:text-[#c4c8e8]">
                   No se encontraron usuarios
                 </td>
               </tr>
@@ -225,16 +284,73 @@ export default function UsersManager() {
                     <td className="px-4 py-3 text-xs text-[#434655] dark:text-[#c4c8e8] hidden sm:table-cell">
                       {user.createdAt ? new Date(user.createdAt).toLocaleDateString('es-ES') : '—'}
                     </td>
+
+                    {/* ── Gestor de Tareas perms ─────────────────────── */}
+                    {showPermCols && (
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {TASK_PERMS.map(({ key, icon, label }) => {
+                            const active = effectivePerms[key] ?? false
+                            return (
+                              <button
+                                key={key}
+                                title={label}
+                                onClick={() => handleTogglePermission(user, key)}
+                                className="w-6 h-6 rounded flex items-center justify-center transition hover:scale-110"
+                                style={{
+                                  background: active ? '#dcfce7' : '#f3f4f6',
+                                  color:      active ? '#16a34a' : '#9ca3af',
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{icon}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </td>
+                    )}
+
+                    {/* ── Fondo Emprender perms ──────────────────────── */}
+                    {showPermCols && (
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        {isFondoMember(user.id) ? (
+                          <div className="flex flex-wrap gap-1">
+                            {FONDO_PERMS.map(({ key, icon, label }) => {
+                              const active = getFondoPerm(user, key)
+                              return (
+                                <button
+                                  key={key}
+                                  title={label}
+                                  onClick={() => handleToggleFondoPerm(user, key)}
+                                  className="w-6 h-6 rounded flex items-center justify-center transition hover:scale-110"
+                                  style={{
+                                    background: active ? '#dcfce7' : '#f3f4f6',
+                                    color:      active ? '#16a34a' : '#9ca3af',
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{icon}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-[#c3c6d7] dark:text-[#3a3f5c]">—</span>
+                        )}
+                      </td>
+                    )}
+
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setExpandedPermsId(isExpanded ? null : user.id)}
-                          className={`flex items-center gap-1 px-2 h-7 rounded-lg text-xs font-semibold border transition ${isExpanded ? 'bg-[#004ac6] text-white border-[#004ac6]' : 'border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840]'}`}
-                          title="Permisos"
-                        >
-                          <span className="material-symbols-outlined text-sm">shield</span>
-                          Permisos
-                        </button>
+                        {showPermCols && (
+                          <button
+                            onClick={() => setExpandedPermsId(isExpanded ? null : user.id)}
+                            className={`flex items-center gap-1 px-2 h-7 rounded-lg text-xs font-semibold border transition ${isExpanded ? 'bg-[#004ac6] text-white border-[#004ac6]' : 'border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840]'}`}
+                            title="Permisos"
+                          >
+                            <span className="material-symbols-outlined text-sm">shield</span>
+                            Permisos
+                          </button>
+                        )}
                         <button
                           onClick={() => openEdit(user)}
                           className="p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] transition"
@@ -271,30 +387,60 @@ export default function UsersManager() {
                   </tr>
                   {isExpanded && (
                     <tr className="bg-[#f8f9ff] dark:bg-[#181a2e]">
-                      <td colSpan={4} className="px-6 py-4">
-                        <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
-                          <span className="material-symbols-outlined text-sm">shield</span>
-                          Permisos de {user.name}
-                          {user.permissions && Object.keys(user.permissions).length > 0 && (
-                            <span className="ml-1 px-1.5 py-0.5 rounded bg-[#004ac6] text-white text-[10px]">personalizados</span>
-                          )}
-                        </p>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {PERMISSIONS.map(({ key, label }) => (
-                            <label
-                              key={key}
-                              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] cursor-pointer hover:border-[#004ac6] transition select-none"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={effectivePerms[key] ?? false}
-                                onChange={() => handleTogglePermission(user, key)}
-                                className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
-                              />
-                              <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{label}</span>
-                            </label>
-                          ))}
+                      <td colSpan={showPermCols ? 6 : 4} className="px-6 py-4 space-y-4">
+                        {/* Gestor de Tareas */}
+                        <div>
+                          <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">shield</span>
+                            Permisos de {user.name}
+                            {user.permissions && Object.keys(user.permissions).length > 0 && (
+                              <span className="ml-1 px-1.5 py-0.5 rounded bg-[#004ac6] text-white text-[10px]">personalizados</span>
+                            )}
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {PERMISSIONS.map(({ key, label }) => (
+                              <label
+                                key={key}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] cursor-pointer hover:border-[#004ac6] transition select-none"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={effectivePerms[key] ?? false}
+                                  onChange={() => handleTogglePermission(user, key)}
+                                  className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
+                                />
+                                <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{label}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
+
+                        {/* Fondo Emprender — solo si el usuario es miembro del grupo */}
+                        {isFondoMember(user.id) && (
+                          <div>
+                            <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-sm">corporate_fare</span>
+                              Fondo Emprender
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {FONDO_PERMS.map(({ key, icon, label }) => (
+                                <label
+                                  key={key}
+                                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] cursor-pointer hover:border-[#004ac6] transition select-none"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={getFondoPerm(user, key)}
+                                    onChange={() => handleToggleFondoPerm(user, key)}
+                                    className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
+                                  />
+                                  <span className="material-symbols-outlined text-[#8890b5]" style={{ fontSize: 13 }}>{icon}</span>
+                                  <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )}

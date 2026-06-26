@@ -266,6 +266,7 @@ describe('updateTask', () => {
       .mockResolvedValueOnce({ rows: [{ name: 'Actor' }] })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [rawTask] });
 
     const req = {

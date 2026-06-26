@@ -10,7 +10,7 @@ export const PERMISSIONS = [
 export const DEFAULT_PERMISSIONS = {
   admin:  { canCreateTask: true,  canEditTask: true,  canDeleteTask: true,  canComment: true,  canViewReports: true,  canManageGroups: true },
   leader: { canCreateTask: true,  canEditTask: true,  canDeleteTask: true,  canComment: true,  canViewReports: true,  canManageGroups: true },
-  member: { canCreateTask: true,  canEditTask: false, canDeleteTask: false, canComment: true,  canViewReports: false, canManageGroups: false },
+  member: { canCreateTask: true,  canEditTask: true,  canDeleteTask: false, canComment: true,  canViewReports: false, canManageGroups: false },
   viewer: { canCreateTask: false, canEditTask: false, canDeleteTask: false, canComment: false, canViewReports: false, canManageGroups: false },
 }
 

@@ -32,7 +32,8 @@ const getTasks = async (req, res, next) => {
         g.name AS group_name,
         (SELECT json_agg(s ORDER BY s.created_at) FROM task_subtasks s WHERE s.task_id = t.id) AS subtasks,
         (SELECT json_agg(c ORDER BY c.created_at) FROM task_comments c WHERE c.task_id = t.id) AS comments,
-        (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids
+        (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids,
+        (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link
       FROM tasks t
       LEFT JOIN users u ON u.id = t.assigned_to
       LEFT JOIN groups g ON g.id = t.group_id
@@ -65,7 +66,8 @@ const FULL_TASK_QUERY = `
     g.name AS group_name,
     (SELECT json_agg(s ORDER BY s.created_at) FROM task_subtasks s WHERE s.task_id = t.id) AS subtasks,
     (SELECT json_agg(c ORDER BY c.created_at) FROM task_comments c WHERE c.task_id = t.id) AS comments,
-    (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids
+    (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids,
+    (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link
   FROM tasks t
   LEFT JOIN users u ON u.id = t.assigned_to
   LEFT JOIN groups g ON g.id = t.group_id
@@ -223,6 +225,51 @@ const updateTask = async (req, res, next) => {
           });
         });
       }));
+
+      // Sincronizar con Fondo Emprender si la tarea tiene un vínculo activo
+      try {
+        const linkResult = await db.query(
+          'SELECT * FROM task_fondo_links WHERE task_id = $1',
+          [id]
+        );
+        if (linkResult.rows.length > 0) {
+          const link = linkResult.rows[0];
+          if (link.link_type === 'macroproceso') {
+            const syncNow = new Date();
+            const syncAnio = syncNow.getFullYear();
+            const syncMes  = syncNow.getMonth() + 1;
+            await db.query(
+              `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, anio, mes, estado)
+               VALUES ($1, $2, $3, $4, $5, 'done')
+               ON CONFLICT (empresa_id, macroproceso_id, anio, mes) DO UPDATE SET estado = 'done'`,
+              [uuidv4(), link.empresa_id, link.macro_id, syncAnio, syncMes]
+            );
+            req.io?.emit('empresa:updated', { empresaId: link.empresa_id, tipo: 'detalle' });
+          } else if (link.link_type === 'checklist') {
+            await db.query(
+              `INSERT INTO fondo_checklist_meses (id, empresa_id, anio, mes)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (empresa_id, anio, mes) DO NOTHING`,
+              [uuidv4(), link.empresa_id, link.anio, link.mes]
+            );
+            const mesRow = await db.query(
+              'SELECT id FROM fondo_checklist_meses WHERE empresa_id = $1 AND anio = $2 AND mes = $3',
+              [link.empresa_id, link.anio, link.mes]
+            );
+            const mesId = mesRow.rows[0].id;
+            await db.query(
+              `INSERT INTO fondo_checklist_items (id, mes_id, proceso_id, estado)
+               VALUES ($1, $2, $3, 'done')
+               ON CONFLICT (mes_id, proceso_id) DO UPDATE SET estado = 'done'`,
+              [uuidv4(), mesId, link.proceso_id]
+            );
+            req.io?.emit('empresa:updated', { empresaId: link.empresa_id, anio: link.anio, mes: link.mes, tipo: 'checklist' });
+          }
+        }
+      } catch (fondoErr) {
+        // No bloquear la respuesta si la sincronización con fondo falla
+        logger.warn({ taskId: id, err: fondoErr.message }, 'Fondo sync failed on task completion');
+      }
     }
 
     await auditLog(req.user.userId, 'UPDATE', 'tasks', id, changes);
@@ -317,6 +364,7 @@ function normalizeTask(t) {
       updatedAt: c.updated_at,
     })),
     tagIds: t.tag_ids || [],
+    hasFondoLink: t.has_fondo_link ?? false,
     createdAt: t.created_at,
     updatedAt: t.updated_at,
   };

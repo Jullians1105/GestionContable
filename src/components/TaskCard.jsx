@@ -53,6 +53,12 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-white" style={{ background: STATUS_COLORS[task.status] }}>
           {STATUS_LABELS[task.status]}
         </span>
+        {task.hasFondoLink && (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-0.5 bg-[#ede9fe] text-[#6d28d9]">
+            <span className="material-symbols-outlined" style={{ fontSize: 10 }}>link</span>
+            Fondo
+          </span>
+        )}
         {tags.map((tag) => (
           <span key={tag.id} className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ background: tag.color }}>
             {tag.name}
