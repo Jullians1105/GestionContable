@@ -772,7 +772,7 @@ export default function FondoEmprenderPagosPage() {
                       {row.mesesDebidos.length > 0 && (
                         <div style={{ marginTop: 2, paddingLeft: 14 }}>
                           <span style={{ fontSize: 12, color: '#ef4444', fontWeight: 600 }}>
-                            {row.mesesDebidos.length} mes{row.mesesDebidos.length > 1 ? 'es' : ''} debidos
+                            {row.mesesDebidos.length} mes{row.mesesDebidos.length > 1 ? 'es' : ''} faltantes
                           </span>
                         </div>
                       )}
