@@ -35,7 +35,7 @@ router.put('/:id',
   updateGroup
 );
 
-router.delete('/:id', validateUUIDParam('id'), roleMiddleware('admin'), deleteGroup);
+router.delete('/:id', validateUUIDParam('id'), roleMiddleware('admin', 'leader'), deleteGroup);
 
 router.post('/:id/members',
   validateUUIDParam('id'),
