@@ -36,8 +36,9 @@ export function NotificationProvider({ children }) {
   // Solicitar permiso de notificaciones del SO al iniciar sesión
   useEffect(() => {
     if (!userId) return
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+    if (!('Notification' in window)) return
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {})
     }
   }, [userId])
 
@@ -65,14 +66,19 @@ export function NotificationProvider({ children }) {
       // Notificación del SO (cuando la app está en background o en otra pestaña)
       if ('Notification' in window && Notification.permission === 'granted') {
         const title = NOTIF_TITLES[notif.type] || 'Notificación'
-        const osNotif = new Notification(title, {
-          body: notif.message,
-          icon: '/app-icon.png',
-          tag: notif.id,
-        })
-        osNotif.onclick = () => {
-          window.focus()
-          if (notif.taskId) navigate('/tasks')
+        const options = { body: notif.message, icon: '/app-icon.png', tag: notif.id }
+        // Service Worker es necesario en contextos no-seguros (HTTP por IP de red)
+        if (navigator.serviceWorker?.controller) {
+          navigator.serviceWorker.ready.then(reg => {
+            reg.showNotification(title, options)
+          }).catch(() => {})
+        } else {
+          try {
+            const osNotif = new Notification(title, options)
+            osNotif.onclick = () => { window.focus(); if (notif.taskId) navigate('/tasks') }
+          } catch {
+            // new Notification() bloqueado en HTTP — las notificaciones in-app siguen funcionando
+          }
         }
       }
     }

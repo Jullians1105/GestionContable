@@ -33,6 +33,9 @@ const fondoLinksRoutes      = require('./routes/fondoLinks');
 const app = express();
 const server = http.createServer(app);
 
+// Confiar en el proxy reverso (nginx) para que express-rate-limit lea X-Forwarded-For correctamente
+app.set('trust proxy', 1);
+
 // En desarrollo permite cualquier puerto de localhost (Vite puede usar 5173, 5174, etc.)
 const corsOrigin = env.NODE_ENV === 'development'
   ? /^http:\/\/localhost(:\d+)?$/
