@@ -39,7 +39,7 @@ app.set('trust proxy', 1);
 // En desarrollo permite cualquier puerto de localhost (Vite puede usar 5173, 5174, etc.)
 const corsOrigin = env.NODE_ENV === 'development'
   ? /^http:\/\/localhost(:\d+)?$/
-  : env.CLIENT_URL;
+  : env.CLIENT_URL.split(',').map(u => u.trim()).filter(Boolean);
 
 // Socket.io
 const io = new Server(server, {
