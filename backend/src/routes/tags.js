@@ -25,7 +25,6 @@ router.get('/', async (req, res, next) => {
 });
 
 router.post('/',
-  roleMiddleware('admin', 'leader'),
   body('name').trim().notEmpty(),
   body('color').optional().matches(/^#[0-9A-Fa-f]{6}$/),
   validate,
