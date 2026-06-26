@@ -1,11 +1,11 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-06-26 (sesión 7 — Fondo Emprender, HTTPS, backups, notificaciones)  
+**Última actualización:** 2026-06-26 (sesión 8 — Cloudflare Tunnel, dominio gestcon.work, acceso remoto líderes)  
 **Rama activa:** `main`  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
 **Ramas activas en remoto:** `main`  
-**Servidor de producción:** `https://192.168.1.12` (HTTPS con cert autofirmado, puerto 443)
+**Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)
 
 ---
 
@@ -274,7 +274,7 @@ migrate:    Perfil "migrate" — corre run.js --seed y termina
 
 **Frontend nginx:** escucha en 443 (HTTPS) y redirige 80 → 443. Certs montados desde `/etc/nginx/certs/` del host como volumen `:ro`. Expone puertos 80 y 443.
 
-**HTTPS producción:** Certificado autofirmado para `192.168.1.12`. Los navegadores muestran "No es seguro" — se acepta una vez. **Plan pendiente:** Cloudflare Tunnel con dominio propio → HTTPS real para todos sin warning, sin instalar nada en los 14 equipos de oficina ni en los dispositivos de los 3 líderes remotos.
+**HTTPS producción:** Cloudflare Tunnel activo en `https://gestcon.work`. HTTPS real sin warning para todos los usuarios (14 en oficina + 3 líderes remotos). Acceso local directo sigue disponible en `https://192.168.1.12` (cert autofirmado). CORS acepta ambos orígenes vía `CLIENT_URL` separado por comas.
 
 **Service Worker:** `public/sw.js` registrado en `src/main.jsx`. Necesario para que la Notification API funcione en HTTPS de red local. Maneja `notificationclick` para enfocar la pestaña.
 
@@ -422,4 +422,4 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 30 | Backup automático con cron a las 6 PM (BD + .env + certs, rotación 7 días) | ✅ Implementado 2026-06-26 |
 | 31 | Fix grupos: leaders pueden eliminar grupos | ✅ Resuelto 2026-06-26 |
 | 32 | Tags: sin restricción de rol para crear, eliminadas etiquetas de muestra | ✅ Resuelto 2026-06-26 |
-| 33 | Cloudflare Tunnel para todos los usuarios (HTTPS real, sin warning) | ⏳ Pendiente — requiere comprar dominio |
+| 33 | Cloudflare Tunnel `gestcon.work` (HTTPS real, acceso remoto 3 líderes, sin warning) | ✅ Implementado 2026-06-26 |
