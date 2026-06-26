@@ -137,7 +137,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
         alert('Error: ' + err.message)
       }
     }
-  }, [empresaId])
+  }, [empresaId, anio, mes])
 
   // Progress summary
   const mp5        = macroprocesos.find(m => m.id === 5)
