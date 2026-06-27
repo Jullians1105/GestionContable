@@ -40,6 +40,19 @@ async function run() {
       );
     `);
 
+    // Compatibilidad: renombrar columna 'version' → 'filename' si existe con ese nombre
+    await client.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'schema_migrations' AND column_name = 'version'
+        ) THEN
+          ALTER TABLE schema_migrations RENAME COLUMN version TO filename;
+        END IF;
+      END $$;
+    `);
+
     // Collect all candidate migration files (sorted)
     const allMigrationFiles = fs.readdirSync(__dirname)
       .filter((f) => /^\d+.*\.sql$/.test(f))
