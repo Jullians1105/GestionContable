@@ -1,6 +1,7 @@
 jest.mock('../../src/config/database');
 jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
-jest.mock('../../src/utils/logger', () => ({ info: jest.fn(), error: jest.fn() }));
+jest.mock('../../src/utils/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
+jest.mock('../../src/services/pushService', () => ({ sendPushToUser: jest.fn() }));
 
 const db = require('../../src/config/database');
 const {
