@@ -50,31 +50,47 @@ export function NotificationProvider({ children }) {
     () => (pushSupported ? Notification.permission : 'unsupported')
   )
 
-  // Si el permiso ya estaba concedido (sesión anterior), registrar suscripción silenciosamente
+  // Si el permiso ya estaba concedido (sesión anterior), registrar suscripción silenciosamente.
+  // También se re-ejecuta cuando el usuario vuelve a la pestaña/app para renovar suscripciones
+  // que hayan expirado o sido eliminadas del servidor.
   useEffect(() => {
     if (!userId || !useRealBackend || !pushSupported) return
-    if (Notification.permission !== 'granted') return
 
     async function resubscribe() {
+      if (Notification.permission !== 'granted') return
       try {
         const { key } = await api.getVapidPublicKey()
         if (!key) { console.warn('[Push] VAPID key vacía'); return }
         const reg = await navigator.serviceWorker.ready
-        const existing = await reg.pushManager.getSubscription()
+        let existing = await reg.pushManager.getSubscription()
+
+        // Si la suscripción local existe pero el servidor ya no la tiene (por expiración/410),
+        // la eliminamos del navegador y creamos una nueva
         if (existing) {
-          await api.subscribeToPush(existing.toJSON()).catch(() => {})
-          return
+          const saved = await api.subscribeToPush(existing.toJSON()).catch(() => null)
+          if (saved !== null) return  // OK, backend actualizado
+          // subscribeToPush falló → forzar nueva suscripción
+          await existing.unsubscribe().catch(() => {})
+          existing = null
         }
+
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(key),
         })
         await api.subscribeToPush(sub.toJSON())
-        console.info('[Push] Suscripción registrada correctamente')
+        console.info('[Push] Suscripción renovada correctamente')
       } catch (err) { console.warn('[Push] Error al suscribir:', err?.message ?? err) }
     }
 
     resubscribe()
+
+    // Renovar suscripción cuando el usuario vuelve a la pestaña o abre la PWA
+    function onVisible() {
+      if (document.visibilityState === 'visible') resubscribe()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [userId, useRealBackend, pushSupported])
 
   // Llamar desde un tap/click del usuario — única forma que acepta Safari iOS
