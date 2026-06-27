@@ -1,12 +1,24 @@
+import { useState } from 'react'
 import { storage } from '../utils/storage'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useToast } from '../context/ToastContext'
+import { useNotifications } from '../context/NotificationContext'
 
 export default function SettingsPage() {
   const { isAdmin, logout } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { addToast } = useToast()
+  const { pushPermission, requestPushPermission } = useNotifications()
+  const [requestingPush, setRequestingPush] = useState(false)
+
+  async function handleEnablePush() {
+    setRequestingPush(true)
+    const result = await requestPushPermission()
+    setRequestingPush(false)
+    if (result === 'granted') addToast('Notificaciones push activadas', 'success')
+    else if (result === 'denied') addToast('Permiso denegado. Actívalas desde Ajustes del sistema.', 'error', 8000)
+  }
 
   const handleClearData = () => {
     if (window.confirm('¿Borrar todos los datos y restaurar los datos de ejemplo? Esta acción no se puede deshacer.')) {

@@ -41,41 +41,68 @@ export function NotificationProvider({ children }) {
     setNotifications(storage.getNotifications(userId))
   }, [userId])
 
-  // Solicitar permiso de notificaciones + suscripción Web Push (iPhone PWA)
+  const pushSupported = typeof window !== 'undefined'
+    && 'Notification' in window
+    && 'serviceWorker' in navigator
+    && 'PushManager' in window
+
+  const [pushPermission, setPushPermission] = useState(
+    () => (pushSupported ? Notification.permission : 'unsupported')
+  )
+
+  // Si el permiso ya estaba concedido (sesión anterior), registrar suscripción silenciosamente
   useEffect(() => {
-    if (!userId || !useRealBackend) return
-    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+    if (!userId || !useRealBackend || !pushSupported) return
+    if (Notification.permission !== 'granted') return
 
-    async function setupPush() {
-      let permission = Notification.permission
-      if (permission === 'default') {
-        permission = await Notification.requestPermission().catch(() => 'denied')
-      }
-      if (permission !== 'granted') return
-
+    async function resubscribe() {
       try {
         const { key } = await api.getVapidPublicKey()
-        if (!key) return
-
+        if (!key) { console.warn('[Push] VAPID key vacía'); return }
         const reg = await navigator.serviceWorker.ready
         const existing = await reg.pushManager.getSubscription()
         if (existing) {
           await api.subscribeToPush(existing.toJSON()).catch(() => {})
           return
         }
-
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(key),
         })
         await api.subscribeToPush(sub.toJSON())
-      } catch {
-        // Push no soportado o bloqueado — las notificaciones in-app siguen activas
-      }
+        console.info('[Push] Suscripción registrada correctamente')
+      } catch (err) { console.warn('[Push] Error al suscribir:', err?.message ?? err) }
     }
 
-    setupPush()
-  }, [userId, useRealBackend])
+    resubscribe()
+  }, [userId, useRealBackend, pushSupported])
+
+  // Llamar desde un tap/click del usuario — única forma que acepta Safari iOS
+  const requestPushPermission = useCallback(async () => {
+    if (!pushSupported) return 'unsupported'
+    const permission = await Notification.requestPermission().catch(() => 'denied')
+    setPushPermission(permission)
+    if (permission !== 'granted') return permission
+
+    try {
+      const { key } = await api.getVapidPublicKey()
+      if (!key) return permission
+      const reg = await navigator.serviceWorker.ready
+      const existing = await reg.pushManager.getSubscription()
+      if (existing) {
+        await api.subscribeToPush(existing.toJSON()).catch(() => {})
+        return permission
+      }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      })
+      await api.subscribeToPush(sub.toJSON())
+      console.info('[Push] Suscripción registrada correctamente')
+    } catch (err) { console.warn('[Push] Error al suscribir:', err?.message ?? err) }
+
+    return permission
+  }, [pushSupported])
 
   // Cargar desde API real cuando backend disponible
   useEffect(() => {
@@ -178,7 +205,7 @@ export function NotificationProvider({ children }) {
 
   return (
     <NotificationContext.Provider
-      value={{ notifications, unreadCount, addNotification, markAsRead, markAllAsRead, deleteNotification, clearAll }}
+      value={{ notifications, unreadCount, addNotification, markAsRead, markAllAsRead, deleteNotification, clearAll, pushPermission, requestPushPermission }}
     >
       {children}
     </NotificationContext.Provider>

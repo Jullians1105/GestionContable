@@ -23,7 +23,7 @@ async function sendDueReminders(io) {
         AND (
           (t.due_time IS NULL     AND t.due_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '1 day')
           OR
-          (t.due_time IS NOT NULL AND (t.due_date + t.due_time)::timestamp BETWEEN NOW() AND NOW() + INTERVAL '2 hours')
+          (t.due_time IS NOT NULL AND (t.due_date::timestamp + t.due_time::interval) BETWEEN NOW() AND NOW() + INTERVAL '2 hours')
         )
     `);
 
