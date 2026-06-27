@@ -55,6 +55,44 @@ export default function SettingsPage() {
       </div>
 
       <div className="max-w-3xl space-y-6">
+        {pushPermission !== 'unsupported' && (
+          <div className={cardCls}>
+            <h3 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-4">Notificaciones</h3>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-2xl text-[#004ac6]">notifications</span>
+                <div>
+                  <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
+                    {pushPermission === 'granted' ? 'Notificaciones activadas' : 'Notificaciones push'}
+                  </p>
+                  <p className="text-xs text-[#434655] dark:text-[#8b8fa8] mt-0.5">
+                    {pushPermission === 'granted'
+                      ? 'Recibirás alertas de vencimiento aunque tengas la app cerrada'
+                      : 'Recibe alertas de vencimiento de tareas en tu dispositivo'}
+                  </p>
+                </div>
+              </div>
+              {pushPermission === 'granted' ? (
+                <span className="flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full">
+                  <span className="material-symbols-outlined text-sm">check_circle</span>
+                  Activas
+                </span>
+              ) : (
+                <button
+                  onClick={handleEnablePush}
+                  disabled={requestingPush}
+                  className="flex items-center gap-1.5 h-9 px-4 rounded-lg text-sm font-semibold text-white bg-[#004ac6] hover:bg-[#0040b0] disabled:opacity-60 transition"
+                >
+                  {requestingPush
+                    ? <span className="material-symbols-outlined text-base animate-spin">progress_activity</span>
+                    : <span className="material-symbols-outlined text-base">notifications_active</span>}
+                  {requestingPush ? 'Activando...' : 'Activar'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className={cardCls}>
           <h3 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-4">Apariencia</h3>
           <div className="flex items-center justify-between">

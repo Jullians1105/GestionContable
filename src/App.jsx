@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { usePullToRefresh } from './hooks/usePullToRefresh'
 import { TaskProvider } from './context/TaskContext'
 import { TeamProvider } from './context/TeamContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -36,10 +37,33 @@ import RecurringTasksPage from './pages/RecurringTasksPage'
 function Layout() {
   const { isAuthenticated } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { pullY, releasing, ready } = usePullToRefresh()
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
   return (
     <div className="min-h-screen bg-[#f3f4f6] dark:bg-[#0f1117] text-[#191c1e] dark:text-[#e4e6f0]">
+      {/* Pull-to-refresh indicator — visible solo en móvil cuando se arrastra hacia abajo */}
+      <div
+        className="lg:hidden fixed top-16 left-0 right-0 z-30 flex justify-center pointer-events-none"
+        style={{
+          transform: `translateY(${pullY - 48}px)`,
+          transition: releasing || pullY === 0 ? 'transform 0.25s ease' : 'none',
+          opacity: pullY > 10 ? Math.min(pullY / 48, 1) : 0,
+        }}
+      >
+        <div className={`w-10 h-10 rounded-full shadow-md flex items-center justify-center bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] ${releasing ? 'animate-spin' : ''}`}>
+          <span
+            className="material-symbols-outlined text-[#004ac6]"
+            style={{
+              fontSize: 20,
+              transform: ready && !releasing ? 'rotate(180deg)' : `rotate(${(pullY / 48) * 180}deg)`,
+              transition: 'transform 0.1s',
+            }}
+          >
+            {releasing ? 'progress_activity' : 'arrow_downward'}
+          </span>
+        </div>
+      </div>
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
