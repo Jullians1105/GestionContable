@@ -94,7 +94,7 @@ jobs:
       - name: Run migrations
         run: node migrations/run.js --seed
       - name: Run integration tests
-        run: npm test -- --testPathPattern=tests/integration
+        run: npm test -- --testPathPattern=tests/integration --forceExit
 
   docker-build:
     name: Docker Build Check
