@@ -6,7 +6,7 @@ import { useTasks } from '../hooks/useTasks'
 import { useToast } from '../context/ToastContext'
 import { api } from '../services/api'
 
-export default function TaskModal({ isOpen, task, onClose }) {
+export default function TaskModal({ isOpen, task, onClose, forceRecurring = false }) {
   const { addTask, updateTask, getTaskById } = useTasks()
   const { addToast } = useToast()
   const [activeTab, setActiveTab] = useState('form')
@@ -55,7 +55,7 @@ export default function TaskModal({ isOpen, task, onClose }) {
       <div className="relative bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col border border-[#c3c6d7] dark:border-[#2e3148]" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#edeef0] dark:border-[#2e3148]">
           <h2 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0]">
-            {isEdit ? 'Editar tarea' : 'Nueva tarea'}
+            {isEdit ? 'Editar tarea' : forceRecurring ? 'Nuevo template recurrente' : 'Nueva tarea'}
           </h2>
           <button onClick={onClose} className="p-1.5 text-[#434655] hover:bg-[#edeef0] dark:hover:bg-[#252840] rounded-lg transition">
             <span className="material-symbols-outlined text-xl">close</span>
@@ -79,7 +79,7 @@ export default function TaskModal({ isOpen, task, onClose }) {
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {activeTab === 'form' && (
-            <TaskForm task={task} onSubmit={handleSubmit} onCancel={onClose} />
+            <TaskForm task={task} onSubmit={handleSubmit} onCancel={onClose} forceRecurring={forceRecurring} />
           )}
           {activeTab === 'subtasks' && liveTask && (
             <SubtaskList task={liveTask} />

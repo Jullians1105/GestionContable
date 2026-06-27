@@ -31,6 +31,7 @@ import FondoEmprenderPage from './pages/FondoEmprenderPage'
 import FondoEmprenderEmpresasPage from './pages/FondoEmprenderEmpresasPage'
 import FondoEmprenderEmpresaDetallePage from './pages/FondoEmprenderEmpresaDetallePage'
 import FondoEmprenderPagosPage from './pages/FondoEmprenderPagosPage'
+import RecurringTasksPage from './pages/RecurringTasksPage'
 
 function Layout() {
   const { isAuthenticated } = useAuth()
@@ -62,6 +63,7 @@ function Layout() {
             <Route path="/fondo-emprender/empresas" element={<FondoEmprenderEmpresasPage />} />
             <Route path="/fondo-emprender/empresas/:empresaId" element={<FondoEmprenderEmpresaDetallePage />} />
             <Route path="/fondo-emprender/pagos" element={<FondoEmprenderPagosPage />} />
+            <Route path="/tasks/recurrentes" element={<RecurringTasksPage />} />
           </Routes>
         </div>
       </main>

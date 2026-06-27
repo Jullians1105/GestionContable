@@ -186,16 +186,16 @@ export default function FondoEmprenderEmpresaDetallePage() {
       </div>
 
       {/* ── Header ───────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">{companyName}</h1>
-          <p className="text-sm text-[#6b7280] dark:text-[#8890b5] mt-0.5">
+          <h1 className="text-lg sm:text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">{companyName}</h1>
+          <p className="text-xs sm:text-sm text-[#6b7280] dark:text-[#8890b5] mt-0.5">
             Procesos macro · {MONTHS[mes - 1]} {anio}
           </p>
         </div>
         {/* Progress pill */}
         <div
-          className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold"
+          className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-semibold flex-shrink-0"
           style={{
             background: totalDone === 7 ? '#dcfce7' : totalDone > 0 ? '#fef9c3' : '#f3f4f6',
             color:      totalDone === 7 ? '#16a34a' : totalDone > 0 ? '#d97706' : '#6b7280',

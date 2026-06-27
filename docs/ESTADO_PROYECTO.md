@@ -1,6 +1,6 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-06-26 (sesión 8 — Cloudflare Tunnel, dominio gestcon.work, acceso remoto líderes)  
+**Última actualización:** 2026-06-27 (sesión 9 — Tareas recurrentes, Web Push / iPhone PWA, recordatorios automáticos)  
 **Rama activa:** `main`  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
@@ -123,7 +123,7 @@ GestionTareasOficina/
 - `DashboardPage` — estadísticas, tareas recientes
 - `TasksPage` — lista de tareas con filtros
 - `KanbanPage` — tablero drag-and-drop (@dnd-kit)
-- `CalendarPage` — vista de calendario
+- `CalendarPage` — vista de calendario + templates proyectados + barras de rango de fechas
 - `GroupsPage` — gestión de grupos
 - `TeamPage` — gestión de equipo
 - `UsersPage` — administración de usuarios (admin)
@@ -131,6 +131,7 @@ GestionTareasOficina/
 - `ReportsPage` — exportación PDF/Excel
 - `ProfilePage`, `SettingsPage`
 - `FondoEmprenderPage` + `FondoEmprenderEmpresasPage` + `FondoEmprenderEmpresaDetallePage` + `FondoEmprenderPagosPage` (módulo Fondo Emprender)
+- `RecurringTasksPage` — gestión de templates recurrentes (solo admin/leader, ruta `/tasks/recurrentes`)
 
 **Contextos y estado:**
 - `AuthContext`: detecta automáticamente si backend real está disponible; fallback a localStorage
@@ -214,10 +215,15 @@ GET    /api/tasks/:id/fondo-link
 POST   /api/tasks/:id/fondo-link
 DELETE /api/tasks/:id/fondo-link
 
+GET    /api/tasks/templates                  → lista templates recurrentes (admin/leader)
+
 GET    /api/notifications
 PUT    /api/notifications/:id/read
 PUT    /api/notifications/read-all
 DELETE /api/notifications/:id
+GET    /api/notifications/vapid-public-key  → clave pública VAPID para Web Push
+POST   /api/notifications/push-subscribe    → registrar suscripción push del dispositivo
+DELETE /api/notifications/push-subscribe    → eliminar suscripción
 
 GET    /api/stats
 GET    /api/stats/audit                    → solo admin/leader
@@ -250,13 +256,24 @@ GET    /api/stats/audit                    → solo admin/leader
 | 005 | Tabla password_reset_tokens |
 | 006 | OWASP hardening: columna `is_active` en users, tabla `login_attempts` (detección fuerza bruta) |
 
-**Sistema de tracking:** `run.js` crea tabla `schema_migrations` (PRIMARY KEY `version`). Saltar migraciones ya aplicadas. Opción `--reset` para limpiar y reaplicar todo. Todos los `CREATE INDEX` deben usar `IF NOT EXISTS` para ser idempotentes.  
-⚠️ En producción la columna se llamaba `filename` — se renombró manualmente a `version` con `ALTER TABLE schema_migrations RENAME COLUMN filename TO version`. Ya corregido.
+**Sistema de tracking:** `run.js` crea tabla `schema_migrations` (PRIMARY KEY `filename`). Saltar migraciones ya aplicadas. Opción `--reset` para limpiar y reaplicar todo. Todos los `CREATE INDEX` deben usar `IF NOT EXISTS` para ser idempotentes.
+
+| Migración | Contenido |
+|---|---|
+| 007 | Columna `due_time TIME` en tasks |
+| 007_fondo_* → 012 | Módulo Fondo Emprender |
+| 013 | Tareas recurrentes: `is_recurring`, `recurrence JSONB`, `template_id` |
+| 014 | Columna `start_time` (existe en BD, no usada en código — reverted) |
+| 015 | Tabla `push_subscriptions` (Web Push / iPhone PWA) |
+| 016 | Columna `reminder_sent_at TIMESTAMPTZ` en tasks |
 
 **Tests:**
-- Cobertura actual: **~84% statements / ~73% functions** (umbral: 70%)
+- Cobertura actual: **~79% statements / ~71% functions** (umbral: 70%)
 - 8 archivos unitarios: authController, taskController, groupController, statsController, middleware, routes, helpers, validators
 - 2 archivos de integración: auth.test.js, tasks.test.js
+- Excluidos de cobertura: `pushService.js`, `recurringTaskService.js`, `reminderService.js` (servicios de infraestructura)
+- `jest.mock('../../src/services/pushService', ...)` en taskController.test.js y routes.test.js
+- `public/sw.js` tiene override en `.eslintrc.cjs` con `env: { serviceworker: true }`
 - Script: `npm --prefix backend run test:coverage`
 
 ### Docker Compose
@@ -276,7 +293,9 @@ migrate:    Perfil "migrate" — corre run.js --seed y termina
 
 **HTTPS producción:** Cloudflare Tunnel activo en `https://gestcon.work`. HTTPS real sin warning para todos los usuarios (14 en oficina + 3 líderes remotos). Acceso local directo sigue disponible en `https://192.168.1.12` (cert autofirmado). CORS acepta ambos orígenes vía `CLIENT_URL` separado por comas.
 
-**Service Worker:** `public/sw.js` registrado en `src/main.jsx`. Necesario para que la Notification API funcione en HTTPS de red local. Maneja `notificationclick` para enfocar la pestaña.
+**Service Worker (`public/sw.js`):** Maneja `push` events (Web Push API) y `notificationclick` con navegación a `event.notification.data.url`. Registrado en `src/main.jsx`.
+
+**PWA (iPhone):** `public/manifest.json` con `display: standalone`. Meta tags Apple en `index.html`. Instalar desde Safari → Compartir → "Agregar a pantalla de inicio". Push notifications se suscriben automáticamente al iniciar sesión si el usuario otorga permiso. VAPID keys en `backend/.env`.
 
 **Frontend build:** Se construye localmente con `--platform linux/amd64` si el servidor no tiene RAM suficiente para esbuild.
 
@@ -423,3 +442,9 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 31 | Fix grupos: leaders pueden eliminar grupos | ✅ Resuelto 2026-06-26 |
 | 32 | Tags: sin restricción de rol para crear, eliminadas etiquetas de muestra | ✅ Resuelto 2026-06-26 |
 | 33 | Cloudflare Tunnel `gestcon.work` (HTTPS real, acceso remoto 3 líderes, sin warning) | ✅ Implementado 2026-06-26 |
+| 34 | Tareas recurrentes mensuales: templates, instancias automáticas, cron días 1-3 a las 7AM, vigencia por rango de fechas | ✅ Implementado 2026-06-27 |
+| 35 | Calendario: templates proyectados + barras naranjas para rangos de fechas | ✅ Implementado 2026-06-27 |
+| 36 | Web Push notifications (VAPID) — soporte iPhone PWA + manifest.json | ✅ Implementado 2026-06-27 |
+| 37 | Recordatorios automáticos de vencimiento: cron cada 30 min, sin due_time → hoy/mañana, con due_time → 2h antes | ✅ Implementado 2026-06-27 |
+| 38 | Logo Sidebar clickeable → navega al inicio (/) | ✅ Implementado 2026-06-27 |
+| 39 | Fix CI: ESLint override para sw.js (serviceworker env), mock pushService en tests, coveragePathIgnore nuevos servicios | ✅ Resuelto 2026-06-27 |

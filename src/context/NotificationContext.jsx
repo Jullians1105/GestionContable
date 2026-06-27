@@ -1,4 +1,11 @@
 import { createContext, useState, useCallback, useContext, useEffect } from 'react'
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(base64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
 import { useNavigate } from 'react-router-dom'
 import { generateId } from '../utils/helpers'
 import { storage } from '../utils/storage'
@@ -8,12 +15,13 @@ import { useSocket } from './SocketContext'
 import { useToast } from './ToastContext'
 
 const NOTIF_TITLES = {
-  task_assigned:   'Tarea asignada',
-  task_completed:  'Tarea completada',
-  task_overdue:    'Tarea vencida',
-  task_in_progress:'Tarea en progreso',
-  comment_added:   'Nuevo comentario',
-  subtask_done:    'Subtarea completada',
+  task_assigned:        'Tarea asignada',
+  task_completed:       'Tarea completada',
+  task_overdue:         'Tarea vencida',
+  task_in_progress:     'Tarea en progreso',
+  comment_added:        'Nuevo comentario',
+  subtask_done:         'Subtarea completada',
+  task_reminder_pending:'Tarea recurrente pendiente de fecha',
 }
 
 export const NotificationContext = createContext(null)
@@ -33,14 +41,41 @@ export function NotificationProvider({ children }) {
     setNotifications(storage.getNotifications(userId))
   }, [userId])
 
-  // Solicitar permiso de notificaciones del SO al iniciar sesión
+  // Solicitar permiso de notificaciones + suscripción Web Push (iPhone PWA)
   useEffect(() => {
-    if (!userId) return
-    if (!('Notification' in window)) return
-    if (Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {})
+    if (!userId || !useRealBackend) return
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return
+
+    async function setupPush() {
+      let permission = Notification.permission
+      if (permission === 'default') {
+        permission = await Notification.requestPermission().catch(() => 'denied')
+      }
+      if (permission !== 'granted') return
+
+      try {
+        const { key } = await api.getVapidPublicKey()
+        if (!key) return
+
+        const reg = await navigator.serviceWorker.ready
+        const existing = await reg.pushManager.getSubscription()
+        if (existing) {
+          await api.subscribeToPush(existing.toJSON()).catch(() => {})
+          return
+        }
+
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(key),
+        })
+        await api.subscribeToPush(sub.toJSON())
+      } catch {
+        // Push no soportado o bloqueado — las notificaciones in-app siguen activas
+      }
     }
-  }, [userId])
+
+    setupPush()
+  }, [userId, useRealBackend])
 
   // Cargar desde API real cuando backend disponible
   useEffect(() => {

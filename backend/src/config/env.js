@@ -28,6 +28,9 @@ module.exports = {
   SMTP_USER: process.env.SMTP_USER || '',
   SMTP_PASS: process.env.SMTP_PASS || '',
 
-  // Devuelve el token de recuperación en la respuesta del API (solo para entornos de desarrollo locales)
   SHOW_RESET_TOKEN: process.env.SHOW_RESET_TOKEN === 'true',
+
+  VAPID_EMAIL:       process.env.VAPID_EMAIL       || '',
+  VAPID_PUBLIC_KEY:  process.env.VAPID_PUBLIC_KEY  || '',
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY || '',
 };

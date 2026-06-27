@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { body, query } = require('express-validator');
 const {
   getTasks, getTask, createTask, updateTask, deleteTask, getTaskHistory, searchTasks,
+  getTemplates,
   addSubtask, updateSubtask, deleteSubtask,
   addComment, updateComment, deleteComment,
 } = require('../controllers/taskController');
@@ -51,6 +52,7 @@ router.get('/', sanitizePagination, getTasks);
  *         description: Resultados de búsqueda con ranking
  */
 router.get('/search', searchTasks);
+router.get('/templates', roleMiddleware('admin', 'leader'), getTemplates);
 
 /**
  * @openapi
