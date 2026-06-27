@@ -46,6 +46,10 @@ const io = new Server(server, {
   cors: { origin: corsOrigin, credentials: true },
 });
 setupSocket(io);
+const { initRecurringCron } = require('./services/recurringTaskService');
+initRecurringCron(io);
+const { initReminderCron } = require('./services/reminderService');
+initReminderCron(io);
 
 // Inyectar io en todas las requests
 app.use((req, _res, next) => { req.io = io; next(); });

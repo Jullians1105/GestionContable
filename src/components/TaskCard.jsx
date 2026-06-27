@@ -59,6 +59,18 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
             Fondo
           </span>
         )}
+        {task.templateId && !task.dueDate && (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-0.5 bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa]">
+            <span className="material-symbols-outlined" style={{ fontSize: 10 }}>schedule</span>
+            Sin fecha
+          </span>
+        )}
+        {task.isRecurring && !task.templateId && (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-0.5 bg-[#fff7ed] text-[#c2410c]">
+            <span className="material-symbols-outlined" style={{ fontSize: 10 }}>repeat</span>
+            Template
+          </span>
+        )}
         {tags.map((tag) => (
           <span key={tag.id} className="px-2 py-0.5 rounded-full text-[10px] font-semibold text-white" style={{ background: tag.color }}>
             {tag.name}

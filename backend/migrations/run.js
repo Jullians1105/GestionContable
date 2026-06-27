@@ -35,7 +35,7 @@ async function run() {
     // Ensure tracking table exists
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
-        version    VARCHAR(255) PRIMARY KEY,
+        filename   VARCHAR(255) PRIMARY KEY,
         applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
@@ -62,7 +62,7 @@ async function run() {
         console.log('↷ Base existente detectada — registrando migraciones previas sin re-ejecutarlas...');
         for (const file of allMigrationFiles) {
           await client.query(
-            'INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING',
+            'INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING',
             [file]
           );
           console.log(`  ✓ registrada: ${file}`);
@@ -79,7 +79,7 @@ async function run() {
       }
 
       const { rows: applied } = await client.query(
-        'SELECT 1 FROM schema_migrations WHERE version = $1',
+        'SELECT 1 FROM schema_migrations WHERE filename = $1',
         [file]
       );
       if (applied.length > 0) {
@@ -94,7 +94,7 @@ async function run() {
       try {
         await client.query(sql);
         await client.query(
-          'INSERT INTO schema_migrations (version) VALUES ($1)',
+          'INSERT INTO schema_migrations (filename) VALUES ($1)',
           [file]
         );
         await client.query('COMMIT');

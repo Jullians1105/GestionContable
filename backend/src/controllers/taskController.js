@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const logger = require('../utils/logger');
 const auditLog = require('../utils/auditLog');
+const { sendPushToUser } = require('../services/pushService');
 
 const emitTaskEvent = (io, event, data, groupId) => {
   if (!io) return;
@@ -25,6 +26,8 @@ const getTasks = async (req, res, next) => {
       where += ` AND to_tsvector('spanish', t.title || ' ' || COALESCE(t.description, '')) @@ plainto_tsquery('spanish', $${i++})`;
       params.push(search);
     }
+    // Excluir templates del listado principal — solo instancias y tareas normales
+    where += ` AND (t.is_recurring = false OR t.template_id IS NOT NULL)`;
 
     const tasksQuery = `
       SELECT t.*,
@@ -101,16 +104,16 @@ const normalizeAssignedTo = (val) => {
 
 const createTask = async (req, res, next) => {
   try {
-    const { title, description, priority = 'medium', assignedTo: assignedToRaw, dueDate, dueTime, groupId, tagIds = [] } = req.body;
+    const { title, description, priority = 'medium', assignedTo: assignedToRaw, dueDate, dueTime, groupId, tagIds = [], isRecurring = false, recurrence = null } = req.body;
     const assignedToArr = normalizeAssignedTo(assignedToRaw);
     const assignedTo = assignedToArr[0] ?? null;
     const id = uuidv4();
 
     const result = await db.query(
-      `INSERT INTO tasks (id, user_id, group_id, title, description, status, priority, assigned_to, due_date, due_time)
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9)
+      `INSERT INTO tasks (id, user_id, group_id, title, description, status, priority, assigned_to, due_date, due_time, is_recurring, recurrence)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11)
        RETURNING *`,
-      [id, req.user.userId, groupId || null, title, description || null, priority, assignedTo, dueDate || null, dueTime || null]
+      [id, req.user.userId, groupId || null, title, description || null, priority, assignedTo, dueDate || null, dueTime || null, isRecurring, recurrence ? JSON.stringify(recurrence) : null]
     );
     const task = result.rows[0];
 
@@ -138,6 +141,7 @@ const createTask = async (req, res, next) => {
             id: notifId, type: 'task_assigned', message: notifMsg, taskId: id,
             extra: { actorId: req.user.userId, actorName }, read: false, createdAt: new Date().toISOString(),
           });
+          sendPushToUser(uid, { title: 'Tarea asignada', body: notifMsg, url: '/tasks', tag: notifId });
         });
       }));
     }
@@ -162,6 +166,12 @@ const updateTask = async (req, res, next) => {
     const assignedToArr = assignedToRaw !== undefined ? normalizeAssignedTo(assignedToRaw) : null;
     const assignedTo = assignedToArr !== null ? (assignedToArr[0] ?? null) : undefined;
 
+    // Resetear reminder si cambia la fecha, la hora o el asignado
+    const dueDateChanged = dueDate !== undefined && dueDate !== (old.due_date?.toISOString().slice(0, 10) ?? null);
+    const dueTimeChanged = dueTime !== undefined && (dueTime || null) !== old.due_time;
+    const assignedChanged = assignedToArr !== null && (assignedToArr[0] ?? null) !== old.assigned_to;
+    const resetReminder = dueDateChanged || dueTimeChanged || assignedChanged;
+
     const result = await db.query(
       `UPDATE tasks SET
         title = COALESCE($1, title),
@@ -172,9 +182,10 @@ const updateTask = async (req, res, next) => {
         due_date = $6,
         due_time = $7,
         group_id = $8,
+        reminder_sent_at = CASE WHEN $10 THEN NULL ELSE reminder_sent_at END,
         updated_at = NOW()
        WHERE id = $9 RETURNING *`,
-      [title, description, status, priority, assignedTo ?? old.assigned_to, dueDate ?? old.due_date, dueTime !== undefined ? (dueTime || null) : old.due_time, groupId ?? old.group_id, id]
+      [title, description, status, priority, assignedTo ?? old.assigned_to, dueDate ?? old.due_date, dueTime !== undefined ? (dueTime || null) : old.due_time, groupId ?? old.group_id, id, resetReminder]
     );
     const task = result.rows[0];
 
@@ -207,6 +218,7 @@ const updateTask = async (req, res, next) => {
               id: notifId, type: 'task_assigned', message: notifMsg, taskId: id,
               extra: { actorId: req.user.userId, actorName }, read: false, createdAt: new Date().toISOString(),
             });
+            sendPushToUser(uid, { title: 'Tarea asignada', body: notifMsg, url: '/tasks', tag: notifId });
           });
         }));
       }
@@ -227,6 +239,7 @@ const updateTask = async (req, res, next) => {
             id: notifId, type: 'task_completed', message: notifMsg, taskId: id,
             extra: { completedById: req.user.userId, completedByName: actorName }, read: false, createdAt: new Date().toISOString(),
           });
+          sendPushToUser(l.id, { title: 'Tarea completada', body: notifMsg, url: '/tasks', tag: notifId });
         });
       }));
 
@@ -369,6 +382,9 @@ function normalizeTask(t) {
     })),
     tagIds: t.tag_ids || [],
     hasFondoLink: t.has_fondo_link ?? false,
+    isRecurring: t.is_recurring ?? false,
+    recurrence: t.recurrence ?? null,
+    templateId: t.template_id ?? null,
     createdByName: t.created_by_name || null,
     createdAt: t.created_at,
     updatedAt: t.updated_at,
@@ -480,9 +496,11 @@ const addComment = async (req, res, next) => {
         `INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'comment_added', $3, $4, $5)`,
         [uuidv4(), userId, message, id, extraData]
       ).then(() => {
+        const notifId = uuidv4();
         req.io?.to(`user:${userId}`).emit('notification:received', {
-          type: 'comment_added', taskId: id, message, extra: { commentId },
+          id: notifId, type: 'comment_added', taskId: id, message, extra: { commentId },
         });
+        sendPushToUser(userId, { title: 'Nuevo comentario', body: message, url: '/tasks', tag: notifId });
       })
     ));
 
@@ -531,8 +549,34 @@ const deleteComment = async (req, res, next) => {
   }
 };
 
+const getTemplates = async (req, res, next) => {
+  try {
+    const result = await db.query(`
+      SELECT t.*,
+        u.name AS assigned_to_name,
+        creator.name AS created_by_name,
+        g.name AS group_name
+      FROM tasks t
+      LEFT JOIN users u ON u.id = t.assigned_to
+      LEFT JOIN users creator ON creator.id = t.user_id
+      LEFT JOIN groups g ON g.id = t.group_id
+      WHERE t.is_recurring = true AND t.template_id IS NULL
+      ORDER BY t.created_at DESC
+    `);
+    res.json(result.rows.map(t => ({
+      ...normalizeTask({ ...t, subtasks: null, comments: null, tag_ids: null, has_fondo_link: false }),
+      subtasks: [],
+      comments: [],
+      tagIds: [],
+    })));
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getTasks, getTask, createTask, updateTask, deleteTask, getTaskHistory, searchTasks,
+  getTemplates,
   addSubtask, updateSubtask, deleteSubtask,
   addComment, updateComment, deleteComment,
 };
