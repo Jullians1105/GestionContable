@@ -1,11 +1,11 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-06-24 (sesión 6 — fixes frontend producción)  
+**Última actualización:** 2026-06-27 (sesión 9 — Tareas recurrentes, Web Push / iPhone PWA, recordatorios automáticos)  
 **Rama activa:** `main`  
 **Versión:** 3.0.0  
-**Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅  
-**Ramas activas en remoto:** `main` · `feat/arregloBugsYAdiciones` · `feat/modulo-pagos`  
-**Servidor de producción:** `192.168.1.12:5173`
+**Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
+**Ramas activas en remoto:** `main`  
+**Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)
 
 ---
 
@@ -55,20 +55,30 @@ GestionTareasOficina/
 │   ├── src/
 │   │   ├── index.js            # Punto de entrada (Express + Socket.io + Swagger)
 │   │   ├── config/             # database.js, env.js
-│   │   ├── controllers/        # authController, taskController, groupController, statsController
-│   │   ├── middleware/         # auth.js (JWT + roles), errorHandler.js, validation.js
-│   │   ├── routes/             # auth, tasks, employees, groups, tags, notifications, stats
+│   │   ├── controllers/        # authController, taskController, groupController, statsController,
+│   │   │                       # fondoEmpresasController, fondoProcesosController, fondoChecklistController,
+│   │   │                       # fondoDetalleController, fondoPagosController, fondoLinksController
+│   │   ├── middleware/         # auth.js (JWT + roles), errorHandler.js, validation.js, fondoAccess.js
+│   │   ├── routes/             # auth, tasks, employees, groups, tags, notifications, stats,
+│   │   │                       # fondoEmpresas, fondoProcesos, fondoChecklist, fondoDetalle, fondoPagos, fondoLinks
 │   │   ├── socket/events.js    # setupSocket — autenticación JWT, rooms, user:online/offline
 │   │   ├── services/           # emailService
 │   │   └── utils/              # jwt.js, logger.js, ...
-│   ├── migrations/             # 6 archivos SQL + run.js
+│   ├── migrations/             # 12 archivos SQL + run.js
 │   │   ├── 001_initial_schema.sql
 │   │   ├── 002_seed_data.sql
 │   │   ├── 003_notification_extra.sql
 │   │   ├── 004_user_permissions.sql
 │   │   ├── 005_password_reset.sql
 │   │   ├── 006_security_hardening.sql
-│   │   └── run.js              # CLI: --seed, --reset + tabla schema_migrations (tracking)
+│   │   ├── 007_due_time.sql
+│   │   ├── 007_fondo_empresas.sql
+│   │   ├── 008_fondo_checklist.sql
+│   │   ├── 009_fondo_detalle.sql
+│   │   ├── 010_fondo_pagos.sql
+│   │   ├── 011_task_fondo_links.sql
+│   │   ├── 012_fondo_detalle_anio_mes.sql
+│   │   └── run.js              # CLI: --seed, --reset + tabla schema_migrations (col: version)
 │   ├── tests/
 │   │   ├── unit/               # 8 archivos (auth, tasks, groups, middleware, routes, stats, helpers, validators)
 │   │   ├── integration/        # auth.test.js, tasks.test.js
@@ -89,7 +99,10 @@ GestionTareasOficina/
 ├── scripts/
 │   ├── start-dev.sh            # Levanta Docker Compose para desarrollo
 │   ├── stop-dev.sh
-│   ├── backup-db.sh            # pg_dump manual vía docker compose exec
+│   ├── backup-db.sh            # pg_dump manual (legacy, usar backup.sh)
+│   ├── backup.sh               # Backup completo: BD + .env + certs, comprimido, rotación 7 días
+│   ├── restore.sh              # Restaura desde backup_TIMESTAMP.tar.gz
+│   ├── setup-cron.sh           # Instala cron de backup diario a las 6 PM
 │   └── reset-db.sh
 ├── docker-compose.yml          # 5 servicios: postgres, mailhog, backend, frontend, migrate
 ├── Dockerfile                  # ← PROBLEMA (ver sección "Falta")
@@ -110,14 +123,15 @@ GestionTareasOficina/
 - `DashboardPage` — estadísticas, tareas recientes
 - `TasksPage` — lista de tareas con filtros
 - `KanbanPage` — tablero drag-and-drop (@dnd-kit)
-- `CalendarPage` — vista de calendario
+- `CalendarPage` — vista de calendario + templates proyectados + barras de rango de fechas
 - `GroupsPage` — gestión de grupos
 - `TeamPage` — gestión de equipo
 - `UsersPage` — administración de usuarios (admin)
 - `NotificationsPage`
 - `ReportsPage` — exportación PDF/Excel
 - `ProfilePage`, `SettingsPage`
-- `FondoEmprenderPage` + `FondoEmprenderEmpresasPage` + `FondoEmprenderEmpresaDetallePage` (módulo externo)
+- `FondoEmprenderPage` + `FondoEmprenderEmpresasPage` + `FondoEmprenderEmpresaDetallePage` + `FondoEmprenderPagosPage` (módulo Fondo Emprender)
+- `RecurringTasksPage` — gestión de templates recurrentes (solo admin/leader, ruta `/tasks/recurrentes`)
 
 **Contextos y estado:**
 - `AuthContext`: detecta automáticamente si backend real está disponible; fallback a localStorage
@@ -178,14 +192,38 @@ POST   /api/groups/:id/members
 DELETE /api/groups/:id/members/:userId
 
 GET    /api/tags
-POST   /api/tags
+POST   /api/tags                           → cualquier usuario autenticado (sin restricción de rol)
 PUT    /api/tags/:id
 DELETE /api/tags/:id                       → solo admin
+
+GET    /api/fondo/empresas
+POST   /api/fondo/empresas
+PUT    /api/fondo/empresas/:id
+DELETE /api/fondo/empresas/:id
+GET    /api/fondo/procesos
+GET    /api/fondo/checklist/:empresaId
+PUT    /api/fondo/checklist/:empresaId
+GET    /api/fondo/detalle/:empresaId
+PUT    /api/fondo/detalle/:empresaId/:macroId
+GET    /api/fondo/detalle/tareas-macro
+GET    /api/fondo/detalle/responsables
+GET    /api/fondo/pagos
+POST   /api/fondo/pagos
+PUT    /api/fondo/pagos/:id
+DELETE /api/fondo/pagos/:id
+GET    /api/tasks/:id/fondo-link
+POST   /api/tasks/:id/fondo-link
+DELETE /api/tasks/:id/fondo-link
+
+GET    /api/tasks/templates                  → lista templates recurrentes (admin/leader)
 
 GET    /api/notifications
 PUT    /api/notifications/:id/read
 PUT    /api/notifications/read-all
 DELETE /api/notifications/:id
+GET    /api/notifications/vapid-public-key  → clave pública VAPID para Web Push
+POST   /api/notifications/push-subscribe    → registrar suscripción push del dispositivo
+DELETE /api/notifications/push-subscribe    → eliminar suscripción
 
 GET    /api/stats
 GET    /api/stats/audit                    → solo admin/leader
@@ -218,12 +256,24 @@ GET    /api/stats/audit                    → solo admin/leader
 | 005 | Tabla password_reset_tokens |
 | 006 | OWASP hardening: columna `is_active` en users, tabla `login_attempts` (detección fuerza bruta) |
 
-**Sistema de tracking:** `run.js` crea tabla `schema_migrations` (PRIMARY KEY filename). Saltar migraciones ya aplicadas con `⏭ already applied`. Opción `--reset` para limpiar y reaplicar todo. Todos los `CREATE INDEX` deben usar `IF NOT EXISTS` para ser idempotentes.
+**Sistema de tracking:** `run.js` crea tabla `schema_migrations` (PRIMARY KEY `filename`). Saltar migraciones ya aplicadas. Opción `--reset` para limpiar y reaplicar todo. Todos los `CREATE INDEX` deben usar `IF NOT EXISTS` para ser idempotentes.
+
+| Migración | Contenido |
+|---|---|
+| 007 | Columna `due_time TIME` en tasks |
+| 007_fondo_* → 012 | Módulo Fondo Emprender |
+| 013 | Tareas recurrentes: `is_recurring`, `recurrence JSONB`, `template_id` |
+| 014 | Columna `start_time` (existe en BD, no usada en código — reverted) |
+| 015 | Tabla `push_subscriptions` (Web Push / iPhone PWA) |
+| 016 | Columna `reminder_sent_at TIMESTAMPTZ` en tasks |
 
 **Tests:**
-- Cobertura actual: **~84% statements / ~73% functions** (umbral: 70%)
+- Cobertura actual: **~79% statements / ~71% functions** (umbral: 70%)
 - 8 archivos unitarios: authController, taskController, groupController, statsController, middleware, routes, helpers, validators
 - 2 archivos de integración: auth.test.js, tasks.test.js
+- Excluidos de cobertura: `pushService.js`, `recurringTaskService.js`, `reminderService.js` (servicios de infraestructura)
+- `jest.mock('../../src/services/pushService', ...)` en taskController.test.js y routes.test.js
+- `public/sw.js` tiene override en `.eslintrc.cjs` con `env: { serviceworker: true }`
 - Script: `npm --prefix backend run test:coverage`
 
 ### Docker Compose
@@ -237,15 +287,24 @@ frontend:   Imagen propia + depende de backend
 migrate:    Perfil "migrate" — corre run.js --seed y termina
 ```
 
-**Backend Dockerfile:** multi-stage ✅ · usuario no-root (`appuser`) ✅ · `HEALTHCHECK` en imagen ✅
+**Backend Dockerfile:** multi-stage ✅ · usuario no-root (`appuser`) ✅ · `HEALTHCHECK` en imagen ✅ · `app.set('trust proxy', 1)` para X-Forwarded-For con nginx ✅
 
-**Frontend build:** Se construye en la Mac con `--platform linux/amd64` y se transfiere al servidor con `docker save | scp | docker load`. El servidor (amd64) no tiene RAM suficiente para que esbuild compile el bundle sin SIGSEGV.
+**Frontend nginx:** escucha en 443 (HTTPS) y redirige 80 → 443. Certs montados desde `/etc/nginx/certs/` del host como volumen `:ro`. Expone puertos 80 y 443.
+
+**HTTPS producción:** Cloudflare Tunnel activo en `https://gestcon.work`. HTTPS real sin warning para todos los usuarios (14 en oficina + 3 líderes remotos). Acceso local directo sigue disponible en `https://192.168.1.12` (cert autofirmado). CORS acepta ambos orígenes vía `CLIENT_URL` separado por comas.
+
+**Service Worker (`public/sw.js`):** Maneja `push` events (Web Push API) y `notificationclick` con navegación a `event.notification.data.url`. Registrado en `src/main.jsx`.
+
+**PWA (iPhone):** `public/manifest.json` con `display: standalone`. Meta tags Apple en `index.html`. Instalar desde Safari → Compartir → "Agregar a pantalla de inicio". Push notifications se suscriben automáticamente al iniciar sesión si el usuario otorga permiso. VAPID keys en `backend/.env`.
+
+**Frontend build:** Se construye localmente con `--platform linux/amd64` si el servidor no tiene RAM suficiente para esbuild.
 
 ### Documentación y scripts
 
 - `docs/SETUP_MACOS.md` — instrucciones de primer setup completas
-- `docs/ACCESO_EXTERNO.md` — acceso desde red local
-- `scripts/backup-db.sh` — hace `pg_dump` vía Docker
+- `scripts/backup.sh` — backup completo (BD + .env + certs) con rotación 7 días
+- `scripts/restore.sh` — restauración desde archivo tar.gz
+- `scripts/setup-cron.sh` — instala cron de backup diario 6 PM
 - `scripts/start-dev.sh / stop-dev.sh / reset-db.sh`
 - Swagger UI disponible en `/api/docs` cuando el backend está corriendo
 
@@ -374,3 +433,18 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 22 | Fix backend crash SHOW_RESET_TOKEN en producción | ✅ Resuelto 2026-06-24 |
 | 23 | Fix frontend Docker: puerto 5173:80, CSP nginx una línea, logos como imports ES | ✅ Resuelto 2026-06-24 |
 | 24 | Build frontend desde Mac (--platform linux/amd64) por SIGSEGV esbuild en servidor | ✅ Documentado 2026-06-24 |
+| 25 | Módulo Fondo Emprender completo (empresas, checklist, macroprocesos, pagos, responsables) | ✅ Implementado 2026-06-26 |
+| 26 | Vínculo tarea ↔ macroproceso Fondo (task_fondo_links, badge en TaskCard, TaskForm) | ✅ Implementado 2026-06-26 |
+| 27 | Panel Fondo Emprender en Mis Tareas (solo miembros del grupo) | ✅ Implementado 2026-06-26 |
+| 28 | HTTPS con certificado autofirmado en nginx (puertos 80→443) | ✅ Implementado 2026-06-26 |
+| 29 | Service Worker para Notification API en red local HTTP/HTTPS | ✅ Implementado 2026-06-26 |
+| 30 | Backup automático con cron a las 6 PM (BD + .env + certs, rotación 7 días) | ✅ Implementado 2026-06-26 |
+| 31 | Fix grupos: leaders pueden eliminar grupos | ✅ Resuelto 2026-06-26 |
+| 32 | Tags: sin restricción de rol para crear, eliminadas etiquetas de muestra | ✅ Resuelto 2026-06-26 |
+| 33 | Cloudflare Tunnel `gestcon.work` (HTTPS real, acceso remoto 3 líderes, sin warning) | ✅ Implementado 2026-06-26 |
+| 34 | Tareas recurrentes mensuales: templates, instancias automáticas, cron días 1-3 a las 7AM, vigencia por rango de fechas | ✅ Implementado 2026-06-27 |
+| 35 | Calendario: templates proyectados + barras naranjas para rangos de fechas | ✅ Implementado 2026-06-27 |
+| 36 | Web Push notifications (VAPID) — soporte iPhone PWA + manifest.json | ✅ Implementado 2026-06-27 |
+| 37 | Recordatorios automáticos de vencimiento: cron cada 30 min, sin due_time → hoy/mañana, con due_time → 2h antes | ✅ Implementado 2026-06-27 |
+| 38 | Logo Sidebar clickeable → navega al inicio (/) | ✅ Implementado 2026-06-27 |
+| 39 | Fix CI: ESLint override para sw.js (serviceworker env), mock pushService en tests, coveragePathIgnore nuevos servicios | ✅ Resuelto 2026-06-27 |

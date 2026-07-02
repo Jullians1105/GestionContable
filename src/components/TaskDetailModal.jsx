@@ -98,6 +98,16 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
 
           {/* Meta row */}
           <div className="grid grid-cols-2 gap-4">
+            {liveTask.createdByName && (
+              <div className="col-span-2 flex items-center gap-2 px-3 py-2 bg-[#f3f4f6] dark:bg-[#252840] rounded-xl">
+                <span className="material-symbols-outlined text-[#888]" style={{ fontSize: 15 }}>person</span>
+                <span className="text-[10px] font-semibold text-[#888] uppercase tracking-wide">Creado por</span>
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0 ${getAvatarColor(liveTask.createdByName)}`}>
+                  {getInitials(liveTask.createdByName)}
+                </div>
+                <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{liveTask.createdByName}</span>
+              </div>
+            )}
             <div className="bg-[#f3f4f6] dark:bg-[#252840] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide mb-1">Asignado a</p>
               {assignedMembers.length > 0 ? (

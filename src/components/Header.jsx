@@ -57,6 +57,14 @@ export default function Header({ onMenuToggle }) {
         </span>
 
         <button
+          onClick={() => window.location.reload()}
+          className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-[#434655] dark:text-[#c4c8e8]"
+          title="Recargar"
+        >
+          <span className="material-symbols-outlined text-xl">refresh</span>
+        </button>
+
+        <button
           onClick={toggleTheme}
           className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-[#434655] dark:text-[#c4c8e8]"
           title={theme === 'light' ? 'Modo oscuro' : 'Modo claro'}

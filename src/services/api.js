@@ -103,6 +103,7 @@ export const api = {
     return request(`/tasks${params ? `?${params}` : ''}`);
   },
   getTask: (id) => request(`/tasks/${id}`),
+  getTemplates: () => request('/tasks/templates'),
   createTask: (data) => request('/tasks', { method: 'POST', body: JSON.stringify(data) }),
   updateTask: (id, data) => request(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
@@ -250,4 +251,15 @@ export const api = {
   markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: 'PUT' }),
   markAllNotificationsRead: () => request('/notifications/read-all', { method: 'PUT' }),
   deleteNotification: (id) => request(`/notifications/${id}`, { method: 'DELETE' }),
+
+  // Push subscriptions (Web Push / iPhone PWA)
+  getVapidPublicKey: () => request('/notifications/vapid-public-key'),
+  subscribeToPush: (subscription) => request('/notifications/push-subscribe', {
+    method: 'POST',
+    body: JSON.stringify(subscription),
+  }),
+  unsubscribeFromPush: (endpoint) => request('/notifications/push-subscribe', {
+    method: 'DELETE',
+    body: JSON.stringify({ endpoint }),
+  }),
 };

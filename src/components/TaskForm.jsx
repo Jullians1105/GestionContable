@@ -17,18 +17,20 @@ const EMPTY_TASK = {
   groupId: '',
   tagIds: [],
   subtasks: [],
+  isRecurring: false,
+  recurrence: null,
 }
 
 const labelCls = 'block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5'
 const inputCls = 'w-full border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 h-10 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-[#edeef0] dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
 const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
 
-export default function TaskForm({ task, onSubmit, onCancel }) {
+export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = false }) {
   const { members } = useTeam()
   const { groups } = useGroups()
   const [form, setForm] = useState(task
-    ? { ...task, dueTime: task.dueTime ?? '', assignedTo: normalizeAssignedTo(task.assignedTo) }
-    : EMPTY_TASK
+    ? { ...task, dueTime: task.dueTime ?? '', assignedTo: normalizeAssignedTo(task.assignedTo), isRecurring: task.isRecurring ?? false, recurrence: task.recurrence ?? null }
+    : { ...EMPTY_TASK, isRecurring: forceRecurring, recurrence: forceRecurring ? { type: 'monthly', approx_day: '' } : null }
   )
   const [errors, setErrors] = useState({})
   const [subtaskInput, setSubtaskInput] = useState('')
@@ -213,23 +215,53 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
         {errors.assignedTo && <p className="text-[#EF4444] text-xs mt-1">{errors.assignedTo}</p>}
       </div>
 
-      <div>
-        <label className={labelCls}>Fecha límite <span className="text-[#EF4444]">*</span></label>
-        <input type="date" value={form.dueDate} onChange={(e) => handleChange('dueDate', e.target.value)} className={`${inputCls} ${errors.dueDate ? inputErrCls : ''}`} />
-        {errors.dueDate && <p className="text-[#EF4444] text-xs mt-1">{errors.dueDate}</p>}
-      </div>
+      {form.isRecurring ? (
+        <div>
+          <label className={labelCls}>Vigencia del template <span className="text-[#888] font-normal">(opcional)</span></label>
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <p className="text-[10px] text-[#888] mb-1">Fecha inicio</p>
+              <input
+                type="date"
+                value={form.recurrence?.start_date ?? ''}
+                onChange={(e) => setForm(prev => ({ ...prev, recurrence: { ...prev.recurrence, start_date: e.target.value || undefined } }))}
+                className={inputCls}
+              />
+            </div>
+            <span className="material-symbols-outlined text-[#888] mt-4 flex-shrink-0">arrow_forward</span>
+            <div className="flex-1">
+              <p className="text-[10px] text-[#888] mb-1">Fecha fin</p>
+              <input
+                type="date"
+                value={form.recurrence?.end_date ?? ''}
+                onChange={(e) => setForm(prev => ({ ...prev, recurrence: { ...prev.recurrence, end_date: e.target.value || undefined } }))}
+                className={inputCls}
+              />
+            </div>
+          </div>
+          <p className="text-[10px] text-[#888] mt-1">Sin rango definido el template genera instancias indefinidamente</p>
+        </div>
+      ) : (
+        <>
+          <div>
+            <label className={labelCls}>Fecha límite <span className="text-[#EF4444]">*</span></label>
+            <input type="date" value={form.dueDate} onChange={(e) => handleChange('dueDate', e.target.value)} className={`${inputCls} ${errors.dueDate ? inputErrCls : ''}`} />
+            {errors.dueDate && <p className="text-[#EF4444] text-xs mt-1">{errors.dueDate}</p>}
+          </div>
 
-      <div className="flex flex-col items-center gap-1">
-        <label className="text-[10px] text-[#888]">
-          Hora límite <span className="italic text-[#EF4444]">(opcional de lo contario hasta las 7:00 p.m.)</span>
-        </label>
-        <input
-          type="time"
-          value={form.dueTime}
-          onChange={(e) => handleChange('dueTime', e.target.value)}
-          className="border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 h-9 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-[#edeef0] dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
-        />
-      </div>
+          <div className="flex flex-col items-center gap-1">
+            <label className="text-[10px] text-[#888]">
+              Hora límite <span className="italic text-[#EF4444]">(opcional de lo contario hasta las 7:00 p.m.)</span>
+            </label>
+            <input
+              type="time"
+              value={form.dueTime}
+              onChange={(e) => handleChange('dueTime', e.target.value)}
+              className="border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 h-9 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-[#edeef0] dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+            />
+          </div>
+        </>
+      )}
 
       <div>
         <label className={labelCls}>Grupo</label>
@@ -306,7 +338,7 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
           style={{ background: '#004ac6' }}
         >
           <span className="material-symbols-outlined text-base">save</span>
-          {task ? 'Guardar cambios' : 'Crear tarea'}
+          {task ? 'Guardar cambios' : form.isRecurring ? 'Crear template' : 'Crear tarea'}
         </button>
       </div>
     </form>

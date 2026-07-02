@@ -4,6 +4,7 @@ jest.mock('../../src/utils/logger', () => ({
   info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(),
 }));
 jest.mock('../../src/utils/jwt');
+jest.mock('../../src/services/pushService', () => ({ sendPushToUser: jest.fn() }));
 
 describe('Routes registration', () => {
   test('auth routes se cargan correctamente', () => {

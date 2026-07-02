@@ -32,7 +32,7 @@ export const validators = {
     const assignedArr = Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo ? [task.assignedTo] : [])
     if (assignedArr.length === 0) errors.assignedTo = 'Debes asignar la tarea a alguien'
     else if (!assignedArr.every(id => UUID_RE.test(id))) errors.assignedTo = 'Selecciona miembros válidos del equipo'
-    if (!task.dueDate) errors.dueDate = 'La fecha límite es obligatoria'
+    if (!task.isRecurring && !task.dueDate) errors.dueDate = 'La fecha límite es obligatoria'
     return errors
   },
 

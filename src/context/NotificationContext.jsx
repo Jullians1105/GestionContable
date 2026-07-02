@@ -1,4 +1,11 @@
 import { createContext, useState, useCallback, useContext, useEffect } from 'react'
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const raw = atob(base64)
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+}
 import { useNavigate } from 'react-router-dom'
 import { generateId } from '../utils/helpers'
 import { storage } from '../utils/storage'
@@ -8,12 +15,13 @@ import { useSocket } from './SocketContext'
 import { useToast } from './ToastContext'
 
 const NOTIF_TITLES = {
-  task_assigned:   'Tarea asignada',
-  task_completed:  'Tarea completada',
-  task_overdue:    'Tarea vencida',
-  task_in_progress:'Tarea en progreso',
-  comment_added:   'Nuevo comentario',
-  subtask_done:    'Subtarea completada',
+  task_assigned:        'Tarea asignada',
+  task_completed:       'Tarea completada',
+  task_overdue:         'Tarea vencida',
+  task_in_progress:     'Tarea en progreso',
+  comment_added:        'Nuevo comentario',
+  subtask_done:         'Subtarea completada',
+  task_reminder_pending:'Tarea recurrente pendiente de fecha',
 }
 
 export const NotificationContext = createContext(null)
@@ -33,13 +41,84 @@ export function NotificationProvider({ children }) {
     setNotifications(storage.getNotifications(userId))
   }, [userId])
 
-  // Solicitar permiso de notificaciones del SO al iniciar sesión
+  const pushSupported = typeof window !== 'undefined'
+    && 'Notification' in window
+    && 'serviceWorker' in navigator
+    && 'PushManager' in window
+
+  const [pushPermission, setPushPermission] = useState(
+    () => (pushSupported ? Notification.permission : 'unsupported')
+  )
+
+  // Si el permiso ya estaba concedido (sesión anterior), registrar suscripción silenciosamente.
+  // También se re-ejecuta cuando el usuario vuelve a la pestaña/app para renovar suscripciones
+  // que hayan expirado o sido eliminadas del servidor.
   useEffect(() => {
-    if (!userId) return
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission()
+    if (!userId || !useRealBackend || !pushSupported) return
+
+    async function resubscribe() {
+      if (Notification.permission !== 'granted') return
+      try {
+        const { key } = await api.getVapidPublicKey()
+        if (!key) { console.warn('[Push] VAPID key vacía'); return }
+        const reg = await navigator.serviceWorker.ready
+        let existing = await reg.pushManager.getSubscription()
+
+        // Si la suscripción local existe pero el servidor ya no la tiene (por expiración/410),
+        // la eliminamos del navegador y creamos una nueva
+        if (existing) {
+          const saved = await api.subscribeToPush(existing.toJSON()).catch(() => null)
+          if (saved !== null) return  // OK, backend actualizado
+          // subscribeToPush falló → forzar nueva suscripción
+          await existing.unsubscribe().catch(() => {})
+          existing = null
+        }
+
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(key),
+        })
+        await api.subscribeToPush(sub.toJSON())
+        console.info('[Push] Suscripción renovada correctamente')
+      } catch (err) { console.warn('[Push] Error al suscribir:', err?.message ?? err) }
     }
-  }, [userId])
+
+    resubscribe()
+
+    // Renovar suscripción cuando el usuario vuelve a la pestaña o abre la PWA
+    function onVisible() {
+      if (document.visibilityState === 'visible') resubscribe()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [userId, useRealBackend, pushSupported])
+
+  // Llamar desde un tap/click del usuario — única forma que acepta Safari iOS
+  const requestPushPermission = useCallback(async () => {
+    if (!pushSupported) return 'unsupported'
+    const permission = await Notification.requestPermission().catch(() => 'denied')
+    setPushPermission(permission)
+    if (permission !== 'granted') return permission
+
+    try {
+      const { key } = await api.getVapidPublicKey()
+      if (!key) return permission
+      const reg = await navigator.serviceWorker.ready
+      const existing = await reg.pushManager.getSubscription()
+      if (existing) {
+        await api.subscribeToPush(existing.toJSON()).catch(() => {})
+        return permission
+      }
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(key),
+      })
+      await api.subscribeToPush(sub.toJSON())
+      console.info('[Push] Suscripción registrada correctamente')
+    } catch (err) { console.warn('[Push] Error al suscribir:', err?.message ?? err) }
+
+    return permission
+  }, [pushSupported])
 
   // Cargar desde API real cuando backend disponible
   useEffect(() => {
@@ -65,14 +144,19 @@ export function NotificationProvider({ children }) {
       // Notificación del SO (cuando la app está en background o en otra pestaña)
       if ('Notification' in window && Notification.permission === 'granted') {
         const title = NOTIF_TITLES[notif.type] || 'Notificación'
-        const osNotif = new Notification(title, {
-          body: notif.message,
-          icon: '/app-icon.png',
-          tag: notif.id,
-        })
-        osNotif.onclick = () => {
-          window.focus()
-          if (notif.taskId) navigate('/tasks')
+        const options = { body: notif.message, icon: '/app-icon.png', tag: notif.id }
+        // Service Worker es necesario en contextos no-seguros (HTTP por IP de red)
+        if (navigator.serviceWorker?.controller) {
+          navigator.serviceWorker.ready.then(reg => {
+            reg.showNotification(title, options)
+          }).catch(() => {})
+        } else {
+          try {
+            const osNotif = new Notification(title, options)
+            osNotif.onclick = () => { window.focus(); if (notif.taskId) navigate('/tasks') }
+          } catch {
+            // new Notification() bloqueado en HTTP — las notificaciones in-app siguen funcionando
+          }
         }
       }
     }
@@ -137,7 +221,7 @@ export function NotificationProvider({ children }) {
 
   return (
     <NotificationContext.Provider
-      value={{ notifications, unreadCount, addNotification, markAsRead, markAllAsRead, deleteNotification, clearAll }}
+      value={{ notifications, unreadCount, addNotification, markAsRead, markAllAsRead, deleteNotification, clearAll, pushPermission, requestPushPermission }}
     >
       {children}
     </NotificationContext.Provider>

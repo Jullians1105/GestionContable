@@ -44,10 +44,10 @@ function calcularMesesDebidos(pagos) {
 // Estilo estructural del <td> — visual va en className para que hover: Tailwind funcione
 const TD_STYLE = {
   fontSize: 11,
-  padding: '12px',
+  padding: '8px 6px',
   verticalAlign: 'middle',
   textAlign: 'center',
-  height: 70,
+  height: 58,
 }
 
 // className por estado (fondo de color identifica el estado)
@@ -679,9 +679,9 @@ export default function FondoEmprenderPagosPage() {
                     rowSpan={2}
                     style={{
                       position: 'sticky', left: 0, zIndex: 3,
-                      padding: '10px 16px',
-                      width: 280, minWidth: 280, maxWidth: 280,
-                      textAlign: 'left', fontSize: 14, fontWeight: 600,
+                      padding: '10px 12px',
+                      width: 200, minWidth: 160, maxWidth: 200,
+                      textAlign: 'left', fontSize: 13, fontWeight: 600,
                       boxShadow: '2px 0 4px rgba(0,0,0,0.04)',
                       overflow: 'hidden',
                     }}
@@ -694,8 +694,8 @@ export default function FondoEmprenderPagosPage() {
                       key={m.ym}
                       colSpan={2}
                       style={{
-                        textAlign: 'center', fontSize: 14, fontWeight: 600,
-                        padding: '8px 4px',
+                        textAlign: 'center', fontSize: 12, fontWeight: 600,
+                        padding: '6px 4px',
                         whiteSpace: 'nowrap',
                       }}
                       className="bg-white dark:bg-[#1e2030] text-[#434655] dark:text-[#c4c8e8] border-b border-l-2 border-[#e2e4ef] dark:border-[#2e3148]"
@@ -709,13 +709,13 @@ export default function FondoEmprenderPagosPage() {
                   {months.map(m => (
                     <Fragment key={m.ym}>
                       <th
-                        style={{ textAlign: 'center', fontSize: 13, fontWeight: 500, padding: '5px 8px', width: 120, maxWidth: 120 }}
+                        style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, padding: '4px 6px', width: 100, maxWidth: 100 }}
                         className="bg-[#f8f9fe] dark:bg-[#252840] text-[#8890b5] dark:text-[#5a5f7a] border-b-2 border-l-2 border-[#e2e4ef] dark:border-[#2e3148]"
                       >
                         Envío
                       </th>
                       <th
-                        style={{ textAlign: 'center', fontSize: 13, fontWeight: 500, padding: '5px 8px', width: 120, maxWidth: 120 }}
+                        style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, padding: '4px 6px', width: 100, maxWidth: 100 }}
                         className="bg-[#f8f9fe] dark:bg-[#252840] text-[#8890b5] dark:text-[#5a5f7a] border-b-2 border-[#e2e4ef] dark:border-[#2e3148]"
                       >
                         Resultado
@@ -735,9 +735,9 @@ export default function FondoEmprenderPagosPage() {
                     <td
                       style={{
                         position: 'sticky', left: 0, zIndex: 2,
-                        padding: '8px 14px',
+                        padding: '8px 10px',
                         boxShadow: '2px 0 4px rgba(0,0,0,0.04)',
-                        width: 280, minWidth: 280, maxWidth: 280,
+                        width: 200, minWidth: 160, maxWidth: 200,
                         verticalAlign: 'middle',
                         overflow: 'hidden',
                         whiteSpace: 'nowrap',

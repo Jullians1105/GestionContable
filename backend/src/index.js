@@ -34,16 +34,23 @@ const dianRoutes            = require('./routes/dian');
 const app = express();
 const server = http.createServer(app);
 
+// Confiar en el proxy reverso (nginx) para que express-rate-limit lea X-Forwarded-For correctamente
+app.set('trust proxy', 1);
+
 // En desarrollo permite cualquier puerto de localhost (Vite puede usar 5173, 5174, etc.)
 const corsOrigin = env.NODE_ENV === 'development'
   ? /^http:\/\/localhost(:\d+)?$/
-  : env.CLIENT_URL;
+  : env.CLIENT_URL.split(',').map(u => u.trim()).filter(Boolean);
 
 // Socket.io
 const io = new Server(server, {
   cors: { origin: corsOrigin, credentials: true },
 });
 setupSocket(io);
+const { initRecurringCron } = require('./services/recurringTaskService');
+initRecurringCron(io);
+const { initReminderCron } = require('./services/reminderService');
+initReminderCron(io);
 
 // Inyectar io en todas las requests
 app.use((req, _res, next) => { req.io = io; next(); });

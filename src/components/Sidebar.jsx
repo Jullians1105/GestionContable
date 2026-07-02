@@ -11,6 +11,7 @@ const navItems = [
   { to: '/tasks', label: 'Mis Tareas', icon: 'task_alt' },
   { to: '/kanban', label: 'Kanban', icon: 'view_kanban' },
   { to: '/calendar', label: 'Calendario', icon: 'calendar_month' },
+  { to: '/tasks/recurrentes', label: 'Recurrentes', icon: 'repeat', leaderOnly: true },
   { to: '/team', label: 'Equipo', icon: 'group' },
   { to: '/groups', label: 'Grupos', icon: 'group_work' },
   { to: '/reports', label: 'Reportes', icon: 'bar_chart' },
@@ -72,6 +73,7 @@ export default function Sidebar({ open, onClose }) {
   }
 
   const visible = navItems.filter(item => {
+    if (item.leaderOnly && !isAdmin() && !isLeader()) return false
     if (item.to === '/reports' && !isAdmin() && !isLeader()) return false
     if (item.to === '/groups' && !isAdmin() && !isLeader()) return false
     if (item.to === '/usuarios' && !isAdmin()) return false
@@ -105,14 +107,14 @@ export default function Sidebar({ open, onClose }) {
           className="w-16 h-full flex flex-col items-center py-4 gap-1 flex-shrink-0 overflow-hidden"
           style={{ background: '#004ac6' }}
         >
-          {/* Logo wrapper same width as buttons so items align on the same axis */}
-          <div className="w-10 h-10 flex items-center justify-center mb-3 flex-shrink-0">
+          {/* Logo — navega al inicio */}
+          <NavLink to="/" className="w-10 h-10 flex items-center justify-center mb-3 flex-shrink-0">
             <img
               src={logoBlanco}
               alt="Logo"
               className="w-9 h-9 object-contain"
             />
-          </div>
+          </NavLink>
           {modules.map(({ id, label, icon }) => (
             <button
               key={id}

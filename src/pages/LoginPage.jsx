@@ -32,7 +32,7 @@ export default function LoginPage() {
       <div className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-lg p-8 w-full max-w-md border border-[#c3c6d7] dark:border-[#2e3148]">
         <div className="flex items-center gap-3 mb-8">
           <img src={logoIcono} alt="Gestor de Tareas" className="w-10 h-10 object-contain" />
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Gestor de Tareas</h1>
+          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Gestor de Tareas - GESTCON</h1>
         </div>
 
         <h2 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">Iniciar sesión</h2>
@@ -52,7 +52,7 @@ export default function LoginPage() {
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="tu@empresa.com"
+              placeholder="tu@gmail.com"
               className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition"
             />
           </div>

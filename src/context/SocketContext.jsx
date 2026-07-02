@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { useAuth } from './AuthContext'
 
-export const SocketContext = createContext({ socket: null, connected: false })
+export const SocketContext = createContext({ socket: null, connected: false, onlineUserIds: new Set() })
 
 export function SocketProvider({ children }) {
   const { token, isAuthenticated } = useAuth()
   const [socket, setSocket] = useState(null)
   const [connected, setConnected] = useState(false)
+  const [onlineUserIds, setOnlineUserIds] = useState(new Set())
   const socketRef = useRef(null)
 
   useEffect(() => {
@@ -36,6 +37,8 @@ export function SocketProvider({ children }) {
       s.on('connect', () => { console.debug('[Socket] Connected:', s.id); setConnected(true) })
       s.on('disconnect', () => { console.debug('[Socket] Disconnected'); setConnected(false) })
       s.on('connect_error', (err) => { console.debug('[Socket] Error:', err.message); setConnected(false) })
+      s.on('user:online',  ({ userId }) => setOnlineUserIds(prev => new Set([...prev, userId])))
+      s.on('user:offline', ({ userId }) => setOnlineUserIds(prev => { const n = new Set(prev); n.delete(userId); return n }))
 
       socketRef.current = s
       setSocket(s)
@@ -53,7 +56,7 @@ export function SocketProvider({ children }) {
   }, [isAuthenticated, token])
 
   return (
-    <SocketContext.Provider value={{ socket, connected }}>
+    <SocketContext.Provider value={{ socket, connected, onlineUserIds }}>
       {children}
     </SocketContext.Provider>
   )
