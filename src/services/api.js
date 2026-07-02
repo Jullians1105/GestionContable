@@ -199,7 +199,12 @@ export const api = {
   getFondoResponsables: (anio, mes) => request(`/fondo/detalle/responsables?anio=${anio}&mes=${mes}`),
 
   // Fondo Emprender — Catálogo de procesos (checklist)
-  getFondoProcesos: () => request('/fondo/procesos'),
+  getFondoProcesos: (incluirInactivos) => {
+    const qs = incluirInactivos ? '?incluirInactivos=true' : ''
+    return request(`/fondo/procesos${qs}`)
+  },
+  createFondoProceso: (data) => request('/fondo/procesos', { method: 'POST', body: JSON.stringify(data) }),
+  updateFondoProceso: (id, data) => request(`/fondo/procesos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Notifications
   getNotifications: () => request('/notifications'),
