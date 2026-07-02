@@ -12,7 +12,8 @@ const getChecklistMes = async (req, res, next) => {
       `SELECT p.id, p.name, p.orden, p.activo,
               COALESCE(i.estado, 'pending') AS estado,
               i.nota,
-              COALESCE(m.confirmed, false) AS confirmed
+              COALESCE(m.confirmed, false) AS confirmed,
+              m.updated_at AS confirmed_at
        FROM fondo_procesos p
        LEFT JOIN fondo_checklist_meses m
               ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
@@ -24,7 +25,8 @@ const getChecklistMes = async (req, res, next) => {
     );
 
     const rows = result.rows;
-    const confirmed = rows.length > 0 ? rows[0].confirmed : false;
+    const confirmed   = rows.length > 0 ? rows[0].confirmed : false;
+    const confirmedAt = rows.length > 0 ? rows[0].confirmed_at : null;
     const items = rows.map(row => ({
       id:     row.id,
       name:   row.name,
@@ -34,7 +36,7 @@ const getChecklistMes = async (req, res, next) => {
       nota:   row.nota,
     }));
 
-    res.json({ confirmed, items });
+    res.json({ confirmed, confirmedAt, items });
   } catch (err) {
     next(err);
   }

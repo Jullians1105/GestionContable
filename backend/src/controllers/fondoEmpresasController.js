@@ -83,6 +83,7 @@ const createEmpresa = async (req, res, next) => {
       [id, name.trim().toUpperCase(), categoria, monthlyFee]
     );
     await auditLog(req.user.userId, 'CREATE', 'fondo_empresas', id, { name, categoria, monthlyFee });
+    req.io.emit('empresa:updated', { empresaId: id, tipo: 'empresa' });
     res.status(201).json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
     next(err);
@@ -111,6 +112,7 @@ const updateEmpresa = async (req, res, next) => {
       ]
     );
     await auditLog(req.user.userId, 'UPDATE', 'fondo_empresas', id, { name, categoria, monthlyFee });
+    req.io.emit('empresa:updated', { empresaId: id, tipo: 'empresa' });
     res.json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
     next(err);
@@ -125,6 +127,7 @@ const deleteEmpresa = async (req, res, next) => {
 
     await db.query('DELETE FROM fondo_empresas WHERE id = $1', [id]);
     await auditLog(req.user.userId, 'DELETE', 'fondo_empresas', id, {});
+    req.io.emit('empresa:updated', { empresaId: id, tipo: 'empresa' });
     res.status(204).end();
   } catch (err) {
     next(err);

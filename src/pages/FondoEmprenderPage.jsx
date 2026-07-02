@@ -1,9 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
-import {
-  loadProcesses, saveProcesses, buildDefaultProcesses,
-  loadMonthData, saveMonthData, buildDefaultCompanies, ensureCells,
-} from '../data/fondoEmprender'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { migrateLegacyLocalStorage, getMigrationReport, dismissMigrationReport } from '../data/fondoEmprender'
 import { api } from '../services/api'
+import { useSocket } from '../context/SocketContext'
 
 // ─── page-level constants ─────────────────────────────────────────────────────
 
@@ -22,23 +20,25 @@ const MONTHS = [
 const BORDER     = '1px solid #e2e4ef'
 const BORDER_STR = '2px solid #c3c6d7'
 
+const emptyCell = { status: 'pending', note: '' }
+
 // ─── component ───────────────────────────────────────────────────────────────
 
 export default function FondoEmprenderPage() {
   const today = new Date()
+  const { socket } = useSocket()
 
   // ── state ────────────────────────────────────────────────────────────────
   const [month, setMonth]           = useState(today.getMonth())
   const [year, setYear]             = useState(today.getFullYear())
-  const [processes, setProcesses]   = useState(() => loadProcesses() ?? buildDefaultProcesses())
-  const [companies, setCompanies]   = useState(() => {
-    const procs = loadProcesses() ?? buildDefaultProcesses()
-    const d = loadMonthData(today.getFullYear(), today.getMonth())
-    return d ? ensureCells(d.companies, procs) : buildDefaultCompanies(procs)
-  })
+  const [processes, setProcesses]   = useState([])
+  const [companies, setCompanies]   = useState([])
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState(null)
+  const [migrationReport, setMigrationReport] = useState(() => getMigrationReport())
 
   // cell popup
-  const [openCell, setOpenCell]     = useState(null)
+  const [openCell, setOpenCell]     = useState(null)  // { companyId, procId, left, top }
   const dropdownRef    = useRef(null)
   const noteTextareaRef = useRef(null)
 
@@ -63,40 +63,75 @@ export default function FondoEmprenderPage() {
   // delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState(null) // { type, id, name }
 
-  // Mapa name→UUID real de la BD (para persistir confirmed a la API)
-  const [empresaUUIDs, setEmpresaUUIDs] = useState({}) // { [name]: uuid }
+  const refetchTimerRef = useRef(null)
 
-  // load/save guards
-  const isFirstRender = useRef(true)
-  const skipSave      = useRef(false)
+  // ── load grid from backend ──────────────────────────────────────────────
 
-  // ── effects ──────────────────────────────────────────────────────────────
+  const fetchGrid = useCallback(async () => {
+    try {
+      setError(null)
+      const [empresas, procesos] = await Promise.all([
+        api.getFondoEmpresas(),
+        api.getFondoProcesos(),
+      ])
 
-  // Cargar UUIDs reales de la BD para poder persistir confirmed a la API
+      // One-time, best-effort recovery of whatever is still stuck in
+      // localStorage from before the grid was wired to the backend.
+      await migrateLegacyLocalStorage(api, empresas, procesos)
+      setMigrationReport(getMigrationReport())
+
+      const checklists = await Promise.all(
+        empresas.map(e => api.getFondoChecklist(e.id, year, month + 1))
+      )
+
+      const built = empresas.map((e, i) => {
+        const chk = checklists[i]
+        const cells = {}
+        chk.items.forEach(it => { cells[it.id] = { status: it.estado, note: it.nota ?? '' } })
+        return {
+          id: e.id,
+          name: e.name,
+          categoria: e.categoria,
+          cells,
+          confirmed: chk.confirmed
+            ? { date: (chk.confirmedAt ?? new Date().toISOString()).slice(0, 10) }
+            : null,
+        }
+      })
+
+      setProcesses(procesos)
+      setCompanies(built)
+    } catch (err) {
+      setError(err.message || 'Error al cargar el seguimiento mensual')
+    } finally {
+      setLoading(false)
+    }
+  }, [year, month])
+
+  useEffect(() => { setLoading(true); fetchGrid() }, [fetchGrid])
+
+  // Refresh on window focus (catches changes made in another tab)
   useEffect(() => {
-    api.getFondoEmpresas().then(lista => {
-      const map = {}
-      lista.forEach(e => { map[e.name] = e.id })
-      setEmpresaUUIDs(map)
-    }).catch(() => {})
-  }, [])
+    window.addEventListener('focus', fetchGrid)
+    return () => window.removeEventListener('focus', fetchGrid)
+  }, [fetchGrid])
 
-  // Save processes whenever they change
-  useEffect(() => { saveProcesses(processes) }, [processes])
-
-  // Load when month/year changes (skip initial mount)
+  // Refresh (debounced) when another user edits the same month, or the
+  // company list changes — debounced so a burst of edits from one user
+  // doesn't trigger a full-grid refetch storm for everyone else.
   useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return }
-    skipSave.current = true
-    const d = loadMonthData(year, month)
-    setCompanies(d ? ensureCells(d.companies, processes) : buildDefaultCompanies(processes))
-  }, [month, year]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Save companies whenever they change
-  useEffect(() => {
-    if (skipSave.current) { skipSave.current = false; return }
-    saveMonthData(year, month, { companies })
-  }, [companies, month, year])
+    if (!socket) return
+    const handler = (payload) => {
+      if (payload?.tipo === 'checklist' && (payload.anio !== year || payload.mes !== month + 1)) return
+      clearTimeout(refetchTimerRef.current)
+      refetchTimerRef.current = setTimeout(fetchGrid, 1200)
+    }
+    socket.on('empresa:updated', handler)
+    return () => {
+      socket.off('empresa:updated', handler)
+      clearTimeout(refetchTimerRef.current)
+    }
+  }, [socket, year, month, fetchGrid])
 
   // Auto-resize textarea when popup opens; overflow only at max height
   useEffect(() => {
@@ -131,7 +166,7 @@ export default function FondoEmprenderPage() {
 
   // ── cell popup ───────────────────────────────────────────────────────────
 
-  function handleCellClick(companyId, processName, e) {
+  function handleCellClick(companyId, procId, e) {
     const rect = e.currentTarget.getBoundingClientRect()
     const PW = 260, PH = 252
     let left = rect.left
@@ -140,21 +175,45 @@ export default function FondoEmprenderPage() {
     if (left < 8) left = 8
     if (top  + PH > window.innerHeight - 8) top  = rect.top - PH - 4
     if (top  < 8) top  = 8
-    setOpenCell({ companyId, process: processName, left, top })
+    setOpenCell({ companyId, procId, left, top })
   }
 
-  function updateCell(companyId, processName, updates) {
+  function updateCellLocal(companyId, procId, updates) {
     setCompanies(prev =>
       prev.map(c =>
         c.id === companyId
-          ? { ...c, cells: { ...c.cells, [processName]: { ...(c.cells[processName] ?? {}), ...updates } } }
+          ? { ...c, cells: { ...c.cells, [procId]: { ...(c.cells[procId] ?? emptyCell), ...updates } } }
           : c
       )
     )
   }
 
+  async function handleStatusChange(companyId, procId, status) {
+    updateCellLocal(companyId, procId, { status })
+    try {
+      await api.updateFondoChecklistItem(companyId, procId, year, month + 1, { estado: status })
+    } catch (err) {
+      console.error('Error al guardar estado:', err.message)
+      fetchGrid()
+    }
+  }
+
+  function handleNoteChange(companyId, procId, note) {
+    updateCellLocal(companyId, procId, { note })
+  }
+
+  async function handleNoteBlur(companyId, procId, note) {
+    try {
+      await api.updateFondoChecklistItem(companyId, procId, year, month + 1, { nota: note || null })
+    } catch (err) {
+      console.error('Error al guardar nota:', err.message)
+      fetchGrid()
+    }
+  }
+
   const openCompany  = openCell ? companies.find(c => c.id === openCell.companyId) : null
-  const openCellData = openCompany?.cells[openCell?.process]
+  const openProcess  = openCell ? processes.find(p => p.id === openCell.procId) : null
+  const openCellData = openCompany?.cells[openCell?.procId] ?? emptyCell
 
   // ── company actions ──────────────────────────────────────────────────────
 
@@ -163,19 +222,26 @@ export default function FondoEmprenderPage() {
     setEditCompanyName(company.name)
   }
 
-  function saveEditCompany() {
+  async function saveEditCompany() {
     const name = editCompanyName.trim().toUpperCase()
-    if (name) {
-      setCompanies(prev => prev.map(c => c.id === editingCompany.id ? { ...c, name } : c))
-    }
+    const companyId = editingCompany.id
     setEditingCompany(null)
+    if (!name) return
+    const previous = companies.find(c => c.id === companyId)?.name
+    setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, name } : c))
+    try {
+      await api.updateFondoEmpresa(companyId, { name })
+    } catch (err) {
+      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, name: previous } : c))
+      alert('Error al renombrar empresa: ' + err.message)
+    }
   }
 
   async function toggleConfirmed(companyId) {
     const company = companies.find(c => c.id === companyId)
     const newConfirmed = !company?.confirmed
+    const previous = company?.confirmed ?? null
 
-    // Actualizar estado local inmediatamente
     setCompanies(prev =>
       prev.map(c =>
         c.id === companyId
@@ -184,22 +250,17 @@ export default function FondoEmprenderPage() {
       )
     )
 
-    // Buscar el UUID real por nombre (las empresas localStorage usan IDs locales tipo "c14")
-    const realId = empresaUUIDs[company?.name]
-    if (!realId) return  // empresa no sincronizada con la BD, solo actualiza localStorage
-
-    // Persistir en la BD (mes es 1-indexado en la API, month es 0-indexado en JS)
     try {
-      await api.updateFondoChecklistConfirmado(realId, year, month + 1, { confirmed: newConfirmed })
-    } catch (err) {
-      // Revertir si falla
+      const result = await api.updateFondoChecklistConfirmado(companyId, year, month + 1, { confirmed: newConfirmed })
       setCompanies(prev =>
         prev.map(c =>
           c.id === companyId
-            ? { ...c, confirmed: company?.confirmed ?? null }
+            ? { ...c, confirmed: result.confirmed ? { date: (result.updatedAt ?? new Date().toISOString()).slice(0, 10) } : null }
             : c
         )
       )
+    } catch (err) {
+      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, confirmed: previous } : c))
       console.error('Error al confirmar contabilidad:', err.message)
     }
   }
@@ -263,16 +324,17 @@ export default function FondoEmprenderPage() {
 
   // ── process (column) actions ─────────────────────────────────────────────
 
-  function handleAddProcess() {
+  async function handleAddProcess() {
     const name = newProcessName.trim()
     if (!name) return
-    const newProc = { id: `p${Date.now()}`, name }
-    setProcesses(prev => [...prev, newProc])
-    setCompanies(prev =>
-      prev.map(c => ({ ...c, cells: { ...c.cells, [name]: { status: 'pending', note: '' } } }))
-    )
     setNewProcessName('')
     setAddingProcess(false)
+    try {
+      const created = await api.createFondoProceso({ name })
+      setProcesses(prev => [...prev, created])
+    } catch (err) {
+      alert('Error al crear proceso: ' + err.message)
+    }
   }
 
   function startEditProcess(proc) {
@@ -280,51 +342,74 @@ export default function FondoEmprenderPage() {
     setEditProcessName(proc.name)
   }
 
-  function saveEditProcess() {
+  async function saveEditProcess() {
     const newName = editProcessName.trim()
-    if (!newName || !editingProcess) { setEditingProcess(null); return }
-    const { id, oldName } = editingProcess
-    if (newName !== oldName) {
-      setProcesses(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p))
-      setCompanies(prev =>
-        prev.map(c => {
-          const oldCell = c.cells[oldName]
-          const cells = { ...c.cells }
-          delete cells[oldName]
-          cells[newName] = oldCell ?? { status: 'pending', note: '' }
-          return { ...c, cells }
-        })
-      )
-    }
+    const editing = editingProcess
     setEditingProcess(null)
+    if (!newName || !editing || newName === editing.oldName) return
+    setProcesses(prev => prev.map(p => p.id === editing.id ? { ...p, name: newName } : p))
+    try {
+      await api.updateFondoProceso(editing.id, { name: newName })
+    } catch (err) {
+      setProcesses(prev => prev.map(p => p.id === editing.id ? { ...p, name: editing.oldName } : p))
+      alert('Error al renombrar proceso: ' + err.message)
+    }
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteConfirm) return
-    if (deleteConfirm.type === 'process') {
-      const { id, name } = deleteConfirm
-      setProcesses(prev => prev.filter(p => p.id !== id))
-      setCompanies(prev =>
-        prev.map(c => {
-          const cells = { ...c.cells }
-          delete cells[name]
-          return { ...c, cells }
-        })
-      )
-    } else {
-      setCompanies(prev => prev.filter(c => c.id !== deleteConfirm.id))
-    }
+    const { type, id } = deleteConfirm
     setDeleteConfirm(null)
+    if (type === 'process') {
+      try {
+        // Procesos con historial no se pueden borrar de verdad — se desactivan
+        // para dejar de ofrecerlos en meses nuevos sin perder lo ya registrado.
+        await api.updateFondoProceso(id, { activo: false })
+        setProcesses(prev => prev.filter(p => p.id !== id))
+      } catch (err) {
+        alert('Error al eliminar proceso: ' + err.message)
+      }
+    } else {
+      try {
+        await api.deleteFondoEmpresa(id)
+        setCompanies(prev => prev.filter(c => c.id !== id))
+      } catch (err) {
+        alert('Error al eliminar empresa: ' + err.message)
+      }
+    }
   }
 
   // ── stats ─────────────────────────────────────────────────────────────────
 
   const totalCells = companies.length * processes.length
   const doneCells  = companies.reduce(
-    (acc, c) => acc + processes.filter(p => (c.cells[p.name]?.status ?? 'pending') === 'done').length,
+    (acc, c) => acc + processes.filter(p => (c.cells[p.id]?.status ?? 'pending') === 'done').length,
     0
   )
   const pct = totalCells ? Math.round((doneCells / totalCells) * 100) : 0
+
+  // ── loading / error states ────────────────────────────────────────────────
+  if (loading) return (
+    <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
+      <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
+        progress_activity
+      </span>
+      Cargando seguimiento mensual…
+    </div>
+  )
+
+  if (error) return (
+    <div className="flex flex-col items-center gap-3 py-20">
+      <span className="material-symbols-outlined text-[#ef4444]" style={{ fontSize: 32 }}>error</span>
+      <p className="text-sm text-[#ef4444]">{error}</p>
+      <button
+        onClick={fetchGrid}
+        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+      >
+        Reintentar
+      </button>
+    </div>
+  )
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -359,6 +444,26 @@ export default function FondoEmprenderPage() {
           </button>
         </div>
       </div>
+
+      {/* ── Legacy data recovery banner ─────────────────────────────────── */}
+      {migrationReport && migrationReport.length > 0 && (
+        <div className="bg-[#fef9c3] dark:bg-[#3a3312] border border-[#eab308] rounded-xl p-3 flex items-start gap-2.5">
+          <span className="material-symbols-outlined text-[#d97706] flex-shrink-0" style={{ fontSize: 18 }}>warning</span>
+          <div className="flex-1 text-xs text-[#7a5b00] dark:text-[#f0d878]">
+            <p className="font-semibold mb-0.5">Datos locales no recuperados automáticamente</p>
+            <p>
+              Se encontró información guardada en este navegador para {migrationReport.length === 1 ? 'una empresa' : `${migrationReport.length} empresas`}{' '}
+              que no coincide con ningún nombre actual: {migrationReport.join(', ')}. Si esa información es importante, avisa para revisarla manualmente.
+            </p>
+          </div>
+          <button
+            onClick={() => { dismissMigrationReport(); setMigrationReport(null) }}
+            className="text-[#7a5b00] dark:text-[#f0d878] hover:opacity-70 transition flex-shrink-0"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
+          </button>
+        </div>
+      )}
 
       {/* ── Progress bar ─────────────────────────────────────────────────── */}
       <div className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] p-4 shadow-sm flex items-center gap-4">
@@ -535,12 +640,12 @@ export default function FondoEmprenderPage() {
 
                   {/* Process cells */}
                   {processes.map(proc => {
-                    const cell = company.cells[proc.name] ?? { status: 'pending', note: '' }
+                    const cell = company.cells[proc.id] ?? emptyCell
                     const cfg  = STATUS[cell.status] ?? STATUS.pending
                     return (
                       <td key={proc.id} style={{ width: 46, minWidth: 46, border: BORDER, padding: 2 }}>
                         <button
-                          onClick={e => handleCellClick(company.id, proc.name, e)}
+                          onClick={e => handleCellClick(company.id, proc.id, e)}
                           onMouseEnter={cell.note ? e => showTooltip(e, cell.note, `${company.id}_${proc.id}`) : undefined}
                           onMouseLeave={cell.note ? scheduleHide : undefined}
                           className="w-full flex items-center justify-center relative transition-all hover:opacity-75 hover:scale-90 active:scale-75 rounded"
@@ -614,20 +719,20 @@ export default function FondoEmprenderPage() {
       </div>
 
       {/* ── Cell popup ───────────────────────────────────────────────────── */}
-      {openCell && openCellData && (
+      {openCell && openProcess && (
         <div
           ref={dropdownRef}
           className="fixed z-50 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-2xl p-4 w-64"
           style={{ left: openCell.left, top: openCell.top }}
         >
-          <p className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-3 truncate" title={openCell.process}>
-            {openCell.process}
+          <p className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-3 truncate" title={openProcess.name}>
+            {openProcess.name}
           </p>
           <div className="grid grid-cols-2 gap-1.5 mb-3">
             {Object.entries(STATUS).map(([key, cfg]) => (
               <button
                 key={key}
-                onClick={() => updateCell(openCell.companyId, openCell.process, { status: key })}
+                onClick={() => handleStatusChange(openCell.companyId, openCell.procId, key)}
                 className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-95 active:scale-90"
                 style={{
                   background: openCellData.status === key ? cfg.bg : 'transparent',
@@ -644,12 +749,13 @@ export default function FondoEmprenderPage() {
             ref={noteTextareaRef}
             value={openCellData.note}
             onChange={e => {
-              updateCell(openCell.companyId, openCell.process, { note: e.target.value })
+              handleNoteChange(openCell.companyId, openCell.procId, e.target.value)
               e.target.style.height = 'auto'
               const h = Math.min(e.target.scrollHeight, 200)
               e.target.style.height = h + 'px'
               e.target.style.overflowY = h >= 200 ? 'auto' : 'hidden'
             }}
+            onBlur={e => handleNoteBlur(openCell.companyId, openCell.procId, e.target.value)}
             placeholder="Nota opcional..."
             className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
             style={{ minHeight: 52, overflowY: 'hidden' }}
