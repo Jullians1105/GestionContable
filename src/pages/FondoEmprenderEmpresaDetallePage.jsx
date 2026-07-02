@@ -26,7 +26,7 @@ const PRIORITY_COLORS = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' }
 const MACRO_RESPONSABLES = {
   1: [{ name: 'Diego Quintero' }],
   2: [{ name: 'Katerin Pineda' }],
-  3: [{ name: 'Diego Quintero' }, { name: 'Daniela Ruiz', note: 'temporal' }],
+  3: [{ name: 'Diego Quintero' }, { name: 'Dana', note: 'temporal' }],
   4: [{ name: 'Diego Quintero' }],
   5: [{ name: 'Katerin Pineda' }, { name: 'Ruben Parada' }],
   6: [{ name: 'Diana Gutierrez' }],

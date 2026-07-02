@@ -129,6 +129,7 @@ describe('socket/events', () => {
       user: { userId: 'u1', email: 'test@test.com' },
       join: jest.fn(),
       leave: jest.fn(),
+      emit: jest.fn(),
       on: jest.fn((event, fn) => { socketEvents[event] = fn; }),
       id: 'socket-1',
     };
