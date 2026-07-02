@@ -1,10 +1,10 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-06-27 (sesión 9 — Tareas recurrentes, Web Push / iPhone PWA, recordatorios automáticos)  
-**Rama activa:** `main`  
+**Última actualización:** 2026-07-02 (sesión 10 — fixes-02-07: Dana, online PWA, seed tags, n8n/WhatsApp análisis)  
+**Rama activa:** `fixes-02-07` (pendiente de merge a `main`)  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
-**Ramas activas en remoto:** `main`  
+**Ramas activas en remoto:** `main` · `fixes-02-07`  
 **Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)
 
 ---
@@ -242,6 +242,7 @@ GET    /api/stats/audit                    → solo admin/leader
 - Autenticación con JWT en handshake (no puede conectar sin token válido)
 - Rooms: `user:{userId}`, `group:{groupId}`, `task:{taskId}`
 - Eventos emitidos por el backend: `task:created`, `task:updated`, `task:deleted`, `user:online`, `user:offline`
+- `users:online:list` emitido al socket recién conectado con array de IDs ya online (fix PWA)
 - `mark:read` para marcar notificaciones desde el cliente
 - Evento `disconnect` limpia el mapa de usuarios online
 
@@ -266,6 +267,7 @@ GET    /api/stats/audit                    → solo admin/leader
 | 014 | Columna `start_time` (existe en BD, no usada en código — reverted) |
 | 015 | Tabla `push_subscriptions` (Web Push / iPhone PWA) |
 | 016 | Columna `reminder_sent_at TIMESTAMPTZ` en tasks |
+| 017 | Elimina etiquetas de muestra del seed (bug, feature, urgente, documentación) vía DELETE por UUID |
 
 **Tests:**
 - Cobertura actual: **~79% statements / ~71% functions** (umbral: 70%)
@@ -448,3 +450,6 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 37 | Recordatorios automáticos de vencimiento: cron cada 30 min, sin due_time → hoy/mañana, con due_time → 2h antes | ✅ Implementado 2026-06-27 |
 | 38 | Logo Sidebar clickeable → navega al inicio (/) | ✅ Implementado 2026-06-27 |
 | 39 | Fix CI: ESLint override para sw.js (serviceworker env), mock pushService en tests, coveragePathIgnore nuevos servicios | ✅ Resuelto 2026-06-27 |
+| 40 | Responsable temporal Nómina electrónica: `Daniela Ruiz` → `Dana` en `MACRO_RESPONSABLES` (hardcoded en FondoEmprenderEmpresaDetallePage.jsx) | ✅ Resuelto 2026-07-02 |
+| 41 | Fix online en PWA: `socket/events.js` emite `users:online:list` al conectar; `SocketContext.jsx` lo escucha para poblar estado inicial | ✅ Resuelto 2026-07-02 |
+| 42 | Migración 017: elimina etiquetas de muestra del seed; `002_seed_data.sql` limpiado de tags y assignments | ✅ Resuelto 2026-07-02 |
