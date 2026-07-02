@@ -20,16 +20,22 @@ const navItems = [
 ]
 
 const modules = [
-  { id: 'tasks', label: 'Gestor de Tareas', icon: 'task_alt' },
-  { id: 'fondo', label: 'Fondo Emprender', icon: 'rocket_launch' },
-  { id: 'empresas', label: 'Empresas Externas', icon: 'corporate_fare' },
+  { id: 'tasks',   label: 'Gestor de Tareas',    icon: 'task_alt' },
+  { id: 'fondo',   label: 'Fondo Emprender',      icon: 'rocket_launch' },
+  { id: 'dian',    label: 'Contabilidad DIAN',    icon: 'receipt_long' },
+  { id: 'empresas', label: 'Empresas Externas',   icon: 'corporate_fare' },
 ]
 
 const MODULE_TITLES = {
-  tasks: 'Gestor de Tareas',
-  fondo: 'Fondo Emprender',
+  tasks:    'Gestor de Tareas',
+  fondo:    'Fondo Emprender',
+  dian:     'Contabilidad DIAN',
   empresas: 'Empresas Externas',
 }
+
+const DIAN_NAV = [
+  { to: '/dian/upload', label: 'Subir reporte', icon: 'upload_file', end: true },
+]
 
 const FONDO_NAV = [
   { to: '/fondo-emprender',          label: 'Seguimiento mensual', icon: 'table_chart',    end: true },
@@ -75,8 +81,9 @@ export default function Sidebar({ open, onClose }) {
   const activeModuleMeta = modules.find(m => m.id === activeModule)
 
   const navForModule =
-    activeModule === 'tasks' ? visible :
-    activeModule === 'fondo' ? FONDO_NAV :
+    activeModule === 'tasks'   ? visible    :
+    activeModule === 'fondo'   ? FONDO_NAV  :
+    activeModule === 'dian'    ? DIAN_NAV   :
     []
 
   const hasNav = navForModule.length > 0

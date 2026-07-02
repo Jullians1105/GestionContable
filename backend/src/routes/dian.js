@@ -1,7 +1,9 @@
 const { Router } = require('express');
 const multer = require('multer');
+const { body } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
-const { uploadDian } = require('../controllers/dianController');
+const { validate } = require('../middleware/validation');
+const { uploadDian, patchBorrador, exportarBorrador, aplicarClasificacionRapida } = require('../controllers/dianController');
 
 const router = Router();
 
@@ -82,5 +84,57 @@ router.use(authMiddleware);
  *         description: No autenticado.
  */
 router.post('/upload', handleUpload, uploadDian);
+
+/**
+ * @openapi
+ * /api/dian/borradores/{id}:
+ *   patch:
+ *     tags: [DIAN]
+ *     summary: Clasificar una fila del borrador (clasificacionRetencion + tasaRetencion)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [indice]
+ *             properties:
+ *               indice:                 { type: integer }
+ *               clasificacionRetencion: { type: string, nullable: true }
+ *               tasaRetencion:          { type: number, nullable: true }
+ *     responses:
+ *       200:
+ *         description: Clasificación guardada.
+ *       400:
+ *         description: indice no existe en el borrador.
+ *       404:
+ *         description: Borrador no encontrado o no pertenece al usuario.
+ */
+router.patch('/borradores/:id',
+  body('indice').notEmpty().isInt({ min: 0 }).withMessage('"indice" debe ser entero >= 0').toInt(),
+  body('clasificacionRetencion').optional({ nullable: true }).isString(),
+  body('tasaRetencion').optional({ nullable: true }).isFloat({ min: 0 }).toFloat(),
+  validate,
+  patchBorrador
+);
+
+router.patch('/borradores/:id/aplicar-clasificacion-rapida',
+  body('clasificacionRetencion').notEmpty().isString(),
+  body('tasaRetencion').optional({ nullable: true }).isFloat({ min: 0 }).toFloat(),
+  validate,
+  aplicarClasificacionRapida
+);
+
+router.post('/borradores/:id/exportar',
+  body('empleados').optional({ nullable: true }).isInt({ min: 0 }).toInt(),
+  body('meses').optional({ nullable: true }).isInt({ min: 0 }).toInt(),
+  body('salario').optional({ nullable: true }).isFloat({ min: 0 }).toFloat(),
+  validate,
+  exportarBorrador
+);
 
 module.exports = router;

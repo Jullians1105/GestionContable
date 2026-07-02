@@ -200,6 +200,51 @@ export const api = {
   // Fondo Emprender — Catálogo de procesos (checklist)
   getFondoProcesos: () => request('/fondo/procesos'),
 
+  // DIAN
+  uploadDian: (formData) => {
+    const token = getToken()
+    return fetch(`${BASE}/dian/upload`, {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    }).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        const err = new Error(body.error || `Error ${res.status}`)
+        err.status = res.status
+        throw err
+      }
+      return res.json()
+    })
+  },
+  patchDianBorrador: (id, data) =>
+    request(`/dian/borradores/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  patchDianClasificacionRapida: (borradorId, { clasificacionRetencion, tasaRetencion }) =>
+    request(`/dian/borradores/${borradorId}/aplicar-clasificacion-rapida`, {
+      method: 'PATCH',
+      body: JSON.stringify({ clasificacionRetencion, tasaRetencion }),
+    }),
+
+  exportarDian: (borradorId, { empleados, meses, salario }) => {
+    const token = getToken()
+    return fetch(`${BASE}/dian/borradores/${borradorId}/exportar`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ empleados, meses, salario }),
+    }).then((res) => {
+      if (!res.ok) return res.json().then((e) => { throw new Error(e.error || `Error ${res.status}`) })
+      // Extraer nombre sugerido del header Content-Disposition
+      const cd = res.headers.get('content-disposition') ?? ''
+      const match = cd.match(/filename="([^"]+)"/)
+      const filename = match ? match[1] : `ContabilidadDIAN_${borradorId.slice(0,8)}.xlsx`
+      return res.blob().then((blob) => ({ blob, filename }))
+    })
+  },
+
   // Notifications
   getNotifications: () => request('/notifications'),
   markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: 'PUT' }),
