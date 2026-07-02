@@ -1,0 +1,13 @@
+{
+  "2026": {
+    "smmlv": 1750905,
+    "auxilioTransporte": 249095,
+    "description": "SMMLV + Auxilio 2026",
+    "fuente": "Decreto 1469/2025 (SMMLV) y Decreto 1470/2025 (auxilio de transporte)"
+  },
+  "2025": {
+    "smmlv": 1423500,
+    "auxilioTransporte": 200000,
+    "description": "SMMLV + Auxilio 2025"
+  }
+}

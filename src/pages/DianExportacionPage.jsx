@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
+import SALARY_CONSTANTS from '../../shared/salaryConstants.json'
+
+// Año más reciente configurado — mismo criterio de fallback que usa el backend (getSalaryConstants)
+const LATEST_YEAR = Math.max(...Object.keys(SALARY_CONSTANTS).map(Number))
+const SMMLV_ACTUAL = SALARY_CONSTANTS[LATEST_YEAR].smmlv
 
 const fmt = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n ?? 0)
@@ -30,7 +35,7 @@ export default function DianExportacionPage() {
     borradorId,
     empleados        = 0,
     meses            = 0,
-    salario          = 1423500,
+    salario          = SMMLV_ACTUAL,
     costoNominaTotal = 0,
   } = state
 

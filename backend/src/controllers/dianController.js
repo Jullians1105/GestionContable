@@ -2,16 +2,41 @@ const { v4: uuidv4 } = require('uuid');
 const ExcelJS = require('exceljs');
 const { parse } = require('date-fns');
 const db = require('../config/database');
+const { SALARY_CONSTANTS } = require('../constants/salaryConstants');
 
 const REQUIRED_COLS = [
   'Tipo de documento', 'CUFE/CUDE', 'Fecha Emisión',
   'NIT Emisor', 'Nombre Emisor', 'IVA', 'Total', 'Estado', 'Grupo',
 ];
 
-const FACTURA     = 'Factura electrónica';
-const NOTA_CREDITO = 'Nota de crédito electrónica';
-const RECIBIDO    = 'Recibido';
-const EMITIDO     = 'Emitido';
+const FACTURA                  = 'Factura electrónica';
+const NOTA_CREDITO             = 'Nota de crédito electrónica';
+const DOC_EQUIVALENTE          = 'Documento equivalente - Servicios públicos domiciliarios';
+const DOC_SOPORTE_NO_OBLIGADOS = 'Documento soporte con no obligados';
+const APPLICATION_RESPONSE     = 'Application response';
+const RECIBIDO                 = 'Recibido';
+const EMITIDO                  = 'Emitido';
+
+// Tipos de documento "Recibido" que cuentan como costo deducible ante la DIAN
+const TIPOS_COMPRA = [FACTURA, DOC_EQUIVALENTE, DOC_SOPORTE_NO_OBLIGADOS];
+
+// Tipos de documento que sí entran en algún cálculo (compras, ventas, notas crédito, doc. soporte)
+const TIPOS_CONTABILIZADOS = new Set([
+  FACTURA, NOTA_CREDITO, DOC_EQUIVALENTE, DOC_SOPORTE_NO_OBLIGADOS, 'Documento Soporte',
+]);
+
+// Motivos conocidos para documentos que quedan fuera de los cálculos (sección de transparencia)
+const MOTIVOS_DOCUMENTOS_EXCLUIDOS = {
+  [APPLICATION_RESPONSE]: 'Acuse técnico DIAN sin valor comercial',
+  'Nomina Individual':    'Documento de nómina — no se contabiliza como compra (ver hoja NÓMINA)',
+};
+
+const getSalaryConstants = (year) => {
+  if (SALARY_CONSTANTS[year]) return SALARY_CONSTANTS[year];
+  const fallbackYear = Math.max(...Object.keys(SALARY_CONSTANTS).map(Number));
+  console.warn(`[DIAN] Sin SALARY_CONSTANTS para el año ${year}, usando ${fallbackYear}`);
+  return SALARY_CONSTANTS[fallbackYear];
+};
 
 // Extrae el valor primitivo de una celda de exceljs (maneja fórmulas y texto enriquecido)
 const getCellRawValue = (cell) => {
@@ -135,12 +160,16 @@ const uploadDian = async (req, res, next) => {
       filas.filter(pred).reduce((acc, r) => acc + (r[field] ?? 0), 0);
 
     const esFacturaRecibida  = (r) => r.grupo === RECIBIDO && r.tipoDocumento === FACTURA;
+    // comprasBruto: Factura electrónica + Documento equivalente (servicios públicos) +
+    // Documento soporte con no obligados — los tres son costos deducibles ante la DIAN.
+    // "Application response" queda fuera a propósito: es un acuse técnico sin valor comercial.
+    const esCompraRecibida   = (r) => r.grupo === RECIBIDO && TIPOS_COMPRA.includes(r.tipoDocumento);
     const esNotaRecibida     = (r) => r.grupo === RECIBIDO && r.tipoDocumento === NOTA_CREDITO;
     const esFacturaEmitida   = (r) => r.grupo === EMITIDO  && r.tipoDocumento === FACTURA;
     const esNotaEmitida      = (r) => r.grupo === EMITIDO  && r.tipoDocumento === NOTA_CREDITO;
 
     const calculos = {
-      comprasBruto:          sumField(esFacturaRecibida, 'total'),
+      comprasBruto:          sumField(esCompraRecibida,  'total'),
       devolucionCompras:     sumField(esNotaRecibida,    'total'),
       ventasBruto:           sumField(esFacturaEmitida,  'total'),
       devolucionVentas:      sumField(esNotaEmitida,     'total'),
@@ -235,11 +264,27 @@ const patchBorrador = async (req, res, next) => {
   }
 };
 
-// ── Tasas de nómina (sincronizadas con DianNominaPage.jsx) ─────────────────────
-const TASA_APORTES     = 0.12 + 0.0052 + 0.04;        // 16,52 %
-const TASA_PROVISIONES = 0.0833 + 0.0833 + 0.01 + 0.0417; // 21,83 %
-
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+// Documentos que no entraron en ningún cálculo (compras/ventas/notas/doc. soporte), para
+// mostrar transparencia en el Excel — evita que un tipo de documento desconocido se pierda en silencio.
+const calcularDocumentosNoContabilizados = (filas) => {
+  const grupos = {};
+  for (const f of filas) {
+    if (TIPOS_CONTABILIZADOS.has(f.tipoDocumento)) continue;
+    const tipo = f.tipoDocumento ?? '(sin tipo de documento)';
+    if (!grupos[tipo]) grupos[tipo] = { cantidad: 0, total: 0 };
+    grupos[tipo].cantidad += 1;
+    grupos[tipo].total += (f.total ?? 0);
+  }
+  return Object.entries(grupos).map(([tipo, { cantidad, total }]) => ({
+    tipo,
+    cantidad,
+    total: round2(total),
+    motivo: MOTIVOS_DOCUMENTOS_EXCLUIDOS[tipo] ?? 'Tipo de documento no reconocido — revisar manualmente',
+    esConocido: tipo in MOTIVOS_DOCUMENTOS_EXCLUIDOS,
+  }));
+};
 
 // ── Helpers de formato Excel ───────────────────────────────────────────────────
 const XL_BLUE    = 'FF004AC6';
@@ -363,7 +408,7 @@ function buildResumen(ws, resumen, nomina, meta) {
   valueRow('Costos Totales',              resumen.costosTotales,     { subtotal: true });
   blank();
 
-  valueRow('UTILIDAD BRUTA', resumen.utilidadBruta, { total: true });
+  valueRow('UTILIDAD BRUTA', resumen.utilidadBruta, { total: true, isNeg: resumen.utilidadBruta < 0 });
   blank();
 
   // IMPUESTOS
@@ -382,7 +427,7 @@ function buildResumen(ws, resumen, nomina, meta) {
   valueRow('(−) Total retenciones', resumen.totalRetenciones, { isNeg: true, bold: true });
   blank();
 
-  valueRow('UTILIDAD NETA (antes nómina)', resumen.utilidadNeta, { total: true });
+  valueRow('UTILIDAD NETA (antes nómina)', resumen.utilidadNeta, { total: true, isNeg: resumen.utilidadNeta < 0 });
   blank();
 
   // NÓMINA
@@ -396,7 +441,7 @@ function buildResumen(ws, resumen, nomina, meta) {
     blank();
   }
 
-  // UTILIDAD FINAL
+  // UTILIDAD FINAL: el costo laboral es un GASTO, por eso se RESTA (no se suma) a la utilidad neta
   const utilFinal = resumen.utilidadNeta - (nomina?.costoTotal ?? 0);
   valueRow('UTILIDAD FINAL', utilFinal, { total: true, isNeg: utilFinal < 0 });
 }
@@ -519,28 +564,39 @@ function buildNomina(ws, nomina, salario) {
   };
 
   sectionRow('PARÁMETROS DE ENTRADA');
-  addRow('Número de empleados',           nomina.empleados, { indent: 2 });
-  addRow('Número de meses',               nomina.meses,     { indent: 2 });
-  addRow('Salario mensual (SMMLV 2026)',  salario,          { indent: 2 });
+  addRow('Número de empleados',                     nomina.empleados, { indent: 2 });
+  addRow('Número de meses',                         nomina.meses,     { indent: 2 });
+  addRow(`Salario mensual (SMMLV ${nomina.year})`,  salario,          { indent: 2 });
+  addRow(
+    `Auxilio de transporte (${nomina.year})${nomina.auxilioAplica ? '' : ' — no aplica (salario > 2 SMMLV)'}`,
+    nomina.auxilioAplica ? nomina.auxilioTransporte : 0,
+    { indent: 2 }
+  );
   blank();
 
-  sectionRow('APORTES EMPRESA (por empleado/mes)');
-  addRow('Pensión (12%)',               round2(salario * 0.12),   { indent: 2 });
-  addRow('ARL Clase I (0,52%)',         round2(salario * 0.0052), { indent: 2 });
-  addRow('Caja de Compensación (4%)',   round2(salario * 0.04),   { indent: 2 });
-  addRow('Total aportes (16,52%)',      round2(salario * TASA_APORTES), { subtotal: true });
+  sectionRow('DEVENGADO (por empleado/mes)');
+  addRow('Salario',               salario, { indent: 2 });
+  addRow('Auxilio de transporte', nomina.auxilioAplica ? nomina.auxilioTransporte : 0, { indent: 2 });
+  addRow('Total devengado',       nomina.devengado, { subtotal: true });
+  blank();
+
+  sectionRow('APORTES EMPRESA (por empleado/mes, sobre salario)');
+  addRow(`Pensión (${(nomina.tasaPension * 100).toFixed(0)}%)`,             round2(salario * nomina.tasaPension), { indent: 2 });
+  addRow(`ARL Clase I (${(nomina.tasaArl * 100).toFixed(2)}%)`,             round2(salario * nomina.tasaArl),     { indent: 2 });
+  addRow(`Caja de Compensación (${(nomina.tasaCaja * 100).toFixed(0)}%)`,   round2(salario * nomina.tasaCaja),    { indent: 2 });
+  addRow('Total aportes',                                                  round2(nomina.aportesEmpresa),        { subtotal: true });
   blank();
 
   sectionRow('PROVISIONES (por empleado/mes)');
-  addRow('Prima de Servicios (8,33%)', round2(salario * 0.0833), { indent: 2 });
-  addRow('Cesantías (8,33%)',          round2(salario * 0.0833), { indent: 2 });
-  addRow('Intereses Cesantías (1%)',   round2(salario * 0.01),   { indent: 2 });
-  addRow('Vacaciones (4,17%)',         round2(salario * 0.0417), { indent: 2 });
-  addRow('Total provisiones (21,83%)',round2(salario * TASA_PROVISIONES), { subtotal: true });
+  addRow('Vacaciones (4,17% s/ salario)',                round2(nomina.provisionesDetalle.vacaciones),         { indent: 2 });
+  addRow('Prima de Servicios (8,33% s/ salario+auxilio)', round2(nomina.provisionesDetalle.prima),             { indent: 2 });
+  addRow('Cesantías (8,33% s/ salario+auxilio)',          round2(nomina.provisionesDetalle.cesantias),         { indent: 2 });
+  addRow('Intereses Cesantías (1% s/ cesantías)',         round2(nomina.provisionesDetalle.interesesCesantias),{ indent: 2 });
+  addRow('Total provisiones',                             round2(nomina.provisiones), { subtotal: true });
   blank();
 
   addRow(
-    'Costo por empleado / mes (Salario + Aportes + Provisiones)',
+    'Costo por empleado / mes (Devengado + Aportes + Provisiones)',
     nomina.costoMes,
     { total: true }
   );
@@ -553,8 +609,13 @@ function buildNomina(ws, nomina, salario) {
 }
 
 // ── Hoja METADATOS ─────────────────────────────────────────────────────────────
-function buildMetadatos(ws, { totalFilas, periodoDesde, periodoHasta, procesadoEn }, userEmail, filas) {
-  ws.columns = [{ key: 'campo', width: 34 }, { key: 'valor', width: 36 }];
+function buildMetadatos(ws, { totalFilas, periodoDesde, periodoHasta, procesadoEn }, userEmail, filas, documentosNoContabilizados = []) {
+  ws.columns = [
+    { key: 'campo', width: 34 },
+    { key: 'valor', width: 36 },
+    { key: 'c',     width: 14 },
+    { key: 'd',     width: 50 },
+  ];
 
   const emitido  = filas.filter((f) => f.grupo === EMITIDO).length;
   const recibido = filas.filter((f) => f.grupo === RECIBIDO).length;
@@ -585,6 +646,34 @@ function buildMetadatos(ws, { totalFilas, periodoDesde, periodoHasta, procesadoE
     row.getCell(2).alignment = { horizontal: 'left' };
     applyDataRow(row, 2, i % 2 === 1);
   });
+
+  // ── Documentos no contabilizados (transparencia) ────────────────────────
+  ws.addRow([]);
+  const secRow = ws.addRow(['DOCUMENTOS NO CONTABILIZADOS']);
+  secRow.getCell(1).font = { bold: true, color: { argb: XL_WHITE }, size: 10 };
+  secRow.getCell(1).fill = sfill(XL_BLUE);
+  secRow.height = 20;
+  ws.mergeCells(secRow.number, 1, secRow.number, 4);
+
+  if (documentosNoContabilizados.length === 0) {
+    const row = ws.addRow(['Ningún documento quedó fuera de los cálculos']);
+    row.getCell(1).alignment = { horizontal: 'left' };
+    applyDataRow(row, 4, false);
+  } else {
+    const subHdr = ws.addRow(['Tipo de documento', 'Cant.', 'Total', 'Motivo']);
+    applyHeaderRow(subHdr, 4);
+
+    documentosNoContabilizados.forEach((doc, i) => {
+      const row = ws.addRow([doc.tipo, doc.cantidad, doc.total, doc.motivo]);
+      row.getCell(1).alignment = { horizontal: 'left' };
+      row.getCell(2).alignment = { horizontal: 'center' };
+      row.getCell(3).numFmt    = '"$ "#,##0';
+      row.getCell(3).alignment = { horizontal: 'right' };
+      row.getCell(4).alignment = { horizontal: 'left' };
+      if (!doc.esConocido) row.getCell(4).font = { color: { argb: XL_RED } };
+      applyDataRow(row, 4, i % 2 === 1);
+    });
+  }
 }
 
 const exportarBorrador = async (req, res, next) => {
@@ -592,7 +681,6 @@ const exportarBorrador = async (req, res, next) => {
     const { id } = req.params;
     const empleados = parseInt(req.body.empleados ?? 0, 10) || 0;
     const meses     = parseInt(req.body.meses     ?? 0, 10) || 0;
-    const salario   = parseFloat(req.body.salario ?? 1423500) || 1423500;
 
     // ── 1. Leer borrador y verificar propiedad ─────────────────────────────
     const { rows } = await db.query(
@@ -657,20 +745,36 @@ const exportarBorrador = async (req, res, next) => {
     const utilidadBruta     = ventasNetas - costosTotales;
     const utilidadNeta      = round2(utilidadBruta - totalRetenciones);
 
-    // ── 6. Nómina ──────────────────────────────────────────────────────────
-    let costoMes = 0;
-    let costoNominaTotal = 0;
-    if (empleados > 0 && meses > 0) {
-      costoMes         = salario * (1 + TASA_APORTES + TASA_PROVISIONES);
-      costoNominaTotal = round2(empleados * meses * costoMes);
-    }
-
-    // Período
+    // ── 6. Período (se calcula antes de nómina para saber qué año de SMMLV usar) ──
     const fechas       = filas.map((f) => f.fechaEmision).filter(Boolean).sort();
     const periodoDesde = fechas[0] ?? null;
     const periodoHasta = fechas[fechas.length - 1] ?? null;
     const procesadoEn  = new Date().toISOString();
     const totalFilas   = filas.length;
+
+    const anioPeriodo  = periodoDesde ? parseInt(periodoDesde.slice(0, 4), 10) : new Date().getFullYear();
+    const salaryConsts = getSalaryConstants(anioPeriodo);
+    const salario       = parseFloat(req.body.salario ?? salaryConsts.smmlv) || salaryConsts.smmlv;
+
+    // ── 7. Nómina ──────────────────────────────────────────────────────────
+    // Fórmula compartida con el preview de frontend (shared/calcularNomina.js) — evita que
+    // backend y frontend vuelvan a desincronizarse, como pasó antes con el SMMLV hardcodeado.
+    const { calcularNomina, calcularCostoTotal, TASA_PENSION, TASA_ARL, TASA_CAJA } =
+      await import('../../../shared/calcularNomina.js');
+
+    let nominaCalc = null;
+    let costoNominaTotal = 0;
+    if (empleados > 0 && meses > 0) {
+      nominaCalc = calcularNomina({
+        salario,
+        smmlv: salaryConsts.smmlv,
+        auxilioTransporte: salaryConsts.auxilioTransporte,
+      });
+      costoNominaTotal = calcularCostoTotal({ empleados, meses, costoMes: nominaCalc.costoMes });
+    }
+
+    // ── 8. Documentos no contabilizados (transparencia) ─────────────────────
+    const documentosNoContabilizados = calcularDocumentosNoContabilizados(filas);
 
     const resumen = {
       ventasBruto:          round2(ventasBruto),
@@ -692,15 +796,31 @@ const exportarBorrador = async (req, res, next) => {
       utilidadNeta,
     };
 
-    const nominaData = empleados > 0 && meses > 0
-      ? { empleados, meses, salario: round2(salario), costoMes: round2(costoMes), costoTotal: costoNominaTotal }
+    const nominaData = nominaCalc
+      ? {
+          empleados, meses,
+          year:               anioPeriodo,
+          salario:            round2(salario),
+          smmlv:              salaryConsts.smmlv,
+          auxilioTransporte:  salaryConsts.auxilioTransporte,
+          auxilioAplica:      nominaCalc.auxilioAplica,
+          devengado:          round2(nominaCalc.devengado),
+          aportesEmpresa:     nominaCalc.aportesEmpresa,
+          provisiones:        nominaCalc.provisiones,
+          provisionesDetalle: nominaCalc.provisionesDetalle,
+          costoMes:           round2(nominaCalc.costoMes),
+          costoTotal:         costoNominaTotal,
+          tasaPension:        TASA_PENSION,
+          tasaArl:            TASA_ARL,
+          tasaCaja:           TASA_CAJA,
+        }
       : null;
 
-    // ── 7. Email del usuario para metadatos ────────────────────────────────
+    // ── 9. Email del usuario para metadatos ────────────────────────────────
     const userRow   = await db.query('SELECT email FROM users WHERE id = $1', [req.user.userId]);
     const userEmail = userRow.rows[0]?.email ?? 'usuario';
 
-    // ── 8. Generar workbook ────────────────────────────────────────────────
+    // ── 10. Generar workbook ───────────────────────────────────────────────
     const wb = new ExcelJS.Workbook();
     wb.creator = userEmail;
     wb.created = new Date();
@@ -710,8 +830,8 @@ const exportarBorrador = async (req, res, next) => {
     buildResumen(wb.addWorksheet('RESUMEN'), resumen, nominaData, meta);
     buildRetenciones(wb.addWorksheet('RETENCIONES_POR_PROVEEDOR'), retencionesPorProveedor, totalRetenciones);
     buildDetalleCompras(wb.addWorksheet('DETALLE_COMPRAS'), filasRecibido);
-    if (nominaData) buildNomina(wb.addWorksheet('NOMINA'), nominaData, salario);
-    buildMetadatos(wb.addWorksheet('METADATOS'), meta, userEmail, filas);
+    if (nominaData) buildNomina(wb.addWorksheet('NOMINA'), nominaData, nominaData.salario);
+    buildMetadatos(wb.addWorksheet('METADATOS'), meta, userEmail, filas, documentosNoContabilizados);
 
     // ── 9. Escribir buffer y enviar ────────────────────────────────────────
     const buffer = await wb.xlsx.writeBuffer();

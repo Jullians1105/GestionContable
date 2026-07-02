@@ -1,20 +1,16 @@
 import { useState, useMemo } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import SALARY_CONSTANTS from '../../shared/salaryConstants.json'
+import {
+  calcularNomina, calcularCostoTotal,
+  TASA_PENSION, TASA_ARL, TASA_CAJA,
+  TASA_VACACIONES, TASA_PRIMA, TASA_CESANTIAS, TASA_INTERESES_CESANTIAS,
+} from '../../shared/calcularNomina.js'
 
-const SMMLV_2026 = 1423500
-
-// ── tasas ──────────────────────────────────────────────────────────────────────
-const APORTES = [
-  { label: 'Pensión',                 tasa: 0.12   },
-  { label: 'ARL Clase I',             tasa: 0.0052 },
-  { label: 'Caja de Compensación',    tasa: 0.04   },
-]
-const PROVISIONES = [
-  { label: 'Prima de Servicios',      tasa: 0.0833 },
-  { label: 'Cesantías',               tasa: 0.0833 },
-  { label: 'Intereses Cesantías',     tasa: 0.01   },
-  { label: 'Vacaciones',              tasa: 0.0417 },
-]
+// Año más reciente configurado — mismo criterio de fallback que usa el backend (getSalaryConstants)
+const LATEST_YEAR   = Math.max(...Object.keys(SALARY_CONSTANTS).map(Number))
+const SMMLV_ACTUAL   = SALARY_CONSTANTS[LATEST_YEAR].smmlv
+const AUXILIO_ACTUAL = SALARY_CONSTANTS[LATEST_YEAR].auxilioTransporte
 
 const fmt = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
@@ -29,9 +25,9 @@ const toFloat = (v) => {
   return isNaN(n) || n < 0 ? 0 : n
 }
 
-// ── subcomponente: fila del preview ───────────────────────────────────────────
-function PreviewRow({ label, tasa, base, isTotal }) {
-  const valor = base * tasa
+// ── subcomponente: fila del preview (valor precomputado, o base*tasa si no se pasa) ────────────
+function PreviewRow({ label, tasa, base, valor: valorProp, isTotal }) {
+  const valor = valorProp !== undefined ? valorProp : base * tasa
   return (
     <div className={`flex items-center justify-between py-1.5 ${isTotal ? 'border-t border-[#e2e4ef] dark:border-[#2e3148] mt-1 pt-2.5 font-semibold' : ''}`}>
       <span className={`text-sm ${isTotal ? 'text-[#191c1e] dark:text-[#e4e6f0]' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
@@ -52,11 +48,11 @@ export default function DianNominaPage() {
 
   const [empleados, setEmpleados] = useState('')
   const [meses,     setMeses]     = useState('')
-  const [salario,   setSalario]   = useState(String(SMMLV_2026))
+  const [salario,   setSalario]   = useState(String(SMMLV_ACTUAL))
 
   const empVal = toInt(empleados)
   const mesVal = toInt(meses)
-  const salVal = toFloat(salario) || SMMLV_2026
+  const salVal = toFloat(salario) || SMMLV_ACTUAL
 
   // Validación cruzada
   const error =
@@ -64,23 +60,13 @@ export default function DianNominaPage() {
     empVal === 0 && mesVal > 0 ? 'Especifica el número de empleados' :
     null
 
-  // ── cálculos preview ───────────────────────────────────────────────────────
+  // ── cálculos preview — misma fórmula que usa el backend al exportar (shared/calcularNomina.js) ──
   const calc = useMemo(() => {
-    const totalAportesTasa    = APORTES.reduce((s, a) => s + a.tasa, 0)
-    const totalProvisionesTasa = PROVISIONES.reduce((s, a) => s + a.tasa, 0)
+    const n = calcularNomina({ salario: salVal, smmlv: SMMLV_ACTUAL, auxilioTransporte: AUXILIO_ACTUAL })
+    const tieneNomina = empVal > 0 && mesVal > 0
+    const costoTotal  = tieneNomina ? calcularCostoTotal({ empleados: empVal, meses: mesVal, costoMes: n.costoMes }) : 0
 
-    const aportes    = salVal * totalAportesTasa
-    const provisiones = salVal * totalProvisionesTasa
-    const costoMes   = salVal + aportes + provisiones
-    const costoTotal = empVal > 0 && mesVal > 0 ? empVal * mesVal * costoMes : 0
-
-    return {
-      aportes,
-      provisiones,
-      costoMes,
-      costoTotal,
-      tieneNomina: empVal > 0 && mesVal > 0,
-    }
+    return { ...n, costoTotal, tieneNomina }
   }, [salVal, empVal, mesVal])
 
   const handleContinuar = () => {
@@ -170,12 +156,12 @@ export default function DianNominaPage() {
               min="0"
               value={salario}
               onChange={(e) => setSalario(e.target.value)}
-              placeholder="1423500"
+              placeholder={String(SMMLV_ACTUAL)}
               className="w-full pl-7 pr-3.5 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] text-sm focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent"
             />
           </div>
           <p className="mt-1 text-xs text-[#9ca3af] dark:text-[#6b7280]">
-            COP — SMMLV 2026 por defecto
+            COP — SMMLV {LATEST_YEAR} por defecto · Auxilio de transporte {LATEST_YEAR}: {fmt(AUXILIO_ACTUAL)} (aplica si el salario es ≤ 2 SMMLV)
           </p>
         </div>
 
@@ -200,30 +186,28 @@ export default function DianNominaPage() {
           </p>
         ) : (
           <div className="space-y-5">
-            {/* Salario base */}
-            <div className="flex items-center justify-between pb-3 border-b border-[#f0f2f8] dark:border-[#2e3148]">
-              <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
-                Salario mensual
-              </span>
-              <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">
-                {fmt(salVal)}
-              </span>
+            {/* Devengado */}
+            <div>
+              <p className="text-[11px] font-bold text-[#8890b5] uppercase tracking-wide mb-2">
+                Devengado
+              </p>
+              <PreviewRow label="Salario" valor={salVal} />
+              <PreviewRow
+                label={`Auxilio de transporte${calc.auxilioAplica ? '' : ' (no aplica: salario > 2 SMMLV)'}`}
+                valor={calc.auxilio}
+              />
+              <PreviewRow label="Total devengado" valor={calc.devengado} isTotal />
             </div>
 
             {/* Aportes empresa */}
             <div>
               <p className="text-[11px] font-bold text-[#8890b5] uppercase tracking-wide mb-2">
-                Aportes empresa
+                Aportes empresa (sobre salario)
               </p>
-              {APORTES.map((a) => (
-                <PreviewRow key={a.label} label={a.label} tasa={a.tasa} base={salVal} />
-              ))}
-              <PreviewRow
-                label="Total aportes"
-                tasa={APORTES.reduce((s, a) => s + a.tasa, 0)}
-                base={salVal}
-                isTotal
-              />
+              <PreviewRow label="Pensión"              tasa={TASA_PENSION} base={salVal} />
+              <PreviewRow label="ARL Clase I"           tasa={TASA_ARL}     base={salVal} />
+              <PreviewRow label="Caja de Compensación"  tasa={TASA_CAJA}    base={salVal} />
+              <PreviewRow label="Total aportes" valor={calc.aportesEmpresa} isTotal />
             </div>
 
             {/* Provisiones */}
@@ -231,15 +215,11 @@ export default function DianNominaPage() {
               <p className="text-[11px] font-bold text-[#8890b5] uppercase tracking-wide mb-2">
                 Provisiones por mes
               </p>
-              {PROVISIONES.map((p) => (
-                <PreviewRow key={p.label} label={p.label} tasa={p.tasa} base={salVal} />
-              ))}
-              <PreviewRow
-                label="Total provisiones"
-                tasa={PROVISIONES.reduce((s, a) => s + a.tasa, 0)}
-                base={salVal}
-                isTotal
-              />
+              <PreviewRow label="Vacaciones (s/ salario)"          tasa={TASA_VACACIONES}          valor={calc.provisionesDetalle.vacaciones} />
+              <PreviewRow label="Prima de Servicios (s/ salario+auxilio)" tasa={TASA_PRIMA}         valor={calc.provisionesDetalle.prima} />
+              <PreviewRow label="Cesantías (s/ salario+auxilio)"   tasa={TASA_CESANTIAS}            valor={calc.provisionesDetalle.cesantias} />
+              <PreviewRow label="Intereses Cesantías (s/ cesantías)" tasa={TASA_INTERESES_CESANTIAS} valor={calc.provisionesDetalle.interesesCesantias} />
+              <PreviewRow label="Total provisiones" valor={calc.provisiones} isTotal />
             </div>
 
             {/* Costo por empleado/mes */}
