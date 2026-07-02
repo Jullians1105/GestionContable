@@ -3,7 +3,7 @@ const multer = require('multer');
 const { body } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
-const { uploadDian, patchBorrador, exportarBorrador, aplicarClasificacionRapida } = require('../controllers/dianController');
+const { uploadDian, patchBorrador, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada } = require('../controllers/dianController');
 
 const router = Router();
 
@@ -127,6 +127,39 @@ router.patch('/borradores/:id/aplicar-clasificacion-rapida',
   body('tasaRetencion').optional({ nullable: true }).isFloat({ min: 0 }).toFloat(),
   validate,
   aplicarClasificacionRapida
+);
+
+/**
+ * @openapi
+ * /api/dian/borradores/{id}/revisar-anomalia:
+ *   patch:
+ *     tags: [DIAN]
+ *     summary: Marca un tipo de anomalía como revisado manualmente (solo ack de auditoría — nunca cambia ningún cálculo)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [tipo]
+ *             properties:
+ *               tipo: { type: string, description: 'Debe coincidir exactamente con el "tipo" de la anomalía detectada' }
+ *     responses:
+ *       200:
+ *         description: Anomalía marcada como revisada.
+ *       400:
+ *         description: "tipo" ausente.
+ *       404:
+ *         description: Borrador no encontrado o no pertenece al usuario.
+ */
+router.patch('/borradores/:id/revisar-anomalia',
+  body('tipo').notEmpty().isString(),
+  validate,
+  marcarAnomaliaRevisada
 );
 
 router.post('/borradores/:id/exportar',
