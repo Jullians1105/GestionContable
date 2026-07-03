@@ -525,42 +525,32 @@ function buildResumen(ws, resumen, nomina, meta) {
   // Fila de encabezado a congelar en scroll: hasta acá (título + KPI + contador)
   freezeHeaderRowAt(ws, docRow.number + 1);
 
-  // INGRESOS
+  // INGRESOS/COSTOS — esta hoja muestra solo las BASES (montos sin IVA). El IVA
+  // correspondiente a cada una de estas bases se cuadra aparte en la hoja IMPUESTOS.
   sectionRow('INGRESOS');
-  valueRow('Ventas (bruto)',           resumen.ventasBruto,      { indent: 2 });
-  valueRow('(−) Devolución en ventas', resumen.devolucionVentas, { isNeg: true, indent: 2 });
-  valueRow('Ventas Netas',             resumen.ventasNetas,      { subtotal: true });
+  valueRow('Ventas',                   resumen.ventasBrutoSinIva,      {
+    indent: 2,
+    nota: 'Todos los valores de esta hoja son BASE (sin IVA). El IVA de cada línea está en la hoja IMPUESTOS.',
+  });
+  valueRow('(−) Devolución en ventas', resumen.devolucionVentasSinIva, { isNeg: true, indent: 2 });
+  valueRow('Ventas Netas',             resumen.ventasNetas,            { subtotal: true });
   blank();
 
   // COSTOS
   sectionRow('COSTOS');
-  valueRow('Compras (bruto)',             resumen.comprasBruto,      { indent: 2 });
-  valueRow('(−) Devolución en compras',   resumen.devolucionCompras, { isNeg: true, indent: 2 });
+  valueRow('Compras',                   resumen.comprasBrutoSinIva,      { indent: 2 });
+  valueRow('(−) Devolución en compras', resumen.devolucionComprasSinIva, { isNeg: true, indent: 2 });
   if (resumen.documentoSoporteCompras > 0) {
-    valueRow('+ Documento Soporte (compra)', resumen.documentoSoporteCompras, {
+    valueRow('+ Documento Soporte (compra)', resumen.documentoSoporteComprasSinIva, {
       indent: 2,
       nota: '"Documento soporte con no obligados" con Grupo="Emitido": compra a un no-obligado a facturar. Incluido en Compras Netas.',
     });
   }
-  valueRow('Compras Netas',               resumen.comprasNetas,      { subtotal: true });
-  valueRow('Costos Totales',              resumen.costosTotales,     { subtotal: true });
+  valueRow('Compras Netas',   resumen.comprasNetas,  { subtotal: true });
+  valueRow('Costos Totales',  resumen.costosTotales, { subtotal: true });
   blank();
 
   valueRow('UTILIDAD BRUTA', resumen.utilidadBruta, { total: true, isNeg: resumen.utilidadBruta < 0 });
-  blank();
-
-  // IMPUESTOS
-  sectionRow('IMPUESTOS');
-  valueRow('IVA Generado',                resumen.ivaGenerado,          { indent: 2 });
-  valueRow('(−) IVA Descontable',         resumen.ivaDescontable,       { isNeg: true, indent: 2 });
-  valueRow('(−) IVA devolución compras',  resumen.ivaDevolucionCompras, { isNeg: true, indent: 2 });
-  valueRow('(−) IVA devolución ventas',   resumen.ivaDevolucionVentas,  { isNeg: true, indent: 2 });
-  const ivaNeg = resumen.ivaPagar < 0;
-  valueRow(
-    ivaNeg ? 'IVA a pagar (saldo a FAVOR)' : 'IVA a pagar',
-    resumen.ivaPagar,
-    { subtotal: true, isNeg: ivaNeg }
-  );
   blank();
 
   valueRow('(−) Total retenciones', resumen.totalRetenciones, { isNeg: true, bold: true });
@@ -582,6 +572,112 @@ function buildResumen(ws, resumen, nomina, meta) {
 
   // Total de cierre (detalle, para auditar cómo se llegó al número de la tarjeta de arriba)
   valueRow('UTILIDAD FINAL', utilFinal, { total: true, isNeg: utilFinal < 0 });
+}
+
+// ── Hoja IMPUESTOS ─────────────────────────────────────────────────────────────
+// El IVA no es ingreso ni costo real de la empresa (es un pasivo que se recauda
+// y se paga a la DIAN), por eso vive en su propia hoja separada de RESUMEN en
+// vez de mezclarse con el Estado de Resultados.
+// Dos bloques lado a lado: izquierda = bases de ingresos/costos (sin IVA, igual
+// que RESUMEN); derecha = IVA, agrupado por efecto sobre el IVA a pagar y NO por
+// Emitido/Recibido — Devolución en compras sube el IVA a pagar (revierte crédito),
+// Devolución en ventas lo baja (revierte el generado). Ver nota en exportarBorrador.
+function buildImpuestos(ws, resumen) {
+  ws.columns = [
+    { key: 'labelL', width: 30 },
+    { key: 'valL',   width: 18 },
+    { key: 'gap',    width: 4  },
+    { key: 'labelR', width: 30 },
+    { key: 'valR',   width: 18 },
+  ];
+
+  const COP = '"$ "#,##0';
+
+  const titleRow = ws.addRow(['IMPUESTOS — IVA']);
+  titleRow.getCell(1).font = { bold: true, size: 14, color: { argb: XL_WHITE } };
+  titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+  titleRow.height = 26;
+  for (let c = 1; c <= 5; c++) titleRow.getCell(c).fill = sfill(XL_TITLE);
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 5);
+  ws.addRow([]);
+  freezeHeaderRowAt(ws, titleRow.number + 2);
+
+  const sectionHdr = ws.addRow(['INGRESOS Y COSTOS (base, sin IVA)', '', '', 'IVA', '']);
+  for (let c = 1; c <= 5; c++) {
+    const cell = sectionHdr.getCell(c);
+    cell.font      = { bold: true, color: { argb: XL_WHITE }, size: 10 };
+    cell.fill      = sfill(XL_BLUE);
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border    = xlBorder;
+  }
+  sectionHdr.height = 22;
+  ws.mergeCells(sectionHdr.number, 1, sectionHdr.number, 2);
+  ws.mergeCells(sectionHdr.number, 4, sectionHdr.number, 5);
+
+  const writeCell = (row, col, label, val, opts = {}) => {
+    const cA = row.getCell(col);
+    const cB = row.getCell(col + 1);
+    cA.value = label;
+    cB.value = val !== null && val !== undefined ? Math.abs(val) : null;
+    cA.alignment = { horizontal: 'left', indent: opts.indent ?? 1 };
+    cB.alignment = { horizontal: 'right' };
+    cB.numFmt = COP;
+    cA.border = cB.border = xlBorder;
+    if (opts.isNeg) {
+      cA.font = { color: { argb: XL_RED } };
+      cB.font = { color: { argb: XL_RED } };
+    }
+    if (opts.subtotal) {
+      cA.fill = cB.fill = sfill(XL_BLUE_LT);
+      cA.font = { bold: true, ...(opts.isNeg ? { color: { argb: XL_RED } } : {}) };
+      cB.font = { bold: true, ...(opts.isNeg ? { color: { argb: XL_RED } } : {}) };
+      row.height = 20;
+    }
+    if (opts.total) {
+      cA.fill = cB.fill = sfill(XL_GRAY);
+      cA.font = { bold: true, size: 11, ...(opts.isNeg ? { color: { argb: XL_RED } } : {}) };
+      cB.font = { bold: true, size: 11, ...(opts.isNeg ? { color: { argb: XL_RED } } : {}) };
+      row.height = 20;
+    }
+  };
+
+  // Total compras (sin IVA) acá es solo Compras − Devolución compras — sin el
+  // ajuste de Documento Soporte (ese vive únicamente en RESUMEN/Compras Netas).
+  const totalIngresoSinIva = resumen.ventasBrutoSinIva  - resumen.devolucionVentasSinIva;
+  const totalComprasSinIva = resumen.comprasBrutoSinIva - resumen.devolucionComprasSinIva;
+
+  const ivaNeg = resumen.ivaPagar < 0;
+
+  const left = [
+    { label: 'Ingreso (base antes de IVA)',    val: resumen.ventasBrutoSinIva },
+    { label: '(−) Dev ventas (notas crédito)', val: resumen.devolucionVentasSinIva, isNeg: true },
+    { label: 'Total ingreso (sin IVA)',        val: totalIngresoSinIva, subtotal: true },
+    null,
+    { label: 'Compras (base antes de IVA)',     val: resumen.comprasBrutoSinIva },
+    { label: '(−) Dev compras (notas crédito)', val: resumen.devolucionComprasSinIva, isNeg: true },
+    { label: 'Total compras (sin IVA)',         val: totalComprasSinIva, subtotal: true },
+  ];
+
+  const right = [
+    { label: 'IVA generado (ventas)',       val: resumen.ivaGenerado },
+    { label: 'IVA devolución compras',      val: resumen.ivaDevolucionCompras },
+    { label: 'Total IVA Ventas',            val: resumen.totalIvaVentas, subtotal: true },
+    null,
+    { label: 'IVA descontable (compras)',   val: resumen.ivaDescontable },
+    { label: 'IVA devolución ventas',       val: resumen.ivaDevolucionVentas },
+    { label: 'Total IVA Compras',           val: resumen.totalIvaCompras, subtotal: true },
+    null,
+    { label: ivaNeg ? 'TOTAL IVA (saldo a FAVOR)' : 'TOTAL IVA', val: resumen.ivaPagar, total: true, isNeg: ivaNeg },
+  ];
+
+  const maxLen = Math.max(left.length, right.length);
+  for (let i = 0; i < maxLen; i++) {
+    const row = ws.addRow([]);
+    const l = left[i];
+    const r = right[i];
+    if (l) writeCell(row, 1, l.label, l.val, l);
+    if (r) writeCell(row, 4, r.label, r.val, r);
+  }
 }
 
 // ── Hoja RETENCIONES_POR_PROVEEDOR ─────────────────────────────────────────────
@@ -907,19 +1003,35 @@ const exportarBorrador = async (req, res, next) => {
     totalRetenciones = round2(totalRetenciones);
 
     // ── 4. IVA ─────────────────────────────────────────────────────────────
+    // Agrupado por efecto sobre el IVA a pagar, no por Emitido/Recibido:
+    // - Devolución en COMPRAS revierte crédito de IVA descontable → sube el IVA
+    //   a pagar, igual que IVA Generado (grupo "IVA Ventas").
+    // - Devolución en VENTAS revierte el IVA generado en esa venta → baja el IVA
+    //   a pagar, igual que IVA Descontable (grupo "IVA Compras").
+    // Total IVA = (IVA Generado + IVA devolución compras) − (IVA Descontable + IVA devolución ventas)
     const ivaGenerado          = calculos.ivaGenerado          ?? 0;
     const ivaDescontable       = calculos.ivaDescontable       ?? 0;
     const ivaDevolucionCompras = calculos.ivaDevolucionCompras ?? 0;
     const ivaDevolucionVentas  = calculos.ivaDevolucionVentas  ?? 0;
-    const ivaDevoluciones      = ivaDevolucionCompras + ivaDevolucionVentas;
-    const ivaPagar             = round2(ivaGenerado - ivaDescontable - ivaDevoluciones);
+    const totalIvaVentas       = ivaGenerado    + ivaDevolucionCompras;
+    const totalIvaCompras      = ivaDescontable + ivaDevolucionVentas;
+    const ivaPagar             = round2(totalIvaVentas - totalIvaCompras);
 
     // ── 5. Estado de resultados ────────────────────────────────────────────
-    const comprasBruto      = calculos.comprasBruto      ?? 0;
-    const devolucionCompras = calculos.devolucionCompras ?? 0;
-    const ventasBruto       = calculos.ventasBruto       ?? 0;
-    const devolucionVentas  = calculos.devolucionVentas  ?? 0;
-    const ventasNetas       = ventasBruto  - devolucionVentas;
+    // Ventas/Compras Netas (y por lo tanto Utilidad Bruta) se calculan SIN IVA:
+    // el "Total" del reporte DIAN incluye IVA, pero el IVA no es ingreso ni costo
+    // real de la empresa — es un pasivo que se cuadra aparte en IMPUESTOS. Se
+    // muestran ambas versiones (con/sin IVA) en el Excel para poder auditar.
+    const ventasBrutoConIva      = calculos.ventasBruto       ?? 0;
+    const ventasBrutoSinIva      = ventasBrutoConIva - ivaGenerado;
+    const devolucionVentasConIva = calculos.devolucionVentas  ?? 0;
+    const devolucionVentasSinIva = devolucionVentasConIva - ivaDevolucionVentas;
+    const ventasNetas            = ventasBrutoSinIva - devolucionVentasSinIva;
+
+    const comprasBrutoConIva      = calculos.comprasBruto      ?? 0;
+    const comprasBrutoSinIva      = comprasBrutoConIva - ivaDescontable;
+    const devolucionComprasConIva = calculos.devolucionCompras ?? 0;
+    const devolucionComprasSinIva = devolucionComprasConIva - ivaDevolucionCompras;
 
     // "Documento soporte con no obligados" tiene el Grupo invertido respecto a la
     // convención normal: Grupo="Emitido" es una COMPRA nuestra (se lo emitimos a alguien
@@ -927,9 +1039,12 @@ const exportarBorrador = async (req, res, next) => {
     // Costos Totales por separado — Grupo="Recibido" no tiene contrapartida normal acá
     // y se reporta como anomalía (ver calcularAnomalias), sin sumar a ningún total.
     const esDocSoporteCompra = (f) => f.tipoDocumento === DOC_SOPORTE_NO_OBLIGADOS && f.grupo === EMITIDO;
-    const documentoSoporteCompras = filas.filter(esDocSoporteCompra).reduce((s, f) => s + (f.total ?? 0), 0);
+    const documentoSoporteComprasFilas = filas.filter(esDocSoporteCompra);
+    const documentoSoporteCompras    = documentoSoporteComprasFilas.reduce((s, f) => s + (f.total ?? 0), 0);
+    const ivaDocumentoSoporteCompras = documentoSoporteComprasFilas.reduce((s, f) => s + (f.iva ?? 0), 0);
+    const documentoSoporteComprasSinIva = documentoSoporteCompras - ivaDocumentoSoporteCompras;
 
-    const comprasNetas   = comprasBruto - devolucionCompras + documentoSoporteCompras;
+    const comprasNetas   = comprasBrutoSinIva - devolucionComprasSinIva + documentoSoporteComprasSinIva;
     const costosTotales  = comprasNetas;
     const utilidadBruta  = ventasNetas - costosTotales;
     const utilidadNeta   = round2(utilidadBruta - totalRetenciones);
@@ -972,20 +1087,22 @@ const exportarBorrador = async (req, res, next) => {
     const anomalias                  = calcularAnomalias(filas, anomaliasRevisadas);
 
     const resumen = {
-      ventasBruto:              round2(ventasBruto),
-      devolucionVentas:         round2(devolucionVentas),
-      ventasNetas:              round2(ventasNetas),
-      comprasBruto:             round2(comprasBruto),
-      devolucionCompras:        round2(devolucionCompras),
-      comprasNetas:             round2(comprasNetas),
-      documentoSoporteCompras:  round2(documentoSoporteCompras),
-      costosTotales:            round2(costosTotales),
-      utilidadBruta:            round2(utilidadBruta),
-      ivaGenerado:              round2(ivaGenerado),
-      ivaDescontable:           round2(ivaDescontable),
-      ivaDevolucionCompras:     round2(ivaDevolucionCompras),
-      ivaDevolucionVentas:      round2(ivaDevolucionVentas),
-      ivaDevoluciones:          round2(ivaDevoluciones),
+      ventasBrutoSinIva:            round2(ventasBrutoSinIva),
+      devolucionVentasSinIva:       round2(devolucionVentasSinIva),
+      ventasNetas:                  round2(ventasNetas),
+      comprasBrutoSinIva:           round2(comprasBrutoSinIva),
+      devolucionComprasSinIva:      round2(devolucionComprasSinIva),
+      comprasNetas:                 round2(comprasNetas),
+      documentoSoporteCompras:      round2(documentoSoporteCompras),
+      documentoSoporteComprasSinIva: round2(documentoSoporteComprasSinIva),
+      costosTotales:                round2(costosTotales),
+      utilidadBruta:                round2(utilidadBruta),
+      ivaGenerado:                  round2(ivaGenerado),
+      ivaDescontable:               round2(ivaDescontable),
+      ivaDevolucionCompras:         round2(ivaDevolucionCompras),
+      ivaDevolucionVentas:          round2(ivaDevolucionVentas),
+      totalIvaVentas:               round2(totalIvaVentas),
+      totalIvaCompras:              round2(totalIvaCompras),
       ivaPagar,
       totalRetenciones,
       utilidadNeta,
@@ -1023,6 +1140,7 @@ const exportarBorrador = async (req, res, next) => {
     const meta = { totalFilas, periodoDesde, periodoHasta, procesadoEn, empresaNombre };
 
     buildResumen(wb.addWorksheet('RESUMEN'), resumen, nominaData, meta);
+    buildImpuestos(wb.addWorksheet('IMPUESTOS'), resumen);
     buildRetenciones(wb.addWorksheet('RETENCIONES_POR_PROVEEDOR'), retencionesPorProveedor, totalRetenciones);
     buildDetalleCompras(wb.addWorksheet('DETALLE_COMPRAS'), filasRecibido);
     if (nominaData) buildNomina(wb.addWorksheet('NOMINA'), nominaData, nominaData.salario);

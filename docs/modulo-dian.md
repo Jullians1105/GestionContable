@@ -4,7 +4,7 @@
 
 El módulo DIAN permite a un usuario tomar el reporte Excel que exporta el portal de la DIAN (facturas electrónicas emitidas y recibidas de un período) y, a partir de él, generar automáticamente un **Estado de Resultados contable** listo para presentar al contador o para archivo interno.
 
-El flujo elimina el trabajo manual de clasificar cada factura, calcular retenciones, cuadrar el IVA y estimar el costo de nómina: el usuario sube un archivo, clasifica las compras en dos clics y descarga un Excel profesional de cinco hojas.
+El flujo elimina el trabajo manual de clasificar cada factura, calcular retenciones, cuadrar el IVA y estimar el costo de nómina: el usuario sube un archivo, clasifica las compras en dos clics y descarga un Excel profesional de seis hojas.
 
 ---
 
@@ -120,27 +120,27 @@ Retención por fila = `total × (tasaRetencion / 100)`
 
 #### 4. Estado de Resultados (en la exportación)
 
+El IVA no es ingreso ni costo real de la empresa — es un pasivo que se recauda y se
+paga a la DIAN aparte. Por eso la hoja RESUMEN muestra **solo bases** (montos sin IVA):
+a cada monto "bruto" del reporte (campo `Total`, que sí incluye IVA) se le resta su
+componente de IVA antes de usarlo en Ventas Netas / Compras Netas / UTILIDAD BRUTA. El
+IVA correspondiente a cada una de esas bases se cuadra aparte en su propia hoja
+`IMPUESTOS` (ver más abajo) — no se mezcla con el Estado de Resultados.
+
 ```
 INGRESOS
-  Ventas (bruto)
-  (−) Devolución en ventas
+  Ventas                        = Total (Emitido, Factura) − IVA Generado
+  (−) Devolución en ventas      = Total (Emitido, Nota crédito) − IVA devolución ventas
   = Ventas Netas
 
 COSTOS
-  Compras (bruto)
-  (−) Devolución en compras
-  + Documento Soporte (compra) — "Documento soporte con no obligados" con Grupo="Emitido"
+  Compras                       = Total (Recibido, Factura/Doc. equiv.) − IVA Descontable
+  (−) Devolución en compras     = Total (Recibido, Nota crédito) − IVA devolución compras
+  + Documento Soporte (compra)  — "Documento soporte con no obligados" con Grupo="Emitido", sin su IVA
   = Compras Netas
   = Costos Totales   (igual a Compras Netas; se mantiene como línea propia por nombre contable)
 
 UTILIDAD BRUTA = Ventas Netas − Costos Totales
-
-IMPUESTOS
-  IVA Generado
-  (−) IVA Descontable
-  (−) IVA devolución compras   [línea propia, antes venía combinada en "IVA Devoluciones"]
-  (−) IVA devolución ventas    [línea propia, antes venía combinada en "IVA Devoluciones"]
-  = IVA a pagar
 
 (−) Total retenciones
 
@@ -151,6 +151,42 @@ NÓMINA (opcional)
 
 UTILIDAD FINAL = UTILIDAD NETA − Costo laboral   (el costo laboral es un GASTO, resta)
 ```
+
+La hoja `IMPUESTOS` (separada de RESUMEN) tiene dos bloques lado a lado:
+
+**Izquierda — bases (sin IVA)**, duplicando el mismo desglose de INGRESOS/COSTOS de
+RESUMEN (sin el ajuste de Documento Soporte, que solo vive en RESUMEN):
+```
+Ingreso (base antes de IVA)
+(−) Dev ventas (notas crédito)
+= Total ingreso (sin IVA)
+
+Compras (base antes de IVA)
+(−) Dev compras (notas crédito)
+= Total compras (sin IVA)
+```
+
+**Derecha — IVA**, agrupado **por efecto sobre el IVA a pagar, no por Emitido/Recibido**:
+```
+IVA generado (ventas)
+IVA devolución compras        [revierte crédito de IVA descontable → SUMA al IVA a pagar]
+= Total IVA Ventas
+
+IVA descontable (compras)
+IVA devolución ventas         [revierte el IVA generado en esa venta → RESTA del IVA a pagar]
+= Total IVA Compras
+
+TOTAL IVA = Total IVA Ventas − Total IVA Compras
+```
+
+Esta agrupación es intencional aunque a primera vista parezca "cruzada" (Devolución en
+compras junto a IVA Generado, en vez de junto a IVA Descontable): una devolución en
+compras reduce el crédito de IVA descontable que se podía deducir, lo que en la
+práctica **aumenta** el IVA a pagar — el mismo sentido que IVA Generado. Simétricamente,
+una devolución en ventas reduce el IVA que ya se había generado, **bajando** el IVA a
+pagar — el mismo sentido que IVA Descontable. La fórmula anterior (`ivaGenerado −
+ivaDescontable − ivaDevolucionCompras − ivaDevolucionVentas`) restaba
+`ivaDevolucionCompras` cuando debía sumarlo; quedó corregida en esta versión.
 
 **Regla de `Grupo` invertido para `"Documento soporte con no obligados"`** — confirmada
 y ya implementada: para este tipo de documento (y *solo* para este), el sentido normal
@@ -198,7 +234,7 @@ de emisión), con fallback al año más reciente configurado si no hay dato para
 
 ---
 
-### Excel de salida (5 hojas)
+### Excel de salida (6 hojas)
 
 Formato tradicional de estado de resultados imprimible (no dashboard): tabla jerárquica
 con una sola tarjeta destacada para UTILIDAD FINAL, bordes por bloque de sección, alturas
@@ -207,7 +243,8 @@ fijos, y una columna de Notas (col. C en RESUMEN) para explicaciones puntuales.
 
 | Hoja | Contenido |
 |------|-----------|
-| `RESUMEN` | Título con banda propia (empresa + período), tarjeta UTILIDAD FINAL (verde si es positiva, roja si es negativa — mismo criterio `isNeg` que el resto de la hoja), y el Estado de Resultados detallado línea por línea para auditar cómo se llegó a ese número |
+| `RESUMEN` | Título con banda propia (empresa + período), tarjeta UTILIDAD FINAL (verde si es positiva, roja si es negativa — mismo criterio `isNeg` que el resto de la hoja), y el Estado de Resultados detallado línea por línea (con desglose con/sin IVA de ventas y compras) para auditar cómo se llegó a ese número. Ya no incluye el cuadre de IVA — eso vive en su propia hoja |
+| `IMPUESTOS` | Cuadre de IVA como pasivo (Generado, Descontable, devoluciones, IVA a pagar), separado de RESUMEN porque el IVA no es ingreso ni costo real de la empresa |
 | `RETENCIONES_POR_PROVEEDOR` | Retenciones agrupadas por NIT emisor y concepto |
 | `DETALLE_COMPRAS` | Todas las facturas recibidas con su clasificación, tasa y valor retenido |
 | `NOMINA` | Desglose de devengado, aportes y provisiones, con tarjeta destacada del costo total (solo si se ingresó nómina) |
@@ -236,7 +273,7 @@ Nombre del archivo generado: `ContabilidadDIAN_<empresa>_<YYYY-MM>.xlsx`
 - Upload, parsing y cálculo base: implementado
 - Clasificación fila a fila + clasificación rápida: implementado
 - Módulo nómina con preview en vivo: implementado
-- Generación y descarga del Excel (5 hojas): implementado
+- Generación y descarga del Excel (6 hojas, IVA en hoja propia): implementado
 - Eliminación automática del borrador tras exportación: implementado
 
 **Pendiente / ideas futuras:**
