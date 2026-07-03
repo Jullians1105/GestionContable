@@ -4,7 +4,10 @@ const { authMiddleware } = require('../middleware/auth');
 const { requireFondoAccess, requireFondoAutorizarPagos } = require('../middleware/fondoAccess');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
-const { getPagos, listPagos, createPago, updatePago, updateAutorizado, getMesActual, avanzarMesActual } = require('../controllers/fondoPagosController');
+const {
+  getPagos, listPagos, createPago, updatePago, updateAutorizado,
+  getMesActual, avanzarMesActual, retrocederMesActual,
+} = require('../controllers/fondoPagosController');
 
 const router = Router();
 router.use(authMiddleware);
@@ -38,6 +41,26 @@ router.get('/mes-actual', getMesActual);
  *         description: Sin permiso para autorizar pagos.
  */
 router.post('/mes-actual/avanzar', requireFondoAutorizarPagos, avanzarMesActual);
+
+/**
+ * @openapi
+ * /api/fondo/pagos/mes-actual/retroceder:
+ *   post:
+ *     tags: [FondoPagos]
+ *     summary: >
+ *       Deshacer el mes habilitado más reciente (ej. si se habilitó por
+ *       error) — solo jefas. No retrocede antes del inicio del programa.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "{ anio, mes } — el nuevo mes habilitado"
+ *       400:
+ *         description: No se puede retroceder antes del inicio del programa.
+ *       403:
+ *         description: Sin permiso para autorizar pagos.
+ */
+router.post('/mes-actual/retroceder', requireFondoAutorizarPagos, retrocederMesActual);
 
 /**
  * @openapi

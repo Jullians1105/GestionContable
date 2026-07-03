@@ -186,6 +186,7 @@ export const api = {
   },
   getFondoPagosMesActual: () => request('/fondo/pagos/mes-actual'),
   avanzarFondoPagosMesActual: () => request('/fondo/pagos/mes-actual/avanzar', { method: 'POST' }),
+  retrocederFondoPagosMesActual: () => request('/fondo/pagos/mes-actual/retroceder', { method: 'POST' }),
 
   // Fondo Emprender — Empresas
   getFondoEmpresas: (categoria, anio, mes) => {

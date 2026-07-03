@@ -12,6 +12,9 @@ function fromYM(ym) { return { anio: Math.floor(ym / 100), mes: ym % 100, ym } }
 function nextYM(ym) {
   return ym % 100 === 12 ? (Math.floor(ym / 100) + 1) * 100 + 1 : ym + 1
 }
+function prevYM(ym) {
+  return ym % 100 === 1 ? (Math.floor(ym / 100) - 1) * 100 + 12 : ym - 1
+}
 function buildRange(startYM, endYM) {
   const out = []
   for (let ym = startYM; ym <= endYM; ym = nextYM(ym)) out.push(fromYM(ym))
@@ -55,7 +58,7 @@ const TD_STYLE = {
 // className por estado (fondo de color identifica el estado)
 const TD_EMPTY_CLS = 'border border-[#E5E7EB] bg-[#F9FAFB]'
 const TD_PEND_CLS  = 'border border-[#E5E7EB] bg-[#F9FAFB]'
-const TD_BLOQ_CLS  = 'border border-[#FDE68A] bg-[#FFFBEB]'
+const TD_BLOQ_CLS  = 'border border-[#D1D5DB] bg-[#E5E7EB]'
 const TD_ENV_CLS   = 'border border-[#93C5FD] bg-[#DBEAFE]'
 const TD_PAG_CLS   = 'border border-[#86EFAC] bg-[#DCFCE7]'
 const TD_ENV_RES_CLS = 'border border-[#93C5FD] bg-[#F0F9FF]'
@@ -160,7 +163,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
               </button>
             </>
           ) : (
-            <span style={{ ...BTN.base, color: '#92400E', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ ...BTN.base, color: '#4B5563', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
               Bloqueado
             </span>
@@ -172,7 +175,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
           <div
             style={{
               position: 'absolute', top: 4, right: 4, height: 20, width: hovAutorizar ? 82 : 20,
-              background: autorizado ? 'rgba(107,114,128,0.15)' : 'rgba(217,119,6,0.18)',
+              background: autorizado ? 'rgba(107,114,128,0.15)' : 'rgba(75,85,99,0.28)',
               borderRadius: 10, overflow: 'hidden',
               transition: 'width 220ms ease-out, background 150ms ease-out',
               display: 'flex', alignItems: 'center', paddingLeft: 3, gap: 2,
@@ -185,13 +188,13 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
           >
             <span
               className="material-symbols-outlined"
-              style={{ fontSize: 12, color: autorizado ? '#4b5563' : '#92400E', lineHeight: 1, flexShrink: 0 }}
+              style={{ fontSize: 12, color: autorizado ? '#4b5563' : '#374151', lineHeight: 1, flexShrink: 0 }}
             >
               {autorizado ? 'lock_open' : 'lock'}
             </span>
             <span style={{
               fontSize: 10, fontWeight: 600,
-              color: autorizado ? '#4b5563' : '#92400E',
+              color: autorizado ? '#4b5563' : '#374151',
               opacity: hovAutorizar ? 1 : 0,
               transition: 'opacity 140ms ease-out 60ms',
             }}>
@@ -413,7 +416,7 @@ export default function FondoEmprenderPagosPage() {
     } catch { /* silent — optimistic update stays */ }
   }, [mesHabilitadoYM])
 
-  // ── habilitar mes siguiente (solo jefas) ─────────────────────────────────────
+  // ── habilitar / deshacer mes (solo jefas) ────────────────────────────────────
   const [avanzandoMes, setAvanzandoMes] = useState(false)
   async function handleAvanzarMes() {
     setAvanzandoMes(true)
@@ -422,6 +425,18 @@ export default function FondoEmprenderPagosPage() {
       await fetchAll()
     } catch (err) {
       alert(err.status === 403 ? 'Sin permiso para habilitar el mes (403)' : 'Error: ' + err.message)
+    } finally {
+      setAvanzandoMes(false)
+    }
+  }
+
+  async function handleRetrocederMes() {
+    setAvanzandoMes(true)
+    try {
+      await api.retrocederFondoPagosMesActual()
+      await fetchAll()
+    } catch (err) {
+      alert(err.status === 403 ? 'Sin permiso para deshacer el mes (403)' : 'Error: ' + err.message)
     } finally {
       setAvanzandoMes(false)
     }
@@ -756,6 +771,16 @@ export default function FondoEmprenderPagosPage() {
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>event_available</span>
                   Habilitar {(() => { const n = fromYM(nextYM(mesHabilitadoYM)); return `${MONTHS_SHORT[n.mes - 1]} ${n.anio}` })()}
+                </button>
+              )}
+              {canAutorizar && mesHabilitadoYM != null && (
+                <button
+                  onClick={handleRetrocederMes}
+                  disabled={avanzandoMes}
+                  title={`Deshacer — volver a ${(() => { const p = fromYM(prevYM(mesHabilitadoYM)); return `${MONTHS_SHORT[p.mes - 1]} ${p.anio}` })()}`}
+                  className="flex items-center justify-center w-6 h-6 rounded-lg border transition-colors disabled:opacity-50 text-[#6b7280] dark:text-[#8890b5] border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>undo</span>
                 </button>
               )}
             </div>

@@ -239,4 +239,42 @@ const avanzarMesActual = async (req, res, next) => {
   }
 };
 
-module.exports = { getPagos, listPagos, createPago, updatePago, updateAutorizado, getMesActual, avanzarMesActual };
+// Inicio del programa (marzo 2026) — mismo valor que START_YM en el frontend.
+// Piso para retroceder: no tiene sentido deshabilitar meses de antes de que
+// existiera el programa.
+const INICIO_PROGRAMA_ANIO = 2026;
+const INICIO_PROGRAMA_MES  = 3;
+
+const retrocederMesActual = async (req, res, next) => {
+  try {
+    const current = await db.query('SELECT anio, mes FROM fondo_pagos_mes_actual WHERE id = 1');
+    if (current.rows.length === 0) {
+      return res.status(500).json({ error: 'Mes actual de pagos no configurado' });
+    }
+    const { anio, mes } = current.rows[0];
+    if (anio * 100 + mes <= INICIO_PROGRAMA_ANIO * 100 + INICIO_PROGRAMA_MES) {
+      return res.status(400).json({ error: 'No se puede retroceder antes del inicio del programa' });
+    }
+
+    const result = await db.query(
+      `UPDATE fondo_pagos_mes_actual
+       SET anio = CASE WHEN mes = 1 THEN anio - 1 ELSE anio END,
+           mes  = CASE WHEN mes = 1 THEN 12 ELSE mes - 1 END
+       WHERE id = 1
+       RETURNING anio, mes`
+    );
+
+    await auditLog(req.user.userId, 'UPDATE', 'fondo_pagos_mes_actual', 1, {
+      nuevoAnio: result.rows[0].anio, nuevoMes: result.rows[0].mes, accion: 'retroceder',
+    });
+
+    res.json({ anio: result.rows[0].anio, mes: result.rows[0].mes });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  getPagos, listPagos, createPago, updatePago, updateAutorizado,
+  getMesActual, avanzarMesActual, retrocederMesActual,
+};
