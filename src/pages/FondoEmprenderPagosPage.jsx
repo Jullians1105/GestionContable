@@ -15,15 +15,13 @@ function nextYM(ym) {
 function prevYM(ym) {
   return ym % 100 === 1 ? (Math.floor(ym / 100) - 1) * 100 + 12 : ym - 1
 }
-function buildRange(startYM, endYM) {
-  const out = []
-  for (let ym = startYM; ym <= endYM; ym = nextYM(ym)) out.push(fromYM(ym))
-  return out
-}
+// Índice lineal de mes (para poder sumar/restar/dividir sin líos de año) — mes es 1-12
+function ymToIndex(ym) { const { anio, mes } = fromYM(ym); return anio * 12 + mes }
+function indexToYM(idx) { const anio = Math.floor((idx - 1) / 12); const mes = idx - anio * 12; return anio * 100 + mes }
 
-const START_YM          = 2026 * 100 + 3   // Marzo 2026 — inicio del programa
-const HISTORIAL_START_YM = 2026 * 100 + 1  // Enero 2026 — vista historial completo
-const VENTANA_MESES     = 6                // Cuántos meses se ven por defecto (ventana deslizante)
+const START_YM      = 2026 * 100 + 3  // Marzo 2026 — inicio del programa
+const START_IDX      = ymToIndex(START_YM)
+const VENTANA_MESES  = 5              // Cuántos meses se ven por bloque, contados desde marzo
 
 // ─── calcular meses debidos (frontend) ───────────────────────────────────────
 // Genera meses desde START_YM hasta el mes habilitado (no el mes calendario
@@ -177,14 +175,15 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
               onClick={() => act('autorizar', { autorizado: !autorizado })}
               title={autorizado ? 'Bloquear envío hasta nueva orden' : 'Autorizar envío'}
               style={{
-                width: 18, height: 18, borderRadius: 9, border: 'none', flexShrink: 0, padding: 0,
+                width: 24, height: 24, borderRadius: 12, flexShrink: 0, padding: 0,
+                border: autorizado ? '1px solid rgba(107,114,128,0.35)' : '1px solid rgba(55,65,81,0.4)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                background: autorizado ? 'rgba(107,114,128,0.15)' : 'rgba(75,85,99,0.28)',
+                background: autorizado ? 'rgba(107,114,128,0.22)' : 'rgba(75,85,99,0.42)',
               }}
             >
               <span
                 className="material-symbols-outlined"
-                style={{ fontSize: 11, color: autorizado ? '#4b5563' : '#374151', lineHeight: 1 }}
+                style={{ fontSize: 15, color: autorizado ? '#4b5563' : '#f9fafb', lineHeight: 1 }}
               >
                 {autorizado ? 'lock_open' : 'lock'}
               </span>
@@ -355,10 +354,14 @@ export default function FondoEmprenderPagosPage() {
   // ── ui state ─────────────────────────────────────────────────────────────────
   const [activeTab,     setActiveTab]     = useState('todas')
   const [search,        setSearch]        = useState('')
-  const [blockOffset,   setBlockOffset]   = useState(0) // 0 = bloque más reciente de meses
+  const [blockIndex,    setBlockIndex]    = useState(0) // índice del bloque de VENTANA_MESES, contado desde marzo
 
-  // Volver siempre al bloque más reciente cuando cambia el mes habilitado
-  useEffect(() => { setBlockOffset(0) }, [mesHabilitadoYM])
+  // Al cargar / cambiar el mes habilitado, mostrar el bloque que lo contiene
+  useEffect(() => {
+    if (mesHabilitadoYM != null) {
+      setBlockIndex(Math.floor((ymToIndex(mesHabilitadoYM) - START_IDX) / VENTANA_MESES))
+    }
+  }, [mesHabilitadoYM])
 
   // ── data loading ──────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -610,35 +613,23 @@ export default function FondoEmprenderPagosPage() {
     return scopedRows.filter(r => !q || r.empresa.name.toLowerCase().includes(q))
   }, [scopedRows, search])
 
-  // Ventana de VENTANA_MESES meses, paginada de a bloques con flechas — nunca
-  // crece más allá de eso, así que nunca fuerza scroll. blockOffset = 0 es el
-  // bloque más reciente (termina en el mes habilitado); cada +1 retrocede un
-  // bloque completo de VENTANA_MESES.
-  const minHistoricoYM = useMemo(() => {
-    let minYM = HISTORIAL_START_YM
-    for (const row of rows)
-      for (const h of row.historialCompleto) {
-        const ym = toYM(h.anio, h.mes)
-        if (ym < minYM) minYM = ym
-      }
-    return minYM
-  }, [rows])
-
-  const maxBlockOffset = useMemo(() => {
-    if (mesHabilitadoYM == null) return 0
-    const totalMeses = (fromYM(mesHabilitadoYM).anio - fromYM(minHistoricoYM).anio) * 12
-      + (fromYM(mesHabilitadoYM).mes - fromYM(minHistoricoYM).mes) + 1
-    return Math.max(0, Math.ceil(totalMeses / VENTANA_MESES) - 1)
-  }, [mesHabilitadoYM, minHistoricoYM])
+  // Bloques fijos de VENTANA_MESES meses contados desde marzo (START_YM), en
+  // orden — no una ventana deslizante. Bloque 0 = Mar-Jul, bloque 1 = Ago-Dic,
+  // etc. Nunca muestra más de VENTANA_MESES columnas, así que no debería
+  // necesitar scroll horizontal. Las flechas pasean entre bloques completos.
+  const maxBlockIndex = mesHabilitadoYM == null
+    ? 0
+    : Math.floor((ymToIndex(mesHabilitadoYM) - START_IDX) / VENTANA_MESES)
 
   const months = useMemo(() => {
     if (mesHabilitadoYM == null) return []
-    let finYM = mesHabilitadoYM
-    for (let i = 0; i < blockOffset * VENTANA_MESES; i++) finYM = prevYM(finYM)
-    let inicioYM = finYM
-    for (let i = 1; i < VENTANA_MESES && inicioYM > minHistoricoYM; i++) inicioYM = prevYM(inicioYM)
-    return buildRange(Math.max(inicioYM, minHistoricoYM), finYM)
-  }, [mesHabilitadoYM, blockOffset, minHistoricoYM])
+    const habilitadoIdx = ymToIndex(mesHabilitadoYM)
+    const bloqueInicioIdx = START_IDX + blockIndex * VENTANA_MESES
+    const bloqueFinIdx = Math.min(bloqueInicioIdx + VENTANA_MESES - 1, habilitadoIdx)
+    const out = []
+    for (let idx = bloqueInicioIdx; idx <= bloqueFinIdx; idx++) out.push(fromYM(indexToYM(idx)))
+    return out
+  }, [mesHabilitadoYM, blockIndex])
 
   // ── loading / error ───────────────────────────────────────────────────────────
   if (loading) return (
@@ -796,8 +787,8 @@ export default function FondoEmprenderPagosPage() {
                 pasea por bloques fijos en vez de expandir la tabla */}
             <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-2 py-1.5 shadow-sm">
               <button
-                onClick={() => setBlockOffset(o => Math.min(o + 1, maxBlockOffset))}
-                disabled={blockOffset >= maxBlockOffset}
+                onClick={() => setBlockIndex(i => Math.max(i - 1, 0))}
+                disabled={blockIndex <= 0}
                 title="Meses anteriores"
                 className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
@@ -811,8 +802,8 @@ export default function FondoEmprenderPagosPage() {
                 )}
               </span>
               <button
-                onClick={() => setBlockOffset(o => Math.max(o - 1, 0))}
-                disabled={blockOffset <= 0}
+                onClick={() => setBlockIndex(i => Math.min(i + 1, maxBlockIndex))}
+                disabled={blockIndex >= maxBlockIndex}
                 title="Meses más recientes"
                 className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
