@@ -180,6 +180,10 @@ export const api = {
   getFondoPagos:    (empresaId)         => request(`/fondo/pagos/${empresaId}`),
   createFondoPago:  (empresaId, data)   => request(`/fondo/pagos/${empresaId}`, { method: 'POST', body: JSON.stringify(data) }),
   updateFondoPago:  (empresaId, pagoId, data) => request(`/fondo/pagos/${empresaId}/${pagoId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateFondoPagoAutorizado: (empresaId, anio, mes, autorizado) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/pagos/${empresaId}/autorizar?${qs}`, { method: 'PUT', body: JSON.stringify({ autorizado }) });
+  },
 
   // Fondo Emprender — Empresas
   getFondoEmpresas: (categoria, anio, mes) => {

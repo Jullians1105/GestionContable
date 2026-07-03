@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, Fragment } from 'react'
 import StatsCard from '../components/StatsCard'
 import { api } from '../services/api'
+import { useAuth } from '../context/AuthContext'
 
 // ─── month utilities ──────────────────────────────────────────────────────────
 
@@ -32,8 +33,8 @@ function calcularMesesDebidos(pagos) {
     const pago = pagos.find(p => p.anio === anio && p.mes === mes) ?? null
     if (pago?.estado === 'aprobado') continue
     out.push(pago
-      ? { anio, mes, estado: pago.estado, pagoId: pago.id, nota: pago.nota ?? null }
-      : { anio, mes, estado: 'pendiente', pagoId: null, nota: null }
+      ? { anio, mes, estado: pago.estado, pagoId: pago.id, nota: pago.nota ?? null, autorizado: pago.autorizado ?? true }
+      : { anio, mes, estado: 'pendiente', pagoId: null, nota: null, autorizado: true }
     )
   }
   return out
@@ -79,10 +80,11 @@ const BTN = {
   rechazado: { background: '#FEE2E2', color: '#991B1B' },
 }
 
-function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onAction }) {
+function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onAction, canAutorizar }) {
   const [hovRechazado, setHovRechazado] = useState(false)
   const [hovEditar,    setHovEditar]    = useState(false)
   const [hovNota,      setHovNota]      = useState(false)
+  const [hovAutorizar, setHovAutorizar] = useState(false)
   const [notaInput,    setNotaInput]    = useState({ open: false, draft: '' })
 
   const debito    = mesesDebidos.find(md => md.anio === anio && md.mes === mes) ?? null
@@ -137,22 +139,64 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
     return <td colSpan={2} className={TD_EMPTY_CLS} style={{ ...TD_STYLE, color: '#c8c5bc' }}>—</td>
   }
 
-  const { estado, nota } = debito
+  const { estado, nota, autorizado } = debito
 
   // ── Pendiente ────────────────────────────────────────────────────────────────
   if (estado === 'pendiente') {
     return (
-      <td colSpan={2} className={TD_PEND_CLS} style={TD_STYLE}>
+      <td colSpan={2} className={TD_PEND_CLS} style={{ ...TD_STYLE, position: 'relative' }}>
         <div style={ROW}>
-          <span style={{ ...BTN.base, ...BTN.pendiente }}>Pendiente</span>
-          <button
-            className="hover:opacity-80"
-            onClick={() => act('enviado')}
-            style={{ ...BTN.base, ...BTN.pill, ...BTN.enviado }}
-          >
-            Enviado →
-          </button>
+          {autorizado ? (
+            <>
+              <span style={{ ...BTN.base, ...BTN.pendiente }}>Pendiente</span>
+              <button
+                className="hover:opacity-80"
+                onClick={() => act('enviado')}
+                style={{ ...BTN.base, ...BTN.pill, ...BTN.enviado }}
+              >
+                Enviado →
+              </button>
+            </>
+          ) : (
+            <span style={{ ...BTN.base, color: '#9CA3AF', fontWeight: 500, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
+              Bloqueado
+            </span>
+          )}
         </div>
+
+        {/* Toggle de autorización — solo visible para quien tenga el permiso */}
+        {canAutorizar && (
+          <div
+            style={{
+              position: 'absolute', top: 4, right: 4, height: 20, width: hovAutorizar ? 82 : 20,
+              background: autorizado ? 'rgba(107,114,128,0.15)' : 'rgba(217,119,6,0.18)',
+              borderRadius: 10, overflow: 'hidden',
+              transition: 'width 220ms ease-out, background 150ms ease-out',
+              display: 'flex', alignItems: 'center', paddingLeft: 3, gap: 2,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+            onMouseEnter={() => setHovAutorizar(true)}
+            onMouseLeave={() => setHovAutorizar(false)}
+            onClick={() => act('autorizar', { autorizado: !autorizado })}
+            title={autorizado ? 'Bloquear envío hasta nueva orden' : 'Autorizar envío'}
+          >
+            <span
+              className="material-symbols-outlined"
+              style={{ fontSize: 12, color: autorizado ? '#4b5563' : '#92400E', lineHeight: 1, flexShrink: 0 }}
+            >
+              {autorizado ? 'lock_open' : 'lock'}
+            </span>
+            <span style={{
+              fontSize: 10, fontWeight: 600,
+              color: autorizado ? '#4b5563' : '#92400E',
+              opacity: hovAutorizar ? 1 : 0,
+              transition: 'opacity 140ms ease-out 60ms',
+            }}>
+              {autorizado ? 'Bloquear' : 'Autorizar'}
+            </span>
+          </div>
+        )}
       </td>
     )
   }
@@ -305,6 +349,8 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function FondoEmprenderPagosPage() {
+  const { user } = useAuth()
+  const canAutorizar = user?.role === 'admin' || user?.permissions?.modulos?.fondoEmprender?.canAutorizarPagos === true
 
   // ── server state ─────────────────────────────────────────────────────────────
   const [rows,    setRows]    = useState([])
@@ -360,7 +406,7 @@ export default function FondoEmprenderPagosPage() {
   }, [])
 
   // ── action handler ────────────────────────────────────────────────────────────
-  const handleAction = useCallback(async (action, { empresaId, anio, mes, pagoId, nota }) => {
+  const handleAction = useCallback(async (action, { empresaId, anio, mes, pagoId, nota, autorizado }) => {
     const updateRow = (fn) =>
       setRows(prev => prev.map(r => r.empresa.id === empresaId ? fn(r) : r))
 
@@ -454,6 +500,25 @@ export default function FondoEmprenderPagosPage() {
         } catch (err) {
           refreshEmpresa(empresaId)
           alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
+        }
+        break
+      }
+
+      case 'autorizar': {
+        updateRow(r => ({
+          ...r,
+          mesesDebidos: r.mesesDebidos.map(md =>
+            md.anio === anio && md.mes === mes ? { ...md, autorizado } : md
+          ),
+        }))
+        try {
+          await api.updateFondoPagoAutorizado(empresaId, anio, mes, autorizado)
+          // Si el mes aún no tenía registro, el backend lo crea — refrescamos
+          // para tomar el pagoId nuevo y mantener historialCompleto consistente.
+          if (!pagoId) refreshEmpresa(empresaId)
+        } catch (err) {
+          refreshEmpresa(empresaId)
+          alert(err.status === 403 ? 'Sin permiso para autorizar pagos (403)' : 'Error: ' + err.message)
         }
         break
       }
@@ -788,6 +853,7 @@ export default function FondoEmprenderPagosPage() {
                         mesesDebidos={row.mesesDebidos}
                         historialCompleto={row.historialCompleto}
                         onAction={handleAction}
+                        canAutorizar={canAutorizar}
                       />
                     ))}
                   </tr>

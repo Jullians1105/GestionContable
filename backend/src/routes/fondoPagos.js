@@ -1,10 +1,10 @@
 const { Router } = require('express');
 const { body, query } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
-const { requireFondoAccess } = require('../middleware/fondoAccess');
+const { requireFondoAccess, requireFondoAutorizarPagos } = require('../middleware/fondoAccess');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
-const { getPagos, listPagos, createPago, updatePago } = require('../controllers/fondoPagosController');
+const { getPagos, listPagos, createPago, updatePago, updateAutorizado } = require('../controllers/fondoPagosController');
 
 const router = Router();
 router.use(authMiddleware);
@@ -83,6 +83,52 @@ router.post('/:empresaId',
     .toInt(),
   validate,
   createPago
+);
+
+/**
+ * @openapi
+ * /api/fondo/pagos/{empresaId}/autorizar:
+ *   put:
+ *     tags: [FondoPagos]
+ *     summary: >
+ *       Autorizar (o bloquear) el envío de un mes — permiso independiente de
+ *       "Editar pagos". Si el mes no tiene registro aún, se crea uno en
+ *       estado 'pendiente' solo para guardar el flag.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: empresaId, in: path, required: true, schema: { type: string, format: uuid } }
+ *       - { name: anio, in: query, required: true, schema: { type: integer } }
+ *       - { name: mes,  in: query, required: true, schema: { type: integer, minimum: 1, maximum: 12 } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [autorizado]
+ *             properties:
+ *               autorizado: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Pago actualizado (o creado) con el nuevo flag.
+ *       403:
+ *         description: Sin permiso para autorizar pagos.
+ */
+router.put('/:empresaId/autorizar',
+  ...validateUUIDParam('empresaId'),
+  requireFondoAutorizarPagos,
+  query('anio')
+    .notEmpty().withMessage('anio es requerido')
+    .isInt({ min: 2000, max: 2100 }).withMessage('anio debe ser un año entre 2000 y 2100')
+    .toInt(),
+  query('mes')
+    .notEmpty().withMessage('mes es requerido')
+    .isInt({ min: 1, max: 12 }).withMessage('mes debe ser entre 1 y 12')
+    .toInt(),
+  body('autorizado').isBoolean().withMessage('autorizado debe ser boolean'),
+  validate,
+  updateAutorizado
 );
 
 /**

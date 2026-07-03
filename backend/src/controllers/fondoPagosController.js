@@ -8,6 +8,7 @@ const normalizePago = (row) => ({
   anio:            row.anio,
   mes:             row.mes,
   estado:          row.estado,
+  autorizado:      row.autorizado,
   fechaEnvio:      row.fecha_envio,
   fechaResolucion: row.fecha_resolucion,
   monto:           row.monto,
@@ -119,6 +120,55 @@ const createPago = async (req, res, next) => {
   }
 };
 
+// Autorización interna de envío — independiente de `estado` (el avance con la
+// fiduciaria). Si el mes aún no tiene registro (pendiente virtual, sin fila
+// en BD), se crea una en estado 'pendiente' solo para guardar el flag.
+const updateAutorizado = async (req, res, next) => {
+  try {
+    const { empresaId } = req.params;
+    const anio = parseInt(req.query.anio, 10);
+    const mes  = parseInt(req.query.mes, 10);
+    const { autorizado } = req.body;
+
+    const existing = await db.query(
+      'SELECT id FROM fondo_pagos WHERE empresa_id = $1 AND anio = $2 AND mes = $3',
+      [empresaId, anio, mes]
+    );
+
+    let result;
+    if (existing.rows.length > 0) {
+      result = await db.query(
+        'UPDATE fondo_pagos SET autorizado = $1 WHERE id = $2 RETURNING *',
+        [autorizado, existing.rows[0].id]
+      );
+    } else {
+      const feeResult = await db.query(
+        'SELECT monthly_fee FROM fondo_empresas WHERE id = $1',
+        [empresaId]
+      );
+      if (feeResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Empresa no encontrada' });
+      }
+      const monto = feeResult.rows[0].monthly_fee ?? null;
+      result = await db.query(
+        `INSERT INTO fondo_pagos
+           (id, empresa_id, anio, mes, estado, monto, autorizado, fecha_envio, registrado_por)
+         VALUES ($1, $2, $3, $4, 'pendiente', $5, $6, CURRENT_DATE, $7)
+         RETURNING *`,
+        [uuidv4(), empresaId, anio, mes, monto, autorizado, req.user.userId]
+      );
+    }
+
+    await auditLog(req.user.userId, 'UPDATE', 'fondo_pagos', result.rows[0].id, {
+      empresaId, anio, mes, autorizado,
+    });
+
+    res.json(normalizePago(result.rows[0]));
+  } catch (err) {
+    next(err);
+  }
+};
+
 const updatePago = async (req, res, next) => {
   try {
     const { empresaId, pagoId } = req.params;
@@ -151,4 +201,4 @@ const updatePago = async (req, res, next) => {
   }
 };
 
-module.exports = { getPagos, listPagos, createPago, updatePago };
+module.exports = { getPagos, listPagos, createPago, updatePago, updateAutorizado };
