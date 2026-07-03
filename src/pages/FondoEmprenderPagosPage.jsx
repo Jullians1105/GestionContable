@@ -406,31 +406,28 @@ export default function FondoEmprenderPagosPage() {
 
   // ── habilitar / deshacer mes (solo jefas) ────────────────────────────────────
   const [avanzandoMes, setAvanzandoMes] = useState(false)
-  async function handleAvanzarMes() {
+  const [confirmMes, setConfirmMes] = useState(null) // { tipo: 'habilitar' | 'deshacer', label }
+
+  function requestAvanzarMes() {
     const { anio, mes } = fromYM(nextYM(mesHabilitadoYM))
-    const label = `${MONTHS_SHORT[mes - 1]} ${anio}`
-    if (!confirm(`¿Habilitar ${label}? Todas las empresas podrán empezar a tramitar ese mes.`)) return
-    setAvanzandoMes(true)
-    try {
-      await api.avanzarFondoPagosMesActual()
-      await fetchAll()
-    } catch (err) {
-      alert(err.status === 403 ? 'Sin permiso para habilitar el mes (403)' : 'Error: ' + err.message)
-    } finally {
-      setAvanzandoMes(false)
-    }
+    setConfirmMes({ tipo: 'habilitar', label: `${MONTHS_SHORT[mes - 1]} ${anio}` })
   }
 
-  async function handleRetrocederMes() {
+  function requestRetrocederMes() {
     const { anio, mes } = fromYM(prevYM(mesHabilitadoYM))
-    const label = `${MONTHS_SHORT[mes - 1]} ${anio}`
-    if (!confirm(`¿Deshacer y volver a ${label}? Se ocultará el mes habilitado actualmente.`)) return
+    setConfirmMes({ tipo: 'deshacer', label: `${MONTHS_SHORT[mes - 1]} ${anio}` })
+  }
+
+  async function confirmarAccionMes() {
+    const tipo = confirmMes?.tipo
+    setConfirmMes(null)
     setAvanzandoMes(true)
     try {
-      await api.retrocederFondoPagosMesActual()
+      if (tipo === 'habilitar') await api.avanzarFondoPagosMesActual()
+      else await api.retrocederFondoPagosMesActual()
       await fetchAll()
     } catch (err) {
-      alert(err.status === 403 ? 'Sin permiso para deshacer el mes (403)' : 'Error: ' + err.message)
+      alert(err.status === 403 ? 'Sin permiso para modificar el mes habilitado (403)' : 'Error: ' + err.message)
     } finally {
       setAvanzandoMes(false)
     }
@@ -758,7 +755,7 @@ export default function FondoEmprenderPagosPage() {
               </span>
               {canAutorizar && mesHabilitadoYM != null && (
                 <button
-                  onClick={handleAvanzarMes}
+                  onClick={requestAvanzarMes}
                   disabled={avanzandoMes}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50"
                   style={{ background: '#f0fdf4', color: '#16a34a', borderColor: '#bbf7d0' }}
@@ -769,7 +766,7 @@ export default function FondoEmprenderPagosPage() {
               )}
               {canAutorizar && mesHabilitadoYM != null && (
                 <button
-                  onClick={handleRetrocederMes}
+                  onClick={requestRetrocederMes}
                   disabled={avanzandoMes}
                   title={`Deshacer — volver a ${(() => { const p = fromYM(prevYM(mesHabilitadoYM)); return `${MONTHS_SHORT[p.mes - 1]} ${p.anio}` })()}`}
                   className="flex items-center justify-center w-6 h-6 rounded-lg border transition-colors disabled:opacity-50 text-[#6b7280] dark:text-[#8890b5] border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
@@ -798,10 +795,11 @@ export default function FondoEmprenderPagosPage() {
             className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm"
             style={{ overflowX: 'auto' }}
           >
-            <table style={{ borderCollapse: 'collapse', minWidth: '100%', tableLayout: 'fixed' }}>
-              {/* table-layout: fixed + colgroup — cada columna mantiene su
-                  ancho exacto sin importar cuántos meses se agreguen; el
-                  scroll horizontal del wrapper absorbe el resto. */}
+            {/* Ancho explícito en px (no % / minWidth) — con table-layout: fixed
+                esto fuerza que cada columna respete su tamaño exacto siempre;
+                si la suma supera el contenedor, el wrapper de arriba scrollea
+                en vez de encoger las columnas. */}
+            <table style={{ borderCollapse: 'collapse', width: 200 + months.length * 200, tableLayout: 'fixed' }}>
               <colgroup>
                 <col style={{ width: 200 }} />
                 {months.map(m => (
@@ -934,6 +932,48 @@ export default function FondoEmprenderPagosPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirmación habilitar/deshacer mes ──────────────────────────── */}
+      {confirmMes && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setConfirmMes(null)}>
+          <div
+            className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef] dark:border-[#2e3148]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <span
+                className="material-symbols-outlined text-2xl"
+                style={{ color: confirmMes.tipo === 'habilitar' ? '#16a34a' : '#6b7280' }}
+              >
+                {confirmMes.tipo === 'habilitar' ? 'event_available' : 'undo'}
+              </span>
+              <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
+                {confirmMes.tipo === 'habilitar' ? `¿Habilitar ${confirmMes.label}?` : `¿Volver a ${confirmMes.label}?`}
+              </p>
+            </div>
+            <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-4">
+              {confirmMes.tipo === 'habilitar'
+                ? 'Todas las empresas podrán empezar a tramitar ese mes.'
+                : 'Se ocultará el mes habilitado actualmente.'}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmMes(null)}
+                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarAccionMes}
+                className="flex-1 py-2 text-xs font-semibold rounded-lg text-white transition hover:opacity-90"
+                style={{ background: confirmMes.tipo === 'habilitar' ? '#16a34a' : '#6b7280' }}
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </div>
       )}
