@@ -355,7 +355,10 @@ export default function FondoEmprenderPagosPage() {
   // ── ui state ─────────────────────────────────────────────────────────────────
   const [activeTab,     setActiveTab]     = useState('todas')
   const [search,        setSearch]        = useState('')
-  const [showHistorial, setShowHistorial] = useState(false)
+  const [blockOffset,   setBlockOffset]   = useState(0) // 0 = bloque más reciente de meses
+
+  // Volver siempre al bloque más reciente cuando cambia el mes habilitado
+  useEffect(() => { setBlockOffset(0) }, [mesHabilitadoYM])
 
   // ── data loading ──────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -607,27 +610,35 @@ export default function FondoEmprenderPagosPage() {
     return scopedRows.filter(r => !q || r.empresa.name.toLowerCase().includes(q))
   }, [scopedRows, search])
 
-  // Rango de columnas de la tabla — el límite superior es el mes habilitado
-  // por las jefas, no el mes calendario actual (pagos sobre mes vencido).
+  // Ventana de VENTANA_MESES meses, paginada de a bloques con flechas — nunca
+  // crece más allá de eso, así que nunca fuerza scroll. blockOffset = 0 es el
+  // bloque más reciente (termina en el mes habilitado); cada +1 retrocede un
+  // bloque completo de VENTANA_MESES.
+  const minHistoricoYM = useMemo(() => {
+    let minYM = HISTORIAL_START_YM
+    for (const row of rows)
+      for (const h of row.historialCompleto) {
+        const ym = toYM(h.anio, h.mes)
+        if (ym < minYM) minYM = ym
+      }
+    return minYM
+  }, [rows])
+
+  const maxBlockOffset = useMemo(() => {
+    if (mesHabilitadoYM == null) return 0
+    const totalMeses = (fromYM(mesHabilitadoYM).anio - fromYM(minHistoricoYM).anio) * 12
+      + (fromYM(mesHabilitadoYM).mes - fromYM(minHistoricoYM).mes) + 1
+    return Math.max(0, Math.ceil(totalMeses / VENTANA_MESES) - 1)
+  }, [mesHabilitadoYM, minHistoricoYM])
+
   const months = useMemo(() => {
     if (mesHabilitadoYM == null) return []
-    if (showHistorial) {
-      // Desde el pago más antiguo en historial (mínimo Ene 2026) hasta el mes habilitado
-      let minYM = mesHabilitadoYM
-      for (const row of rows)
-        for (const h of row.historialCompleto) {
-          const ym = toYM(h.anio, h.mes)
-          if (ym < minYM) minYM = ym
-        }
-      return buildRange(Math.max(minYM, HISTORIAL_START_YM), mesHabilitadoYM)
-    }
-    // Default: ventana fija de los últimos VENTANA_MESES habilitados — no
-    // crece con el tiempo. Al habilitar un mes nuevo, el más viejo se cae
-    // de la vista (sigue disponible en "Ver historial completo").
-    let inicioYM = mesHabilitadoYM
-    for (let i = 1; i < VENTANA_MESES; i++) inicioYM = prevYM(inicioYM)
-    return buildRange(Math.max(inicioYM, START_YM), mesHabilitadoYM)
-  }, [rows, showHistorial, mesHabilitadoYM])
+    let finYM = mesHabilitadoYM
+    for (let i = 0; i < blockOffset * VENTANA_MESES; i++) finYM = prevYM(finYM)
+    let inicioYM = finYM
+    for (let i = 1; i < VENTANA_MESES && inicioYM > minHistoricoYM; i++) inicioYM = prevYM(inicioYM)
+    return buildRange(Math.max(inicioYM, minHistoricoYM), finYM)
+  }, [mesHabilitadoYM, blockOffset, minHistoricoYM])
 
   // ── loading / error ───────────────────────────────────────────────────────────
   if (loading) return (
@@ -781,19 +792,33 @@ export default function FondoEmprenderPagosPage() {
               )}
             </div>
 
-            <button
-              onClick={() => setShowHistorial(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors"
-              style={showHistorial
-                ? { background: '#f0f4ff', color: '#004ac6', borderColor: '#c7d7fc' }
-                : { background: 'transparent', color: '#6b7280', borderColor: '#e2e4ef' }
-              }
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
-                {showHistorial ? 'unfold_less' : 'unfold_more'}
+            {/* Navegador de bloques de VENTANA_MESES meses — nunca crece, se
+                pasea por bloques fijos en vez de expandir la tabla */}
+            <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-2 py-1.5 shadow-sm">
+              <button
+                onClick={() => setBlockOffset(o => Math.min(o + 1, maxBlockOffset))}
+                disabled={blockOffset >= maxBlockOffset}
+                title="Meses anteriores"
+                className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                <span className="material-symbols-outlined text-xl">chevron_left</span>
+              </button>
+              <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] px-1 min-w-[140px] text-center whitespace-nowrap">
+                {months.length > 0 && (
+                  months.length === 1
+                    ? `${MONTHS_SHORT[months[0].mes - 1]} ${months[0].anio}`
+                    : `${MONTHS_SHORT[months[0].mes - 1]} ${months[0].anio} – ${MONTHS_SHORT[months[months.length - 1].mes - 1]} ${months[months.length - 1].anio}`
+                )}
               </span>
-              {showHistorial ? 'Ocultar historial' : 'Ver historial completo'}
-            </button>
+              <button
+                onClick={() => setBlockOffset(o => Math.max(o - 1, 0))}
+                disabled={blockOffset <= 0}
+                title="Meses más recientes"
+                className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                <span className="material-symbols-outlined text-xl">chevron_right</span>
+              </button>
+            </div>
           </div>
 
           <div
