@@ -89,7 +89,6 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   const [hovRechazado, setHovRechazado] = useState(false)
   const [hovEditar,    setHovEditar]    = useState(false)
   const [hovNota,      setHovNota]      = useState(false)
-  const [hovAutorizar, setHovAutorizar] = useState(false)
   const [notaInput,    setNotaInput]    = useState({ open: false, draft: '' })
 
   const debito    = mesesDebidos.find(md => md.anio === anio && md.mes === mes) ?? null
@@ -149,7 +148,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   // ── Pendiente ────────────────────────────────────────────────────────────────
   if (estado === 'pendiente') {
     return (
-      <td colSpan={2} className={autorizado ? TD_PEND_CLS : TD_BLOQ_CLS} style={{ ...TD_STYLE, position: 'relative' }}>
+      <td colSpan={2} className={autorizado ? TD_PEND_CLS : TD_BLOQ_CLS} style={TD_STYLE}>
         <div style={ROW}>
           {autorizado ? (
             <>
@@ -168,40 +167,29 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
               Bloqueado
             </span>
           )}
-        </div>
 
-        {/* Toggle de autorización — solo visible para quien tenga el permiso */}
-        {canAutorizar && (
-          <div
-            style={{
-              position: 'absolute', top: 4, right: 4, height: 20, width: hovAutorizar ? 82 : 20,
-              background: autorizado ? 'rgba(107,114,128,0.15)' : 'rgba(75,85,99,0.28)',
-              borderRadius: 10, overflow: 'hidden',
-              transition: 'width 220ms ease-out, background 150ms ease-out',
-              display: 'flex', alignItems: 'center', paddingLeft: 3, gap: 2,
-              cursor: 'pointer', whiteSpace: 'nowrap',
-            }}
-            onMouseEnter={() => setHovAutorizar(true)}
-            onMouseLeave={() => setHovAutorizar(false)}
-            onClick={() => act('autorizar', { autorizado: !autorizado })}
-            title={autorizado ? 'Bloquear envío hasta nueva orden' : 'Autorizar envío'}
-          >
-            <span
-              className="material-symbols-outlined"
-              style={{ fontSize: 12, color: autorizado ? '#4b5563' : '#374151', lineHeight: 1, flexShrink: 0 }}
+          {/* Toggle de autorización — icono fijo, sin expandirse, para no
+              invadir el botón "Enviado ->". El significado va en el title. */}
+          {canAutorizar && (
+            <button
+              className="hover:opacity-80"
+              onClick={() => act('autorizar', { autorizado: !autorizado })}
+              title={autorizado ? 'Bloquear envío hasta nueva orden' : 'Autorizar envío'}
+              style={{
+                width: 18, height: 18, borderRadius: 9, border: 'none', flexShrink: 0, padding: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                background: autorizado ? 'rgba(107,114,128,0.15)' : 'rgba(75,85,99,0.28)',
+              }}
             >
-              {autorizado ? 'lock_open' : 'lock'}
-            </span>
-            <span style={{
-              fontSize: 10, fontWeight: 600,
-              color: autorizado ? '#4b5563' : '#374151',
-              opacity: hovAutorizar ? 1 : 0,
-              transition: 'opacity 140ms ease-out 60ms',
-            }}>
-              {autorizado ? 'Bloquear' : 'Autorizar'}
-            </span>
-          </div>
-        )}
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: 11, color: autorizado ? '#4b5563' : '#374151', lineHeight: 1 }}
+              >
+                {autorizado ? 'lock_open' : 'lock'}
+              </span>
+            </button>
+          )}
+        </div>
       </td>
     )
   }
@@ -419,6 +407,9 @@ export default function FondoEmprenderPagosPage() {
   // ── habilitar / deshacer mes (solo jefas) ────────────────────────────────────
   const [avanzandoMes, setAvanzandoMes] = useState(false)
   async function handleAvanzarMes() {
+    const { anio, mes } = fromYM(nextYM(mesHabilitadoYM))
+    const label = `${MONTHS_SHORT[mes - 1]} ${anio}`
+    if (!confirm(`¿Habilitar ${label}? Todas las empresas podrán empezar a tramitar ese mes.`)) return
     setAvanzandoMes(true)
     try {
       await api.avanzarFondoPagosMesActual()
@@ -431,6 +422,9 @@ export default function FondoEmprenderPagosPage() {
   }
 
   async function handleRetrocederMes() {
+    const { anio, mes } = fromYM(prevYM(mesHabilitadoYM))
+    const label = `${MONTHS_SHORT[mes - 1]} ${anio}`
+    if (!confirm(`¿Deshacer y volver a ${label}? Se ocultará el mes habilitado actualmente.`)) return
     setAvanzandoMes(true)
     try {
       await api.retrocederFondoPagosMesActual()
@@ -804,7 +798,19 @@ export default function FondoEmprenderPagosPage() {
             className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm"
             style={{ overflowX: 'auto' }}
           >
-            <table style={{ borderCollapse: 'collapse', minWidth: '100%' }}>
+            <table style={{ borderCollapse: 'collapse', minWidth: '100%', tableLayout: 'fixed' }}>
+              {/* table-layout: fixed + colgroup — cada columna mantiene su
+                  ancho exacto sin importar cuántos meses se agreguen; el
+                  scroll horizontal del wrapper absorbe el resto. */}
+              <colgroup>
+                <col style={{ width: 200 }} />
+                {months.map(m => (
+                  <Fragment key={m.ym}>
+                    <col style={{ width: 100 }} />
+                    <col style={{ width: 100 }} />
+                  </Fragment>
+                ))}
+              </colgroup>
               <thead>
                 {/* Fila 1: Empresa (rowSpan=2) + mes encabezado (colSpan=2) */}
                 <tr>
