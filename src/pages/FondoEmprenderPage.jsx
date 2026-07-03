@@ -70,9 +70,10 @@ export default function FondoEmprenderPage() {
   const fetchGrid = useCallback(async () => {
     try {
       setError(null)
-      const [empresas, procesos] = await Promise.all([
+      const [empresas, procesos, checklistsPorEmpresa] = await Promise.all([
         api.getFondoEmpresas(),
         api.getFondoProcesos(),
+        api.getFondoChecklistMes(year, month + 1),
       ])
 
       // One-time, best-effort recovery of whatever is still stuck in
@@ -80,12 +81,12 @@ export default function FondoEmprenderPage() {
       await migrateLegacyLocalStorage(api, empresas, procesos)
       setMigrationReport(getMigrationReport())
 
-      const checklists = await Promise.all(
-        empresas.map(e => api.getFondoChecklist(e.id, year, month + 1))
+      const checklistPorEmpresaId = new Map(
+        checklistsPorEmpresa.map(c => [c.empresaId, c])
       )
 
-      const built = empresas.map((e, i) => {
-        const chk = checklists[i]
+      const built = empresas.map((e) => {
+        const chk = checklistPorEmpresaId.get(e.id) ?? { items: [], confirmed: false, confirmedAt: null }
         const cells = {}
         chk.items.forEach(it => { cells[it.id] = { status: it.estado, note: it.nota ?? '' } })
         return {

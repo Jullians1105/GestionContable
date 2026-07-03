@@ -6,6 +6,7 @@ const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const {
   getChecklistMes,
+  getChecklistMesTodasEmpresas,
   updateChecklistItem,
   updateChecklistConfirmado,
 } = require('../controllers/fondoChecklistController');
@@ -24,6 +25,26 @@ const validateAnioMes = [
     .toInt(),
   validate,
 ];
+
+/**
+ * @openapi
+ * /api/fondo/checklist/mes:
+ *   get:
+ *     tags: [FondoChecklist]
+ *     summary: Obtener el checklist del mes para todas las empresas en una sola llamada
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: anio, in: query, required: true, schema: { type: integer } }
+ *       - { name: mes,  in: query, required: true, schema: { type: integer, minimum: 1, maximum: 12 } }
+ *     responses:
+ *       200:
+ *         description: Array de { empresaId, confirmed, confirmedAt, items[] }, uno por empresa.
+ */
+router.get('/mes',
+  ...validateAnioMes,
+  getChecklistMesTodasEmpresas
+);
 
 /**
  * @openapi

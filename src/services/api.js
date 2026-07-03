@@ -152,6 +152,11 @@ export const api = {
     const qs = new URLSearchParams({ anio, mes }).toString();
     return request(`/fondo/checklist/${empresaId}?${qs}`);
   },
+  // Checklist del mes para todas las empresas en una sola llamada (evita 1 request por empresa)
+  getFondoChecklistMes: (anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/mes?${qs}`);
+  },
   updateFondoChecklistItem: (empresaId, procesoId, anio, mes, data) => {
     const qs = new URLSearchParams({ anio, mes }).toString();
     return request(`/fondo/checklist/${empresaId}/item/${procesoId}?${qs}`,

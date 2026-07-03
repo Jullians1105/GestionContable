@@ -10,6 +10,7 @@ const swaggerUi = require('swagger-ui-express');
 
 const env = require('./config/env');
 const logger = require('./utils/logger');
+const { verify } = require('./utils/jwt');
 const { validateProductionEnv } = require('./middleware/security');
 const { setupSocket } = require('./socket/events');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -61,12 +62,28 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Rate limiting
+// Se identifica por usuario (del JWT) en vez de por IP: varias personas de la
+// misma oficina salen a internet con la misma IP pública, y contarlas juntas
+// contra un único cupo hacía que 429 apareciera con tráfico normal de equipo.
+const keyByUserOrIp = (req) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const { userId } = verify(authHeader.slice(7));
+      if (userId) return `user:${userId}`;
+    } catch {
+      // token inválido/expirado — se cuenta por IP como fallback
+    }
+  }
+  return req.ip;
+};
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Demasiadas solicitudes, intenta más tarde' },
+  keyGenerator: keyByUserOrIp,
 });
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

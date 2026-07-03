@@ -42,6 +42,60 @@ const getChecklistMes = async (req, res, next) => {
   }
 };
 
+// Checklist del mes para TODAS las empresas en una sola consulta — evita el
+// N+1 (una petición por empresa) que saturaba el rate limiter con 13+ usuarios
+// abriendo la grilla o recibiendo el refetch por socket a la vez.
+const getChecklistMesTodasEmpresas = async (req, res, next) => {
+  try {
+    const anio = parseInt(req.query.anio, 10);
+    const mes  = parseInt(req.query.mes, 10);
+
+    const result = await db.query(
+      `SELECT e.id AS empresa_id,
+              p.id, p.name, p.orden, p.activo,
+              COALESCE(i.estado, 'pending') AS estado,
+              i.nota,
+              COALESCE(m.confirmed, false) AS confirmed,
+              m.updated_at AS confirmed_at
+       FROM fondo_empresas e
+       CROSS JOIN fondo_procesos p
+       LEFT JOIN fondo_checklist_meses m
+              ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+       LEFT JOIN fondo_checklist_items i
+              ON i.mes_id = m.id AND i.proceso_id = p.id
+       WHERE p.activo = true OR i.id IS NOT NULL
+       ORDER BY e.id, p.orden`,
+      [anio, mes]
+    );
+
+    const porEmpresa = new Map();
+    for (const row of result.rows) {
+      let entry = porEmpresa.get(row.empresa_id);
+      if (!entry) {
+        entry = {
+          empresaId: row.empresa_id,
+          confirmed: row.confirmed,
+          confirmedAt: row.confirmed_at,
+          items: [],
+        };
+        porEmpresa.set(row.empresa_id, entry);
+      }
+      entry.items.push({
+        id:     row.id,
+        name:   row.name,
+        orden:  row.orden,
+        activo: row.activo,
+        estado: row.estado,
+        nota:   row.nota,
+      });
+    }
+
+    res.json(Array.from(porEmpresa.values()));
+  } catch (err) {
+    next(err);
+  }
+};
+
 const updateChecklistItem = async (req, res, next) => {
   try {
     const { empresaId, procesoId } = req.params;
@@ -126,4 +180,9 @@ const updateChecklistConfirmado = async (req, res, next) => {
   }
 };
 
-module.exports = { getChecklistMes, updateChecklistItem, updateChecklistConfirmado };
+module.exports = {
+  getChecklistMes,
+  getChecklistMesTodasEmpresas,
+  updateChecklistItem,
+  updateChecklistConfirmado,
+};
