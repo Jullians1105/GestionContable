@@ -33,8 +33,8 @@ function calcularMesesDebidos(pagos) {
     const pago = pagos.find(p => p.anio === anio && p.mes === mes) ?? null
     if (pago?.estado === 'aprobado') continue
     out.push(pago
-      ? { anio, mes, estado: pago.estado, pagoId: pago.id, nota: pago.nota ?? null, autorizado: pago.autorizado ?? true }
-      : { anio, mes, estado: 'pendiente', pagoId: null, nota: null, autorizado: true }
+      ? { anio, mes, estado: pago.estado, pagoId: pago.id, nota: pago.nota ?? null, autorizado: pago.autorizado ?? false }
+      : { anio, mes, estado: 'pendiente', pagoId: null, nota: null, autorizado: false }
     )
   }
   return out

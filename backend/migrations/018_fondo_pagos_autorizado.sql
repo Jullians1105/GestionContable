@@ -6,9 +6,10 @@
 -- independiente de `estado`: separa "en qué va con la fiduciaria" de
 -- "¿el equipo contable tiene permiso interno para empezar a enviarlo?".
 --
--- Default true: hoy nada bloquea el envío, así que el default preserva el
--- comportamiento actual. Las jefas solo desmarcan los casos puntuales que
--- deban retenerse hasta nueva orden.
+-- Default false: todo pendiente nace bloqueado hasta que una jefa lo
+-- autorice explícitamente (decisión acordada — el default anterior de
+-- true se descartó porque no había forma de verificar que quedara
+-- realmente bloqueado hasta la autorización).
 
 ALTER TABLE fondo_pagos
-  ADD COLUMN IF NOT EXISTS autorizado BOOLEAN NOT NULL DEFAULT true;
+  ADD COLUMN IF NOT EXISTS autorizado BOOLEAN NOT NULL DEFAULT false;
