@@ -172,35 +172,24 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
             )}
           </div>
 
-          {/* Toggle de autorización — switch tipo interruptor, en su propia
-              fila para que nunca invada el resto del contenido de la celda. */}
+          {/* Toggle de autorización — ícono simple, tenue por defecto y a
+              toda opacidad al hover; el significado va en el title. En su
+              propia fila para que nunca invada el resto de la celda. */}
           {canAutorizar && (
             <button
-              className="hover:opacity-80"
               onClick={() => act('autorizar', { autorizado: !autorizado })}
               title={autorizado ? 'Bloquear envío hasta nueva orden' : 'Autorizar envío'}
+              className="opacity-50 hover:opacity-100 transition-opacity duration-150"
               style={{
-                display: 'flex', alignItems: 'center', gap: 5,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
                 border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
               }}
             >
               <span
-                style={{
-                  position: 'relative', width: 20, height: 11, borderRadius: 6, flexShrink: 0,
-                  background: autorizado ? '#BBF7D0' : '#D1D5DB',
-                  transition: 'background-color 150ms ease-out',
-                }}
+                className="material-symbols-outlined"
+                style={{ fontSize: 14, color: autorizado ? '#9CA3AF' : '#4B5563', lineHeight: 1 }}
               >
-                <span
-                  style={{
-                    position: 'absolute', top: 1.5, left: autorizado ? 11 : 1.5,
-                    width: 8, height: 8, borderRadius: '50%', background: '#fff',
-                    transition: 'left 150ms ease-out',
-                  }}
-                />
-              </span>
-              <span style={{ fontSize: 9, fontWeight: 500, color: '#9CA3AF' }}>
-                {autorizado ? 'autorizado' : 'bloqueado'}
+                {autorizado ? 'lock_open' : 'lock'}
               </span>
             </button>
           )}
@@ -831,9 +820,18 @@ export default function FondoEmprenderPagosPage() {
                 VENTANA_MESES) — así ninguna columna se estira cuando el
                 bloque queda incompleto (ej. un mes recién habilitado y
                 solo): el espacio sobrante queda libre, no repartido. */}
-            <table style={{ borderCollapse: 'collapse', width: 200 + months.length * 200, tableLayout: 'fixed' }}>
+            <table
+              style={{
+                borderCollapse: 'collapse',
+                tableLayout: 'fixed',
+                // Bloque completo (VENTANA_MESES meses): llena el ancho
+                // disponible. Bloque parcial: ancho exacto de sus columnas,
+                // sin estirarse — el sobrante queda libre.
+                width: months.length === VENTANA_MESES ? '100%' : 240 + months.length * 200,
+              }}
+            >
               <colgroup>
-                <col style={{ width: 200 }} />
+                <col style={{ width: 240 }} />
                 {months.map(m => (
                   <Fragment key={m.ym}>
                     <col style={{ width: 100 }} />
@@ -849,7 +847,7 @@ export default function FondoEmprenderPagosPage() {
                     style={{
                       position: 'sticky', left: 0, zIndex: 3,
                       padding: '10px 12px',
-                      width: 200, minWidth: 160, maxWidth: 200,
+                      width: 240, minWidth: 200, maxWidth: 240,
                       textAlign: 'left', fontSize: 13, fontWeight: 600,
                       boxShadow: '2px 0 4px rgba(0,0,0,0.04)',
                       overflow: 'hidden',
@@ -906,7 +904,7 @@ export default function FondoEmprenderPagosPage() {
                         position: 'sticky', left: 0, zIndex: 2,
                         padding: '8px 10px',
                         boxShadow: '2px 0 4px rgba(0,0,0,0.04)',
-                        width: 200, minWidth: 160, maxWidth: 200,
+                        width: 240, minWidth: 200, maxWidth: 240,
                         verticalAlign: 'middle',
                         overflow: 'hidden',
                         whiteSpace: 'nowrap',
