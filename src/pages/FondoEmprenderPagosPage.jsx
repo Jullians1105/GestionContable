@@ -368,26 +368,22 @@ export default function FondoEmprenderPagosPage() {
     try {
       setLoading(true)
       setError(null)
-      const [lista, mesActual] = await Promise.all([
+      const [lista, mesActual, pagosPorEmpresa] = await Promise.all([
         api.getFondoEmpresas(),
         api.getFondoPagosMesActual(),
+        api.getFondoPagosTodasEmpresas(),
       ])
       const habilitadoYM = toYM(mesActual.anio, mesActual.mes)
       setMesHabilitadoYM(habilitadoYM)
-      const results = await Promise.all(
-        lista.map(e =>
-          api.getFondoPagos(e.id)
-            .then(res => {
-              const pagos = res.pagos ?? []
-              return {
-                empresa:           e,
-                historialCompleto: pagos,
-                mesesDebidos:      calcularMesesDebidos(pagos, habilitadoYM),
-              }
-            })
-            .catch(() => ({ empresa: e, historialCompleto: [], mesesDebidos: [] }))
-        )
-      )
+      const pagosPorEmpresaId = new Map(pagosPorEmpresa.map(p => [p.empresaId, p.pagos]))
+      const results = lista.map(e => {
+        const pagos = pagosPorEmpresaId.get(e.id) ?? []
+        return {
+          empresa:           e,
+          historialCompleto: pagos,
+          mesesDebidos:      calcularMesesDebidos(pagos, habilitadoYM),
+        }
+      })
       setRows(results)
     } catch (err) {
       setError(err.message || 'Error al cargar historial de pagos')

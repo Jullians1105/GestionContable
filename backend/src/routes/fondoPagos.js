@@ -5,12 +5,26 @@ const { requireFondoAccess, requireFondoAutorizarPagos } = require('../middlewar
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const {
-  getPagos, listPagos, createPago, updatePago, updateAutorizado,
+  getPagos, listPagos, listPagosTodasEmpresas, createPago, updatePago, updateAutorizado,
   getMesActual, avanzarMesActual, retrocederMesActual,
 } = require('../controllers/fondoPagosController');
 
 const router = Router();
 router.use(authMiddleware);
+
+/**
+ * @openapi
+ * /api/fondo/pagos/todas:
+ *   get:
+ *     tags: [FondoPagos]
+ *     summary: Historial de pagos de todas las empresas en una sola llamada (evita 1 request por empresa)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "Array de { empresaId, pagos[] }, uno por empresa."
+ */
+router.get('/todas', listPagosTodasEmpresas);
 
 /**
  * @openapi

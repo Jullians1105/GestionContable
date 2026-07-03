@@ -82,6 +82,27 @@ const listPagos = async (req, res, next) => {
   }
 };
 
+// Historial de pagos de TODAS las empresas en una sola consulta — evita el
+// N+1 (una petición por empresa) que la página de Pagos hacía en cada carga.
+const listPagosTodasEmpresas = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      'SELECT * FROM fondo_pagos ORDER BY empresa_id, anio DESC, mes DESC'
+    );
+
+    const porEmpresa = new Map();
+    for (const row of result.rows) {
+      const pago = normalizePago(row);
+      if (!porEmpresa.has(pago.empresaId)) porEmpresa.set(pago.empresaId, []);
+      porEmpresa.get(pago.empresaId).push(pago);
+    }
+
+    res.json(Array.from(porEmpresa.entries()).map(([empresaId, pagos]) => ({ empresaId, pagos })));
+  } catch (err) {
+    next(err);
+  }
+};
+
 const createPago = async (req, res, next) => {
   try {
     const { empresaId } = req.params;
@@ -275,6 +296,6 @@ const retrocederMesActual = async (req, res, next) => {
 };
 
 module.exports = {
-  getPagos, listPagos, createPago, updatePago, updateAutorizado,
+  getPagos, listPagos, listPagosTodasEmpresas, createPago, updatePago, updateAutorizado,
   getMesActual, avanzarMesActual, retrocederMesActual,
 };

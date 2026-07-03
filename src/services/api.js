@@ -178,6 +178,7 @@ export const api = {
 
   // Fondo Emprender — Pagos
   getFondoPagos:    (empresaId)         => request(`/fondo/pagos/${empresaId}`),
+  getFondoPagosTodasEmpresas: () => request('/fondo/pagos/todas'),
   createFondoPago:  (empresaId, data)   => request(`/fondo/pagos/${empresaId}`, { method: 'POST', body: JSON.stringify(data) }),
   updateFondoPago:  (empresaId, pagoId, data) => request(`/fondo/pagos/${empresaId}/${pagoId}`, { method: 'PUT', body: JSON.stringify(data) }),
   updateFondoPagoAutorizado: (empresaId, anio, mes, autorizado) => {
