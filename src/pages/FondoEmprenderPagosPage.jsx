@@ -19,9 +19,12 @@ function prevYM(ym) {
 function ymToIndex(ym) { const { anio, mes } = fromYM(ym); return anio * 12 + mes }
 function indexToYM(idx) { const anio = Math.floor((idx - 1) / 12); const mes = idx - anio * 12; return anio * 100 + mes }
 
-const START_YM      = 2026 * 100 + 3  // Marzo 2026 — inicio del programa
-const START_IDX      = ymToIndex(START_YM)
-const VENTANA_MESES  = 5              // Cuántos meses se ven por bloque, contados desde marzo
+const START_YM        = 2026 * 100 + 3  // Marzo 2026 — inicio del programa (para mora/meses debidos)
+const BLOQUE_ORIGEN_YM = 2026 * 100 + 2 // Febrero 2026 — ancla de la grilla de bloques de a 5
+                                         // (un mes antes de marzo para que el primer bloque
+                                         // ya muestre 5 columnas completas en vez de 4)
+const START_IDX      = ymToIndex(BLOQUE_ORIGEN_YM)
+const VENTANA_MESES  = 5                // Cuántos meses se ven por bloque
 
 // ─── calcular meses debidos (frontend) ───────────────────────────────────────
 // Genera meses desde START_YM hasta el mes habilitado (no el mes calendario
@@ -183,21 +186,20 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
             >
               <span
                 style={{
-                  position: 'relative', width: 26, height: 14, borderRadius: 7, flexShrink: 0,
-                  background: autorizado ? '#86EFAC' : '#9CA3AF',
+                  position: 'relative', width: 20, height: 11, borderRadius: 6, flexShrink: 0,
+                  background: autorizado ? '#BBF7D0' : '#D1D5DB',
                   transition: 'background-color 150ms ease-out',
                 }}
               >
                 <span
                   style={{
-                    position: 'absolute', top: 2, left: autorizado ? 14 : 2,
-                    width: 10, height: 10, borderRadius: '50%', background: '#fff',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+                    position: 'absolute', top: 1.5, left: autorizado ? 11 : 1.5,
+                    width: 8, height: 8, borderRadius: '50%', background: '#fff',
                     transition: 'left 150ms ease-out',
                   }}
                 />
               </span>
-              <span style={{ fontSize: 10, fontWeight: 600, color: autorizado ? '#16a34a' : '#6b7280' }}>
+              <span style={{ fontSize: 9, fontWeight: 500, color: '#9CA3AF' }}>
                 {autorizado ? 'autorizado' : 'bloqueado'}
               </span>
             </button>
@@ -825,10 +827,20 @@ export default function FondoEmprenderPagosPage() {
             className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm"
             style={{ overflowX: 'auto' }}
           >
-            {/* Responsive: como los bloques ya están fijos en VENTANA_MESES
-                meses (nunca crecen), no hace falta forzar un ancho exacto —
-                la tabla se ajusta naturalmente al espacio disponible. */}
-            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+            {/* Ancho exacto según las columnas que haya (nunca más de
+                VENTANA_MESES) — así ninguna columna se estira cuando el
+                bloque queda incompleto (ej. un mes recién habilitado y
+                solo): el espacio sobrante queda libre, no repartido. */}
+            <table style={{ borderCollapse: 'collapse', width: 200 + months.length * 200, tableLayout: 'fixed' }}>
+              <colgroup>
+                <col style={{ width: 200 }} />
+                {months.map(m => (
+                  <Fragment key={m.ym}>
+                    <col style={{ width: 100 }} />
+                    <col style={{ width: 100 }} />
+                  </Fragment>
+                ))}
+              </colgroup>
               <thead>
                 {/* Fila 1: Empresa (rowSpan=2) + mes encabezado (colSpan=2) */}
                 <tr>
