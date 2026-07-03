@@ -51,7 +51,7 @@ const TD_STYLE = {
   padding: '8px 6px',
   verticalAlign: 'middle',
   textAlign: 'center',
-  height: 58,
+  height: 64,
 }
 
 // className por estado (fondo de color identifica el estado)
@@ -148,44 +148,57 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   if (estado === 'pendiente') {
     return (
       <td colSpan={2} className={autorizado ? TD_PEND_CLS : TD_BLOQ_CLS} style={TD_STYLE}>
-        <div style={ROW}>
-          {autorizado ? (
-            <>
-              <span style={{ ...BTN.base, ...BTN.pendiente }}>Pendiente</span>
-              <button
-                className="hover:opacity-80"
-                onClick={() => act('enviado')}
-                style={{ ...BTN.base, ...BTN.pill, ...BTN.enviado }}
-              >
-                Enviado →
-              </button>
-            </>
-          ) : (
-            <span style={{ ...BTN.base, color: '#4B5563', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
-              Bloqueado
-            </span>
-          )}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+          <div style={ROW}>
+            {autorizado ? (
+              <>
+                <span style={{ ...BTN.base, ...BTN.pendiente }}>Pendiente</span>
+                <button
+                  className="hover:opacity-80"
+                  onClick={() => act('enviado')}
+                  style={{ ...BTN.base, ...BTN.pill, ...BTN.enviado }}
+                >
+                  Enviado →
+                </button>
+              </>
+            ) : (
+              <span style={{ ...BTN.base, color: '#4B5563', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
+                Bloqueado
+              </span>
+            )}
+          </div>
 
-          {/* Toggle de autorización — icono fijo, sin expandirse, para no
-              invadir el botón "Enviado ->". El significado va en el title. */}
+          {/* Toggle de autorización — switch tipo interruptor, en su propia
+              fila para que nunca invada el resto del contenido de la celda. */}
           {canAutorizar && (
             <button
               className="hover:opacity-80"
               onClick={() => act('autorizar', { autorizado: !autorizado })}
               title={autorizado ? 'Bloquear envío hasta nueva orden' : 'Autorizar envío'}
               style={{
-                width: 24, height: 24, borderRadius: 12, flexShrink: 0, padding: 0,
-                border: autorizado ? '1px solid rgba(107,114,128,0.35)' : '1px solid rgba(55,65,81,0.4)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                background: autorizado ? 'rgba(107,114,128,0.22)' : 'rgba(75,85,99,0.42)',
+                display: 'flex', alignItems: 'center', gap: 5,
+                border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
               }}
             >
               <span
-                className="material-symbols-outlined"
-                style={{ fontSize: 15, color: autorizado ? '#4b5563' : '#f9fafb', lineHeight: 1 }}
+                style={{
+                  position: 'relative', width: 26, height: 14, borderRadius: 7, flexShrink: 0,
+                  background: autorizado ? '#86EFAC' : '#9CA3AF',
+                  transition: 'background-color 150ms ease-out',
+                }}
               >
-                {autorizado ? 'lock_open' : 'lock'}
+                <span
+                  style={{
+                    position: 'absolute', top: 2, left: autorizado ? 14 : 2,
+                    width: 10, height: 10, borderRadius: '50%', background: '#fff',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+                    transition: 'left 150ms ease-out',
+                  }}
+                />
+              </span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: autorizado ? '#16a34a' : '#6b7280' }}>
+                {autorizado ? 'autorizado' : 'bloqueado'}
               </span>
             </button>
           )}
@@ -812,20 +825,10 @@ export default function FondoEmprenderPagosPage() {
             className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm"
             style={{ overflowX: 'auto' }}
           >
-            {/* Ancho explícito en px (no % / minWidth) — con table-layout: fixed
-                esto fuerza que cada columna respete su tamaño exacto siempre;
-                si la suma supera el contenedor, el wrapper de arriba scrollea
-                en vez de encoger las columnas. */}
-            <table style={{ borderCollapse: 'collapse', width: 200 + months.length * 200, tableLayout: 'fixed' }}>
-              <colgroup>
-                <col style={{ width: 200 }} />
-                {months.map(m => (
-                  <Fragment key={m.ym}>
-                    <col style={{ width: 100 }} />
-                    <col style={{ width: 100 }} />
-                  </Fragment>
-                ))}
-              </colgroup>
+            {/* Responsive: como los bloques ya están fijos en VENTANA_MESES
+                meses (nunca crecen), no hace falta forzar un ancho exacto —
+                la tabla se ajusta naturalmente al espacio disponible. */}
+            <table style={{ borderCollapse: 'collapse', width: '100%' }}>
               <thead>
                 {/* Fila 1: Empresa (rowSpan=2) + mes encabezado (colSpan=2) */}
                 <tr>
