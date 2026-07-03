@@ -23,6 +23,7 @@ function buildRange(startYM, endYM) {
 
 const START_YM          = 2026 * 100 + 3   // Marzo 2026 — inicio del programa
 const HISTORIAL_START_YM = 2026 * 100 + 1  // Enero 2026 — vista historial completo
+const VENTANA_MESES     = 6                // Cuántos meses se ven por defecto (ventana deslizante)
 
 // ─── calcular meses debidos (frontend) ───────────────────────────────────────
 // Genera meses desde START_YM hasta el mes habilitado (no el mes calendario
@@ -620,8 +621,12 @@ export default function FondoEmprenderPagosPage() {
         }
       return buildRange(Math.max(minYM, HISTORIAL_START_YM), mesHabilitadoYM)
     }
-    // Default: siempre desde Mar 2026 hasta el mes habilitado
-    return buildRange(START_YM, mesHabilitadoYM)
+    // Default: ventana fija de los últimos VENTANA_MESES habilitados — no
+    // crece con el tiempo. Al habilitar un mes nuevo, el más viejo se cae
+    // de la vista (sigue disponible en "Ver historial completo").
+    let inicioYM = mesHabilitadoYM
+    for (let i = 1; i < VENTANA_MESES; i++) inicioYM = prevYM(inicioYM)
+    return buildRange(Math.max(inicioYM, START_YM), mesHabilitadoYM)
   }, [rows, showHistorial, mesHabilitadoYM])
 
   // ── loading / error ───────────────────────────────────────────────────────────
