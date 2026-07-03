@@ -63,6 +63,10 @@ export default function FondoEmprenderPage() {
   // delete confirmation
   const [deleteConfirm, setDeleteConfirm] = useState(null) // { type, id, name }
 
+  // filters: category tabs + search
+  const [search, setSearch]       = useState('')
+  const [activeTab, setActiveTab] = useState('todas')
+
   const refetchTimerRef = useRef(null)
 
   // ── load grid from backend ──────────────────────────────────────────────
@@ -380,10 +384,34 @@ export default function FondoEmprenderPage() {
     }
   }
 
-  // ── stats ─────────────────────────────────────────────────────────────────
+  // ── filters: category tabs + search ──────────────────────────────────────
 
-  const totalCells = companies.length * processes.length
-  const doneCells  = companies.reduce(
+  const catCounts = {
+    contable:   companies.filter(c => (c.categoria ?? 'contable') === 'contable').length,
+    tributario: companies.filter(c => (c.categoria ?? 'contable') === 'tributario').length,
+  }
+
+  const tabs = [
+    { key: 'todas',      label: 'Todas',      count: companies.length },
+    { key: 'contable',   label: 'Contable',   count: catCounts.contable },
+    { key: 'tributario', label: 'Tributario', count: catCounts.tributario },
+  ]
+
+  const q = search.toLowerCase()
+  const filteredCompanies = companies.filter(c => {
+    const matchSearch = !q || c.name.toLowerCase().includes(q)
+    const matchCat    = activeTab === 'todas' || (c.categoria ?? 'contable') === activeTab
+    return matchSearch && matchCat
+  })
+
+  // ── stats — scoped to the active category tab, same as Empresas ─────────
+
+  const scopedCompanies = activeTab === 'todas'
+    ? companies
+    : companies.filter(c => (c.categoria ?? 'contable') === activeTab)
+
+  const totalCells = scopedCompanies.length * processes.length
+  const doneCells  = scopedCompanies.reduce(
     (acc, c) => acc + processes.filter(p => (c.cells[p.id]?.status ?? 'pending') === 'done').length,
     0
   )
@@ -443,6 +471,56 @@ export default function FondoEmprenderPage() {
             <span className="material-symbols-outlined text-lg">add_column_right</span>
             Nuevo proceso
           </button>
+        </div>
+      </div>
+
+      {/* ── Filters row: pills + search ──────────────────────────────────── */}
+      <div className="flex items-center gap-3 flex-wrap">
+
+        {/* Segment control / pills */}
+        <div className="flex items-center bg-[#f0f2f8] dark:bg-[#252840] rounded-xl p-1 gap-0.5 flex-shrink-0">
+          {tabs.map(({ key, label, count }) => {
+            const active = activeTab === key
+            return (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
+                  active
+                    ? 'bg-white dark:bg-[#1e2030] text-[#004ac6] dark:text-[#7ba8f0] shadow-sm'
+                    : 'text-[#6b7280] dark:text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0]'
+                }`}
+              >
+                {label}
+                <span
+                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors"
+                  style={
+                    active
+                      ? { background: '#004ac6', color: '#fff' }
+                      : { background: '#e2e4ef', color: '#6b7280' }
+                  }
+                >
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Search */}
+        <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <span
+            className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#8890b5]"
+            style={{ fontSize: 17 }}
+          >
+            search
+          </span>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar empresa..."
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+          />
         </div>
       </div>
 
@@ -589,7 +667,19 @@ export default function FondoEmprenderPage() {
           </thead>
 
           <tbody>
-            {companies.map((company, idx) => {
+            {filteredCompanies.length === 0 && (
+              <tr>
+                <td
+                  colSpan={1 + processes.length + (addingProcess ? 1 : 0) + 1}
+                  className="text-center py-10 text-xs text-[#8890b5] dark:text-[#5a5f7a]"
+                >
+                  {search || activeTab !== 'todas'
+                    ? 'No hay empresas que coincidan con el filtro'
+                    : 'No se encontraron empresas'}
+                </td>
+              </tr>
+            )}
+            {filteredCompanies.map((company, idx) => {
               const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fbff'
               const isEditingName = editingCompany?.id === company.id
               return (

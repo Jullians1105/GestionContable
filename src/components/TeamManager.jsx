@@ -154,7 +154,7 @@ export default function TeamManager() {
                   </div>
                   <div
                     className="absolute bottom-0 right-0 w-4 h-4 border-2 border-white dark:border-[#1e2030] rounded-full transition-colors"
-                    style={{ background: isOnline ? '#10B981' : '#9ca3af' }}
+                    style={{ background: isOnline ? '#22e07a' : '#9ca3af' }}
                     title={isOnline ? 'En línea' : 'Desconectado'}
                   />
                 </div>

@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTasks } from '../hooks/useTasks'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import { useSocket } from '../context/SocketContext'
 import { getInitials, getAvatarColor, ROLE_LABELS, normalizeAssignedTo } from '../utils/helpers'
 import NotificationBell from './Notifications/NotificationBell'
 import GroupSelector from './Groups/GroupSelector'
@@ -12,6 +14,8 @@ export default function Header({ onMenuToggle }) {
   const { tasks } = useTasks()
   const { user, logout, isAdmin, isLeader } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const { connected } = useSocket()
+  const isOnline = useOnlineStatus()
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
 
@@ -71,6 +75,23 @@ export default function Header({ onMenuToggle }) {
         >
           <span className="material-symbols-outlined text-xl">{theme === 'light' ? 'dark_mode' : 'light_mode'}</span>
         </button>
+
+        <div
+          className="flex items-center gap-1.5 text-xs font-semibold px-2 sm:px-2.5 py-1 rounded-full flex-shrink-0"
+          style={{
+            background: connected && isOnline ? '#f0fdf4' : '#fef2f2',
+            color:      connected && isOnline ? '#22c55e' : '#ef4444',
+          }}
+          title={!isOnline ? 'Sin conexión a internet' : !connected ? 'Sin conexión con el servidor' : 'Conectado'}
+        >
+          <span
+            className="w-2 h-2 rounded-full flex-shrink-0"
+            style={{ background: connected && isOnline ? '#22c55e' : '#ef4444' }}
+          />
+          <span className="hidden sm:inline">
+            {connected && isOnline ? 'En línea' : 'Sin conexión'}
+          </span>
+        </div>
 
         <NotificationBell />
 
