@@ -4,10 +4,40 @@ const { authMiddleware } = require('../middleware/auth');
 const { requireFondoAccess, requireFondoAutorizarPagos } = require('../middleware/fondoAccess');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
-const { getPagos, listPagos, createPago, updatePago, updateAutorizado } = require('../controllers/fondoPagosController');
+const { getPagos, listPagos, createPago, updatePago, updateAutorizado, getMesActual, avanzarMesActual } = require('../controllers/fondoPagosController');
 
 const router = Router();
 router.use(authMiddleware);
+
+/**
+ * @openapi
+ * /api/fondo/pagos/mes-actual:
+ *   get:
+ *     tags: [FondoPagos]
+ *     summary: Mes habilitado (límite superior de la grilla) — los pagos son sobre mes vencido
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "{ anio, mes }"
+ */
+router.get('/mes-actual', getMesActual);
+
+/**
+ * @openapi
+ * /api/fondo/pagos/mes-actual/avanzar:
+ *   post:
+ *     tags: [FondoPagos]
+ *     summary: Habilitar el mes siguiente — solo jefas (mismo permiso que autorizar pagos)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: "{ anio, mes } — el nuevo mes habilitado"
+ *       403:
+ *         description: Sin permiso para autorizar pagos.
+ */
+router.post('/mes-actual/avanzar', requireFondoAutorizarPagos, avanzarMesActual);
 
 /**
  * @openapi

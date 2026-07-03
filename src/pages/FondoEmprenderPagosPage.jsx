@@ -18,17 +18,18 @@ function buildRange(startYM, endYM) {
   return out
 }
 
-const TODAY_YM          = (() => { const d = new Date(); return d.getFullYear() * 100 + d.getMonth() + 1 })()
 const START_YM          = 2026 * 100 + 3   // Marzo 2026 — inicio del programa
 const HISTORIAL_START_YM = 2026 * 100 + 1  // Enero 2026 — vista historial completo
 
 // ─── calcular meses debidos (frontend) ───────────────────────────────────────
-// Genera meses desde START_YM hasta hoy. Excluye los aprobados.
+// Genera meses desde START_YM hasta el mes habilitado (no el mes calendario
+// actual — los pagos son sobre mes vencido, y el límite lo controlan las
+// jefas manualmente). Excluye los aprobados.
 // Meses sin registro en BD → { pagoId: null, estado: 'pendiente' } virtual.
 
-function calcularMesesDebidos(pagos) {
+function calcularMesesDebidos(pagos, mesHabilitadoYM) {
   const out = []
-  for (let ym = START_YM; ym <= TODAY_YM; ym = nextYM(ym)) {
+  for (let ym = START_YM; ym <= mesHabilitadoYM; ym = nextYM(ym)) {
     const { anio, mes } = fromYM(ym)
     const pago = pagos.find(p => p.anio === anio && p.mes === mes) ?? null
     if (pago?.estado === 'aprobado') continue
@@ -54,6 +55,7 @@ const TD_STYLE = {
 // className por estado (fondo de color identifica el estado)
 const TD_EMPTY_CLS = 'border border-[#E5E7EB] bg-[#F9FAFB]'
 const TD_PEND_CLS  = 'border border-[#E5E7EB] bg-[#F9FAFB]'
+const TD_BLOQ_CLS  = 'border border-[#FDE68A] bg-[#FFFBEB]'
 const TD_ENV_CLS   = 'border border-[#93C5FD] bg-[#DBEAFE]'
 const TD_PAG_CLS   = 'border border-[#86EFAC] bg-[#DCFCE7]'
 const TD_ENV_RES_CLS = 'border border-[#93C5FD] bg-[#F0F9FF]'
@@ -144,7 +146,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   // ── Pendiente ────────────────────────────────────────────────────────────────
   if (estado === 'pendiente') {
     return (
-      <td colSpan={2} className={TD_PEND_CLS} style={{ ...TD_STYLE, position: 'relative' }}>
+      <td colSpan={2} className={autorizado ? TD_PEND_CLS : TD_BLOQ_CLS} style={{ ...TD_STYLE, position: 'relative' }}>
         <div style={ROW}>
           {autorizado ? (
             <>
@@ -158,7 +160,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
               </button>
             </>
           ) : (
-            <span style={{ ...BTN.base, color: '#9CA3AF', fontWeight: 500, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ ...BTN.base, color: '#92400E', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
               Bloqueado
             </span>
@@ -356,6 +358,7 @@ export default function FondoEmprenderPagosPage() {
   const [rows,    setRows]    = useState([])
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
+  const [mesHabilitadoYM, setMesHabilitadoYM] = useState(null)
 
   // ── ui state ─────────────────────────────────────────────────────────────────
   const [activeTab,     setActiveTab]     = useState('todas')
@@ -367,7 +370,12 @@ export default function FondoEmprenderPagosPage() {
     try {
       setLoading(true)
       setError(null)
-      const lista = await api.getFondoEmpresas()
+      const [lista, mesActual] = await Promise.all([
+        api.getFondoEmpresas(),
+        api.getFondoPagosMesActual(),
+      ])
+      const habilitadoYM = toYM(mesActual.anio, mesActual.mes)
+      setMesHabilitadoYM(habilitadoYM)
       const results = await Promise.all(
         lista.map(e =>
           api.getFondoPagos(e.id)
@@ -376,7 +384,7 @@ export default function FondoEmprenderPagosPage() {
               return {
                 empresa:           e,
                 historialCompleto: pagos,
-                mesesDebidos:      calcularMesesDebidos(pagos),
+                mesesDebidos:      calcularMesesDebidos(pagos, habilitadoYM),
               }
             })
             .catch(() => ({ empresa: e, historialCompleto: [], mesesDebidos: [] }))
@@ -399,11 +407,25 @@ export default function FondoEmprenderPagosPage() {
       const pagos = res.pagos ?? []
       setRows(prev => prev.map(r =>
         r.empresa.id === empresaId
-          ? { ...r, historialCompleto: pagos, mesesDebidos: calcularMesesDebidos(pagos) }
+          ? { ...r, historialCompleto: pagos, mesesDebidos: calcularMesesDebidos(pagos, mesHabilitadoYM) }
           : r
       ))
     } catch { /* silent — optimistic update stays */ }
-  }, [])
+  }, [mesHabilitadoYM])
+
+  // ── habilitar mes siguiente (solo jefas) ─────────────────────────────────────
+  const [avanzandoMes, setAvanzandoMes] = useState(false)
+  async function handleAvanzarMes() {
+    setAvanzandoMes(true)
+    try {
+      await api.avanzarFondoPagosMesActual()
+      await fetchAll()
+    } catch (err) {
+      alert(err.status === 403 ? 'Sin permiso para habilitar el mes (403)' : 'Error: ' + err.message)
+    } finally {
+      setAvanzandoMes(false)
+    }
+  }
 
   // ── action handler ────────────────────────────────────────────────────────────
   const handleAction = useCallback(async (action, { empresaId, anio, mes, pagoId, nota, autorizado }) => {
@@ -532,7 +554,7 @@ export default function FondoEmprenderPagosPage() {
           return {
             ...r,
             historialCompleto: newHistorial,
-            mesesDebidos: calcularMesesDebidos(newHistorial),
+            mesesDebidos: calcularMesesDebidos(newHistorial, mesHabilitadoYM),
           }
         })
         try {
@@ -544,7 +566,7 @@ export default function FondoEmprenderPagosPage() {
         break
       }
     }
-  }, [refreshEmpresa])
+  }, [refreshEmpresa, mesHabilitadoYM])
 
   // ── derived values ────────────────────────────────────────────────────────────
 
@@ -578,21 +600,23 @@ export default function FondoEmprenderPagosPage() {
     return scopedRows.filter(r => !q || r.empresa.name.toLowerCase().includes(q))
   }, [scopedRows, search])
 
-  // Rango de columnas de la tabla
+  // Rango de columnas de la tabla — el límite superior es el mes habilitado
+  // por las jefas, no el mes calendario actual (pagos sobre mes vencido).
   const months = useMemo(() => {
+    if (mesHabilitadoYM == null) return []
     if (showHistorial) {
-      // Desde el pago más antiguo en historial (mínimo Ene 2026) hasta hoy
-      let minYM = TODAY_YM
+      // Desde el pago más antiguo en historial (mínimo Ene 2026) hasta el mes habilitado
+      let minYM = mesHabilitadoYM
       for (const row of rows)
         for (const h of row.historialCompleto) {
           const ym = toYM(h.anio, h.mes)
           if (ym < minYM) minYM = ym
         }
-      return buildRange(Math.max(minYM, HISTORIAL_START_YM), TODAY_YM)
+      return buildRange(Math.max(minYM, HISTORIAL_START_YM), mesHabilitadoYM)
     }
-    // Default: siempre desde Mar 2026 hasta hoy
-    return buildRange(START_YM, TODAY_YM)
-  }, [rows, showHistorial])
+    // Default: siempre desde Mar 2026 hasta el mes habilitado
+    return buildRange(START_YM, mesHabilitadoYM)
+  }, [rows, showHistorial, mesHabilitadoYM])
 
   // ── loading / error ───────────────────────────────────────────────────────────
   if (loading) return (
@@ -716,7 +740,26 @@ export default function FondoEmprenderPagosPage() {
       ) : (
         <div className="flex flex-col gap-2">
 
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-[#6b7280] dark:text-[#8890b5]">
+                Mes habilitado: <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
+                  {mesHabilitadoYM != null && `${MONTHS_SHORT[fromYM(mesHabilitadoYM).mes - 1]} ${fromYM(mesHabilitadoYM).anio}`}
+                </span>
+              </span>
+              {canAutorizar && mesHabilitadoYM != null && (
+                <button
+                  onClick={handleAvanzarMes}
+                  disabled={avanzandoMes}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50"
+                  style={{ background: '#f0fdf4', color: '#16a34a', borderColor: '#bbf7d0' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>event_available</span>
+                  Habilitar {(() => { const n = fromYM(nextYM(mesHabilitadoYM)); return `${MONTHS_SHORT[n.mes - 1]} ${n.anio}` })()}
+                </button>
+              )}
+            </div>
+
             <button
               onClick={() => setShowHistorial(v => !v)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors"

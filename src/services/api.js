@@ -184,6 +184,8 @@ export const api = {
     const qs = new URLSearchParams({ anio, mes }).toString();
     return request(`/fondo/pagos/${empresaId}/autorizar?${qs}`, { method: 'PUT', body: JSON.stringify({ autorizado }) });
   },
+  getFondoPagosMesActual: () => request('/fondo/pagos/mes-actual'),
+  avanzarFondoPagosMesActual: () => request('/fondo/pagos/mes-actual/avanzar', { method: 'POST' }),
 
   // Fondo Emprender — Empresas
   getFondoEmpresas: (categoria, anio, mes) => {

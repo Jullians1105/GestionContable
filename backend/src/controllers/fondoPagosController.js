@@ -201,4 +201,42 @@ const updatePago = async (req, res, next) => {
   }
 };
 
-module.exports = { getPagos, listPagos, createPago, updatePago, updateAutorizado };
+// Mes habilitado — límite superior global de la grilla de pagos, controlado
+// manualmente por las jefas (ver requireFondoAutorizarPagos) en vez de
+// derivarse de la fecha del sistema, ya que los pagos son sobre mes vencido.
+const getMesActual = async (req, res, next) => {
+  try {
+    const result = await db.query('SELECT anio, mes FROM fondo_pagos_mes_actual WHERE id = 1');
+    if (result.rows.length === 0) {
+      return res.status(500).json({ error: 'Mes actual de pagos no configurado' });
+    }
+    res.json({ anio: result.rows[0].anio, mes: result.rows[0].mes });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const avanzarMesActual = async (req, res, next) => {
+  try {
+    const result = await db.query(
+      `UPDATE fondo_pagos_mes_actual
+       SET anio = CASE WHEN mes = 12 THEN anio + 1 ELSE anio END,
+           mes  = CASE WHEN mes = 12 THEN 1 ELSE mes + 1 END
+       WHERE id = 1
+       RETURNING anio, mes`
+    );
+    if (result.rows.length === 0) {
+      return res.status(500).json({ error: 'Mes actual de pagos no configurado' });
+    }
+
+    await auditLog(req.user.userId, 'UPDATE', 'fondo_pagos_mes_actual', 1, {
+      nuevoAnio: result.rows[0].anio, nuevoMes: result.rows[0].mes,
+    });
+
+    res.json({ anio: result.rows[0].anio, mes: result.rows[0].mes });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getPagos, listPagos, createPago, updatePago, updateAutorizado, getMesActual, avanzarMesActual };
