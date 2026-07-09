@@ -15,6 +15,7 @@ const navItems = [
   { to: '/team', label: 'Equipo', icon: 'group' },
   { to: '/groups', label: 'Grupos', icon: 'group_work' },
   { to: '/reports', label: 'Reportes', icon: 'bar_chart' },
+  { to: '/workload', label: 'Carga de trabajo', icon: 'balance' },
   { to: '/usuarios', label: 'Usuarios', icon: 'manage_accounts' },
   { to: '/notifications', label: 'Notificaciones', icon: 'notifications' },
   { to: '/settings', label: 'Configuración', icon: 'settings' },
@@ -69,6 +70,7 @@ export default function Sidebar({ open, onClose }) {
   const visible = navItems.filter(item => {
     if (item.leaderOnly && !isAdmin() && !isLeader()) return false
     if (item.to === '/reports' && !isAdmin() && !isLeader()) return false
+    if (item.to === '/workload' && !isAdmin() && !isLeader()) return false
     if (item.to === '/groups' && !isAdmin() && !isLeader()) return false
     if (item.to === '/usuarios' && !isAdmin()) return false
     return true

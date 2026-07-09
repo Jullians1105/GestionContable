@@ -304,6 +304,20 @@ const deleteTask = async (req, res, next) => {
     const { id } = req.params;
     const result = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Tarea no encontrada' });
+    const task = result.rows[0];
+
+    if (req.user.role !== 'admin') {
+      if (!task.group_id) {
+        return res.status(403).json({ error: 'Solo un administrador puede eliminar tareas sin grupo' });
+      }
+      const leaderCheck = await db.query(
+        'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2 AND is_leader = true',
+        [task.group_id, req.user.userId]
+      );
+      if (leaderCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Solo el líder de este grupo puede eliminar esta tarea' });
+      }
+    }
 
     await db.query('DELETE FROM tasks WHERE id = $1', [id]);
     await auditLog(req.user.userId, 'DELETE', 'tasks', id, {});

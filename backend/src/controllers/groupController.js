@@ -6,7 +6,7 @@ const getGroups = async (req, res, next) => {
     const result = await db.query(
       `SELECT g.*,
         u.name AS leader_name,
-        (SELECT json_agg(json_build_object('id', u2.id, 'name', u2.name, 'role', u2.role, 'joined_at', gm.joined_at))
+        (SELECT json_agg(json_build_object('id', u2.id, 'name', u2.name, 'role', u2.role, 'joined_at', gm.joined_at, 'isLeader', gm.is_leader))
          FROM group_members gm JOIN users u2 ON u2.id = gm.user_id WHERE gm.group_id = g.id) AS members
        FROM groups g
        LEFT JOIN users u ON u.id = g.leader_id
@@ -29,7 +29,7 @@ const createGroup = async (req, res, next) => {
     );
     const group = result.rows[0];
 
-    await db.query('INSERT INTO group_members (group_id, user_id) VALUES ($1, $2)', [id, req.user.userId]);
+    await db.query('INSERT INTO group_members (group_id, user_id, is_leader) VALUES ($1, $2, true)', [id, req.user.userId]);
     await Promise.all(
       memberIds.filter(mid => mid !== req.user.userId).map(mid =>
         db.query('INSERT INTO group_members (group_id, user_id) VALUES ($1, $2)', [id, mid])
@@ -101,4 +101,19 @@ const removeMember = async (req, res, next) => {
   }
 };
 
-module.exports = { getGroups, createGroup, updateGroup, deleteGroup, addMember, removeMember };
+const setMemberLeader = async (req, res, next) => {
+  try {
+    const { id, userId } = req.params;
+    const { isLeader } = req.body;
+    await db.query(
+      `INSERT INTO group_members (group_id, user_id, is_leader) VALUES ($1, $2, $3)
+       ON CONFLICT (group_id, user_id) DO UPDATE SET is_leader = $3`,
+      [id, userId, !!isLeader]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getGroups, createGroup, updateGroup, deleteGroup, addMember, removeMember, setMemberLeader };
