@@ -34,3 +34,6 @@ backups/
 
 # MCP config (contains API keys)
 .mcp.json
+
+# n8n workflows (pueden contener credenciales en texto plano, ej. servicePassword)
+n8n/workflows/*.json
