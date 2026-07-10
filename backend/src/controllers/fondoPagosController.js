@@ -260,11 +260,11 @@ const avanzarMesActual = async (req, res, next) => {
   }
 };
 
-// Inicio del programa (marzo 2026) — mismo valor que START_YM en el frontend.
+// Inicio del programa (febrero 2026) — mismo valor que START_YM en el frontend.
 // Piso para retroceder: no tiene sentido deshabilitar meses de antes de que
 // existiera el programa.
 const INICIO_PROGRAMA_ANIO = 2026;
-const INICIO_PROGRAMA_MES  = 3;
+const INICIO_PROGRAMA_MES  = 2;
 
 const retrocederMesActual = async (req, res, next) => {
   try {

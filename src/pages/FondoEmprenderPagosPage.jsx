@@ -19,11 +19,8 @@ function prevYM(ym) {
 function ymToIndex(ym) { const { anio, mes } = fromYM(ym); return anio * 12 + mes }
 function indexToYM(idx) { const anio = Math.floor((idx - 1) / 12); const mes = idx - anio * 12; return anio * 100 + mes }
 
-const START_YM        = 2026 * 100 + 3  // Marzo 2026 — inicio del programa (para mora/meses debidos)
-const BLOQUE_ORIGEN_YM = 2026 * 100 + 2 // Febrero 2026 — ancla de la grilla de bloques de a 5
-                                         // (un mes antes de marzo para que el primer bloque
-                                         // ya muestre 5 columnas completas en vez de 4)
-const START_IDX      = ymToIndex(BLOQUE_ORIGEN_YM)
+const START_YM       = 2026 * 100 + 2   // Febrero 2026 — inicio del programa (mesesDebidos y grilla)
+const START_IDX      = ymToIndex(START_YM)
 const VENTANA_MESES  = 5                // Cuántos meses se ven por bloque
 
 // ─── calcular meses debidos (frontend) ───────────────────────────────────────
@@ -613,7 +610,7 @@ export default function FondoEmprenderPagosPage() {
     return scopedRows.filter(r => !q || r.empresa.name.toLowerCase().includes(q))
   }, [scopedRows, search])
 
-  // Bloques fijos de VENTANA_MESES meses contados desde marzo (START_YM), en
+  // Bloques fijos de VENTANA_MESES meses contados desde febrero (START_YM), en
   // orden — no una ventana deslizante. Bloque 0 = Mar-Jul, bloque 1 = Ago-Dic,
   // etc. Nunca muestra más de VENTANA_MESES columnas, así que no debería
   // necesitar scroll horizontal. Las flechas pasean entre bloques completos.
