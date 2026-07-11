@@ -480,6 +480,14 @@ export default function FondoEmprenderPagosPage() {
     if (mesHabilitadoYM != null) setMonthsBack(0)
   }, [mesHabilitadoYM])
 
+  // Mes seleccionado para las tarjetas de resumen (Pagadas/Esperando/En mora)
+  // — independiente de la ventana de la grilla (monthsBack). Mismo patrón:
+  // offset hacia atrás desde el mes habilitado, 0 = mes habilitado actual.
+  const [statsMonthsBack, setStatsMonthsBack] = useState(0)
+  useEffect(() => {
+    if (mesHabilitadoYM != null) setStatsMonthsBack(0)
+  }, [mesHabilitadoYM])
+
   // ── data loading ──────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     try {
@@ -753,12 +761,32 @@ export default function FondoEmprenderPagosPage() {
     activeTab === 'todas' ? rows : rows.filter(r => (r.empresa.categoria ?? 'contable') === activeTab),
   [rows, activeTab])
 
-  const stats = useMemo(() => ({
-    total:     scopedRows.length,
-    pagadas:   scopedRows.filter(r => r.mesesDebidos.length === 0).length,
-    esperando: scopedRows.filter(r => r.mesesDebidos.some(md => md.estado === 'enviado')).length,
-    enMora: scopedRows.filter(r => r.mesesDebidos.length > 0).length,
-  }), [scopedRows])
+  // Mes seleccionado en las tarjetas de resumen — Feb 2026 hasta el mes
+  // habilitado, mismo límite que la ventana de la grilla pero con su propio
+  // offset (statsMonthsBack).
+  const maxStatsMonthsBack = mesHabilitadoYM == null
+    ? 0
+    : Math.max(ymToIndex(mesHabilitadoYM) - START_IDX, 0)
+
+  const statsSelectedYM = mesHabilitadoYM == null
+    ? null
+    : indexToYM(ymToIndex(mesHabilitadoYM) - statsMonthsBack)
+
+  const statsMonthLabel = statsSelectedYM == null
+    ? ''
+    : `${MONTHS_SHORT[fromYM(statsSelectedYM).mes - 1]} ${fromYM(statsSelectedYM).anio}`
+
+  const stats = useMemo(() => {
+    if (statsSelectedYM == null) return { total: scopedRows.length, pagadas: 0, esperando: 0, enMora: 0 }
+    const { anio: statsAnio, mes: statsMes } = fromYM(statsSelectedYM)
+    const debitoDelMes = r => r.mesesDebidos.find(md => md.anio === statsAnio && md.mes === statsMes) ?? null
+    return {
+      total:     scopedRows.length,
+      pagadas:   scopedRows.filter(r => !debitoDelMes(r)).length,
+      esperando: scopedRows.filter(r => debitoDelMes(r)?.estado === 'enviado').length,
+      enMora:    scopedRows.filter(r => debitoDelMes(r) != null).length,
+    }
+  }, [scopedRows, statsSelectedYM])
 
   const visibleRows = useMemo(() => {
     const q = search.toLowerCase()
@@ -832,8 +860,13 @@ export default function FondoEmprenderPagosPage() {
           value={stats.pagadas}
           icon="check_circle"
           borderColor="#16a34a" iconColor="#16a34a"
-          sub={stats.pagadas > 0 ? 'Sin meses debidos' : 'Con meses pendientes'}
+          sub={stats.pagadas > 0 ? 'Sin pendientes ese mes' : 'Con empresas pendientes'}
           subColor={stats.pagadas > 0 ? '#16a34a' : '#434655'}
+          monthLabel={statsMonthLabel}
+          onPrevMonth={() => setStatsMonthsBack(b => Math.min(b + 1, maxStatsMonthsBack))}
+          onNextMonth={() => setStatsMonthsBack(b => Math.max(b - 1, 0))}
+          prevMonthDisabled={statsMonthsBack >= maxStatsMonthsBack}
+          nextMonthDisabled={statsMonthsBack <= 0}
         />
         <StatsCard
           title="Esperando respuesta"
@@ -842,14 +875,24 @@ export default function FondoEmprenderPagosPage() {
           borderColor="#d97706" iconColor="#d97706"
           sub="Documentos enviados"
           subColor="#434655"
+          monthLabel={statsMonthLabel}
+          onPrevMonth={() => setStatsMonthsBack(b => Math.min(b + 1, maxStatsMonthsBack))}
+          onNextMonth={() => setStatsMonthsBack(b => Math.max(b - 1, 0))}
+          prevMonthDisabled={statsMonthsBack >= maxStatsMonthsBack}
+          nextMonthDisabled={statsMonthsBack <= 0}
         />
         <StatsCard
           title="En mora"
           value={stats.enMora}
           icon="warning"
           borderColor="#ef4444" iconColor="#ef4444"
-          sub={stats.enMora > 0 ? 'Requieren atención' : 'Todo al día'}
+          sub={stats.enMora > 0 ? 'Deben ese mes' : 'Todo al día'}
           subColor={stats.enMora > 0 ? '#ef4444' : '#16a34a'}
+          monthLabel={statsMonthLabel}
+          onPrevMonth={() => setStatsMonthsBack(b => Math.min(b + 1, maxStatsMonthsBack))}
+          onNextMonth={() => setStatsMonthsBack(b => Math.max(b - 1, 0))}
+          prevMonthDisabled={statsMonthsBack >= maxStatsMonthsBack}
+          nextMonthDisabled={statsMonthsBack <= 0}
         />
       </div>
 
