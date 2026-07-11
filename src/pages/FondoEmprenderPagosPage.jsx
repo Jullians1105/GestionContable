@@ -470,13 +470,14 @@ export default function FondoEmprenderPagosPage() {
   // ── ui state ─────────────────────────────────────────────────────────────────
   const [activeTab,     setActiveTab]     = useState('todas')
   const [search,        setSearch]        = useState('')
-  const [blockIndex,    setBlockIndex]    = useState(0) // índice del bloque de VENTANA_MESES, contado desde marzo
+  // Cuántos meses hacia atrás está el borde derecho de la ventana respecto al
+  // mes habilitado — 0 significa "la ventana termina en el mes habilitado".
+  const [monthsBack,    setMonthsBack]    = useState(0)
 
-  // Al cargar / cambiar el mes habilitado, mostrar el bloque que lo contiene
+  // Al cargar / cambiar el mes habilitado (ej. tras "Habilitar mes"), volver
+  // a mostrar la ventana terminando en el mes habilitado actual.
   useEffect(() => {
-    if (mesHabilitadoYM != null) {
-      setBlockIndex(Math.floor((ymToIndex(mesHabilitadoYM) - START_IDX) / VENTANA_MESES))
-    }
+    if (mesHabilitadoYM != null) setMonthsBack(0)
   }, [mesHabilitadoYM])
 
   // ── data loading ──────────────────────────────────────────────────────────────
@@ -764,23 +765,22 @@ export default function FondoEmprenderPagosPage() {
     return scopedRows.filter(r => !q || r.empresa.name.toLowerCase().includes(q))
   }, [scopedRows, search])
 
-  // Bloques fijos de VENTANA_MESES meses contados desde febrero (START_YM), en
-  // orden — no una ventana deslizante. Bloque 0 = Mar-Jul, bloque 1 = Ago-Dic,
-  // etc. Nunca muestra más de VENTANA_MESES columnas, así que no debería
-  // necesitar scroll horizontal. Las flechas pasean entre bloques completos.
-  const maxBlockIndex = mesHabilitadoYM == null
+  // Ventana deslizante de VENTANA_MESES meses (máximo) — nunca antes de
+  // Feb 2026 (START_IDX) ni después del mes habilitado. Las flechas la
+  // desplazan de a un mes, no de a bloques.
+  const maxMonthsBack = mesHabilitadoYM == null
     ? 0
-    : Math.floor((ymToIndex(mesHabilitadoYM) - START_IDX) / VENTANA_MESES)
+    : Math.max(ymToIndex(mesHabilitadoYM) - START_IDX - (VENTANA_MESES - 1), 0)
 
   const months = useMemo(() => {
     if (mesHabilitadoYM == null) return []
     const habilitadoIdx = ymToIndex(mesHabilitadoYM)
-    const bloqueInicioIdx = START_IDX + blockIndex * VENTANA_MESES
-    const bloqueFinIdx = Math.min(bloqueInicioIdx + VENTANA_MESES - 1, habilitadoIdx)
+    const ventanaFinIdx = habilitadoIdx - monthsBack
+    const ventanaInicioIdx = Math.max(ventanaFinIdx - (VENTANA_MESES - 1), START_IDX)
     const out = []
-    for (let idx = bloqueInicioIdx; idx <= bloqueFinIdx; idx++) out.push(fromYM(indexToYM(idx)))
+    for (let idx = ventanaInicioIdx; idx <= ventanaFinIdx; idx++) out.push(fromYM(indexToYM(idx)))
     return out
-  }, [mesHabilitadoYM, blockIndex])
+  }, [mesHabilitadoYM, monthsBack])
 
   // ── loading / error ───────────────────────────────────────────────────────────
   if (loading) return (
@@ -934,12 +934,12 @@ export default function FondoEmprenderPagosPage() {
               )}
             </div>
 
-            {/* Navegador de bloques de VENTANA_MESES meses — nunca crece, se
-                pasea por bloques fijos en vez de expandir la tabla */}
+            {/* Ventana deslizante de VENTANA_MESES meses — las flechas
+                desplazan de a un mes, entre Feb 2026 y el mes habilitado */}
             <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-2 py-1.5 shadow-sm">
               <button
-                onClick={() => setBlockIndex(i => Math.max(i - 1, 0))}
-                disabled={blockIndex <= 0}
+                onClick={() => setMonthsBack(b => Math.min(b + 1, maxMonthsBack))}
+                disabled={monthsBack >= maxMonthsBack}
                 title="Meses anteriores"
                 className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
@@ -953,8 +953,8 @@ export default function FondoEmprenderPagosPage() {
                 )}
               </span>
               <button
-                onClick={() => setBlockIndex(i => Math.min(i + 1, maxBlockIndex))}
-                disabled={blockIndex >= maxBlockIndex}
+                onClick={() => setMonthsBack(b => Math.max(b - 1, 0))}
+                disabled={monthsBack <= 0}
                 title="Meses más recientes"
                 className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
