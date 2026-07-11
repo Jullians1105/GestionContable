@@ -922,16 +922,6 @@ export default function FondoEmprenderPagosPage() {
                         >
                           {row.empresa.name}
                         </span>
-                        <span
-                          style={{
-                            fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, flexShrink: 0,
-                            ...((row.empresa.categoria ?? 'contable') === 'contable'
-                              ? { background: '#f0f4ff', color: '#004ac6' }
-                              : { background: '#f0fdf4', color: '#16a34a' }),
-                          }}
-                        >
-                          {(row.empresa.categoria ?? 'contable') === 'contable' ? 'CON' : 'TRI'}
-                        </span>
                       </div>
                       {row.mesesDebidos.length > 0 && (
                         <div style={{ marginTop: 2, paddingLeft: 14 }}>
