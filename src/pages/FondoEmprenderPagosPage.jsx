@@ -145,10 +145,56 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
 
   const { estado, nota, autorizado } = debito
 
+  // Pill "Nota" flotante — reutilizable en cualquier estado de la celda para
+  // que una nota existente nunca quede oculta. Temas de color por estado.
+  const NOTA_THEMES = {
+    red:  { icon: '#991B1B', label: '#991B1B', soft: 'rgba(239,68,68,0.12)',   hover: 'rgba(239,68,68,0.20)',   border: '#FEE2E2', heading: '#EF4444' },
+    gray: { icon: '#4B5563', label: '#4B5563', soft: 'rgba(107,114,128,0.12)', hover: 'rgba(107,114,128,0.20)', border: '#E5E7EB', heading: '#6B7280' },
+    blue: { icon: '#1E40AF', label: '#1E40AF', soft: 'rgba(59,130,246,0.12)',  hover: 'rgba(59,130,246,0.20)',  border: '#DBEAFE', heading: '#3B82F6' },
+  }
+  function renderNotaIndicator(theme) {
+    if (!nota?.trim()) return null
+    const c = NOTA_THEMES[theme]
+    return (
+      <>
+        <div
+          style={{
+            position: 'absolute', bottom: 6, right: 6, height: 22,
+            width: hovNota ? 60 : 22,
+            background: hovNota ? c.hover : c.soft,
+            borderRadius: 11, overflow: 'hidden',
+            transition: 'width 220ms ease-out, background 150ms ease-out',
+            display: 'flex', alignItems: 'center', paddingLeft: 4, gap: 2,
+            cursor: 'default', whiteSpace: 'nowrap', zIndex: 1,
+          }}
+          onMouseEnter={(e) => { e.stopPropagation(); setHovNota(true) }}
+          onMouseLeave={() => setHovNota(false)}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 13, color: c.icon, lineHeight: 1, flexShrink: 0 }}>sticky_note_2</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: c.label, opacity: hovNota ? 1 : 0, transition: 'opacity 140ms ease-out 60ms' }}>Nota</span>
+        </div>
+
+        {/* Popover flotante con el contenido — no afecta el tamaño de la celda */}
+        <div style={{
+          position: 'absolute', bottom: 34, right: 6, width: 190,
+          background: 'white', borderRadius: 8,
+          boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+          border: `1px solid ${c.border}`, padding: '10px 12px', zIndex: 200,
+          opacity: hovNota ? 1 : 0, pointerEvents: 'none',
+          transform: hovNota ? 'translateY(0)' : 'translateY(6px)',
+          transition: 'opacity 160ms ease-out, transform 160ms ease-out',
+        }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: c.heading, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Nota</div>
+          <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, wordBreak: 'break-word' }}>{nota}</div>
+        </div>
+      </>
+    )
+  }
+
   // ── Pendiente ────────────────────────────────────────────────────────────────
   if (estado === 'pendiente') {
     return (
-      <td colSpan={2} className={autorizado ? TD_PEND_CLS : TD_BLOQ_CLS} style={TD_STYLE}>
+      <td colSpan={2} className={autorizado ? TD_PEND_CLS : TD_BLOQ_CLS} style={{ ...TD_STYLE, position: 'relative' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
           {autorizado ? (
             <>
@@ -212,6 +258,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
             </span>
           )}
         </div>
+        {renderNotaIndicator('gray')}
       </td>
     )
   }
@@ -223,7 +270,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
         <td className={TD_ENV_CLS} style={TD_STYLE}>
           <span style={{ ...BTN.base, ...BTN.enviadoFix }}>Enviado</span>
         </td>
-        <td className={TD_ENV_RES_CLS} style={{ ...TD_STYLE, padding: '6px 12px' }}>
+        <td className={TD_ENV_RES_CLS} style={{ ...TD_STYLE, padding: '6px 12px', position: 'relative' }}>
           {notaInput.open ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
               <input
@@ -267,6 +314,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
               >Rechazado</button>
             </div>
           )}
+          {!notaInput.open && renderNotaIndicator('blue')}
         </td>
       </>
     )
@@ -302,58 +350,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
           </span>
         </div>
 
-        {/* Pill "Nota" en esquina inferior derecha — solo si hay nota */}
-        {nota?.trim() && (
-          <>
-            <div
-              style={{
-                position: 'absolute',
-                bottom: 6,
-                right: 6,
-                height: 22,
-                width: hovNota ? 60 : 22,
-                background: hovNota ? 'rgba(239,68,68,0.20)' : 'rgba(239,68,68,0.12)',
-                borderRadius: 11,
-                overflow: 'hidden',
-                transition: 'width 220ms ease-out, background 150ms ease-out',
-                display: 'flex',
-                alignItems: 'center',
-                paddingLeft: 4,
-                gap: 2,
-                cursor: 'default',
-                whiteSpace: 'nowrap',
-                zIndex: 1,
-              }}
-              onMouseEnter={(e) => { e.stopPropagation(); setHovNota(true) }}
-              onMouseLeave={() => setHovNota(false)}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#991B1B', lineHeight: 1, flexShrink: 0 }}>sticky_note_2</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#991B1B', opacity: hovNota ? 1 : 0, transition: 'opacity 140ms ease-out 60ms' }}>Nota</span>
-            </div>
-
-            {/* Popover flotante con el contenido — no afecta el tamaño de la celda */}
-            <div style={{
-              position: 'absolute',
-              bottom: 34,
-              right: 6,
-              width: 190,
-              background: 'white',
-              borderRadius: 8,
-              boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
-              border: '1px solid #FEE2E2',
-              padding: '10px 12px',
-              zIndex: 200,
-              opacity: hovNota ? 1 : 0,
-              pointerEvents: 'none',
-              transform: hovNota ? 'translateY(0)' : 'translateY(6px)',
-              transition: 'opacity 160ms ease-out, transform 160ms ease-out',
-            }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#EF4444', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Nota</div>
-              <div style={{ fontSize: 12, color: '#7F1D1D', lineHeight: 1.5, wordBreak: 'break-word' }}>{nota}</div>
-            </div>
-          </>
-        )}
-
+        {renderNotaIndicator('red')}
       </td>
     )
   }

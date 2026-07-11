@@ -194,6 +194,10 @@ const updatePago = async (req, res, next) => {
   try {
     const { empresaId, pagoId } = req.params;
     const { estado, nota } = req.body;
+    // Solo reemplaza la nota si viene un valor explícito no vacío — una nota
+    // vacía/undefined nunca debe borrar silenciosamente la nota existente.
+    // Borrado intencional de nota queda fuera de este endpoint.
+    const notaParam = nota && nota.trim() !== '' ? nota : null;
 
     const result = await db.query(
       `UPDATE fondo_pagos
@@ -205,7 +209,7 @@ const updatePago = async (req, res, next) => {
            END
        WHERE id = $3 AND empresa_id = $4
        RETURNING *`,
-      [estado ?? null, nota ?? null, pagoId, empresaId]
+      [estado ?? null, notaParam, pagoId, empresaId]
     );
 
     if (result.rows.length === 0) {
