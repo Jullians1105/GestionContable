@@ -90,12 +90,154 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   const [hovNota,      setHovNota]      = useState(false)
   const [hovBloqueado, setHovBloqueado] = useState(false)
   const [notaInput,    setNotaInput]    = useState({ open: false, draft: '' })
+  // Editor de nota genérico — disponible en cualquier estado, independiente
+  // del flujo de "Rechazado" (notaInput arriba). Un solo campo nota vigente
+  // por fila, sin historial — mismo patrón que Seguimiento Mensual.
+  const [notaEditor,   setNotaEditor]   = useState({ open: false, draft: '' })
 
   const debito    = mesesDebidos.find(md => md.anio === anio && md.mes === mes) ?? null
   const histEntry = historialCompleto.find(h => h.anio === anio && h.mes === mes) ?? null
 
   function act(action, extra = {}) {
     onAction(action, { empresaId: empresa.id, anio, mes, pagoId: debito?.pagoId ?? histEntry?.id ?? null, ...extra })
+  }
+
+  // Botón + editor de nota flotante — siempre visible (ícono relleno si ya
+  // hay nota, outline si está vacía), clic abre el editor pre-llenado.
+  const NOTA_THEMES = {
+    red:   { icon: '#991B1B', label: '#991B1B', soft: 'rgba(239,68,68,0.12)',   hover: 'rgba(239,68,68,0.20)',   border: '#FEE2E2', heading: '#EF4444' },
+    gray:  { icon: '#4B5563', label: '#4B5563', soft: 'rgba(107,114,128,0.12)', hover: 'rgba(107,114,128,0.20)', border: '#E5E7EB', heading: '#6B7280' },
+    blue:  { icon: '#1E40AF', label: '#1E40AF', soft: 'rgba(59,130,246,0.12)',  hover: 'rgba(59,130,246,0.20)',  border: '#DBEAFE', heading: '#3B82F6' },
+    green: { icon: '#166534', label: '#166534', soft: 'rgba(22,163,74,0.12)',   hover: 'rgba(22,163,74,0.20)',   border: '#BBF7D0', heading: '#16a34a' },
+  }
+  function renderNotaButton(theme, notaValue) {
+    const c = NOTA_THEMES[theme]
+    const hasNota = !!notaValue?.trim()
+    const editing = notaEditor.open
+
+    return (
+      <>
+        <button
+          onClick={(e) => { e.stopPropagation(); setNotaEditor({ open: true, draft: notaValue ?? '' }) }}
+          onMouseEnter={(e) => { e.stopPropagation(); setHovNota(true) }}
+          onMouseLeave={() => setHovNota(false)}
+          title={hasNota ? 'Ver / editar nota' : 'Agregar nota'}
+          style={{
+            position: 'absolute', bottom: 6, right: 6, height: 22,
+            width: hovNota && !editing ? 70 : 22,
+            background: hasNota ? (hovNota ? c.hover : c.soft) : 'rgba(107,114,128,0.08)',
+            border: 'none', borderRadius: 11, overflow: 'hidden',
+            transition: 'width 220ms ease-out, background 150ms ease-out',
+            display: 'flex', alignItems: 'center', paddingLeft: 4, gap: 2,
+            cursor: 'pointer', whiteSpace: 'nowrap', zIndex: 2,
+          }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 13, color: hasNota ? c.icon : '#9CA3AF', lineHeight: 1, flexShrink: 0 }}>
+            {hasNota ? 'sticky_note_2' : 'note_add'}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: hasNota ? c.label : '#6B7280', opacity: hovNota && !editing ? 1 : 0, transition: 'opacity 140ms ease-out 60ms' }}>
+            {hasNota ? 'Nota' : 'Agregar'}
+          </span>
+        </button>
+
+        {/* Preview al pasar el mouse — solo si hay nota y no se está editando */}
+        {hasNota && !editing && (
+          <div style={{
+            position: 'absolute', bottom: 34, right: 6, width: 190,
+            background: 'white', borderRadius: 8,
+            boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+            border: `1px solid ${c.border}`, padding: '10px 12px', zIndex: 200,
+            opacity: hovNota ? 1 : 0, pointerEvents: 'none',
+            transform: hovNota ? 'translateY(0)' : 'translateY(6px)',
+            transition: 'opacity 160ms ease-out, transform 160ms ease-out',
+          }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: c.heading, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Nota</div>
+            <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, wordBreak: 'break-word' }}>{notaValue}</div>
+          </div>
+        )}
+
+        {/* Editor flotante — mismo patrón visual que el input de motivo de rechazo */}
+        {editing && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute', bottom: 34, right: 6, width: 190,
+              background: 'white', borderRadius: 8,
+              boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+              border: `1px solid ${c.border}`, padding: 8, zIndex: 300,
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}
+          >
+            <input
+              autoFocus
+              value={notaEditor.draft}
+              onChange={e => setNotaEditor(s => ({ ...s, draft: e.target.value }))}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { act('nota', { nota: notaEditor.draft }); setNotaEditor({ open: false, draft: '' }) }
+                if (e.key === 'Escape') setNotaEditor({ open: false, draft: '' })
+              }}
+              placeholder="Escribir nota..."
+              style={{
+                width: '100%', padding: '4px 8px', fontSize: 11, borderRadius: 6,
+                border: `1px solid ${c.border}`, outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                onClick={() => { act('nota', { nota: notaEditor.draft }); setNotaEditor({ open: false, draft: '' }) }}
+                style={{ flex: 1, padding: '4px 0', borderRadius: 6, border: 'none', background: c.heading, color: '#fff', fontWeight: 600, fontSize: 11, cursor: 'pointer' }}
+              >Guardar</button>
+              <button
+                onClick={() => setNotaEditor({ open: false, draft: '' })}
+                style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: '#F3F4F6', color: '#444', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}
+              >×</button>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
+
+  // Vista de solo lectura de la nota — sin ícono genérico clickeable, solo
+  // hover para previsualizar. Usada en Rechazado, que ya tiene su propio
+  // flujo de nota (motivo de rechazo) y donde el ícono genérico se superpone
+  // con el texto/badge del estado.
+  function renderNotaPreview(theme, notaValue) {
+    if (!notaValue?.trim()) return null
+    const c = NOTA_THEMES[theme]
+    return (
+      <>
+        <div
+          style={{
+            position: 'absolute', bottom: 6, right: 6, height: 22,
+            width: hovNota ? 60 : 22,
+            background: hovNota ? c.hover : c.soft,
+            borderRadius: 11, overflow: 'hidden',
+            transition: 'width 220ms ease-out, background 150ms ease-out',
+            display: 'flex', alignItems: 'center', paddingLeft: 4, gap: 2,
+            cursor: 'default', whiteSpace: 'nowrap', zIndex: 1,
+          }}
+          onMouseEnter={(e) => { e.stopPropagation(); setHovNota(true) }}
+          onMouseLeave={() => setHovNota(false)}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 13, color: c.icon, lineHeight: 1, flexShrink: 0 }}>sticky_note_2</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: c.label, opacity: hovNota ? 1 : 0, transition: 'opacity 140ms ease-out 60ms' }}>Nota</span>
+        </div>
+
+        <div style={{
+          position: 'absolute', bottom: 34, right: 6, width: 190,
+          background: 'white', borderRadius: 8,
+          boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+          border: `1px solid ${c.border}`, padding: '10px 12px', zIndex: 200,
+          opacity: hovNota ? 1 : 0, pointerEvents: 'none',
+          transform: hovNota ? 'translateY(0)' : 'translateY(6px)',
+          transition: 'opacity 160ms ease-out, transform 160ms ease-out',
+        }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: c.heading, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Nota</div>
+          <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, wordBreak: 'break-word' }}>{notaValue}</div>
+        </div>
+      </>
+    )
   }
 
   // ── Fuera de mesesDebidos ────────────────────────────────────────────────────
@@ -137,6 +279,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
               transition: 'opacity 140ms ease-out 60ms',
             }}>Editar</span>
           </div>
+          {renderNotaButton('green', histEntry?.nota)}
         </td>
       )
     }
@@ -144,52 +287,6 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   }
 
   const { estado, nota, autorizado } = debito
-
-  // Pill "Nota" flotante — reutilizable en cualquier estado de la celda para
-  // que una nota existente nunca quede oculta. Temas de color por estado.
-  const NOTA_THEMES = {
-    red:  { icon: '#991B1B', label: '#991B1B', soft: 'rgba(239,68,68,0.12)',   hover: 'rgba(239,68,68,0.20)',   border: '#FEE2E2', heading: '#EF4444' },
-    gray: { icon: '#4B5563', label: '#4B5563', soft: 'rgba(107,114,128,0.12)', hover: 'rgba(107,114,128,0.20)', border: '#E5E7EB', heading: '#6B7280' },
-    blue: { icon: '#1E40AF', label: '#1E40AF', soft: 'rgba(59,130,246,0.12)',  hover: 'rgba(59,130,246,0.20)',  border: '#DBEAFE', heading: '#3B82F6' },
-  }
-  function renderNotaIndicator(theme) {
-    if (!nota?.trim()) return null
-    const c = NOTA_THEMES[theme]
-    return (
-      <>
-        <div
-          style={{
-            position: 'absolute', bottom: 6, right: 6, height: 22,
-            width: hovNota ? 60 : 22,
-            background: hovNota ? c.hover : c.soft,
-            borderRadius: 11, overflow: 'hidden',
-            transition: 'width 220ms ease-out, background 150ms ease-out',
-            display: 'flex', alignItems: 'center', paddingLeft: 4, gap: 2,
-            cursor: 'default', whiteSpace: 'nowrap', zIndex: 1,
-          }}
-          onMouseEnter={(e) => { e.stopPropagation(); setHovNota(true) }}
-          onMouseLeave={() => setHovNota(false)}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 13, color: c.icon, lineHeight: 1, flexShrink: 0 }}>sticky_note_2</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: c.label, opacity: hovNota ? 1 : 0, transition: 'opacity 140ms ease-out 60ms' }}>Nota</span>
-        </div>
-
-        {/* Popover flotante con el contenido — no afecta el tamaño de la celda */}
-        <div style={{
-          position: 'absolute', bottom: 34, right: 6, width: 190,
-          background: 'white', borderRadius: 8,
-          boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
-          border: `1px solid ${c.border}`, padding: '10px 12px', zIndex: 200,
-          opacity: hovNota ? 1 : 0, pointerEvents: 'none',
-          transform: hovNota ? 'translateY(0)' : 'translateY(6px)',
-          transition: 'opacity 160ms ease-out, transform 160ms ease-out',
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: c.heading, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Nota</div>
-          <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, wordBreak: 'break-word' }}>{nota}</div>
-        </div>
-      </>
-    )
-  }
 
   // ── Pendiente ────────────────────────────────────────────────────────────────
   if (estado === 'pendiente') {
@@ -258,7 +355,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
             </span>
           )}
         </div>
-        {renderNotaIndicator('gray')}
+        {renderNotaButton('gray', nota)}
       </td>
     )
   }
@@ -314,7 +411,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
               >Rechazado</button>
             </div>
           )}
-          {!notaInput.open && renderNotaIndicator('blue')}
+          {!notaInput.open && renderNotaButton('blue', nota)}
         </td>
       </>
     )
@@ -350,7 +447,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
           </span>
         </div>
 
-        {renderNotaIndicator('red')}
+        {renderNotaPreview('red', nota)}
       </td>
     )
   }
@@ -528,6 +625,48 @@ export default function FondoEmprenderPagosPage() {
         }))
         try {
           await api.updateFondoPago(empresaId, pagoId, { estado: 'rechazado', nota })
+        } catch (err) {
+          refreshEmpresa(empresaId)
+          alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
+        }
+        break
+      }
+
+      // Editar la nota sin tocar el estado — disponible desde cualquier
+      // estado de la celda (botón de nota siempre visible).
+      case 'nota': {
+        updateRow(r => ({
+          ...r,
+          mesesDebidos: r.mesesDebidos.map(md =>
+            md.anio === anio && md.mes === mes ? { ...md, nota } : md
+          ),
+          historialCompleto: r.historialCompleto.map(h =>
+            h.id === pagoId ? { ...h, nota } : h
+          ),
+        }))
+        try {
+          let targetId = pagoId
+          if (!targetId) {
+            // Aún no existe registro para este mes (fila virtual "pendiente")
+            // — el backend lo crea con estado='pendiente' y luego le agregamos la nota.
+            const np = await api.createFondoPago(empresaId, { anio, mes })
+            targetId = np.id
+            updateRow(r => ({
+              ...r,
+              mesesDebidos: r.mesesDebidos.map(md =>
+                md.anio === anio && md.mes === mes ? { ...md, pagoId: np.id } : md
+              ),
+              historialCompleto: [...r.historialCompleto, np]
+                .sort((a, b) => toYM(a.anio, a.mes) - toYM(b.anio, b.mes)),
+            }))
+          }
+          await api.updateFondoPago(empresaId, targetId, { nota })
+          updateRow(r => ({
+            ...r,
+            historialCompleto: r.historialCompleto.map(h =>
+              h.id === targetId ? { ...h, nota } : h
+            ),
+          }))
         } catch (err) {
           refreshEmpresa(empresaId)
           alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
