@@ -619,10 +619,7 @@ export default function FondoEmprenderPagosPage() {
   const stats = useMemo(() => ({
     total:     scopedRows.length,
     pagadas:   scopedRows.filter(r => r.mesesDebidos.length === 0).length,
-    esperando: scopedRows.filter(r => {
-      const oldest = [...r.mesesDebidos].sort((a, b) => toYM(a.anio, a.mes) - toYM(b.anio, b.mes))[0]
-      return oldest?.estado === 'enviado'
-    }).length,
+    esperando: scopedRows.filter(r => r.mesesDebidos.some(md => md.estado === 'enviado')).length,
     enMora: scopedRows.filter(r => r.mesesDebidos.length > 0).length,
   }), [scopedRows])
 
