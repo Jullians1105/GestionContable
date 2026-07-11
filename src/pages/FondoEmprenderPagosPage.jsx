@@ -88,6 +88,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   const [hovRechazado, setHovRechazado] = useState(false)
   const [hovEditar,    setHovEditar]    = useState(false)
   const [hovNota,      setHovNota]      = useState(false)
+  const [hovBloqueado, setHovBloqueado] = useState(false)
   const [notaInput,    setNotaInput]    = useState({ open: false, draft: '' })
 
   const debito    = mesesDebidos.find(md => md.anio === anio && md.mes === mes) ?? null
@@ -149,9 +150,9 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
     return (
       <td colSpan={2} className={autorizado ? TD_PEND_CLS : TD_BLOQ_CLS} style={TD_STYLE}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-          <div style={ROW}>
-            {autorizado ? (
-              <>
+          {autorizado ? (
+            <>
+              <div style={ROW}>
                 <span style={{ ...BTN.base, ...BTN.pendiente }}>Pendiente</span>
                 <button
                   className="hover:opacity-80"
@@ -160,35 +161,55 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
                 >
                   Enviado →
                 </button>
-              </>
-            ) : (
-              <span style={{ ...BTN.base, color: '#4B5563', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
-                Bloqueado
-              </span>
-            )}
-          </div>
+              </div>
 
-          {/* Toggle de autorización — ícono simple, tenue por defecto y a
-              toda opacidad al hover; el significado va en el title. En su
-              propia fila para que nunca invada el resto de la celda. */}
-          {canAutorizar && (
+              {/* Toggle de autorización — ícono simple, tenue por defecto y a
+                  toda opacidad al hover; el significado va en el title. En su
+                  propia fila para que nunca invada el resto de la celda. */}
+              {canAutorizar && (
+                <button
+                  onClick={() => act('autorizar', { autorizado: false })}
+                  title="Bloquear envío hasta nueva orden"
+                  className="opacity-50 hover:opacity-100 transition-opacity duration-150"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
+                  }}
+                >
+                  <span
+                    className="material-symbols-outlined"
+                    style={{ fontSize: 14, color: '#9CA3AF', lineHeight: 1 }}
+                  >
+                    lock_open
+                  </span>
+                </button>
+              )}
+            </>
+          ) : canAutorizar ? (
+            // Chip único clickeable: icono + texto fusionados, ejecuta la autorización real
             <button
-              onClick={() => act('autorizar', { autorizado: !autorizado })}
-              title={autorizado ? 'Bloquear envío hasta nueva orden' : 'Autorizar envío'}
-              className="opacity-50 hover:opacity-100 transition-opacity duration-150"
+              onClick={() => act('autorizar', { autorizado: true })}
+              onMouseEnter={() => setHovBloqueado(true)}
+              onMouseLeave={() => setHovBloqueado(false)}
+              title="Autorizar envío"
+              className="transition-colors duration-150"
               style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                ...BTN.base,
+                display: 'flex', alignItems: 'center', gap: 4,
                 border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
+                color: hovBloqueado ? '#166534' : '#4B5563', fontWeight: 600, fontSize: 12,
               }}
             >
-              <span
-                className="material-symbols-outlined"
-                style={{ fontSize: 14, color: autorizado ? '#9CA3AF' : '#4B5563', lineHeight: 1 }}
-              >
-                {autorizado ? 'lock_open' : 'lock'}
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                {hovBloqueado ? 'lock_open' : 'lock'}
               </span>
+              Bloqueado
             </button>
+          ) : (
+            <span style={{ ...BTN.base, color: '#4B5563', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
+              Bloqueado
+            </span>
           )}
         </div>
       </td>
