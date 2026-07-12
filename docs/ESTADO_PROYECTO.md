@@ -1,14 +1,23 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-07-11 (sesión 12 — revisión de seguridad de despliegue para
-`feat/funcionesNuevas`; fix en `CalendarPage` para días dentro del rango de vigencia de un
-template recurrente; corrección de `docs/DEPLOY.md` §6)  
-**Rama activa:** `feat/funcionesNuevas` (local, sin push aún; contiene Tablero de Carga de
-Trabajo + liderazgo por grupo, pendiente de merge a `main`)  
+**Última actualización:** 2026-07-12 (sesión 13 — progreso individual por asignado en tareas
+multi-persona: tabla `task_assignees`, endpoint `PATCH /api/tasks/:id/assignees/me`, barra de
+progreso en Kanban/detalle)  
+**Rama activa:** `feat/ajustesResponsiveArregloBugs11/07` (local, sin push aún; sobre `main`
+tras el merge de `feat/funcionesNuevas` vía PR #13). Working tree con cambios de la sesión 13
+**sin commitear todavía** (progreso individual por asignado — ver checklist #51): 9 archivos
+modificados + `backend/migrations/019_task_assignees.sql` sin trackear. Plan: el usuario va a
+commitear, pushear la rama (sin abrir PR todavía — no hace falta para poder seguir trabajándola
+en otra máquina, `git fetch` + `git checkout` alcanza) y continuar desde un MacBook.  
+**Ojo si se retoma desde otra máquina:** `CLAUDE.md` (raíz) y toda la carpeta `.claude/`
+(incluida esta memoria de sesión) están en `.gitignore` — **no viajan con git push/pull/clone**.
+Si el trabajo continúa en el Mac, ese Claude Code arranca sin este contexto salvo que alguien
+copie esos archivos manualmente (AirDrop/USB/etc.), no vía git.  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
-**Ramas activas en remoto:** `main` (última: `f096c5e`, 2026-07-03 — filtros seguimiento
-mensual Fondo Emprender)  
+**Ramas activas en remoto:** `main` (`feat/funcionesNuevas` ya mergeada vía PR #13 —
+Tablero de Carga de Trabajo + liderazgo por grupo + fix `CalendarPage`; verificar con
+`git fetch` antes de asumir vigencia)  
 **Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)
 
 ---
@@ -223,6 +232,10 @@ GET    /api/tasks/:id/fondo-link
 POST   /api/tasks/:id/fondo-link
 DELETE /api/tasks/:id/fondo-link
 
+PATCH  /api/tasks/:id/assignees/me         → marca el status individual del usuario autenticado
+                                              como asignado; tasks.status se recalcula como
+                                              agregado (completed solo si todos completaron)
+
 GET    /api/tasks/templates                  → lista templates recurrentes (admin/leader)
 
 GET    /api/notifications
@@ -279,9 +292,10 @@ GET    /api/stats/workload                 → solo admin/leader; carga por pers
 | 016 | Columna `reminder_sent_at TIMESTAMPTZ` en tasks |
 | 017 | Elimina etiquetas de muestra del seed (bug, feature, urgente, documentación) vía DELETE por UUID |
 | 018 | `group_members.is_leader BOOLEAN` — soporte multi-líder por grupo (índice parcial `WHERE is_leader = true`) |
+| 019 | Tabla `task_assignees` (task_id, user_id, status, completed_at) — estado individual por asignado; backfill desde `tasks.assigned_to`/`status` existentes |
 
 **Tests:**
-- Cobertura actual: **~79% statements / ~71% functions** (umbral: 70%)
+- Cobertura actual: **~81% statements / ~74% functions** (umbral: 70%)
 - 8 archivos unitarios: authController, taskController, groupController, statsController, middleware, routes, helpers, validators
 - 2 archivos de integración: auth.test.js, tasks.test.js
 - Excluidos de cobertura: `pushService.js`, `recurringTaskService.js`, `reminderService.js` (servicios de infraestructura)
@@ -472,3 +486,4 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 48 | Revisión de seguridad de BD antes de deploy de `feat/funcionesNuevas`: migración 018 es aditiva/idempotente (`ADD COLUMN IF NOT EXISTS` + `DEFAULT false`, `CREATE INDEX IF NOT EXISTS`), no toca datos existentes; `GET /api/stats/workload` es 100% de solo lectura; todas las columnas usadas en las queries nuevas ya existían salvo `is_leader` (la crea la propia 018). El orden migrar→arrancar backend ya está garantizado por `docker-compose.yml` (`backend` tiene `depends_on: migrate: condition: service_completed_successfully`), así que `docker compose up -d` solo es seguro sin pasos manuales extra — ver `docs/DEPLOY.md` §6 (actualizado con backup previo vía `scripts/backup.sh`) | ✅ Revisado 2026-07-11 |
 | 49 | Fix `CalendarPage`: al hacer clic en un día dentro del rango de vigencia (`recurrence.start_date`→`end_date`) de un template recurrente, el panel derecho ahora muestra el template como si fuera una tarea de ese día (antes solo aparecía en el día exacto proyectado `approx_day`, y el resto de días del rango sombreado mostraban "Sin tareas este día"). Verificado end-to-end con Playwright headless contra los contenedores `_dev` (usuario admin temporal creado y borrado en la BD para el test, no se usaron credenciales reales) | ✅ Implementado 2026-07-11 |
 | 50 | Corrección `docs/DEPLOY.md` §6: el paso de migración ya no depende de que la persona que despliega "revise si hay migraciones nuevas" — se descubrió que `docker-compose.yml` ya fuerza el orden correcto vía `backend: depends_on: migrate: condition: service_completed_successfully` (el `migrate` de ese archivo no tiene `profiles:`, a diferencia de lo que sugería la doc vieja con `--profile migrate`). Guía simplificada a 3 comandos (`git pull` → `build` → `up -d`) + backup previo recomendado con `./scripts/backup.sh` | ✅ Resuelto 2026-07-11 |
+| 51 | Progreso individual por asignado en tareas multi-persona: migración 019 (`task_assignees`, aditiva/idempotente, backfill desde `tasks.assigned_to`/`status`), fix del bug preexistente que descartaba todos los asignados salvo el primero al guardar, endpoint `PATCH /api/tasks/:id/assignees/me` (cada asignado marca su propio estado), `tasks.status` recalculado como agregado (completed solo si todos completaron), barra de progreso "X/Y completaron" en `TaskCard`/`TaskDetailModal` (mismo patrón visual que la barra de subtareas). Verificado end-to-end contra la API real de `taskflow_backend_dev` con usuarios temporales (creados y borrados en la BD para la prueba) | ✅ Implementado 2026-07-12 |

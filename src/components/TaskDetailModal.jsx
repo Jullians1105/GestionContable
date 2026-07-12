@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTeam } from '../hooks/useTeam'
 import { useTags } from '../context/TagContext'
 import { useToast } from '../context/ToastContext'
-import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo } from '../utils/helpers'
+import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo, getTaskProgress } from '../utils/helpers'
 import SubtaskList from './Subtasks/SubtaskList'
 import CommentSection from './Comments/CommentSection'
 
@@ -17,8 +17,8 @@ const STATUS_OPTIONS = [
 ]
 
 export default function TaskDetailModal({ task, onClose, onEdit, scrollToCommentId = null }) {
-  const { getTaskById, updateTask } = useTasks()
-  const { hasPermission } = useAuth()
+  const { getTaskById, updateTask, updateMyAssigneeStatus } = useTasks()
+  const { user, hasPermission } = useAuth()
   const { getMemberById } = useTeam()
   const { getTagById } = useTags()
   const { addToast } = useToast()
@@ -35,6 +35,9 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
 
   const assignedMembers = normalizeAssignedTo(liveTask.assignedTo).map(id => getMemberById(id)).filter(Boolean)
   const tags = (liveTask.tagIds || []).map(getTagById).filter(Boolean)
+  const progress = getTaskProgress(liveTask)
+  const showAssigneeProgress = progress && progress.total > 1
+  const myAssignee = (liveTask.assignees || []).find(a => a.userId === user?.id)
   const overdue = isDueDateOverdue(liveTask.dueDate, liveTask.dueTime) && liveTask.status !== 'completed'
   const soon = isDueDateSoon(liveTask.dueDate, liveTask.dueTime) && liveTask.status !== 'completed'
   const canEdit = hasPermission('canEditTask')
@@ -47,6 +50,15 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
     }
     updateTask(liveTask.id, { status: e.target.value })
     addToast('Estado actualizado', 'success')
+  }
+
+  const handleMyStatusChange = (status) => {
+    if (!hasPermission('canEditTask')) {
+      addToast('No tienes permiso para cambiar el estado de tareas', 'error')
+      return
+    }
+    updateMyAssigneeStatus(liveTask.id, status)
+    addToast('Tu estado se actualizó', 'success')
   }
 
   return (
@@ -112,14 +124,25 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
               <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide mb-1">Asignado a</p>
               {assignedMembers.length > 0 ? (
                 <div className="flex flex-col gap-1.5">
-                  {assignedMembers.map((m) => (
-                    <div key={m.id} className="flex items-center gap-2">
-                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0 ${getAvatarColor(m.name)}`}>
-                        {getInitials(m.name)}
+                  {assignedMembers.map((m) => {
+                    const assignee = (liveTask.assignees || []).find(a => a.userId === m.id)
+                    return (
+                      <div key={m.id} className="flex items-center gap-2">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0 ${getAvatarColor(m.name)}`}>
+                          {getInitials(m.name)}
+                        </div>
+                        <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] flex-1">{m.name}</span>
+                        {showAssigneeProgress && assignee && (
+                          <span
+                            className="px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white"
+                            style={{ background: STATUS_COLORS[assignee.status] }}
+                          >
+                            {STATUS_LABELS[assignee.status]}
+                          </span>
+                        )}
                       </div>
-                      <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{m.name}</span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <span className="text-sm text-[#888] italic">Sin asignar</span>
@@ -159,7 +182,47 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
                 </button>
               ))}
             </div>
+            {showAssigneeProgress && (
+              <p className="text-[10px] text-[#888] italic mt-2">
+                Este cambio aplica el mismo estado a los {progress.total} asignados. Para marcar solo tu parte, usá "Mi progreso" abajo.
+              </p>
+            )}
           </div>
+
+          {/* Progreso por asignados (tareas con 2+ personas) */}
+          {showAssigneeProgress && (
+            <div className="bg-[#f3f4f6] dark:bg-[#252840] rounded-xl p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide">Progreso del equipo</p>
+                <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{progress.completed}/{progress.total} completaron</span>
+              </div>
+              <div className="h-1.5 bg-[#edeef0] dark:bg-[#1e2030] rounded-full overflow-hidden mb-3">
+                <div className="h-full rounded-full transition-all" style={{ width: `${progress.pct}%`, background: '#10B981' }} />
+              </div>
+
+              {myAssignee && (
+                <>
+                  <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide mb-2">Mi progreso</p>
+                  <div className="flex gap-2">
+                    {STATUS_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        onClick={() => myAssignee.status !== opt.value && handleMyStatusChange(opt.value)}
+                        className="flex-1 h-9 rounded-lg text-xs font-semibold border-2 transition"
+                        style={
+                          myAssignee.status === opt.value
+                            ? { background: STATUS_COLORS[opt.value], color: '#fff', borderColor: STATUS_COLORS[opt.value] }
+                            : { background: 'transparent', color: STATUS_COLORS[opt.value], borderColor: STATUS_COLORS[opt.value] + '60' }
+                        }
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Descripción */}
           {liveTask.description && (

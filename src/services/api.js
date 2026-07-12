@@ -109,6 +109,7 @@ export const api = {
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
   searchTasks: (q, limit = 20) => request(`/tasks/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   getTaskHistory: (id) => request(`/tasks/${id}/history`),
+  updateMyAssigneeStatus: (taskId, status) => request(`/tasks/${taskId}/assignees/me`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 
   // Subtareas
   addSubtask: (taskId, title) => request(`/tasks/${taskId}/subtasks`, { method: 'POST', body: JSON.stringify({ title }) }),

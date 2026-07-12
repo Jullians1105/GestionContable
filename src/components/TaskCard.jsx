@@ -1,4 +1,4 @@
-import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo } from '../utils/helpers'
+import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo, getTaskProgress } from '../utils/helpers'
 import { useTeam } from '../hooks/useTeam'
 import { useTags } from '../context/TagContext'
 import { useAuth } from '../context/AuthContext'
@@ -26,6 +26,8 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
   const completedSubtasks = subtasks.filter((s) => s.completed).length
   const tags = (task.tagIds || []).map(getTagById).filter(Boolean)
   const commentCount = (task.comments || []).length
+  const progress = getTaskProgress(task)
+  const showAssigneeProgress = progress && progress.total > 1
 
   return (
     <div
@@ -84,6 +86,15 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
             <div className="h-full rounded-full" style={{ width: `${Math.round((completedSubtasks / subtasks.length) * 100)}%`, background: '#004ac6' }} />
           </div>
           <p className="text-[10px] text-[#888] mt-0.5">{completedSubtasks}/{subtasks.length} subtareas</p>
+        </div>
+      )}
+
+      {showAssigneeProgress && (
+        <div>
+          <div className="h-1 bg-[#edeef0] dark:bg-[#252840] rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all" style={{ width: `${progress.pct}%`, background: '#10B981' }} />
+          </div>
+          <p className="text-[10px] text-[#888] mt-0.5">{progress.completed}/{progress.total} asignados completaron</p>
         </div>
       )}
 

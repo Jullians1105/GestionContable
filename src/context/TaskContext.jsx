@@ -3,7 +3,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { api } from '../services/api'
 import { storage } from '../utils/storage'
-import { generateId, today, normalizeAssignedTo, isDueDateOverdue } from '../utils/helpers'
+import { generateId, today, normalizeAssignedTo, isDueDateOverdue, computeAggregateStatus } from '../utils/helpers'
 import { useAuth } from './AuthContext'
 import { useTeam } from './TeamContext'
 import { useSocket } from './SocketContext'
@@ -172,6 +172,36 @@ export function TaskProvider({ children }) {
     api.deleteTask(id).catch(() => {})
   }, [])
 
+  // Marca el estado individual del usuario actual como asignado de la tarea.
+  // El status agregado de la tarea (usado por el badge/Kanban) se recalcula server-side
+  // en modo backend real; en modo localStorage se recalcula acá con el mismo criterio.
+  const updateMyAssigneeStatus = useCallback((taskId, status) => {
+    const task = tasksRef.current.find(t => t.id === taskId)
+    if (!task || !user) return
+
+    if (useRealBackend) {
+      api.updateMyAssigneeStatus(taskId, status)
+        .then(fullTask => setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t)))
+        .catch(() => {})
+      return
+    }
+
+    const baseAssignees = (task.assignees && task.assignees.length > 0)
+      ? task.assignees
+      : normalizeAssignedTo(task.assignedTo).map(uid => ({ userId: uid, status: task.status, completedAt: null }))
+    const nextAssignees = baseAssignees.map(a =>
+      a.userId === user.id ? { ...a, status, completedAt: status === 'completed' ? new Date().toISOString() : null } : a
+    )
+    const aggregateStatus = computeAggregateStatus(nextAssignees) ?? task.status
+    const updated = { ...task, assignees: nextAssignees, status: aggregateStatus, updatedAt: today() }
+    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
+    if (aggregateStatus === 'completed' && task.status !== 'completed') {
+      notifyLeaders(members, 'task_completed',
+        `${user?.name ?? 'Alguien'} completó su parte de "${task.title}" y la tarea quedó completa`, taskId, user?.id)
+    }
+    api.updateTask(taskId, updated).catch(() => {})
+  }, [user, members, useRealBackend])
+
   const getTaskById = useCallback((id) => tasksRef.current.find(t => t.id === id), [])
   const getTasksByMember = useCallback((memberId) => tasksRef.current.filter(t => normalizeAssignedTo(t.assignedTo).includes(memberId)), [])
   const getTasksByGroup = useCallback((groupId) => tasksRef.current.filter(t => t.groupId === groupId), [])
@@ -298,7 +328,7 @@ export function TaskProvider({ children }) {
   return (
     <TaskContext.Provider value={{
       tasks, loading,
-      addTask, updateTask, deleteTask,
+      addTask, updateTask, deleteTask, updateMyAssigneeStatus,
       getTaskById, getTasksByMember, getTasksByGroup,
       addSubtask, toggleSubtask, deleteSubtask,
       addComment, updateComment, deleteComment,

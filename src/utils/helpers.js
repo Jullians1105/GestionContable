@@ -11,6 +11,25 @@ export const normalizeAssignedTo = (val) => {
   return [val]
 }
 
+// Progreso de una tarea según el estado individual de cada asignado (task.assignees).
+// null si la tarea no tiene asignados trackeados (tareas sin asignar, o creadas antes
+// de esta feature y aún no re-sincronizadas).
+export const getTaskProgress = (task) => {
+  const assignees = task.assignees || []
+  if (assignees.length === 0) return null
+  const completed = assignees.filter((a) => a.status === 'completed').length
+  return { completed, total: assignees.length, pct: Math.round((completed / assignees.length) * 100) }
+}
+
+// Mismo criterio de agregación que el backend (recalculateTaskStatus en taskController.js):
+// completed solo si todos completaron, in_progress si alguno avanzó, pending si nadie.
+export const computeAggregateStatus = (assignees) => {
+  if (!assignees || assignees.length === 0) return null
+  if (assignees.every((a) => a.status === 'completed')) return 'completed'
+  if (assignees.some((a) => a.status === 'in_progress' || a.status === 'completed')) return 'in_progress'
+  return 'pending'
+}
+
 export const formatDate = (dateStr, timeStr = '') => {
   if (!dateStr) return '—'
   try {

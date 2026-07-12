@@ -10,6 +10,119 @@ const emitTaskEvent = (io, event, data, groupId) => {
   if (groupId) io.to(`group:${groupId}`).emit(event, data);
 };
 
+// ── Estado individual por asignado (task_assignees) ────────────────────────
+
+// Sincroniza las filas de task_assignees con la lista de asignados actual:
+// agrega los nuevos (status por defecto 'pending'), quita a quien ya no está,
+// preserva el status de quien sigue asignado.
+const syncAssignees = async (taskId, assignedToArr) => {
+  if (assignedToArr.length === 0) {
+    await db.query('DELETE FROM task_assignees WHERE task_id = $1', [taskId]);
+    return;
+  }
+  await db.query(
+    'DELETE FROM task_assignees WHERE task_id = $1 AND user_id != ALL($2::uuid[])',
+    [taskId, assignedToArr]
+  );
+  await Promise.all(assignedToArr.map(uid =>
+    db.query(
+      `INSERT INTO task_assignees (task_id, user_id) VALUES ($1, $2)
+       ON CONFLICT (task_id, user_id) DO NOTHING`,
+      [taskId, uid]
+    )
+  ));
+};
+
+// El status global de la tarea se puede seguir forzando desde PUT /:id (dropdown
+// existente): en ese caso se aplica al status de TODOS los asignados por igual,
+// preservando el comportamiento binario que ya conocía el resto de la app.
+const setAllAssigneesStatus = async (taskId, status) => {
+  await db.query(
+    `UPDATE task_assignees
+     SET status = $2::varchar, completed_at = CASE WHEN $2::varchar = 'completed' THEN NOW() ELSE NULL END
+     WHERE task_id = $1`,
+    [taskId, status]
+  );
+};
+
+// Recalcula tasks.status a partir del status individual de cada asignado:
+// completed solo si TODOS completaron, in_progress si alguno avanzó, pending si nadie.
+// Si la tarea no tiene asignados trackeados (task_assignees vacío), no toca nada.
+const recalculateTaskStatus = async (taskId) => {
+  const { rows } = await db.query('SELECT status FROM task_assignees WHERE task_id = $1', [taskId]);
+  if (rows.length === 0) return null;
+  let status;
+  if (rows.every(r => r.status === 'completed')) status = 'completed';
+  else if (rows.some(r => r.status === 'in_progress' || r.status === 'completed')) status = 'in_progress';
+  else status = 'pending';
+  await db.query('UPDATE tasks SET status = $2, updated_at = NOW() WHERE id = $1', [taskId, status]);
+  return status;
+};
+
+// Notificaciones a líderes/admin + sincronización con Fondo Emprender al completar una tarea.
+// Compartido entre updateTask (status explícito vía PUT) y updateMyAssigneeStatus (recalculado).
+const notifyTaskCompleted = async (req, id, taskTitle) => {
+  const actor = await db.query('SELECT name FROM users WHERE id = $1', [req.user.userId]);
+  const actorName = actor.rows[0]?.name ?? 'Alguien';
+  const extraData = JSON.stringify({ completedById: req.user.userId, completedByName: actorName });
+  const leaders = await db.query(`SELECT id FROM users WHERE role IN ('admin','leader') AND id != $1`, [req.user.userId]);
+  await Promise.all(leaders.rows.map(l => {
+    const notifId = uuidv4();
+    const notifMsg = `"${taskTitle}" fue completada`;
+    return db.query(`INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'task_completed', $3, $4, $5)`,
+      [notifId, l.id, notifMsg, id, extraData])
+    .then(() => {
+      req.io?.to(`user:${l.id}`).emit('notification:received', {
+        id: notifId, type: 'task_completed', message: notifMsg, taskId: id,
+        extra: { completedById: req.user.userId, completedByName: actorName }, read: false, createdAt: new Date().toISOString(),
+      });
+      sendPushToUser(l.id, { title: 'Tarea completada', body: notifMsg, url: '/tasks', tag: notifId });
+    });
+  }));
+
+  // Sincronizar con Fondo Emprender si la tarea tiene un vínculo activo
+  try {
+    const linkResult = await db.query('SELECT * FROM task_fondo_links WHERE task_id = $1', [id]);
+    if (linkResult.rows.length > 0) {
+      const link = linkResult.rows[0];
+      if (link.link_type === 'macroproceso') {
+        const syncNow = new Date();
+        const syncAnio = syncNow.getFullYear();
+        const syncMes  = syncNow.getMonth() + 1;
+        await db.query(
+          `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, anio, mes, estado)
+           VALUES ($1, $2, $3, $4, $5, 'done')
+           ON CONFLICT (empresa_id, macroproceso_id, anio, mes) DO UPDATE SET estado = 'done'`,
+          [uuidv4(), link.empresa_id, link.macro_id, syncAnio, syncMes]
+        );
+        req.io?.emit('empresa:updated', { empresaId: link.empresa_id, tipo: 'detalle' });
+      } else if (link.link_type === 'checklist') {
+        await db.query(
+          `INSERT INTO fondo_checklist_meses (id, empresa_id, anio, mes)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (empresa_id, anio, mes) DO NOTHING`,
+          [uuidv4(), link.empresa_id, link.anio, link.mes]
+        );
+        const mesRow = await db.query(
+          'SELECT id FROM fondo_checklist_meses WHERE empresa_id = $1 AND anio = $2 AND mes = $3',
+          [link.empresa_id, link.anio, link.mes]
+        );
+        const mesId = mesRow.rows[0].id;
+        await db.query(
+          `INSERT INTO fondo_checklist_items (id, mes_id, proceso_id, estado)
+           VALUES ($1, $2, $3, 'done')
+           ON CONFLICT (mes_id, proceso_id) DO UPDATE SET estado = 'done'`,
+          [uuidv4(), mesId, link.proceso_id]
+        );
+        req.io?.emit('empresa:updated', { empresaId: link.empresa_id, anio: link.anio, mes: link.mes, tipo: 'checklist' });
+      }
+    }
+  } catch (fondoErr) {
+    // No bloquear la respuesta si la sincronización con fondo falla
+    logger.warn({ taskId: id, err: fondoErr.message }, 'Fondo sync failed on task completion');
+  }
+};
+
 const getTasks = async (req, res, next) => {
   try {
     const { status, priority, assignedTo, groupId, search, page = 1, limit = 50 } = req.query;
@@ -37,7 +150,9 @@ const getTasks = async (req, res, next) => {
         (SELECT json_agg(s ORDER BY s.created_at) FROM task_subtasks s WHERE s.task_id = t.id) AS subtasks,
         (SELECT json_agg(c ORDER BY c.created_at) FROM task_comments c WHERE c.task_id = t.id) AS comments,
         (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids,
-        (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link
+        (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link,
+        (SELECT json_agg(json_build_object('userId', ta2.user_id, 'name', au.name, 'status', ta2.status, 'completedAt', ta2.completed_at) ORDER BY au.name)
+         FROM task_assignees ta2 JOIN users au ON au.id = ta2.user_id WHERE ta2.task_id = t.id) AS assignees
       FROM tasks t
       LEFT JOIN users u ON u.id = t.assigned_to
       LEFT JOIN users creator ON creator.id = t.user_id
@@ -73,7 +188,9 @@ const FULL_TASK_QUERY = `
     (SELECT json_agg(s ORDER BY s.created_at) FROM task_subtasks s WHERE s.task_id = t.id) AS subtasks,
     (SELECT json_agg(c ORDER BY c.created_at) FROM task_comments c WHERE c.task_id = t.id) AS comments,
     (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids,
-    (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link
+    (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link,
+    (SELECT json_agg(json_build_object('userId', ta2.user_id, 'name', au.name, 'status', ta2.status, 'completedAt', ta2.completed_at) ORDER BY au.name)
+     FROM task_assignees ta2 JOIN users au ON au.id = ta2.user_id WHERE ta2.task_id = t.id) AS assignees
   FROM tasks t
   LEFT JOIN users u ON u.id = t.assigned_to
   LEFT JOIN users creator ON creator.id = t.user_id
@@ -123,6 +240,8 @@ const createTask = async (req, res, next) => {
       ));
     }
 
+    await syncAssignees(id, assignedToArr);
+
     await auditLog(req.user.userId, 'CREATE', 'tasks', id, { title, priority, assignedTo: assignedToArr });
 
     const notifTargets = assignedToArr.filter(uid => uid !== req.user.userId);
@@ -146,7 +265,15 @@ const createTask = async (req, res, next) => {
       }));
     }
 
-    const full = { ...normalizeTask(task), subtasks: [], comments: [], tagIds };
+    const assignees = assignedToArr.length > 0
+      ? (await db.query(
+          `SELECT ta.user_id AS "userId", u.name, ta.status, ta.completed_at AS "completedAt"
+           FROM task_assignees ta JOIN users u ON u.id = ta.user_id
+           WHERE ta.task_id = $1 ORDER BY u.name`,
+          [id]
+        )).rows
+      : [];
+    const full = { ...normalizeTask(task), subtasks: [], comments: [], tagIds, assignees };
     emitTaskEvent(req.io, 'task:created', full, groupId);
     logger.info({ taskId: id, userId: req.user.userId }, 'Task created');
     res.status(201).json(full);
@@ -196,6 +323,17 @@ const updateTask = async (req, res, next) => {
       ));
     }
 
+    if (assignedToArr !== null) {
+      await syncAssignees(id, assignedToArr);
+    }
+    // Un status explícito (dropdown/Kanban) se aplica a todos los asignados por igual;
+    // si solo cambiaron los asignados, el status agregado se recalcula desde sus filas.
+    if (status) {
+      await setAllAssigneesStatus(id, status);
+    } else if (assignedToArr !== null) {
+      await recalculateTaskStatus(id);
+    }
+
     const changes = {};
     if (title && title !== old.title) changes.title = { from: old.title, to: title };
     if (status && status !== old.status) changes.status = { from: old.status, to: status };
@@ -225,73 +363,52 @@ const updateTask = async (req, res, next) => {
     }
 
     if (status === 'completed' && old.status !== 'completed') {
-      const actor = await db.query('SELECT name FROM users WHERE id = $1', [req.user.userId]);
-      const actorName = actor.rows[0]?.name ?? 'Alguien';
-      const extraData = JSON.stringify({ completedById: req.user.userId, completedByName: actorName });
-      const leaders = await db.query(`SELECT id FROM users WHERE role IN ('admin','leader') AND id != $1`, [req.user.userId]);
-      await Promise.all(leaders.rows.map(l => {
-        const notifId = uuidv4();
-        const notifMsg = `"${task.title}" fue completada`;
-        return db.query(`INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'task_completed', $3, $4, $5)`,
-          [notifId, l.id, notifMsg, id, extraData])
-        .then(() => {
-          req.io?.to(`user:${l.id}`).emit('notification:received', {
-            id: notifId, type: 'task_completed', message: notifMsg, taskId: id,
-            extra: { completedById: req.user.userId, completedByName: actorName }, read: false, createdAt: new Date().toISOString(),
-          });
-          sendPushToUser(l.id, { title: 'Tarea completada', body: notifMsg, url: '/tasks', tag: notifId });
-        });
-      }));
-
-      // Sincronizar con Fondo Emprender si la tarea tiene un vínculo activo
-      try {
-        const linkResult = await db.query(
-          'SELECT * FROM task_fondo_links WHERE task_id = $1',
-          [id]
-        );
-        if (linkResult.rows.length > 0) {
-          const link = linkResult.rows[0];
-          if (link.link_type === 'macroproceso') {
-            const syncNow = new Date();
-            const syncAnio = syncNow.getFullYear();
-            const syncMes  = syncNow.getMonth() + 1;
-            await db.query(
-              `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, anio, mes, estado)
-               VALUES ($1, $2, $3, $4, $5, 'done')
-               ON CONFLICT (empresa_id, macroproceso_id, anio, mes) DO UPDATE SET estado = 'done'`,
-              [uuidv4(), link.empresa_id, link.macro_id, syncAnio, syncMes]
-            );
-            req.io?.emit('empresa:updated', { empresaId: link.empresa_id, tipo: 'detalle' });
-          } else if (link.link_type === 'checklist') {
-            await db.query(
-              `INSERT INTO fondo_checklist_meses (id, empresa_id, anio, mes)
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT (empresa_id, anio, mes) DO NOTHING`,
-              [uuidv4(), link.empresa_id, link.anio, link.mes]
-            );
-            const mesRow = await db.query(
-              'SELECT id FROM fondo_checklist_meses WHERE empresa_id = $1 AND anio = $2 AND mes = $3',
-              [link.empresa_id, link.anio, link.mes]
-            );
-            const mesId = mesRow.rows[0].id;
-            await db.query(
-              `INSERT INTO fondo_checklist_items (id, mes_id, proceso_id, estado)
-               VALUES ($1, $2, $3, 'done')
-               ON CONFLICT (mes_id, proceso_id) DO UPDATE SET estado = 'done'`,
-              [uuidv4(), mesId, link.proceso_id]
-            );
-            req.io?.emit('empresa:updated', { empresaId: link.empresa_id, anio: link.anio, mes: link.mes, tipo: 'checklist' });
-          }
-        }
-      } catch (fondoErr) {
-        // No bloquear la respuesta si la sincronización con fondo falla
-        logger.warn({ taskId: id, err: fondoErr.message }, 'Fondo sync failed on task completion');
-      }
+      await notifyTaskCompleted(req, id, task.title);
     }
 
     await auditLog(req.user.userId, 'UPDATE', 'tasks', id, changes);
 
     const full = await fetchFullTask(id);
+    emitTaskEvent(req.io, 'task:updated', full, full.groupId);
+    res.json(full);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Cada asignado marca SU propio estado sobre la tarea; tasks.status se recalcula
+// como agregado (completed solo si todos completaron).
+const updateMyAssigneeStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const current = await db.query(
+      'SELECT ta.status, t.status AS task_status, t.title FROM task_assignees ta JOIN tasks t ON t.id = ta.task_id WHERE ta.task_id = $1 AND ta.user_id = $2',
+      [id, req.user.userId]
+    );
+    if (!current.rows[0]) return res.status(404).json({ error: 'No estás asignado a esta tarea' });
+    const { status: oldStatus, task_status: oldTaskStatus, title: taskTitle } = current.rows[0];
+
+    await db.query(
+      `UPDATE task_assignees
+       SET status = $3::varchar, completed_at = CASE WHEN $3::varchar = 'completed' THEN NOW() ELSE NULL END
+       WHERE task_id = $1 AND user_id = $2`,
+      [id, req.user.userId, status]
+    );
+
+    const newTaskStatus = await recalculateTaskStatus(id);
+
+    await auditLog(req.user.userId, 'UPDATE', 'tasks', id, {
+      assigneeStatus: { userId: req.user.userId, from: oldStatus, to: status },
+    });
+
+    if (newTaskStatus === 'completed' && oldTaskStatus !== 'completed') {
+      await notifyTaskCompleted(req, id, taskTitle);
+    }
+
+    const full = await fetchFullTask(id);
+    if (!full) return res.status(404).json({ error: 'Tarea no encontrada' });
     emitTaskEvent(req.io, 'task:updated', full, full.groupId);
     res.json(full);
   } catch (err) {
@@ -376,6 +493,7 @@ function normalizeTask(t) {
     priority: t.priority,
     assignedTo: t.assigned_to || null,
     assignedToName: t.assigned_to_name || null,
+    assignees: t.assignees || [],
     dueDate: t.due_date ? t.due_date.toISOString().slice(0, 10) : null,
     dueTime: t.due_time || null,
     groupId: t.group_id || null,
@@ -590,7 +708,7 @@ const getTemplates = async (req, res, next) => {
 
 module.exports = {
   getTasks, getTask, createTask, updateTask, deleteTask, getTaskHistory, searchTasks,
-  getTemplates,
+  getTemplates, updateMyAssigneeStatus,
   addSubtask, updateSubtask, deleteSubtask,
   addComment, updateComment, deleteComment,
 };

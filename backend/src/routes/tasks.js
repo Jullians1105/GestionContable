@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { body, query } = require('express-validator');
 const {
   getTasks, getTask, createTask, updateTask, deleteTask, getTaskHistory, searchTasks,
-  getTemplates,
+  getTemplates, updateMyAssigneeStatus,
   addSubtask, updateSubtask, deleteSubtask,
   addComment, updateComment, deleteComment,
 } = require('../controllers/taskController');
@@ -145,6 +145,23 @@ router.put('/:id',
  *       - bearerAuth: []
  */
 router.delete('/:id', validateUUIDParam('id'), roleMiddleware('admin', 'leader'), deleteTask);
+
+/**
+ * @openapi
+ * /api/tasks/{id}/assignees/me:
+ *   patch:
+ *     tags: [Tasks]
+ *     summary: Marcar mi propio estado como asignado de la tarea (tasks.status se recalcula como agregado)
+ *     security:
+ *       - bearerAuth: []
+ */
+router.patch('/:id/assignees/me',
+  validateUUIDParam('id'),
+  canEdit,
+  body('status').isIn(['pending', 'in_progress', 'completed']),
+  validate,
+  updateMyAssigneeStatus
+);
 
 // Subtareas
 router.post('/:id/subtasks', validateUUIDParam('id'), canEdit, addSubtask);
