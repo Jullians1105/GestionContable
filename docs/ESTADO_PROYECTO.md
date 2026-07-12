@@ -1,11 +1,14 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-07-08 (sesión 11 — Tablero de Carga de Trabajo, distribución
-automática de tareas por grupo, fix n8n mora/SMTP Gmail, limpieza duplicado OneDrive)  
-**Rama activa:** `fixes-02-07` (pendiente de merge a `main`)  
+**Última actualización:** 2026-07-11 (sesión 12 — revisión de seguridad de despliegue para
+`feat/funcionesNuevas`; fix en `CalendarPage` para días dentro del rango de vigencia de un
+template recurrente; corrección de `docs/DEPLOY.md` §6)  
+**Rama activa:** `feat/funcionesNuevas` (local, sin push aún; contiene Tablero de Carga de
+Trabajo + liderazgo por grupo, pendiente de merge a `main`)  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
-**Ramas activas en remoto:** `main` · `fixes-02-07`  
+**Ramas activas en remoto:** `main` (última: `f096c5e`, 2026-07-03 — filtros seguimiento
+mensual Fondo Emprender)  
 **Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)
 
 ---
@@ -466,3 +469,6 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 45 | n8n `fondo-pagos-alerta-mora`: fix login de servicio (password real), fix SMTP `Missing credentials for PLAIN` con Mailhog, migrado a Gmail SMTP para alertas reales | ✅ Resuelto 2026-07-08 |
 | 46 | Limpieza: carpeta duplicada de OneDrive del repo (causaba error de migración en Docker) eliminada | ✅ Resuelto 2026-07-08 |
 | 47 | Liderazgo por grupo: migración 018 (`group_members.is_leader`, multi-líder por grupo), permisos reales en backend (editar/eliminar grupo, agregar/quitar miembros, eliminar tarea — solo admin o líder del grupo específico; tareas sin grupo solo las borra admin), asignable desde Usuarios | ✅ Implementado 2026-07-08 |
+| 48 | Revisión de seguridad de BD antes de deploy de `feat/funcionesNuevas`: migración 018 es aditiva/idempotente (`ADD COLUMN IF NOT EXISTS` + `DEFAULT false`, `CREATE INDEX IF NOT EXISTS`), no toca datos existentes; `GET /api/stats/workload` es 100% de solo lectura; todas las columnas usadas en las queries nuevas ya existían salvo `is_leader` (la crea la propia 018). El orden migrar→arrancar backend ya está garantizado por `docker-compose.yml` (`backend` tiene `depends_on: migrate: condition: service_completed_successfully`), así que `docker compose up -d` solo es seguro sin pasos manuales extra — ver `docs/DEPLOY.md` §6 (actualizado con backup previo vía `scripts/backup.sh`) | ✅ Revisado 2026-07-11 |
+| 49 | Fix `CalendarPage`: al hacer clic en un día dentro del rango de vigencia (`recurrence.start_date`→`end_date`) de un template recurrente, el panel derecho ahora muestra el template como si fuera una tarea de ese día (antes solo aparecía en el día exacto proyectado `approx_day`, y el resto de días del rango sombreado mostraban "Sin tareas este día"). Verificado end-to-end con Playwright headless contra los contenedores `_dev` (usuario admin temporal creado y borrado en la BD para el test, no se usaron credenciales reales) | ✅ Implementado 2026-07-11 |
+| 50 | Corrección `docs/DEPLOY.md` §6: el paso de migración ya no depende de que la persona que despliega "revise si hay migraciones nuevas" — se descubrió que `docker-compose.yml` ya fuerza el orden correcto vía `backend: depends_on: migrate: condition: service_completed_successfully` (el `migrate` de ese archivo no tiene `profiles:`, a diferencia de lo que sugería la doc vieja con `--profile migrate`). Guía simplificada a 3 comandos (`git pull` → `build` → `up -d`) + backup previo recomendado con `./scripts/backup.sh` | ✅ Resuelto 2026-07-11 |
