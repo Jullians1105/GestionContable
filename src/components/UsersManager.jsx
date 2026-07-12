@@ -52,7 +52,7 @@ export default function UsersManager() {
   const { members, createUser, updateMember, deleteMember } = useTeam()
   const { addToast } = useToast()
   const { isAdmin } = useAuth()
-  const { groups } = useGroups()
+  const { groups, setGroupLeader } = useGroups()
   const showPermCols = isAdmin()
 
   const fondoGroup = groups?.find(g => g.name === 'Fondo Emprender')
@@ -153,6 +153,14 @@ export default function UsersManager() {
       await updateMember(user.id, { permissions: updated })
     } catch (err) {
       addToast(err.message || 'Error al actualizar permisos', 'error')
+    }
+  }
+
+  const handleToggleGroupLeader = async (groupId, userId, isLeader) => {
+    try {
+      await setGroupLeader(groupId, userId, isLeader)
+    } catch (err) {
+      addToast(err.message || 'Error al actualizar el liderazgo de grupo', 'error')
     }
   }
 
@@ -280,6 +288,14 @@ export default function UsersManager() {
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-semibold ${ROLE_COLORS[user.role] ?? ROLE_COLORS.viewer}`}>
                         {ROLE_LABELS[user.role] ?? user.role}
                       </span>
+                      {user.role === 'leader' && (
+                        <p className="text-[10px] text-[#888] mt-1">
+                          {(() => {
+                            const led = groups.filter((g) => (g.leaderIds || []).includes(user.id))
+                            return led.length > 0 ? `Lidera: ${led.map((g) => g.name).join(', ')}` : 'Sin grupo asignado'
+                          })()}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-xs text-[#434655] dark:text-[#c4c8e8] hidden sm:table-cell">
                       {user.createdAt ? new Date(user.createdAt).toLocaleDateString('es-ES') : '—'}
@@ -414,6 +430,35 @@ export default function UsersManager() {
                             ))}
                           </div>
                         </div>
+
+                        {/* Grupos que lidera — solo aplica a role === 'leader' */}
+                        {user.role === 'leader' && (
+                          <div>
+                            <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-sm">shield_person</span>
+                              Grupos que lidera
+                            </p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {groups.map((g) => {
+                                const isGroupLeader = (g.leaderIds || []).includes(user.id)
+                                return (
+                                  <label
+                                    key={g.id}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] cursor-pointer hover:border-[#004ac6] transition select-none"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isGroupLeader}
+                                      onChange={() => handleToggleGroupLeader(g.id, user.id, !isGroupLeader)}
+                                      className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
+                                    />
+                                    <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{g.name}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Fondo Emprender — solo si el usuario es miembro del grupo */}
                         {isFondoMember(user.id) && (

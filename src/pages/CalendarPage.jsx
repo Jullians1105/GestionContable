@@ -93,8 +93,25 @@ export default function CalendarPage() {
 
   const selectedTasks = useMemo(() => {
     if (!selectedDay) return []
-    return tasksByDate[format(selectedDay, 'yyyy-MM-dd')] || []
-  }, [selectedDay, tasksByDate])
+    const key = format(selectedDay, 'yyyy-MM-dd')
+    const base = tasksByDate[key] || []
+    if (!canSeeTemplates) return base
+
+    // Días dentro del rango de vigencia de un template (barra naranja) que no tienen
+    // ya una instancia/proyección propia ese día: igual mostrar el template en el
+    // panel, como si fuera una tarea de ese día.
+    const baseIds = new Set(base.map((t) => t.id))
+    const inRangeTemplates = templates
+      .filter((t) => {
+        if (baseIds.has(t.id)) return false
+        const { start_date, end_date } = t.recurrence || {}
+        if (!start_date || !end_date) return false
+        return key >= start_date && key <= end_date
+      })
+      .map((t) => ({ ...t, _isTemplate: true, dueDate: key }))
+
+    return [...base, ...inRangeTemplates]
+  }, [selectedDay, tasksByDate, templates, canSeeTemplates])
 
   const monthLabel = format(currentDate, 'MMMM yyyy', { locale: es })
 

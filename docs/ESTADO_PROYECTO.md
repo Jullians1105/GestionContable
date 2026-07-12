@@ -1,10 +1,14 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-07-02 (sesión 10 — fixes-02-07: Dana, online PWA, seed tags, n8n/WhatsApp análisis)  
-**Rama activa:** `fixes-02-07` (pendiente de merge a `main`)  
+**Última actualización:** 2026-07-11 (sesión 12 — revisión de seguridad de despliegue para
+`feat/funcionesNuevas`; fix en `CalendarPage` para días dentro del rango de vigencia de un
+template recurrente; corrección de `docs/DEPLOY.md` §6)  
+**Rama activa:** `feat/funcionesNuevas` (local, sin push aún; contiene Tablero de Carga de
+Trabajo + liderazgo por grupo, pendiente de merge a `main`)  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
-**Ramas activas en remoto:** `main` · `fixes-02-07`  
+**Ramas activas en remoto:** `main` (última: `f096c5e`, 2026-07-03 — filtros seguimiento
+mensual Fondo Emprender)  
 **Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)
 
 ---
@@ -47,7 +51,7 @@ GestionTareasOficina/
 │   │   ├── ThemeContext.jsx    # dark/light mode
 │   │   └── ToastContext.jsx    # Notificaciones UI
 │   ├── components/             # Componentes reutilizables
-│   ├── pages/                  # 17 páginas
+│   ├── pages/                  # 18 páginas
 │   ├── services/api.js         # Cliente HTTP con interceptores
 │   ├── hooks/                  # useTasks.js, useTeam.js
 │   └── utils/
@@ -118,7 +122,7 @@ GestionTareasOficina/
 
 ### Frontend
 
-**Páginas disponibles (17):**
+**Páginas disponibles (18):**
 - `LoginPage`, `RegisterPage`, `ForgotPasswordPage`, `ResetPasswordPage`
 - `DashboardPage` — estadísticas, tareas recientes
 - `TasksPage` — lista de tareas con filtros
@@ -129,6 +133,9 @@ GestionTareasOficina/
 - `UsersPage` — administración de usuarios (admin)
 - `NotificationsPage`
 - `ReportsPage` — exportación PDF/Excel
+- `WorkloadPage` — Tablero de Carga de Trabajo (`/workload`, admin/leader): barras de tareas
+  abiertas por persona, detalle con vencidas, indicador de balance, recomendaciones de
+  rebalanceo **por grupo** (no cruza equipos) e histórico mensual de tareas creadas
 - `ProfilePage`, `SettingsPage`
 - `FondoEmprenderPage` + `FondoEmprenderEmpresasPage` + `FondoEmprenderEmpresaDetallePage` + `FondoEmprenderPagosPage` (módulo Fondo Emprender)
 - `RecurringTasksPage` — gestión de templates recurrentes (solo admin/leader, ruta `/tasks/recurrentes`)
@@ -190,6 +197,7 @@ PUT    /api/groups/:id
 DELETE /api/groups/:id                     → solo admin
 POST   /api/groups/:id/members
 DELETE /api/groups/:id/members/:userId
+PUT    /api/groups/:id/members/:userId/leader  → asignar/quitar liderazgo del grupo (solo admin)
 
 GET    /api/tags
 POST   /api/tags                           → cualquier usuario autenticado (sin restricción de rol)
@@ -227,6 +235,8 @@ DELETE /api/notifications/push-subscribe    → eliminar suscripción
 
 GET    /api/stats
 GET    /api/stats/audit                    → solo admin/leader
+GET    /api/stats/workload                 → solo admin/leader; carga por persona (total + por
+                                              grupo) y tareas creadas por mes (últimos 6 meses)
 ```
 
 **Seguridad:**
@@ -268,6 +278,7 @@ GET    /api/stats/audit                    → solo admin/leader
 | 015 | Tabla `push_subscriptions` (Web Push / iPhone PWA) |
 | 016 | Columna `reminder_sent_at TIMESTAMPTZ` en tasks |
 | 017 | Elimina etiquetas de muestra del seed (bug, feature, urgente, documentación) vía DELETE por UUID |
+| 018 | `group_members.is_leader BOOLEAN` — soporte multi-líder por grupo (índice parcial `WHERE is_leader = true`) |
 
 **Tests:**
 - Cobertura actual: **~79% statements / ~71% functions** (umbral: 70%)
@@ -453,3 +464,11 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 40 | Responsable temporal Nómina electrónica: `Daniela Ruiz` → `Dana` en `MACRO_RESPONSABLES` (hardcoded en FondoEmprenderEmpresaDetallePage.jsx) | ✅ Resuelto 2026-07-02 |
 | 41 | Fix online en PWA: `socket/events.js` emite `users:online:list` al conectar; `SocketContext.jsx` lo escucha para poblar estado inicial | ✅ Resuelto 2026-07-02 |
 | 42 | Migración 017: elimina etiquetas de muestra del seed; `002_seed_data.sql` limpiado de tags y assignments | ✅ Resuelto 2026-07-02 |
+| 43 | Tablero de Carga de Trabajo (`/workload`): `GET /api/stats/workload` (solo lectura, sin migraciones), barras + detalle + balance + histórico mensual | ✅ Implementado 2026-07-08 |
+| 44 | Recomendaciones de rebalanceo **por grupo** (Tablero) y sugerencia de menor carga **por grupo** en el selector "Asignado a" de `TaskForm` — no cruzan equipos (Desarrollo/Fondo Emprender/Tributario/etc.) | ✅ Implementado 2026-07-08 |
+| 45 | n8n `fondo-pagos-alerta-mora`: fix login de servicio (password real), fix SMTP `Missing credentials for PLAIN` con Mailhog, migrado a Gmail SMTP para alertas reales | ✅ Resuelto 2026-07-08 |
+| 46 | Limpieza: carpeta duplicada de OneDrive del repo (causaba error de migración en Docker) eliminada | ✅ Resuelto 2026-07-08 |
+| 47 | Liderazgo por grupo: migración 018 (`group_members.is_leader`, multi-líder por grupo), permisos reales en backend (editar/eliminar grupo, agregar/quitar miembros, eliminar tarea — solo admin o líder del grupo específico; tareas sin grupo solo las borra admin), asignable desde Usuarios | ✅ Implementado 2026-07-08 |
+| 48 | Revisión de seguridad de BD antes de deploy de `feat/funcionesNuevas`: migración 018 es aditiva/idempotente (`ADD COLUMN IF NOT EXISTS` + `DEFAULT false`, `CREATE INDEX IF NOT EXISTS`), no toca datos existentes; `GET /api/stats/workload` es 100% de solo lectura; todas las columnas usadas en las queries nuevas ya existían salvo `is_leader` (la crea la propia 018). El orden migrar→arrancar backend ya está garantizado por `docker-compose.yml` (`backend` tiene `depends_on: migrate: condition: service_completed_successfully`), así que `docker compose up -d` solo es seguro sin pasos manuales extra — ver `docs/DEPLOY.md` §6 (actualizado con backup previo vía `scripts/backup.sh`) | ✅ Revisado 2026-07-11 |
+| 49 | Fix `CalendarPage`: al hacer clic en un día dentro del rango de vigencia (`recurrence.start_date`→`end_date`) de un template recurrente, el panel derecho ahora muestra el template como si fuera una tarea de ese día (antes solo aparecía en el día exacto proyectado `approx_day`, y el resto de días del rango sombreado mostraban "Sin tareas este día"). Verificado end-to-end con Playwright headless contra los contenedores `_dev` (usuario admin temporal creado y borrado en la BD para el test, no se usaron credenciales reales) | ✅ Implementado 2026-07-11 |
+| 50 | Corrección `docs/DEPLOY.md` §6: el paso de migración ya no depende de que la persona que despliega "revise si hay migraciones nuevas" — se descubrió que `docker-compose.yml` ya fuerza el orden correcto vía `backend: depends_on: migrate: condition: service_completed_successfully` (el `migrate` de ese archivo no tiene `profiles:`, a diferencia de lo que sugería la doc vieja con `--profile migrate`). Guía simplificada a 3 comandos (`git pull` → `build` → `up -d`) + backup previo recomendado con `./scripts/backup.sh` | ✅ Resuelto 2026-07-11 |

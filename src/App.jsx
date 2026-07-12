@@ -26,6 +26,7 @@ import GroupsPage from './pages/GroupsPage'
 import KanbanPage from './pages/KanbanPage'
 import CalendarPage from './pages/CalendarPage'
 import ReportsPage from './pages/ReportsPage'
+import WorkloadPage from './pages/WorkloadPage'
 import NotificationsPage from './pages/NotificationsPage'
 import UsersPage from './pages/UsersPage'
 import FondoEmprenderPage from './pages/FondoEmprenderPage'
@@ -79,6 +80,7 @@ function Layout() {
             <Route path="/kanban" element={<KanbanPage />} />
             <Route path="/calendar" element={<CalendarPage />} />
             <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/workload" element={<WorkloadPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<ProfilePage />} />

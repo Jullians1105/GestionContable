@@ -144,18 +144,25 @@ docker compose down -v
 ## 6. Actualizar a una nueva versión
 
 ```bash
-# Traer cambios del repositorio
+# 0. Backup antes de tocar producción (por las dudas, no específico de esta versión)
+./scripts/backup.sh
+
+# 1. Traer cambios del repositorio
 git pull
 
-# Reconstruir imágenes con los cambios
+# 2. Reconstruir imágenes con los cambios
 docker compose build
 
-# Aplicar las nuevas imágenes con reinicio mínimo
+# 3. Levantar con las imágenes nuevas
 docker compose up -d
-
-# Si hay migraciones nuevas (verificar el CHANGELOG)
-docker compose --profile migrate up migrate
 ```
+
+No hace falta un paso manual aparte para migraciones ni verificar si "hay migraciones nuevas":
+en `docker-compose.yml`, el servicio `backend` tiene `depends_on: migrate: condition:
+service_completed_successfully`, así que `docker compose up -d` siempre corre `migrate` primero
+y espera a que termine OK antes de levantar `backend`. `migrations/run.js` es idempotente
+(tabla `schema_migrations` trackea qué archivos ya se aplicaron), así que correrlo en cada
+deploy —incluso sin migraciones nuevas— no tiene efecto ni riesgo, simplemente no hace nada.
 
 ---
 
