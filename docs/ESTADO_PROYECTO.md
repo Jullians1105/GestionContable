@@ -1,15 +1,15 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-07-13 (sesión 14 — quién completó cada subtarea: columnas
-`completed_by`/`completed_at` en `task_subtasks`, texto "Completado por X" en `SubtaskList`)  
+**Última actualización:** 2026-07-13 (sesión 14 — subtareas: quién completó cada una; Equipo:
+editar/remover solo admin; filtro "Creadas por mí"; botón "Nueva Tarea" en el Header; solicitud
+de eliminación de tareas con aprobación de admin/líder — checklist #52-56)  
 **Rama activa:** `feat/ajustesResponsiveArregloBugs11/07` (local, sin push aún; sobre `main`
 tras el merge de `feat/funcionesNuevas` vía PR #13). Working tree **sin commitear todavía**,
-acumulando la sesión 13 (progreso individual por asignado — checklist #51) más la sesión 14
-(checklist #52): incluye `backend/migrations/019_task_assignees.sql` y
-`backend/migrations/020_subtask_completed_by.sql` sin trackear, más los archivos modificados de
-ambas sesiones. Plan: el usuario va a commitear, pushear la rama (sin abrir PR todavía — no
-hace falta para poder seguir trabajándola en otra máquina, `git fetch` + `git checkout`
-alcanza) y continuar desde un MacBook.  
+acumulando la sesión 13 (progreso individual por asignado — checklist #51) más toda la sesión 14
+(checklist #52-56): incluye `backend/migrations/019` a `021` sin trackear, más los archivos
+modificados de ambas sesiones. Plan: el usuario va a commitear, pushear la rama (sin abrir PR
+todavía — no hace falta para poder seguir trabajándola en otra máquina, `git fetch` +
+`git checkout` alcanza) y continuar desde un MacBook.  
 **Ojo si se retoma desde otra máquina:** `CLAUDE.md` (raíz) y toda la carpeta `.claude/`
 (incluida esta memoria de sesión) están en `.gitignore` — **no viajan con git push/pull/clone**.
 Si el trabajo continúa en el Mac, ese Claude Code arranca sin este contexto salvo que alguien
@@ -166,6 +166,9 @@ GestionTareasOficina/
 | member | ❌ | ❌ | ✅ | ❌ |
 | viewer | ❌ | ❌ | ❌ | ❌ |
 
+Nota: member (y cualquiera que no sea viewer) puede *solicitar* la eliminación de una tarea con
+un motivo aunque no pueda borrarla directamente — ver checklist #56 (`task_delete_requests`).
+
 ### Backend API REST
 
 **Endpoints implementados:**
@@ -237,6 +240,12 @@ PATCH  /api/tasks/:id/assignees/me         → marca el status individual del us
                                               como asignado; tasks.status se recalcula como
                                               agregado (completed solo si todos completaron)
 
+POST   /api/tasks/:id/delete-request       → solicita eliminar una tarea con motivo (cualquiera
+                                              que no sea viewer); notifica a admins + líder(es)
+                                              del grupo de la tarea
+PATCH  /api/tasks/:id/delete-request/:requestId → aprueba/rechaza (admin o líder del grupo);
+                                              mismo criterio de autorización que DELETE /:id
+
 GET    /api/tasks/templates                  → lista templates recurrentes (admin/leader)
 
 GET    /api/notifications
@@ -295,6 +304,7 @@ GET    /api/stats/workload                 → solo admin/leader; carga por pers
 | 018 | `group_members.is_leader BOOLEAN` — soporte multi-líder por grupo (índice parcial `WHERE is_leader = true`) |
 | 019 | Tabla `task_assignees` (task_id, user_id, status, completed_at) — estado individual por asignado; backfill desde `tasks.assigned_to`/`status` existentes |
 | 020 | Columnas `completed_by`/`completed_at` en `task_subtasks` — quién completó cada subtarea; backfill best-effort de `completed_at` desde `updated_at` |
+| 021 | Tabla `task_delete_requests` (task_id, requested_by, reason, status, resolved_by, resolved_at) — solicitudes de eliminación con motivo; índice único parcial evita duplicar solicitudes pendientes por tarea |
 
 **Tests:**
 - Cobertura actual: **~81% statements / ~74% functions** (umbral: 70%)
@@ -493,3 +503,4 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 53 | Fix `TeamManager.jsx` (página `/team` "Equipo"): los botones "Editar" y "Remover del equipo" ahora solo se muestran si `isAdmin()` — antes se mostraban a cualquier rol autenticado (leader/member/viewer), aunque el backend (`PUT`/`DELETE /api/employees/:id`) ya exigía admin. "Agregar Miembro" queda fuera de este cambio (no se pidió). Verificado en la UI con dos usuarios temporales (admin ve 17/17 botones, member ve 0) | ✅ Implementado 2026-07-13 |
 | 54 | Filtro "Creadas por mí" en Mis Tareas (`TaskFilters.jsx`/`TaskList.jsx`): nuevo campo `createdBy` (= `tasks.user_id`) expuesto por `normalizeTask` (antes solo se exponía `createdByName`, sin el id, insuficiente para filtrar). Checkbox visible solo para admin/leader (mismo gate que el resto de `TaskFilters`, `canSeeAll`), ya que member/viewer no pueden crear tareas y de por sí solo ven las suyas asignadas. Sin migración (el dato ya existía en `tasks.user_id`). Verificado en la UI real: con el filtro activo pasó de 9 a 1 tarea (la creada por el usuario de prueba) | ✅ Implementado 2026-07-13 |
 | 55 | Botón "Nueva Tarea" siempre accesible desde `Header.jsx` (icono "+" azul, con label en `sm:` y superior), independiente de la barra lateral y disponible en cualquier página, no solo en `/tasks`. Antes la única forma de crear una tarea fuera de `/tasks` era el botón dentro de `Sidebar.jsx`, que en mobile exige primero abrir el drawer (hamburguesa) — ahora no hace falta. De paso se corrigió un overflow horizontal real en el header a 375px/360px (el avatar del usuario quedaba fuera de la pantalla, invisible/no clickeable): al formulario de búsqueda le faltaba `min-w-0`, por lo que no podía encoger más allá de su ancho mínimo de contenido y empujaba al resto de los íconos fuera del viewport (no se detectaba por `scrollWidth` porque es un elemento `fixed`, solo visible comparando screenshots). Verificado con Playwright en 4 anchos (360/375/768/1440px, sin overflow) y flujo completo de creación de tarea desde el Dashboard sin tocar el sidebar | ✅ Implementado 2026-07-13 |
+| 56 | Solicitud de eliminación de tareas: migración 021 (`task_delete_requests`, aditiva, índice único parcial evita solicitudes duplicadas pendientes), `POST /api/tasks/:id/delete-request` (motivo obligatorio, cualquiera que no sea viewer) y `PATCH /api/tasks/:id/delete-request/:requestId` (aprobar/rechazar — admin o líder del grupo de la tarea, mismo criterio que `DELETE /api/tasks/:id`). Notifica a todos los admins + líder(es) del grupo de la tarea (o solo admins si no tiene grupo); botones "Aprobar"/"Rechazar" inline en la notificación (`NotificationBell`/`NotificationsPage`) y banner con motivo + acciones en `TaskDetailModal` cuando hay una solicitud pendiente. Alcance elegido explícitamente por el usuario entre opciones: cualquiera con acceso a la tarea puede solicitar (no solo el asignado), notifica admin + líder del grupo (no solo admin), rechazo sin motivo adicional. 13 tests unitarios nuevos (`createDeleteRequest`/`respondDeleteRequest`), cobertura subió a 82%/75%. Bug encontrado y corregido durante la verificación: `resolveDeleteRequest` en `TaskContext.jsx` devolvía éxito falso si la tarea ya no estaba en el estado local (notificación vieja tras resolver dos veces) — la rama de backend real ahora llama a la API primero, sin depender del estado local; y como `notifications.task_id` queda `NULL` cuando se borra la tarea referenciada (`ON DELETE SET NULL`), se agregó un guard en el frontend para notificaciones con `taskId` nulo. Verificado end-to-end con Playwright (2 usuarios temporales, aprobación + rechazo + ambos casos de solicitud ya resuelta) | ✅ Implementado 2026-07-13 |

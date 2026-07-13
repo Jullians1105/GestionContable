@@ -157,7 +157,10 @@ const getTasks = async (req, res, next) => {
         (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids,
         (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link,
         (SELECT json_agg(json_build_object('userId', ta2.user_id, 'name', au.name, 'status', ta2.status, 'completedAt', ta2.completed_at) ORDER BY au.name)
-         FROM task_assignees ta2 JOIN users au ON au.id = ta2.user_id WHERE ta2.task_id = t.id) AS assignees
+         FROM task_assignees ta2 JOIN users au ON au.id = ta2.user_id WHERE ta2.task_id = t.id) AS assignees,
+        (SELECT json_build_object('id', dr.id, 'reason', dr.reason, 'requestedBy', dr.requested_by, 'requestedByName', rbu.name, 'createdAt', dr.created_at)
+         FROM task_delete_requests dr JOIN users rbu ON rbu.id = dr.requested_by
+         WHERE dr.task_id = t.id AND dr.status = 'pending' LIMIT 1) AS pending_delete_request
       FROM tasks t
       LEFT JOIN users u ON u.id = t.assigned_to
       LEFT JOIN users creator ON creator.id = t.user_id
@@ -200,7 +203,10 @@ const FULL_TASK_QUERY = `
     (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids,
     (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link,
     (SELECT json_agg(json_build_object('userId', ta2.user_id, 'name', au.name, 'status', ta2.status, 'completedAt', ta2.completed_at) ORDER BY au.name)
-     FROM task_assignees ta2 JOIN users au ON au.id = ta2.user_id WHERE ta2.task_id = t.id) AS assignees
+     FROM task_assignees ta2 JOIN users au ON au.id = ta2.user_id WHERE ta2.task_id = t.id) AS assignees,
+    (SELECT json_build_object('id', dr.id, 'reason', dr.reason, 'requestedBy', dr.requested_by, 'requestedByName', rbu.name, 'createdAt', dr.created_at)
+     FROM task_delete_requests dr JOIN users rbu ON rbu.id = dr.requested_by
+     WHERE dr.task_id = t.id AND dr.status = 'pending' LIMIT 1) AS pending_delete_request
   FROM tasks t
   LEFT JOIN users u ON u.id = t.assigned_to
   LEFT JOIN users creator ON creator.id = t.user_id
@@ -457,6 +463,144 @@ const deleteTask = async (req, res, next) => {
   }
 };
 
+// ── Solicitudes de eliminación (task_delete_requests) ──────────────────────
+// Quien no tiene permiso de borrado directo (member) pide eliminar una tarea
+// con un motivo; el pedido notifica a todos los admins + líder(es) del grupo
+// de la tarea (o solo admins si no tiene grupo), que la aprueban o rechazan.
+
+const createDeleteRequest = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) return res.status(400).json({ error: 'Debes indicar un motivo' });
+
+    const taskResult = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
+    if (!taskResult.rows[0]) return res.status(404).json({ error: 'Tarea no encontrada' });
+    const task = taskResult.rows[0];
+
+    const existing = await db.query(
+      `SELECT id FROM task_delete_requests WHERE task_id = $1 AND status = 'pending'`,
+      [id]
+    );
+    if (existing.rows[0]) {
+      return res.status(409).json({ error: 'Ya hay una solicitud de eliminación pendiente para esta tarea' });
+    }
+
+    const requestId = uuidv4();
+    const trimmedReason = reason.trim();
+    await db.query(
+      `INSERT INTO task_delete_requests (id, task_id, requested_by, reason) VALUES ($1, $2, $3, $4)`,
+      [requestId, id, req.user.userId, trimmedReason]
+    );
+
+    // Destinatarios: todos los admins + líder(es) del grupo de la tarea (si tiene grupo)
+    const targetsResult = await db.query(
+      `SELECT id FROM users WHERE role = 'admin'
+       UNION
+       SELECT gm.user_id FROM group_members gm WHERE gm.group_id = $1 AND gm.is_leader = true`,
+      [task.group_id]
+    );
+    const targets = targetsResult.rows.map(r => r.id).filter(uid => uid !== req.user.userId);
+
+    const requester = await db.query('SELECT name FROM users WHERE id = $1', [req.user.userId]);
+    const requesterName = requester.rows[0]?.name ?? 'Alguien';
+    const message = `${requesterName} solicitó eliminar la tarea "${task.title}"`;
+    const extra = { requestId, reason: trimmedReason, requesterName, status: 'pending' };
+    const extraData = JSON.stringify(extra);
+
+    await Promise.all(targets.map(uid => {
+      const notifId = uuidv4();
+      return db.query(
+        `INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, 'delete_request', $3, $4, $5)`,
+        [notifId, uid, message, id, extraData]
+      ).then(() => {
+        req.io?.to(`user:${uid}`).emit('notification:received', {
+          id: notifId, type: 'delete_request', taskId: id, message, extra,
+          read: false, createdAt: new Date().toISOString(),
+        });
+        sendPushToUser(uid, { title: 'Solicitud de eliminación', body: message, url: '/notifications', tag: notifId });
+      });
+    }));
+
+    logger.info({ taskId: id, requestId, userId: req.user.userId }, 'Delete request created');
+    res.status(201).json({ id: requestId, taskId: id, status: 'pending', reason: trimmedReason });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const respondDeleteRequest = async (req, res, next) => {
+  try {
+    const { id, requestId } = req.params;
+    const { action } = req.body;
+    if (!['approve', 'reject'].includes(action)) {
+      return res.status(400).json({ error: 'Acción inválida' });
+    }
+
+    const taskResult = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
+    if (!taskResult.rows[0]) return res.status(404).json({ error: 'Tarea no encontrada' });
+    const task = taskResult.rows[0];
+
+    // Mismo criterio de autorización que deleteTask: admin siempre, si no, líder del grupo
+    if (req.user.role !== 'admin') {
+      if (!task.group_id) {
+        return res.status(403).json({ error: 'Solo un administrador puede resolver esta solicitud' });
+      }
+      const leaderCheck = await db.query(
+        'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2 AND is_leader = true',
+        [task.group_id, req.user.userId]
+      );
+      if (leaderCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Solo el líder de este grupo puede resolver esta solicitud' });
+      }
+    }
+
+    const reqResult = await db.query(
+      `SELECT * FROM task_delete_requests WHERE id = $1 AND task_id = $2 AND status = 'pending'`,
+      [requestId, id]
+    );
+    if (!reqResult.rows[0]) return res.status(404).json({ error: 'Solicitud no encontrada o ya resuelta' });
+    const deleteRequest = reqResult.rows[0];
+
+    const newStatus = action === 'approve' ? 'approved' : 'rejected';
+    await db.query(
+      `UPDATE task_delete_requests SET status = $1, resolved_by = $2, resolved_at = NOW() WHERE id = $3`,
+      [newStatus, req.user.userId, requestId]
+    );
+
+    if (action === 'approve') {
+      await db.query('DELETE FROM tasks WHERE id = $1', [id]);
+      await auditLog(req.user.userId, 'DELETE', 'tasks', id, { viaDeleteRequest: requestId });
+      req.io?.emit('task:deleted', { id });
+    }
+
+    const resolver = await db.query('SELECT name FROM users WHERE id = $1', [req.user.userId]);
+    const resolverName = resolver.rows[0]?.name ?? 'Alguien';
+    const message = action === 'approve'
+      ? `${resolverName} aprobó tu solicitud para eliminar "${task.title}"`
+      : `${resolverName} rechazó tu solicitud para eliminar "${task.title}"`;
+    const notifType = action === 'approve' ? 'delete_request_approved' : 'delete_request_rejected';
+    const notifTaskId = action === 'approve' ? null : id;
+    const extra = { resolverName };
+    const notifId = uuidv4();
+
+    await db.query(
+      `INSERT INTO notifications (id, user_id, type, message, task_id, extra_data) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [notifId, deleteRequest.requested_by, notifType, message, notifTaskId, JSON.stringify(extra)]
+    );
+    req.io?.to(`user:${deleteRequest.requested_by}`).emit('notification:received', {
+      id: notifId, type: notifType, taskId: notifTaskId, message, extra,
+      read: false, createdAt: new Date().toISOString(),
+    });
+    sendPushToUser(deleteRequest.requested_by, { title: 'Solicitud de eliminación', body: message, url: '/notifications', tag: notifId });
+
+    logger.info({ taskId: id, requestId, action, userId: req.user.userId }, 'Delete request resolved');
+    res.json({ success: true, action, taskId: id });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getTaskHistory = async (req, res, next) => {
   try {
     const result = await db.query(
@@ -504,6 +648,15 @@ function normalizeTask(t) {
     assignedTo: t.assigned_to || null,
     assignedToName: t.assigned_to_name || null,
     assignees: t.assignees || [],
+    pendingDeleteRequest: t.pending_delete_request
+      ? {
+          id: t.pending_delete_request.id,
+          reason: t.pending_delete_request.reason,
+          requestedBy: t.pending_delete_request.requestedBy,
+          requestedByName: t.pending_delete_request.requestedByName,
+          createdAt: t.pending_delete_request.createdAt,
+        }
+      : null,
     dueDate: t.due_date ? t.due_date.toISOString().slice(0, 10) : null,
     dueTime: t.due_time || null,
     groupId: t.group_id || null,
@@ -727,6 +880,7 @@ const getTemplates = async (req, res, next) => {
 module.exports = {
   getTasks, getTask, createTask, updateTask, deleteTask, getTaskHistory, searchTasks,
   getTemplates, updateMyAssigneeStatus,
+  createDeleteRequest, respondDeleteRequest,
   addSubtask, updateSubtask, deleteSubtask,
   addComment, updateComment, deleteComment,
 };

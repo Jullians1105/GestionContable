@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTasks } from '../hooks/useTasks'
 import { useAuth } from '../context/AuthContext'
 import { useTeam } from '../hooks/useTeam'
@@ -7,6 +7,7 @@ import { useToast } from '../context/ToastContext'
 import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo, getTaskProgress } from '../utils/helpers'
 import SubtaskList from './Subtasks/SubtaskList'
 import CommentSection from './Comments/CommentSection'
+import DeleteRequestModal from './DeleteRequestModal'
 
 const PRIORITY_COLORS = { high: '#EF4444', medium: '#FBBF24', low: '#10B981' }
 const STATUS_COLORS = { pending: '#888', in_progress: '#004ac6', completed: '#10B981' }
@@ -17,11 +18,13 @@ const STATUS_OPTIONS = [
 ]
 
 export default function TaskDetailModal({ task, onClose, onEdit, scrollToCommentId = null }) {
-  const { getTaskById, updateTask, updateMyAssigneeStatus } = useTasks()
+  const { getTaskById, updateTask, updateMyAssigneeStatus, requestDeleteTask, resolveDeleteRequest } = useTasks()
   const { user, hasPermission } = useAuth()
   const { getMemberById } = useTeam()
   const { getTagById } = useTags()
   const { addToast } = useToast()
+  const [showDeleteRequestModal, setShowDeleteRequestModal] = useState(false)
+  const [resolvingRequest, setResolvingRequest] = useState(false)
 
   const liveTask = getTaskById(task?.id) ?? task
 
@@ -59,6 +62,30 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
     }
     updateMyAssigneeStatus(liveTask.id, status)
     addToast('Tu estado se actualizó', 'success')
+  }
+
+  const handleDeleteRequest = async (reason) => {
+    try {
+      await requestDeleteTask(liveTask.id, reason)
+      addToast('Solicitud de eliminación enviada', 'success')
+      setShowDeleteRequestModal(false)
+    } catch (err) {
+      addToast(err.message || 'Error al enviar la solicitud', 'error')
+    }
+  }
+
+  const handleResolveRequest = async (action) => {
+    if (resolvingRequest) return
+    setResolvingRequest(true)
+    try {
+      await resolveDeleteRequest(liveTask.id, liveTask.pendingDeleteRequest.id, action)
+      addToast(action === 'approve' ? 'Tarea eliminada' : 'Solicitud rechazada', action === 'approve' ? 'info' : 'success')
+      if (action === 'approve') onClose()
+    } catch (err) {
+      addToast(err.message || 'Error al resolver la solicitud', 'error')
+    } finally {
+      setResolvingRequest(false)
+    }
   }
 
   return (
@@ -99,6 +126,16 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
               <span className="material-symbols-outlined text-base">edit</span>
               Editar
             </button>
+            {!hasPermission('canDeleteTask') && hasPermission('canComment') && !liveTask.pendingDeleteRequest && (
+              <button
+                onClick={() => setShowDeleteRequestModal(true)}
+                className="flex items-center gap-1 h-9 px-3 rounded-lg border border-[#EF4444] text-xs font-semibold text-[#EF4444] hover:bg-[#ffdad6] transition"
+                title="Solicitar eliminación"
+              >
+                <span className="material-symbols-outlined text-base">delete_outline</span>
+                Solicitar eliminación
+              </button>
+            )}
             <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-[#434655] dark:text-[#c4c8e8]">
               <span className="material-symbols-outlined text-xl">close</span>
             </button>
@@ -107,6 +144,47 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* Solicitud de eliminación pendiente */}
+          {liveTask.pendingDeleteRequest && (
+            <div className="rounded-xl border border-[#EF4444] bg-[#ffdad6]/40 dark:bg-[#3a1a1a] p-4">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="material-symbols-outlined text-[#93000a]" style={{ fontSize: 18 }}>report</span>
+                <p className="text-sm font-bold text-[#93000a] dark:text-[#ff9b93]">Solicitud de eliminación pendiente</p>
+              </div>
+              <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-1">
+                <strong>{liveTask.pendingDeleteRequest.requestedByName}</strong> pidió eliminar esta tarea:
+              </p>
+              <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0] italic bg-white/60 dark:bg-black/20 rounded-lg px-3 py-2 mb-3">
+                “{liveTask.pendingDeleteRequest.reason}”
+              </p>
+              {hasPermission('canDeleteTask') ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleResolveRequest('approve')}
+                    disabled={resolvingRequest}
+                    className="flex-1 h-9 rounded-lg text-xs font-semibold text-white disabled:opacity-40 transition hover:opacity-90"
+                    style={{ background: '#93000a' }}
+                  >
+                    Aprobar y eliminar
+                  </button>
+                  <button
+                    onClick={() => handleResolveRequest('reject')}
+                    disabled={resolvingRequest}
+                    className="flex-1 h-9 rounded-lg text-xs font-semibold border border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] disabled:opacity-40 hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+                  >
+                    Rechazar
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-[#888] italic">
+                  {liveTask.pendingDeleteRequest.requestedBy === user?.id
+                    ? 'Tu solicitud está pendiente de revisión.'
+                    : 'Pendiente de revisión por un admin o líder.'}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Meta row */}
           <div className="grid grid-cols-2 gap-4">
@@ -184,7 +262,7 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
             </div>
             {showAssigneeProgress && (
               <p className="text-[10px] text-[#888] italic mt-2">
-                Este cambio aplica el mismo estado a los {progress.total} asignados. Para marcar solo tu parte, usá "Mi progreso" abajo.
+                Este cambio aplica el mismo estado a los {progress.total} asignados. Para marcar solo tu parte, usá “Mi progreso” abajo.
               </p>
             )}
           </div>
@@ -252,6 +330,14 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
         </div>
       </div>
       </div>
+
+      {showDeleteRequestModal && (
+        <DeleteRequestModal
+          taskTitle={liveTask.title}
+          onSubmit={handleDeleteRequest}
+          onClose={() => setShowDeleteRequestModal(false)}
+        />
+      )}
     </div>
   )
 }

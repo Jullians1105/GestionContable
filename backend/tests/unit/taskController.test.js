@@ -7,6 +7,7 @@ const db = require('../../src/config/database');
 const {
   getTasks, getTask, createTask, updateTask, deleteTask, getTaskHistory, searchTasks,
   updateMyAssigneeStatus,
+  createDeleteRequest, respondDeleteRequest,
   addSubtask, updateSubtask, deleteSubtask,
   addComment, updateComment, deleteComment,
 } = require('../../src/controllers/taskController');
@@ -522,6 +523,190 @@ describe('deleteTask', () => {
     await deleteTask(req, res, mockNext);
 
     expect(res.json).toHaveBeenCalledWith({ success: true, id: 'mock-uuid' });
+  });
+});
+
+describe('createDeleteRequest', () => {
+  test('crea la solicitud y notifica a los destinatarios', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [rawTask] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 'admin-1' }] })
+      .mockResolvedValueOnce({ rows: [{ name: 'Member User' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const req = {
+      params: { id: 'mock-uuid' },
+      body: { reason: 'Ya no aplica' },
+      user: { userId: 'user-1', role: 'member' },
+      io: null,
+    };
+    const res = mockRes();
+    await createDeleteRequest(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ status: 'pending', reason: 'Ya no aplica' }));
+  });
+
+  test('retorna 400 si falta el motivo', async () => {
+    const req = { params: { id: 'mock-uuid' }, body: {}, user: { userId: 'user-1' }, io: null };
+    const res = mockRes();
+    await createDeleteRequest(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  test('retorna 404 si la tarea no existe', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+
+    const req = { params: { id: 'bad-id' }, body: { reason: 'x' }, user: { userId: 'user-1' }, io: null };
+    const res = mockRes();
+    await createDeleteRequest(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('retorna 409 si ya hay una solicitud pendiente', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [rawTask] })
+      .mockResolvedValueOnce({ rows: [{ id: 'existing-req' }] });
+
+    const req = { params: { id: 'mock-uuid' }, body: { reason: 'x' }, user: { userId: 'user-1' }, io: null };
+    const res = mockRes();
+    await createDeleteRequest(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+  });
+
+  test('llama a next en caso de error', async () => {
+    db.query.mockRejectedValueOnce(new Error('DB error'));
+
+    const req = { params: { id: 'mock-uuid' }, body: { reason: 'x' }, user: { userId: 'user-1' }, io: null };
+    const res = mockRes();
+    await createDeleteRequest(req, res, mockNext);
+
+    expect(mockNext).toHaveBeenCalled();
+  });
+});
+
+describe('respondDeleteRequest', () => {
+  test('admin aprueba: elimina la tarea y notifica al solicitante', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [rawTask] })
+      .mockResolvedValueOnce({ rows: [{ id: 'req-1', task_id: 'mock-uuid', requested_by: 'user-3', status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ name: 'Admin User' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const req = {
+      params: { id: 'mock-uuid', requestId: 'req-1' },
+      body: { action: 'approve' },
+      user: { userId: 'admin-1', role: 'admin' },
+      io: null,
+    };
+    const res = mockRes();
+    await respondDeleteRequest(req, res, mockNext);
+
+    expect(res.json).toHaveBeenCalledWith({ success: true, action: 'approve', taskId: 'mock-uuid' });
+  });
+
+  test('admin rechaza: no elimina la tarea', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [rawTask] })
+      .mockResolvedValueOnce({ rows: [{ id: 'req-1', task_id: 'mock-uuid', requested_by: 'user-3', status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ name: 'Admin User' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const req = {
+      params: { id: 'mock-uuid', requestId: 'req-1' },
+      body: { action: 'reject' },
+      user: { userId: 'admin-1', role: 'admin' },
+      io: null,
+    };
+    const res = mockRes();
+    await respondDeleteRequest(req, res, mockNext);
+
+    expect(res.json).toHaveBeenCalledWith({ success: true, action: 'reject', taskId: 'mock-uuid' });
+  });
+
+  test('leader NO puede resolver una solicitud de una tarea sin grupo', async () => {
+    db.query.mockResolvedValueOnce({ rows: [rawTask] });
+
+    const req = {
+      params: { id: 'mock-uuid', requestId: 'req-1' },
+      body: { action: 'approve' },
+      user: { userId: 'leader-1', role: 'leader' },
+      io: null,
+    };
+    const res = mockRes();
+    await respondDeleteRequest(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  test('leader SÍ puede resolver una solicitud del grupo que lidera', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ ...rawTask, group_id: 'group-1' }] })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'req-1', task_id: 'mock-uuid', requested_by: 'user-3', status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ name: 'Leader User' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const req = {
+      params: { id: 'mock-uuid', requestId: 'req-1' },
+      body: { action: 'reject' },
+      user: { userId: 'leader-1', role: 'leader' },
+      io: null,
+    };
+    const res = mockRes();
+    await respondDeleteRequest(req, res, mockNext);
+
+    expect(res.json).toHaveBeenCalledWith({ success: true, action: 'reject', taskId: 'mock-uuid' });
+  });
+
+  test('retorna 400 si la acción es inválida', async () => {
+    const req = { params: { id: 'mock-uuid', requestId: 'req-1' }, body: { action: 'foo' }, user: { userId: 'admin-1', role: 'admin' }, io: null };
+    const res = mockRes();
+    await respondDeleteRequest(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  test('retorna 404 si la tarea no existe', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+
+    const req = { params: { id: 'bad-id', requestId: 'req-1' }, body: { action: 'approve' }, user: { userId: 'admin-1', role: 'admin' }, io: null };
+    const res = mockRes();
+    await respondDeleteRequest(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('retorna 404 si la solicitud ya fue resuelta', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [rawTask] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const req = { params: { id: 'mock-uuid', requestId: 'req-1' }, body: { action: 'approve' }, user: { userId: 'admin-1', role: 'admin' }, io: null };
+    const res = mockRes();
+    await respondDeleteRequest(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('llama a next en caso de error', async () => {
+    db.query.mockRejectedValueOnce(new Error('DB error'));
+
+    const req = { params: { id: 'mock-uuid', requestId: 'req-1' }, body: { action: 'approve' }, user: { userId: 'admin-1', role: 'admin' }, io: null };
+    const res = mockRes();
+    await respondDeleteRequest(req, res, mockNext);
+
+    expect(mockNext).toHaveBeenCalled();
   });
 });
 

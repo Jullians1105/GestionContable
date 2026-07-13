@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../../context/NotificationContext'
+import { useTasks } from '../../hooks/useTasks'
+import { useToast } from '../../context/ToastContext'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -14,6 +16,9 @@ const TYPE_ICONS = {
   subtask_done:     'task_alt',
   due_soon:         'schedule',
   overdue:          'warning',
+  delete_request:          'report',
+  delete_request_approved: 'delete',
+  delete_request_rejected: 'block',
 }
 
 function timeAgo(str) {
@@ -22,7 +27,10 @@ function timeAgo(str) {
 
 export default function NotificationBell() {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
+  const { resolveDeleteRequest } = useTasks()
+  const { addToast } = useToast()
   const [open, setOpen] = useState(false)
+  const [resolvingId, setResolvingId] = useState(null)
   const navigate = useNavigate()
 
   const recent = notifications.slice(0, 10)
@@ -34,6 +42,25 @@ export default function NotificationBell() {
       const params = new URLSearchParams({ openTask: n.taskId })
       if (n.extra?.commentId) params.set('comment', n.extra.commentId)
       navigate(`/tasks?${params}`)
+    }
+  }
+
+  const handleResolve = async (n, action) => {
+    if (resolvingId) return
+    if (!n.taskId) {
+      addToast('Esta tarea ya no existe (la solicitud ya fue resuelta)', 'error')
+      markAsRead(n.id)
+      return
+    }
+    setResolvingId(n.id)
+    try {
+      await resolveDeleteRequest(n.taskId, n.extra.requestId, action)
+      addToast(action === 'approve' ? 'Tarea eliminada' : 'Solicitud rechazada', action === 'approve' ? 'info' : 'success')
+      markAsRead(n.id)
+    } catch (err) {
+      addToast(err.message || 'Error al resolver la solicitud', 'error')
+    } finally {
+      setResolvingId(null)
     }
   }
 
@@ -75,10 +102,10 @@ export default function NotificationBell() {
                 </div>
               ) : (
                 recent.map((n, i) => (
-                  <button
+                  <div
                     key={n.id ?? `notif-${i}`}
                     onClick={() => handleClick(n)}
-                    className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-left ${!n.read ? 'bg-blue-50 dark:bg-[#1a2040]' : ''}`}
+                    className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-left cursor-pointer ${!n.read ? 'bg-blue-50 dark:bg-[#1a2040]' : ''}`}
                   >
                     <span className="material-symbols-outlined text-base mt-0.5 flex-shrink-0 text-[#004ac6]">
                       {TYPE_ICONS[n.type] || 'notifications'}
@@ -86,6 +113,25 @@ export default function NotificationBell() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-[#191c1e] dark:text-[#e4e6f0] leading-relaxed">{n.message}</p>
                       <p className="text-[10px] text-[#888] mt-0.5">{timeAgo(n.createdAt)}</p>
+                      {n.type === 'delete_request' && (
+                        <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => handleResolve(n, 'approve')}
+                            disabled={resolvingId === n.id}
+                            className="h-7 px-2.5 rounded-lg text-[10px] font-semibold text-white disabled:opacity-40 hover:opacity-90 transition"
+                            style={{ background: '#93000a' }}
+                          >
+                            Aprobar
+                          </button>
+                          <button
+                            onClick={() => handleResolve(n, 'reject')}
+                            disabled={resolvingId === n.id}
+                            className="h-7 px-2.5 rounded-lg text-[10px] font-semibold border border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] disabled:opacity-40 hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+                          >
+                            Rechazar
+                          </button>
+                        </div>
+                      )}
                     </div>
                     {!n.read && (
                       <span className="relative flex-shrink-0 mt-1.5">
@@ -93,7 +139,7 @@ export default function NotificationBell() {
                         <span className="absolute inset-0 rounded-full animate-ping" style={{ background: '#10B98166' }} />
                       </span>
                     )}
-                  </button>
+                  </div>
                 ))
               )}
             </div>

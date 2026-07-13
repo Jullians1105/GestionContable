@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { useNotifications } from '../context/NotificationContext'
+import { useTasks } from '../hooks/useTasks'
+import { useToast } from '../context/ToastContext'
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useNavigate } from 'react-router-dom'
@@ -13,6 +16,9 @@ const TYPE_ICONS = {
   subtask_done:    { icon: 'task_alt',        color: '#8b5cf6' },
   due_soon:        { icon: 'schedule',        color: '#FBBF24' },
   overdue:         { icon: 'warning',         color: '#EF4444' },
+  delete_request:          { icon: 'report', color: '#93000a' },
+  delete_request_approved: { icon: 'delete', color: '#93000a' },
+  delete_request_rejected: { icon: 'block',  color: '#434655' },
 }
 
 function timeAgo(str) {
@@ -21,8 +27,30 @@ function timeAgo(str) {
 
 export default function NotificationsPage() {
   const { notifications, markAsRead, markAllAsRead, deleteNotification, clearAll } = useNotifications()
+  const { resolveDeleteRequest } = useTasks()
+  const { addToast } = useToast()
+  const [resolvingId, setResolvingId] = useState(null)
   const navigate = useNavigate()
   const unread = notifications.filter((n) => !n.read).length
+
+  const handleResolve = async (n, action) => {
+    if (resolvingId) return
+    if (!n.taskId) {
+      addToast('Esta tarea ya no existe (la solicitud ya fue resuelta)', 'error')
+      markAsRead(n.id)
+      return
+    }
+    setResolvingId(n.id)
+    try {
+      await resolveDeleteRequest(n.taskId, n.extra.requestId, action)
+      addToast(action === 'approve' ? 'Tarea eliminada' : 'Solicitud rechazada', action === 'approve' ? 'info' : 'success')
+      markAsRead(n.id)
+    } catch (err) {
+      addToast(err.message || 'Error al resolver la solicitud', 'error')
+    } finally {
+      setResolvingId(null)
+    }
+  }
 
   return (
     <div>
@@ -82,6 +110,25 @@ export default function NotificationsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0]">{n.message}</p>
                   <p className="text-xs text-[#888] mt-0.5">{timeAgo(n.createdAt)}</p>
+                  {n.type === 'delete_request' && (
+                    <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleResolve(n, 'approve')}
+                        disabled={resolvingId === n.id}
+                        className="h-8 px-3 rounded-lg text-xs font-semibold text-white disabled:opacity-40 hover:opacity-90 transition"
+                        style={{ background: '#93000a' }}
+                      >
+                        Aprobar
+                      </button>
+                      <button
+                        onClick={() => handleResolve(n, 'reject')}
+                        disabled={resolvingId === n.id}
+                        className="h-8 px-3 rounded-lg text-xs font-semibold border border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] disabled:opacity-40 hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                   {!n.read && (

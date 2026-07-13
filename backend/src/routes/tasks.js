@@ -3,6 +3,7 @@ const { body, query } = require('express-validator');
 const {
   getTasks, getTask, createTask, updateTask, deleteTask, getTaskHistory, searchTasks,
   getTemplates, updateMyAssigneeStatus,
+  createDeleteRequest, respondDeleteRequest,
   addSubtask, updateSubtask, deleteSubtask,
   addComment, updateComment, deleteComment,
 } = require('../controllers/taskController');
@@ -145,6 +146,41 @@ router.put('/:id',
  *       - bearerAuth: []
  */
 router.delete('/:id', validateUUIDParam('id'), roleMiddleware('admin', 'leader'), deleteTask);
+
+/**
+ * @openapi
+ * /api/tasks/{id}/delete-request:
+ *   post:
+ *     tags: [Tasks]
+ *     summary: Solicitar la eliminación de una tarea (con motivo) — para quien no puede borrarla directamente
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/:id/delete-request',
+  validateUUIDParam('id'),
+  canEdit,
+  body('reason').trim().notEmpty(),
+  validate,
+  createDeleteRequest
+);
+
+/**
+ * @openapi
+ * /api/tasks/{id}/delete-request/{requestId}:
+ *   patch:
+ *     tags: [Tasks]
+ *     summary: Aprobar o rechazar una solicitud de eliminación (admin o líder del grupo de la tarea)
+ *     security:
+ *       - bearerAuth: []
+ */
+router.patch('/:id/delete-request/:requestId',
+  validateUUIDParam('id'),
+  validateUUIDParam('requestId'),
+  roleMiddleware('admin', 'leader'),
+  body('action').isIn(['approve', 'reject']),
+  validate,
+  respondDeleteRequest
+);
 
 /**
  * @openapi

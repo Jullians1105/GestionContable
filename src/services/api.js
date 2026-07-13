@@ -110,6 +110,8 @@ export const api = {
   searchTasks: (q, limit = 20) => request(`/tasks/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   getTaskHistory: (id) => request(`/tasks/${id}/history`),
   updateMyAssigneeStatus: (taskId, status) => request(`/tasks/${taskId}/assignees/me`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  createDeleteRequest: (taskId, reason) => request(`/tasks/${taskId}/delete-request`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  respondDeleteRequest: (taskId, requestId, action) => request(`/tasks/${taskId}/delete-request/${requestId}`, { method: 'PATCH', body: JSON.stringify({ action }) }),
 
   // Subtareas
   addSubtask: (taskId, title) => request(`/tasks/${taskId}/subtasks`, { method: 'POST', body: JSON.stringify({ title }) }),
