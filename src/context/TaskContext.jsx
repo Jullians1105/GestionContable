@@ -228,22 +228,29 @@ export function TaskProvider({ children }) {
     const subtask = (task.subtasks || []).find(s => s.id === subtaskId)
     if (!subtask) return
 
+    const nextCompleted = !subtask.completed
     const optimistic = {
       ...task,
-      subtasks: (task.subtasks || []).map(s => s.id === subtaskId ? { ...s, completed: !s.completed } : s),
+      subtasks: (task.subtasks || []).map(s => s.id === subtaskId ? {
+        ...s,
+        completed: nextCompleted,
+        completedBy: nextCompleted ? (user?.id ?? null) : null,
+        completedByName: nextCompleted ? (user?.name ?? null) : null,
+        completedAt: nextCompleted ? today() : null,
+      } : s),
       updatedAt: today(),
     }
     setTasks(prev => prev.map(t => t.id === taskId ? optimistic : t))
 
     if (useRealBackend) {
-      api.updateSubtask(taskId, subtaskId, { completed: !subtask.completed })
+      api.updateSubtask(taskId, subtaskId, { completed: nextCompleted })
         .then(fullTask => setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t)))
         .catch(() => setTasks(prev => prev.map(t => t.id === taskId ? task : t)))
       return
     }
 
     api.updateTask(taskId, optimistic).catch(() => {})
-    if (!subtask.completed) {
+    if (nextCompleted) {
       notifyLeaders(members, 'subtask_done',
         `Subtarea completada en "${task.title}": ${subtask.title}`, taskId, user?.id)
     }

@@ -83,7 +83,7 @@ function MemberPicker({ allUsers, members, onAdd, onClose }) {
 export default function TeamManager() {
   const { members, allUsers, addMember, updateMember, removeFromTeam } = useTeam()
   const { getTasksByMember } = useTasks()
-  const { useRealBackend } = useAuth()
+  const { useRealBackend, isAdmin } = useAuth()
   const { addToast } = useToast()
   const { onlineUserIds } = useSocket()
   const [modalOpen, setModalOpen] = useState(false)
@@ -169,24 +169,26 @@ export default function TeamManager() {
                     <span className="text-[11px] text-[#434655] dark:text-[#c4c8e8]">Tareas</span>
                   </div>
                 </div>
-                <div className="flex w-full gap-2">
-                  <button
-                    onClick={() => openEdit(m)}
-                    className="flex-1 h-10 border border-[#c3c6d7] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] rounded-lg text-[12px] font-semibold hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition-colors flex items-center justify-center gap-1"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => setDeleteConfirm(m.id)}
-                    title={useRealBackend ? "Remover del equipo" : "Eliminar"}
-                    className="w-10 h-10 border border-[#c3c6d7] dark:border-[#2e3148] text-[#93000a] rounded-lg hover:bg-[#ffdad6] hover:border-[#EF4444] transition-colors flex items-center justify-center"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
-                      {useRealBackend ? "person_remove" : "delete"}
-                    </span>
-                  </button>
-                </div>
+                {isAdmin() && (
+                  <div className="flex w-full gap-2">
+                    <button
+                      onClick={() => openEdit(m)}
+                      className="flex-1 h-10 border border-[#c3c6d7] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] rounded-lg text-[12px] font-semibold hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition-colors flex items-center justify-center gap-1"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => setDeleteConfirm(m.id)}
+                      title={useRealBackend ? "Remover del equipo" : "Eliminar"}
+                      className="w-10 h-10 border border-[#c3c6d7] dark:border-[#2e3148] text-[#93000a] rounded-lg hover:bg-[#ffdad6] hover:border-[#EF4444] transition-colors flex items-center justify-center"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                        {useRealBackend ? "person_remove" : "delete"}
+                      </span>
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}

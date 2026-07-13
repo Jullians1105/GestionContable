@@ -1,14 +1,15 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-07-12 (sesión 13 — progreso individual por asignado en tareas
-multi-persona: tabla `task_assignees`, endpoint `PATCH /api/tasks/:id/assignees/me`, barra de
-progreso en Kanban/detalle)  
+**Última actualización:** 2026-07-13 (sesión 14 — quién completó cada subtarea: columnas
+`completed_by`/`completed_at` en `task_subtasks`, texto "Completado por X" en `SubtaskList`)  
 **Rama activa:** `feat/ajustesResponsiveArregloBugs11/07` (local, sin push aún; sobre `main`
-tras el merge de `feat/funcionesNuevas` vía PR #13). Working tree con cambios de la sesión 13
-**sin commitear todavía** (progreso individual por asignado — ver checklist #51): 9 archivos
-modificados + `backend/migrations/019_task_assignees.sql` sin trackear. Plan: el usuario va a
-commitear, pushear la rama (sin abrir PR todavía — no hace falta para poder seguir trabajándola
-en otra máquina, `git fetch` + `git checkout` alcanza) y continuar desde un MacBook.  
+tras el merge de `feat/funcionesNuevas` vía PR #13). Working tree **sin commitear todavía**,
+acumulando la sesión 13 (progreso individual por asignado — checklist #51) más la sesión 14
+(checklist #52): incluye `backend/migrations/019_task_assignees.sql` y
+`backend/migrations/020_subtask_completed_by.sql` sin trackear, más los archivos modificados de
+ambas sesiones. Plan: el usuario va a commitear, pushear la rama (sin abrir PR todavía — no
+hace falta para poder seguir trabajándola en otra máquina, `git fetch` + `git checkout`
+alcanza) y continuar desde un MacBook.  
 **Ojo si se retoma desde otra máquina:** `CLAUDE.md` (raíz) y toda la carpeta `.claude/`
 (incluida esta memoria de sesión) están en `.gitignore` — **no viajan con git push/pull/clone**.
 Si el trabajo continúa en el Mac, ese Claude Code arranca sin este contexto salvo que alguien
@@ -293,6 +294,7 @@ GET    /api/stats/workload                 → solo admin/leader; carga por pers
 | 017 | Elimina etiquetas de muestra del seed (bug, feature, urgente, documentación) vía DELETE por UUID |
 | 018 | `group_members.is_leader BOOLEAN` — soporte multi-líder por grupo (índice parcial `WHERE is_leader = true`) |
 | 019 | Tabla `task_assignees` (task_id, user_id, status, completed_at) — estado individual por asignado; backfill desde `tasks.assigned_to`/`status` existentes |
+| 020 | Columnas `completed_by`/`completed_at` en `task_subtasks` — quién completó cada subtarea; backfill best-effort de `completed_at` desde `updated_at` |
 
 **Tests:**
 - Cobertura actual: **~81% statements / ~74% functions** (umbral: 70%)
@@ -487,3 +489,7 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 49 | Fix `CalendarPage`: al hacer clic en un día dentro del rango de vigencia (`recurrence.start_date`→`end_date`) de un template recurrente, el panel derecho ahora muestra el template como si fuera una tarea de ese día (antes solo aparecía en el día exacto proyectado `approx_day`, y el resto de días del rango sombreado mostraban "Sin tareas este día"). Verificado end-to-end con Playwright headless contra los contenedores `_dev` (usuario admin temporal creado y borrado en la BD para el test, no se usaron credenciales reales) | ✅ Implementado 2026-07-11 |
 | 50 | Corrección `docs/DEPLOY.md` §6: el paso de migración ya no depende de que la persona que despliega "revise si hay migraciones nuevas" — se descubrió que `docker-compose.yml` ya fuerza el orden correcto vía `backend: depends_on: migrate: condition: service_completed_successfully` (el `migrate` de ese archivo no tiene `profiles:`, a diferencia de lo que sugería la doc vieja con `--profile migrate`). Guía simplificada a 3 comandos (`git pull` → `build` → `up -d`) + backup previo recomendado con `./scripts/backup.sh` | ✅ Resuelto 2026-07-11 |
 | 51 | Progreso individual por asignado en tareas multi-persona: migración 019 (`task_assignees`, aditiva/idempotente, backfill desde `tasks.assigned_to`/`status`), fix del bug preexistente que descartaba todos los asignados salvo el primero al guardar, endpoint `PATCH /api/tasks/:id/assignees/me` (cada asignado marca su propio estado), `tasks.status` recalculado como agregado (completed solo si todos completaron), barra de progreso "X/Y completaron" en `TaskCard`/`TaskDetailModal` (mismo patrón visual que la barra de subtareas). Verificado end-to-end contra la API real de `taskflow_backend_dev` con usuarios temporales (creados y borrados en la BD para la prueba) | ✅ Implementado 2026-07-12 |
+| 52 | Quién completó cada subtarea: migración 020 (`task_subtasks.completed_by`/`completed_at`, aditiva), `updateSubtask` setea `completed_by` desde el usuario autenticado al marcar/desmarcar, texto "Completado por X" bajo cada subtarea tildada en `SubtaskList`. Alcance acotado a propósito (elegido por el usuario entre dos opciones): sin asignación previa de subtareas a personas específicas, cualquier responsable de la tarea puede tildar cualquier subtarea, solo se traza quién lo hizo. Verificado en la UI real (Playwright + usuario temporal) contra `taskflow_backend_dev`/`taskflow_frontend_dev` | ✅ Implementado 2026-07-13 |
+| 53 | Fix `TeamManager.jsx` (página `/team` "Equipo"): los botones "Editar" y "Remover del equipo" ahora solo se muestran si `isAdmin()` — antes se mostraban a cualquier rol autenticado (leader/member/viewer), aunque el backend (`PUT`/`DELETE /api/employees/:id`) ya exigía admin. "Agregar Miembro" queda fuera de este cambio (no se pidió). Verificado en la UI con dos usuarios temporales (admin ve 17/17 botones, member ve 0) | ✅ Implementado 2026-07-13 |
+| 54 | Filtro "Creadas por mí" en Mis Tareas (`TaskFilters.jsx`/`TaskList.jsx`): nuevo campo `createdBy` (= `tasks.user_id`) expuesto por `normalizeTask` (antes solo se exponía `createdByName`, sin el id, insuficiente para filtrar). Checkbox visible solo para admin/leader (mismo gate que el resto de `TaskFilters`, `canSeeAll`), ya que member/viewer no pueden crear tareas y de por sí solo ven las suyas asignadas. Sin migración (el dato ya existía en `tasks.user_id`). Verificado en la UI real: con el filtro activo pasó de 9 a 1 tarea (la creada por el usuario de prueba) | ✅ Implementado 2026-07-13 |
+| 55 | Botón "Nueva Tarea" siempre accesible desde `Header.jsx` (icono "+" azul, con label en `sm:` y superior), independiente de la barra lateral y disponible en cualquier página, no solo en `/tasks`. Antes la única forma de crear una tarea fuera de `/tasks` era el botón dentro de `Sidebar.jsx`, que en mobile exige primero abrir el drawer (hamburguesa) — ahora no hace falta. De paso se corrigió un overflow horizontal real en el header a 375px/360px (el avatar del usuario quedaba fuera de la pantalla, invisible/no clickeable): al formulario de búsqueda le faltaba `min-w-0`, por lo que no podía encoger más allá de su ancho mínimo de contenido y empujaba al resto de los íconos fuera del viewport (no se detectaba por `scrollWidth` porque es un elemento `fixed`, solo visible comparando screenshots). Verificado con Playwright en 4 anchos (360/375/768/1440px, sin overflow) y flujo completo de creación de tarea desde el Dashboard sin tocar el sidebar | ✅ Implementado 2026-07-13 |

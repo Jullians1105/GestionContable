@@ -634,6 +634,7 @@ describe('updateSubtask', () => {
     const req = {
       params: { id: 'mock-uuid', subtaskId: 'sub-1' },
       body: { completed: true },
+      user: { userId: 'user-1' },
       io: null,
     };
     const res = mockRes();

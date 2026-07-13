@@ -147,7 +147,12 @@ const getTasks = async (req, res, next) => {
         u.name AS assigned_to_name,
         creator.name AS created_by_name,
         g.name AS group_name,
-        (SELECT json_agg(s ORDER BY s.created_at) FROM task_subtasks s WHERE s.task_id = t.id) AS subtasks,
+        (SELECT json_agg(json_build_object(
+           'id', s.id, 'title', s.title, 'completed', s.completed,
+           'completed_by', s.completed_by, 'completed_by_name', su.name, 'completed_at', s.completed_at,
+           'created_at', s.created_at
+         ) ORDER BY s.created_at)
+         FROM task_subtasks s LEFT JOIN users su ON su.id = s.completed_by WHERE s.task_id = t.id) AS subtasks,
         (SELECT json_agg(c ORDER BY c.created_at) FROM task_comments c WHERE c.task_id = t.id) AS comments,
         (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids,
         (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link,
@@ -185,7 +190,12 @@ const FULL_TASK_QUERY = `
     u.name AS assigned_to_name,
     creator.name AS created_by_name,
     g.name AS group_name,
-    (SELECT json_agg(s ORDER BY s.created_at) FROM task_subtasks s WHERE s.task_id = t.id) AS subtasks,
+    (SELECT json_agg(json_build_object(
+       'id', s.id, 'title', s.title, 'completed', s.completed,
+       'completed_by', s.completed_by, 'completed_by_name', su.name, 'completed_at', s.completed_at,
+       'created_at', s.created_at
+     ) ORDER BY s.created_at)
+     FROM task_subtasks s LEFT JOIN users su ON su.id = s.completed_by WHERE s.task_id = t.id) AS subtasks,
     (SELECT json_agg(c ORDER BY c.created_at) FROM task_comments c WHERE c.task_id = t.id) AS comments,
     (SELECT json_agg(tg.id) FROM task_tag_assignment ta JOIN task_tags tg ON tg.id = ta.tag_id WHERE ta.task_id = t.id) AS tag_ids,
     (SELECT EXISTS(SELECT 1 FROM task_fondo_links fl WHERE fl.task_id = t.id)) AS has_fondo_link,
@@ -502,6 +512,9 @@ function normalizeTask(t) {
       id: s.id,
       title: s.title,
       completed: s.completed,
+      completedBy: s.completed_by || null,
+      completedByName: s.completed_by_name || null,
+      completedAt: s.completed_at || null,
       createdAt: s.created_at,
     })),
     comments: (t.comments || []).map(c => ({
@@ -517,6 +530,7 @@ function normalizeTask(t) {
     isRecurring: t.is_recurring ?? false,
     recurrence: t.recurrence ?? null,
     templateId: t.template_id ?? null,
+    createdBy: t.user_id || null,
     createdByName: t.created_by_name || null,
     createdAt: t.created_at,
     updatedAt: t.updated_at,
@@ -555,7 +569,11 @@ const updateSubtask = async (req, res, next) => {
     const params = [];
     let i = 1;
     if (title !== undefined) { fields.push(`title = $${i++}`); params.push(title.trim()); }
-    if (completed !== undefined) { fields.push(`completed = $${i++}`); params.push(completed); }
+    if (completed !== undefined) {
+      fields.push(`completed = $${i++}`); params.push(completed);
+      fields.push(`completed_by = $${i++}`); params.push(completed ? req.user.userId : null);
+      fields.push(`completed_at = ${completed ? 'NOW()' : 'NULL'}`);
+    }
     if (!fields.length) return res.status(400).json({ error: 'Nada que actualizar' });
 
     fields.push(`updated_at = NOW()`);
