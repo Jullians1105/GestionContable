@@ -17,9 +17,10 @@ const TASK_PERMS = [
 ]
 
 const FONDO_PERMS = [
-  { key: 'canEditar',      icon: 'edit',            label: 'Editar macroprocesos' },
-  { key: 'canGestionar',   icon: 'corporate_fare',  label: 'Gestionar empresas' },
-  { key: 'canEditarPagos', icon: 'payments',        label: 'Editar pagos' },
+  { key: 'canEditar',          icon: 'edit',            label: 'Editar macroprocesos' },
+  { key: 'canGestionar',       icon: 'corporate_fare',  label: 'Gestionar empresas' },
+  { key: 'canEditarPagos',     icon: 'payments',        label: 'Editar pagos' },
+  { key: 'canAutorizarPagos',  icon: 'verified_user',   label: 'Autorizar envío de pagos' },
 ]
 
 function getFondoPerm(user, key) {

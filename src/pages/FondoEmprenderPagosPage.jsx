@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, Fragment } from 'react'
 import StatsCard from '../components/StatsCard'
 import { api } from '../services/api'
+import { useAuth } from '../context/AuthContext'
 
 // ─── month utilities ──────────────────────────────────────────────────────────
 
@@ -11,29 +12,32 @@ function fromYM(ym) { return { anio: Math.floor(ym / 100), mes: ym % 100, ym } }
 function nextYM(ym) {
   return ym % 100 === 12 ? (Math.floor(ym / 100) + 1) * 100 + 1 : ym + 1
 }
-function buildRange(startYM, endYM) {
-  const out = []
-  for (let ym = startYM; ym <= endYM; ym = nextYM(ym)) out.push(fromYM(ym))
-  return out
+function prevYM(ym) {
+  return ym % 100 === 1 ? (Math.floor(ym / 100) - 1) * 100 + 12 : ym - 1
 }
+// Índice lineal de mes (para poder sumar/restar/dividir sin líos de año) — mes es 1-12
+function ymToIndex(ym) { const { anio, mes } = fromYM(ym); return anio * 12 + mes }
+function indexToYM(idx) { const anio = Math.floor((idx - 1) / 12); const mes = idx - anio * 12; return anio * 100 + mes }
 
-const TODAY_YM          = (() => { const d = new Date(); return d.getFullYear() * 100 + d.getMonth() + 1 })()
-const START_YM          = 2026 * 100 + 3   // Marzo 2026 — inicio del programa
-const HISTORIAL_START_YM = 2026 * 100 + 1  // Enero 2026 — vista historial completo
+const START_YM       = 2026 * 100 + 2   // Febrero 2026 — inicio del programa (mesesDebidos y grilla)
+const START_IDX      = ymToIndex(START_YM)
+const VENTANA_MESES  = 5                // Cuántos meses se ven por bloque
 
 // ─── calcular meses debidos (frontend) ───────────────────────────────────────
-// Genera meses desde START_YM hasta hoy. Excluye los aprobados.
+// Genera meses desde START_YM hasta el mes habilitado (no el mes calendario
+// actual — los pagos son sobre mes vencido, y el límite lo controlan las
+// jefas manualmente). Excluye los aprobados.
 // Meses sin registro en BD → { pagoId: null, estado: 'pendiente' } virtual.
 
-function calcularMesesDebidos(pagos) {
+function calcularMesesDebidos(pagos, mesHabilitadoYM) {
   const out = []
-  for (let ym = START_YM; ym <= TODAY_YM; ym = nextYM(ym)) {
+  for (let ym = START_YM; ym <= mesHabilitadoYM; ym = nextYM(ym)) {
     const { anio, mes } = fromYM(ym)
     const pago = pagos.find(p => p.anio === anio && p.mes === mes) ?? null
     if (pago?.estado === 'aprobado') continue
     out.push(pago
-      ? { anio, mes, estado: pago.estado, pagoId: pago.id, nota: pago.nota ?? null }
-      : { anio, mes, estado: 'pendiente', pagoId: null, nota: null }
+      ? { anio, mes, estado: pago.estado, pagoId: pago.id, nota: pago.nota ?? null, autorizado: pago.autorizado ?? false }
+      : { anio, mes, estado: 'pendiente', pagoId: null, nota: null, autorizado: false }
     )
   }
   return out
@@ -47,15 +51,15 @@ const TD_STYLE = {
   padding: '8px 6px',
   verticalAlign: 'middle',
   textAlign: 'center',
-  height: 58,
+  height: 64,
 }
 
 // className por estado (fondo de color identifica el estado)
 const TD_EMPTY_CLS = 'border border-[#E5E7EB] bg-[#F9FAFB]'
 const TD_PEND_CLS  = 'border border-[#E5E7EB] bg-[#F9FAFB]'
-const TD_ENV_CLS   = 'border border-[#93C5FD] bg-[#DBEAFE]'
+const TD_BLOQ_CLS  = 'border border-[#D1D5DB] bg-[#E5E7EB]'
+const TD_ENV_CLS   = 'border border-[#93C5FD]'
 const TD_PAG_CLS   = 'border border-[#86EFAC] bg-[#DCFCE7]'
-const TD_ENV_RES_CLS = 'border border-[#93C5FD] bg-[#F0F9FF]'
 
 // Wrappers flex para usar DENTRO de cada td
 const ROW = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }
@@ -79,17 +83,126 @@ const BTN = {
   rechazado: { background: '#FEE2E2', color: '#991B1B' },
 }
 
-function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onAction }) {
+function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onAction, canAutorizar }) {
   const [hovRechazado, setHovRechazado] = useState(false)
   const [hovEditar,    setHovEditar]    = useState(false)
   const [hovNota,      setHovNota]      = useState(false)
-  const [notaInput,    setNotaInput]    = useState({ open: false, draft: '' })
+  const [hovBloqueado, setHovBloqueado] = useState(false)
+  // Separado de hovBloqueado a propósito: aunque el chip "Bloqueado" y el
+  // ícono de esquina "Bloquear" nunca se muestran a la vez (dependen de
+  // autorizado), compartir el mismo booleano hacía que al hacer clic en
+  // "Autorizar" el ícono de esquina apareciera ya "en hover" — el mouse
+  // nunca dispara mouseleave porque el elemento bajo el cursor desaparece
+  // al re-renderizar, así que el estado quedaba pegado en true.
+  const [hovBloquear,  setHovBloquear]  = useState(false)
+  const [hovEnviado,      setHovEnviado]      = useState(false)
+  const [hovEnvPagado,    setHovEnvPagado]    = useState(false)
+  const [hovEnvRechazado, setHovEnvRechazado] = useState(false)
+  // Editor de nota genérico — disponible en cualquier estado. Un solo campo
+  // nota vigente por fila, sin historial — mismo patrón que Seguimiento Mensual.
+  const [notaEditor,   setNotaEditor]   = useState({ open: false, draft: '' })
 
   const debito    = mesesDebidos.find(md => md.anio === anio && md.mes === mes) ?? null
   const histEntry = historialCompleto.find(h => h.anio === anio && h.mes === mes) ?? null
 
   function act(action, extra = {}) {
     onAction(action, { empresaId: empresa.id, anio, mes, pagoId: debito?.pagoId ?? histEntry?.id ?? null, ...extra })
+  }
+
+  // Botón + editor de nota flotante — siempre visible (ícono relleno si ya
+  // hay nota, outline si está vacía), clic abre el editor pre-llenado.
+  const NOTA_THEMES = {
+    red:   { icon: '#991B1B', label: '#991B1B', soft: 'rgba(239,68,68,0.12)',   hover: 'rgba(239,68,68,0.20)',   border: '#FEE2E2', heading: '#EF4444' },
+    gray:  { icon: '#4B5563', label: '#4B5563', soft: 'rgba(107,114,128,0.12)', hover: 'rgba(107,114,128,0.20)', border: '#E5E7EB', heading: '#6B7280' },
+    blue:  { icon: '#1E40AF', label: '#1E40AF', soft: 'rgba(59,130,246,0.12)',  hover: 'rgba(59,130,246,0.20)',  border: '#DBEAFE', heading: '#3B82F6' },
+    green: { icon: '#166534', label: '#166534', soft: 'rgba(22,163,74,0.12)',   hover: 'rgba(22,163,74,0.20)',   border: '#BBF7D0', heading: '#16a34a' },
+  }
+  function renderNotaButton(theme, notaValue) {
+    const c = NOTA_THEMES[theme]
+    const hasNota = !!notaValue?.trim()
+    const editing = notaEditor.open
+
+    return (
+      <>
+        <button
+          onClick={(e) => { e.stopPropagation(); setNotaEditor({ open: true, draft: notaValue ?? '' }) }}
+          onMouseEnter={(e) => { e.stopPropagation(); setHovNota(true) }}
+          onMouseLeave={() => setHovNota(false)}
+          title={hasNota ? 'Ver / editar nota' : 'Agregar nota'}
+          style={{
+            position: 'absolute', bottom: 6, right: 6, height: 22,
+            width: hovNota && !editing ? 70 : 22,
+            background: hasNota ? (hovNota ? c.hover : c.soft) : 'rgba(107,114,128,0.08)',
+            border: 'none', borderRadius: 11, overflow: 'hidden',
+            transition: 'width 220ms ease-out, background 150ms ease-out',
+            display: 'flex', alignItems: 'center', paddingLeft: 4, gap: 2,
+            cursor: 'pointer', whiteSpace: 'nowrap', zIndex: 2,
+          }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 13, color: hasNota ? c.icon : '#9CA3AF', lineHeight: 1, flexShrink: 0 }}>
+            {hasNota ? 'sticky_note_2' : 'note_add'}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: hasNota ? c.label : '#6B7280', opacity: hovNota && !editing ? 1 : 0, transition: 'opacity 140ms ease-out 60ms' }}>
+            {hasNota ? 'Nota' : 'Agregar'}
+          </span>
+        </button>
+
+        {/* Preview al pasar el mouse — solo si hay nota y no se está editando */}
+        {hasNota && !editing && (
+          <div style={{
+            position: 'absolute', bottom: 34, right: 6, width: 190,
+            background: 'white', borderRadius: 8,
+            boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+            border: `1px solid ${c.border}`, padding: '10px 12px', zIndex: 200,
+            opacity: hovNota ? 1 : 0, pointerEvents: 'none',
+            transform: hovNota ? 'translateY(0)' : 'translateY(6px)',
+            transition: 'opacity 160ms ease-out, transform 160ms ease-out',
+          }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: c.heading, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Nota</div>
+            <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, wordBreak: 'break-word' }}>{notaValue}</div>
+          </div>
+        )}
+
+        {/* Editor flotante — mismo patrón visual que el input de motivo de rechazo */}
+        {editing && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute', bottom: 34, right: 6, width: 190,
+              background: 'white', borderRadius: 8,
+              boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+              border: `1px solid ${c.border}`, padding: 8, zIndex: 300,
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}
+          >
+            <input
+              autoFocus
+              value={notaEditor.draft}
+              onChange={e => setNotaEditor(s => ({ ...s, draft: e.target.value }))}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { act('nota', { nota: notaEditor.draft }); setNotaEditor({ open: false, draft: '' }) }
+                if (e.key === 'Escape') setNotaEditor({ open: false, draft: '' })
+              }}
+              placeholder="Escribir nota..."
+              style={{
+                width: '100%', padding: '4px 8px', fontSize: 11, borderRadius: 6,
+                border: `1px solid ${c.border}`, outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 4 }}>
+              <button
+                onClick={() => { act('nota', { nota: notaEditor.draft }); setNotaEditor({ open: false, draft: '' }) }}
+                style={{ flex: 1, padding: '4px 0', borderRadius: 6, border: 'none', background: c.heading, color: '#fff', fontWeight: 600, fontSize: 11, cursor: 'pointer' }}
+              >Guardar</button>
+              <button
+                onClick={() => setNotaEditor({ open: false, draft: '' })}
+                style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: '#F3F4F6', color: '#444', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}
+              >×</button>
+            </div>
+          </div>
+        )}
+      </>
+    )
   }
 
   // ── Fuera de mesesDebidos ────────────────────────────────────────────────────
@@ -131,28 +244,104 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
               transition: 'opacity 140ms ease-out 60ms',
             }}>Editar</span>
           </div>
+          {renderNotaButton('green', histEntry?.nota)}
         </td>
       )
     }
     return <td colSpan={2} className={TD_EMPTY_CLS} style={{ ...TD_STYLE, color: '#c8c5bc' }}>—</td>
   }
 
-  const { estado, nota } = debito
+  const { estado, nota, autorizado } = debito
 
   // ── Pendiente ────────────────────────────────────────────────────────────────
   if (estado === 'pendiente') {
     return (
-      <td colSpan={2} className={TD_PEND_CLS} style={TD_STYLE}>
-        <div style={ROW}>
-          <span style={{ ...BTN.base, ...BTN.pendiente }}>Pendiente</span>
-          <button
-            className="hover:opacity-80"
-            onClick={() => act('enviado')}
-            style={{ ...BTN.base, ...BTN.pill, ...BTN.enviado }}
-          >
-            Enviado →
-          </button>
+      <td colSpan={2} className={autorizado ? TD_PEND_CLS : TD_BLOQ_CLS} style={{ ...TD_STYLE, position: 'relative' }}>
+        {/* padding horizontal reserva la franja de las esquinas (nota abajo,
+            bloquear arriba) para que el contenido centrado nunca quede debajo
+            de esos íconos, aunque el texto/pill crezca */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 46, padding: '0 28px' }}>
+          {autorizado ? (
+            <div style={ROW}>
+              <span style={{ ...BTN.base, ...BTN.pendiente }}>Pendiente</span>
+              <button
+                className="hover:opacity-80"
+                onClick={() => act('enviado')}
+                style={{ ...BTN.base, ...BTN.pill, ...BTN.enviado }}
+              >
+                Enviado →
+              </button>
+            </div>
+          ) : canAutorizar ? (
+            // Chip único clickeable: pill con fondo propio (contrasta contra
+            // TD_BLOQ_CLS que ya es gris) para que el ícono tenga espacio real
+            // y no se vea recortado, y para comunicar affordance de clic —
+            // mismo mecanismo de fondo+label que cambia en hover que usan
+            // Rechazado ("Pendiente reenvío") y Enviado (split).
+            <button
+              onClick={() => { act('autorizar', { autorizado: true }); setHovBloqueado(false) }}
+              onMouseEnter={() => setHovBloqueado(true)}
+              onMouseLeave={() => setHovBloqueado(false)}
+              title="Clic para autorizar envío"
+              style={{
+                ...BTN.base,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                borderRadius: 9999, padding: '5px 12px', cursor: 'pointer',
+                border: `1px solid ${hovBloqueado ? '#86EFAC' : '#D1D5DB'}`,
+                background: hovBloqueado ? '#DCFCE7' : '#FFFFFF',
+                color: hovBloqueado ? '#166534' : '#4B5563', fontWeight: 600, fontSize: 12,
+                transition: 'background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out',
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14, lineHeight: 1, flexShrink: 0 }}>
+                {hovBloqueado ? 'lock_open' : 'lock'}
+              </span>
+              {hovBloqueado ? 'Autorizar' : 'Bloqueado'}
+            </button>
+          ) : (
+            <span style={{
+              ...BTN.base,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              borderRadius: 9999, padding: '5px 12px',
+              border: '1px solid #D1D5DB', background: '#FFFFFF',
+              color: '#4B5563', fontWeight: 600, fontSize: 12,
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14, lineHeight: 1, flexShrink: 0 }}>lock</span>
+              Bloqueado
+            </span>
+          )}
         </div>
+
+        {/* Toggle de bloqueo — esquina superior derecha, fuera del flujo,
+            mismo patrón de "editar" en Pagado: ícono fijo que expande con
+            label al hacer hover, nunca empuja la altura de la celda.
+            Estado propio (hovBloquear) — ver comentario junto a su
+            declaración sobre por qué no comparte hovBloqueado. */}
+        {canAutorizar && autorizado && (
+          <div
+            onClick={() => { act('autorizar', { autorizado: false }); setHovBloquear(false) }}
+            onMouseEnter={() => setHovBloquear(true)}
+            onMouseLeave={() => setHovBloquear(false)}
+            title="Bloquear envío hasta nueva orden"
+            style={{
+              position: 'absolute', top: 6, right: 6, height: 22,
+              width: hovBloquear ? 76 : 22,
+              background: hovBloquear ? '#FED7AA' : 'rgba(107,114,128,0.08)',
+              border: 'none', borderRadius: 11, overflow: 'hidden',
+              transition: 'width 220ms ease-out, background 150ms ease-out',
+              display: 'flex', alignItems: 'center', paddingLeft: 4, gap: 2,
+              cursor: 'pointer', whiteSpace: 'nowrap', zIndex: 2,
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 13, color: hovBloquear ? '#B45309' : '#9CA3AF', lineHeight: 1, flexShrink: 0 }}>
+              {hovBloquear ? 'lock' : 'lock_open'}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#B45309', opacity: hovBloquear ? 1 : 0, transition: 'opacity 140ms ease-out 60ms' }}>
+              Bloquear
+            </span>
+          </div>
+        )}
+        {renderNotaButton('gray', nota)}
       </td>
     )
   }
@@ -160,56 +349,71 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   // ── Enviado ──────────────────────────────────────────────────────────────────
   if (estado === 'enviado') {
     return (
-      <>
-        <td className={TD_ENV_CLS} style={TD_STYLE}>
-          <span style={{ ...BTN.base, ...BTN.enviadoFix }}>Enviado</span>
-        </td>
-        <td className={TD_ENV_RES_CLS} style={{ ...TD_STYLE, padding: '6px 12px' }}>
-          {notaInput.open ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
-              <input
-                autoFocus
-                value={notaInput.draft}
-                onChange={e => setNotaInput(s => ({ ...s, draft: e.target.value }))}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { act('rechazado', { nota: notaInput.draft }); setNotaInput({ open: false, draft: '' }) }
-                  if (e.key === 'Escape') setNotaInput({ open: false, draft: '' })
-                }}
-                placeholder="Motivo del rechazo..."
-                style={{
-                  width: '100%', padding: '4px 8px', fontSize: 11, borderRadius: 6,
-                  border: '1px solid #93C5FD', outline: 'none', boxSizing: 'border-box',
-                  background: 'rgba(255,255,255,0.8)',
-                }}
-              />
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button
-                  className="hover:opacity-80"
-                  onClick={() => { act('rechazado', { nota: notaInput.draft }); setNotaInput({ open: false, draft: '' }) }}
-                  style={{ flex: 1, padding: '4px 0', borderRadius: 6, border: 'none', background: '#EF4444', color: '#fff', fontWeight: 600, fontSize: 11, cursor: 'pointer', transition: 'all 150ms ease-out' }}
-                >OK</button>
-                <button
-                  onClick={() => setNotaInput({ open: false, draft: '' })}
-                  style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.6)', color: '#444441', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}
-                >×</button>
-              </div>
+      <td
+        colSpan={2}
+        className={TD_ENV_CLS}
+        style={{
+          ...TD_STYLE,
+          position: 'relative',
+          background: hovEnviado ? '#BFDBFE' : '#DBEAFE',
+          transition: 'background-color 200ms ease-out',
+        }}
+        onMouseEnter={() => setHovEnviado(true)}
+        onMouseLeave={() => { setHovEnviado(false); setHovEnvPagado(false); setHovEnvRechazado(false) }}
+      >
+        {hovEnviado ? (
+          // Ocupa la casilla completa de borde a borde (inset:0 respecto al
+          // td relative — el "padding box" incluye el padding del td, así
+          // que cubre el mismo espacio visual que ya cubre el fondo de
+          // Rechazado standalone, sin dejar ver el azul del fondo detrás).
+          <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+            <div
+              onClick={() => act('aprobado')}
+              onMouseEnter={() => setHovEnvPagado(true)}
+              onMouseLeave={() => setHovEnvPagado(false)}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                // paddingBottom reserva la franja del ícono de nota (bottom-
+                // right) — el fondo sigue llegando hasta el borde (cubre
+                // todo el padding-box), solo el texto se corre hacia arriba.
+                paddingBottom: 22,
+                cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                color: '#166534',
+                // Reposo: gris neutro (misma idea "aún por elegir" que otros
+                // grises del archivo, ej. el botón cancelar del editor de nota).
+                // Hover: el mismo bg que ya usa la celda Pagado standalone
+                // (TD_PAG_CLS) — previsualiza literalmente el resultado.
+                background: hovEnvPagado ? '#DCFCE7' : '#F3F4F6',
+                transition: 'background-color 200ms ease-out',
+              }}
+            >
+              Pagado
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-              <button
-                className="hover:opacity-80"
-                onClick={() => act('aprobado')}
-                style={{ ...BTN.base, ...BTN.pill, ...BTN.pagado, width: 90, padding: '4px 14px' }}
-              >Pagado</button>
-              <button
-                className="hover:opacity-80"
-                onClick={() => setNotaInput({ open: true, draft: '' })}
-                style={{ ...BTN.base, ...BTN.pill, ...BTN.rechazado, width: 90, padding: '4px 14px' }}
-              >Rechazado</button>
+            <div
+              onClick={() => act('rechazado')}
+              onMouseEnter={() => setHovEnvRechazado(true)}
+              onMouseLeave={() => setHovEnvRechazado(false)}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                paddingBottom: 22,
+                cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                color: '#B91C1C',
+                // Mismo criterio: reposo neutro, hover = bg real de la celda
+                // Rechazado standalone (en reposo, sin su propio hover).
+                background: hovEnvRechazado ? '#FEE2E2' : '#F3F4F6',
+                transition: 'background-color 200ms ease-out',
+              }}
+            >
+              Rechazado
             </div>
-          )}
-        </td>
-      </>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 46 }}>
+            <span style={{ ...BTN.base, ...BTN.enviadoFix }}>Enviado</span>
+          </div>
+        )}
+        {renderNotaButton('blue', nota)}
+      </td>
     )
   }
 
@@ -230,8 +434,10 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
         onClick={() => act('pendiente')}
         title="Clic para reenviar"
       >
-        {/* Texto centrado — separado de la nota para no desplazarse */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 46 }}>
+        {/* Texto centrado — separado de la nota para no desplazarse. Padding
+            horizontal reserva la franja del ícono de nota (bottom-right) para
+            que "Pendiente reenvío" nunca quede debajo al hacer hover. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 46, padding: '0 28px' }}>
           <span style={{
             ...BTN.base,
             fontWeight: 600,
@@ -243,58 +449,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
           </span>
         </div>
 
-        {/* Pill "Nota" en esquina inferior derecha — solo si hay nota */}
-        {nota?.trim() && (
-          <>
-            <div
-              style={{
-                position: 'absolute',
-                bottom: 6,
-                right: 6,
-                height: 22,
-                width: hovNota ? 60 : 22,
-                background: hovNota ? 'rgba(239,68,68,0.20)' : 'rgba(239,68,68,0.12)',
-                borderRadius: 11,
-                overflow: 'hidden',
-                transition: 'width 220ms ease-out, background 150ms ease-out',
-                display: 'flex',
-                alignItems: 'center',
-                paddingLeft: 4,
-                gap: 2,
-                cursor: 'default',
-                whiteSpace: 'nowrap',
-                zIndex: 1,
-              }}
-              onMouseEnter={(e) => { e.stopPropagation(); setHovNota(true) }}
-              onMouseLeave={() => setHovNota(false)}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#991B1B', lineHeight: 1, flexShrink: 0 }}>sticky_note_2</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: '#991B1B', opacity: hovNota ? 1 : 0, transition: 'opacity 140ms ease-out 60ms' }}>Nota</span>
-            </div>
-
-            {/* Popover flotante con el contenido — no afecta el tamaño de la celda */}
-            <div style={{
-              position: 'absolute',
-              bottom: 34,
-              right: 6,
-              width: 190,
-              background: 'white',
-              borderRadius: 8,
-              boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
-              border: '1px solid #FEE2E2',
-              padding: '10px 12px',
-              zIndex: 200,
-              opacity: hovNota ? 1 : 0,
-              pointerEvents: 'none',
-              transform: hovNota ? 'translateY(0)' : 'translateY(6px)',
-              transition: 'opacity 160ms ease-out, transform 160ms ease-out',
-            }}>
-              <div style={{ fontSize: 9, fontWeight: 700, color: '#EF4444', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Nota</div>
-              <div style={{ fontSize: 12, color: '#7F1D1D', lineHeight: 1.5, wordBreak: 'break-word' }}>{nota}</div>
-            </div>
-          </>
-        )}
-
+        {renderNotaButton('red', nota)}
       </td>
     )
   }
@@ -305,37 +460,57 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function FondoEmprenderPagosPage() {
+  const { user } = useAuth()
+  const canAutorizar = user?.role === 'admin' || user?.permissions?.modulos?.fondoEmprender?.canAutorizarPagos === true
 
   // ── server state ─────────────────────────────────────────────────────────────
   const [rows,    setRows]    = useState([])
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
+  const [mesHabilitadoYM, setMesHabilitadoYM] = useState(null)
 
   // ── ui state ─────────────────────────────────────────────────────────────────
   const [activeTab,     setActiveTab]     = useState('todas')
   const [search,        setSearch]        = useState('')
-  const [showHistorial, setShowHistorial] = useState(false)
+  // Cuántos meses hacia atrás está el borde derecho de la ventana respecto al
+  // mes habilitado — 0 significa "la ventana termina en el mes habilitado".
+  const [monthsBack,    setMonthsBack]    = useState(0)
+
+  // Al cargar / cambiar el mes habilitado (ej. tras "Habilitar mes"), volver
+  // a mostrar la ventana terminando en el mes habilitado actual.
+  useEffect(() => {
+    if (mesHabilitadoYM != null) setMonthsBack(0)
+  }, [mesHabilitadoYM])
+
+  // Mes seleccionado para las tarjetas de resumen (Pagadas/Esperando/En mora)
+  // — independiente de la ventana de la grilla (monthsBack). Mismo patrón:
+  // offset hacia atrás desde el mes habilitado, 0 = mes habilitado actual.
+  const [statsMonthsBack, setStatsMonthsBack] = useState(0)
+  useEffect(() => {
+    if (mesHabilitadoYM != null) setStatsMonthsBack(0)
+  }, [mesHabilitadoYM])
 
   // ── data loading ──────────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-      const lista = await api.getFondoEmpresas()
-      const results = await Promise.all(
-        lista.map(e =>
-          api.getFondoPagos(e.id)
-            .then(res => {
-              const pagos = res.pagos ?? []
-              return {
-                empresa:           e,
-                historialCompleto: pagos,
-                mesesDebidos:      calcularMesesDebidos(pagos),
-              }
-            })
-            .catch(() => ({ empresa: e, historialCompleto: [], mesesDebidos: [] }))
-        )
-      )
+      const [lista, mesActual, pagosPorEmpresa] = await Promise.all([
+        api.getFondoEmpresas(),
+        api.getFondoPagosMesActual(),
+        api.getFondoPagosTodasEmpresas(),
+      ])
+      const habilitadoYM = toYM(mesActual.anio, mesActual.mes)
+      setMesHabilitadoYM(habilitadoYM)
+      const pagosPorEmpresaId = new Map(pagosPorEmpresa.map(p => [p.empresaId, p.pagos]))
+      const results = lista.map(e => {
+        const pagos = pagosPorEmpresaId.get(e.id) ?? []
+        return {
+          empresa:           e,
+          historialCompleto: pagos,
+          mesesDebidos:      calcularMesesDebidos(pagos, habilitadoYM),
+        }
+      })
       setRows(results)
     } catch (err) {
       setError(err.message || 'Error al cargar historial de pagos')
@@ -353,14 +528,43 @@ export default function FondoEmprenderPagosPage() {
       const pagos = res.pagos ?? []
       setRows(prev => prev.map(r =>
         r.empresa.id === empresaId
-          ? { ...r, historialCompleto: pagos, mesesDebidos: calcularMesesDebidos(pagos) }
+          ? { ...r, historialCompleto: pagos, mesesDebidos: calcularMesesDebidos(pagos, mesHabilitadoYM) }
           : r
       ))
     } catch { /* silent — optimistic update stays */ }
-  }, [])
+  }, [mesHabilitadoYM])
+
+  // ── habilitar / deshacer mes (solo jefas) ────────────────────────────────────
+  const [avanzandoMes, setAvanzandoMes] = useState(false)
+  const [confirmMes, setConfirmMes] = useState(null) // { tipo: 'habilitar' | 'deshacer', label }
+
+  function requestAvanzarMes() {
+    const { anio, mes } = fromYM(nextYM(mesHabilitadoYM))
+    setConfirmMes({ tipo: 'habilitar', label: `${MONTHS_SHORT[mes - 1]} ${anio}` })
+  }
+
+  function requestRetrocederMes() {
+    const { anio, mes } = fromYM(prevYM(mesHabilitadoYM))
+    setConfirmMes({ tipo: 'deshacer', label: `${MONTHS_SHORT[mes - 1]} ${anio}` })
+  }
+
+  async function confirmarAccionMes() {
+    const tipo = confirmMes?.tipo
+    setConfirmMes(null)
+    setAvanzandoMes(true)
+    try {
+      if (tipo === 'habilitar') await api.avanzarFondoPagosMesActual()
+      else await api.retrocederFondoPagosMesActual()
+      await fetchAll()
+    } catch (err) {
+      alert(err.status === 403 ? 'Sin permiso para modificar el mes habilitado (403)' : 'Error: ' + err.message)
+    } finally {
+      setAvanzandoMes(false)
+    }
+  }
 
   // ── action handler ────────────────────────────────────────────────────────────
-  const handleAction = useCallback(async (action, { empresaId, anio, mes, pagoId, nota }) => {
+  const handleAction = useCallback(async (action, { empresaId, anio, mes, pagoId, nota, autorizado }) => {
     const updateRow = (fn) =>
       setRows(prev => prev.map(r => r.empresa.id === empresaId ? fn(r) : r))
 
@@ -421,17 +625,62 @@ export default function FondoEmprenderPagosPage() {
       }
 
       case 'rechazado': {
+        // nota es opcional (rechazo directo desde el split de Enviado) — solo
+        // se sobrescribe localmente si vino definida, para no pisar con
+        // undefined una nota existente mientras el backend la preserva (COALESCE).
         updateRow(r => ({
           ...r,
           mesesDebidos: r.mesesDebidos.map(md =>
-            md.anio === anio && md.mes === mes ? { ...md, estado: 'rechazado', nota } : md
+            md.anio === anio && md.mes === mes ? { ...md, estado: 'rechazado', ...(nota !== undefined ? { nota } : {}) } : md
           ),
           historialCompleto: r.historialCompleto.map(h =>
-            h.id === pagoId ? { ...h, estado: 'rechazado', nota } : h
+            h.id === pagoId ? { ...h, estado: 'rechazado', ...(nota !== undefined ? { nota } : {}) } : h
           ),
         }))
         try {
           await api.updateFondoPago(empresaId, pagoId, { estado: 'rechazado', nota })
+        } catch (err) {
+          refreshEmpresa(empresaId)
+          alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
+        }
+        break
+      }
+
+      // Editar la nota sin tocar el estado — disponible desde cualquier
+      // estado de la celda (botón de nota siempre visible).
+      case 'nota': {
+        updateRow(r => ({
+          ...r,
+          mesesDebidos: r.mesesDebidos.map(md =>
+            md.anio === anio && md.mes === mes ? { ...md, nota } : md
+          ),
+          historialCompleto: r.historialCompleto.map(h =>
+            h.id === pagoId ? { ...h, nota } : h
+          ),
+        }))
+        try {
+          let targetId = pagoId
+          if (!targetId) {
+            // Aún no existe registro para este mes (fila virtual "pendiente")
+            // — el backend lo crea con estado='pendiente' y luego le agregamos la nota.
+            const np = await api.createFondoPago(empresaId, { anio, mes })
+            targetId = np.id
+            updateRow(r => ({
+              ...r,
+              mesesDebidos: r.mesesDebidos.map(md =>
+                md.anio === anio && md.mes === mes ? { ...md, pagoId: np.id } : md
+              ),
+              historialCompleto: [...r.historialCompleto, np]
+                .sort((a, b) => toYM(a.anio, a.mes) - toYM(b.anio, b.mes)),
+            }))
+          }
+          await api.updateFondoPago(empresaId, targetId, { nota })
+          updateRow(r => ({
+            ...r,
+            historialCompleto: r.historialCompleto.map(h =>
+              h.id === targetId ? { ...h, nota } : h
+            ),
+          }))
         } catch (err) {
           refreshEmpresa(empresaId)
           alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
@@ -458,6 +707,25 @@ export default function FondoEmprenderPagosPage() {
         break
       }
 
+      case 'autorizar': {
+        updateRow(r => ({
+          ...r,
+          mesesDebidos: r.mesesDebidos.map(md =>
+            md.anio === anio && md.mes === mes ? { ...md, autorizado } : md
+          ),
+        }))
+        try {
+          await api.updateFondoPagoAutorizado(empresaId, anio, mes, autorizado)
+          // Si el mes aún no tenía registro, el backend lo crea — refrescamos
+          // para tomar el pagoId nuevo y mantener historialCompleto consistente.
+          if (!pagoId) refreshEmpresa(empresaId)
+        } catch (err) {
+          refreshEmpresa(empresaId)
+          alert(err.status === 403 ? 'Sin permiso para autorizar pagos (403)' : 'Error: ' + err.message)
+        }
+        break
+      }
+
       case 'revertirAprobado': {
         // Revierte un pago aprobado a 'enviado' (para corregir un error)
         updateRow(r => {
@@ -467,7 +735,7 @@ export default function FondoEmprenderPagosPage() {
           return {
             ...r,
             historialCompleto: newHistorial,
-            mesesDebidos: calcularMesesDebidos(newHistorial),
+            mesesDebidos: calcularMesesDebidos(newHistorial, mesHabilitadoYM),
           }
         })
         try {
@@ -479,7 +747,7 @@ export default function FondoEmprenderPagosPage() {
         break
       }
     }
-  }, [refreshEmpresa])
+  }, [refreshEmpresa, mesHabilitadoYM])
 
   // ── derived values ────────────────────────────────────────────────────────────
 
@@ -498,36 +766,54 @@ export default function FondoEmprenderPagosPage() {
     activeTab === 'todas' ? rows : rows.filter(r => (r.empresa.categoria ?? 'contable') === activeTab),
   [rows, activeTab])
 
-  const stats = useMemo(() => ({
-    total:     scopedRows.length,
-    pagadas:   scopedRows.filter(r => r.mesesDebidos.length === 0).length,
-    esperando: scopedRows.filter(r => {
-      const oldest = [...r.mesesDebidos].sort((a, b) => toYM(a.anio, a.mes) - toYM(b.anio, b.mes))[0]
-      return oldest?.estado === 'enviado'
-    }).length,
-    enMora: scopedRows.filter(r => r.mesesDebidos.length > 0).length,
-  }), [scopedRows])
+  // Mes seleccionado en las tarjetas de resumen — Feb 2026 hasta el mes
+  // habilitado, mismo límite que la ventana de la grilla pero con su propio
+  // offset (statsMonthsBack).
+  const maxStatsMonthsBack = mesHabilitadoYM == null
+    ? 0
+    : Math.max(ymToIndex(mesHabilitadoYM) - START_IDX, 0)
+
+  const statsSelectedYM = mesHabilitadoYM == null
+    ? null
+    : indexToYM(ymToIndex(mesHabilitadoYM) - statsMonthsBack)
+
+  const statsMonthLabel = statsSelectedYM == null
+    ? ''
+    : `${MONTHS_SHORT[fromYM(statsSelectedYM).mes - 1]} ${fromYM(statsSelectedYM).anio}`
+
+  const stats = useMemo(() => {
+    if (statsSelectedYM == null) return { total: scopedRows.length, pagadas: 0, esperando: 0, enMora: 0 }
+    const { anio: statsAnio, mes: statsMes } = fromYM(statsSelectedYM)
+    const debitoDelMes = r => r.mesesDebidos.find(md => md.anio === statsAnio && md.mes === statsMes) ?? null
+    return {
+      total:     scopedRows.length,
+      pagadas:   scopedRows.filter(r => !debitoDelMes(r)).length,
+      esperando: scopedRows.filter(r => debitoDelMes(r)?.estado === 'enviado').length,
+      enMora:    scopedRows.filter(r => debitoDelMes(r) != null).length,
+    }
+  }, [scopedRows, statsSelectedYM])
 
   const visibleRows = useMemo(() => {
     const q = search.toLowerCase()
     return scopedRows.filter(r => !q || r.empresa.name.toLowerCase().includes(q))
   }, [scopedRows, search])
 
-  // Rango de columnas de la tabla
+  // Ventana deslizante de VENTANA_MESES meses (máximo) — nunca antes de
+  // Feb 2026 (START_IDX) ni después del mes habilitado. Las flechas la
+  // desplazan de a un mes, no de a bloques.
+  const maxMonthsBack = mesHabilitadoYM == null
+    ? 0
+    : Math.max(ymToIndex(mesHabilitadoYM) - START_IDX - (VENTANA_MESES - 1), 0)
+
   const months = useMemo(() => {
-    if (showHistorial) {
-      // Desde el pago más antiguo en historial (mínimo Ene 2026) hasta hoy
-      let minYM = TODAY_YM
-      for (const row of rows)
-        for (const h of row.historialCompleto) {
-          const ym = toYM(h.anio, h.mes)
-          if (ym < minYM) minYM = ym
-        }
-      return buildRange(Math.max(minYM, HISTORIAL_START_YM), TODAY_YM)
-    }
-    // Default: siempre desde Mar 2026 hasta hoy
-    return buildRange(START_YM, TODAY_YM)
-  }, [rows, showHistorial])
+    if (mesHabilitadoYM == null) return []
+    const habilitadoIdx = ymToIndex(mesHabilitadoYM)
+    const ventanaFinIdx = habilitadoIdx - monthsBack
+    const ventanaInicioIdx = Math.max(ventanaFinIdx - (VENTANA_MESES - 1), START_IDX)
+    const out = []
+    for (let idx = ventanaInicioIdx; idx <= ventanaFinIdx; idx++) out.push(fromYM(indexToYM(idx)))
+    return out
+  }, [mesHabilitadoYM, monthsBack])
 
   // ── loading / error ───────────────────────────────────────────────────────────
   if (loading) return (
@@ -579,8 +865,13 @@ export default function FondoEmprenderPagosPage() {
           value={stats.pagadas}
           icon="check_circle"
           borderColor="#16a34a" iconColor="#16a34a"
-          sub={stats.pagadas > 0 ? 'Sin meses debidos' : 'Con meses pendientes'}
+          sub={stats.pagadas > 0 ? 'Sin pendientes ese mes' : 'Con empresas pendientes'}
           subColor={stats.pagadas > 0 ? '#16a34a' : '#434655'}
+          monthLabel={statsMonthLabel}
+          onPrevMonth={() => setStatsMonthsBack(b => Math.min(b + 1, maxStatsMonthsBack))}
+          onNextMonth={() => setStatsMonthsBack(b => Math.max(b - 1, 0))}
+          prevMonthDisabled={statsMonthsBack >= maxStatsMonthsBack}
+          nextMonthDisabled={statsMonthsBack <= 0}
         />
         <StatsCard
           title="Esperando respuesta"
@@ -589,14 +880,24 @@ export default function FondoEmprenderPagosPage() {
           borderColor="#d97706" iconColor="#d97706"
           sub="Documentos enviados"
           subColor="#434655"
+          monthLabel={statsMonthLabel}
+          onPrevMonth={() => setStatsMonthsBack(b => Math.min(b + 1, maxStatsMonthsBack))}
+          onNextMonth={() => setStatsMonthsBack(b => Math.max(b - 1, 0))}
+          prevMonthDisabled={statsMonthsBack >= maxStatsMonthsBack}
+          nextMonthDisabled={statsMonthsBack <= 0}
         />
         <StatsCard
           title="En mora"
           value={stats.enMora}
           icon="warning"
           borderColor="#ef4444" iconColor="#ef4444"
-          sub={stats.enMora > 0 ? 'Requieren atención' : 'Todo al día'}
+          sub={stats.enMora > 0 ? 'Deben ese mes' : 'Todo al día'}
           subColor={stats.enMora > 0 ? '#ef4444' : '#16a34a'}
+          monthLabel={statsMonthLabel}
+          onPrevMonth={() => setStatsMonthsBack(b => Math.min(b + 1, maxStatsMonthsBack))}
+          onNextMonth={() => setStatsMonthsBack(b => Math.max(b - 1, 0))}
+          prevMonthDisabled={statsMonthsBack >= maxStatsMonthsBack}
+          nextMonthDisabled={statsMonthsBack <= 0}
         />
       </div>
 
@@ -651,27 +952,92 @@ export default function FondoEmprenderPagosPage() {
       ) : (
         <div className="flex flex-col gap-2">
 
-          <div className="flex justify-end">
-            <button
-              onClick={() => setShowHistorial(v => !v)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors"
-              style={showHistorial
-                ? { background: '#f0f4ff', color: '#004ac6', borderColor: '#c7d7fc' }
-                : { background: 'transparent', color: '#6b7280', borderColor: '#e2e4ef' }
-              }
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
-                {showHistorial ? 'unfold_less' : 'unfold_more'}
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-[#6b7280] dark:text-[#8890b5]">
+                Mes habilitado: <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
+                  {mesHabilitadoYM != null && `${MONTHS_SHORT[fromYM(mesHabilitadoYM).mes - 1]} ${fromYM(mesHabilitadoYM).anio}`}
+                </span>
               </span>
-              {showHistorial ? 'Ocultar historial' : 'Ver historial completo'}
-            </button>
+              {canAutorizar && mesHabilitadoYM != null && (
+                <button
+                  onClick={requestAvanzarMes}
+                  disabled={avanzandoMes}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors disabled:opacity-50"
+                  style={{ background: '#f0fdf4', color: '#16a34a', borderColor: '#bbf7d0' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>event_available</span>
+                  Habilitar {(() => { const n = fromYM(nextYM(mesHabilitadoYM)); return `${MONTHS_SHORT[n.mes - 1]} ${n.anio}` })()}
+                </button>
+              )}
+              {canAutorizar && mesHabilitadoYM != null && (
+                <button
+                  onClick={requestRetrocederMes}
+                  disabled={avanzandoMes}
+                  title={`Deshacer — volver a ${(() => { const p = fromYM(prevYM(mesHabilitadoYM)); return `${MONTHS_SHORT[p.mes - 1]} ${p.anio}` })()}`}
+                  className="flex items-center justify-center w-6 h-6 rounded-lg border transition-colors disabled:opacity-50 text-[#6b7280] dark:text-[#8890b5] border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>undo</span>
+                </button>
+              )}
+            </div>
+
+            {/* Ventana deslizante de VENTANA_MESES meses — las flechas
+                desplazan de a un mes, entre Feb 2026 y el mes habilitado */}
+            <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-2 py-1.5 shadow-sm">
+              <button
+                onClick={() => setMonthsBack(b => Math.min(b + 1, maxMonthsBack))}
+                disabled={monthsBack >= maxMonthsBack}
+                title="Meses anteriores"
+                className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                <span className="material-symbols-outlined text-xl">chevron_left</span>
+              </button>
+              <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] px-1 min-w-[140px] text-center whitespace-nowrap">
+                {months.length > 0 && (
+                  months.length === 1
+                    ? `${MONTHS_SHORT[months[0].mes - 1]} ${months[0].anio}`
+                    : `${MONTHS_SHORT[months[0].mes - 1]} ${months[0].anio} – ${MONTHS_SHORT[months[months.length - 1].mes - 1]} ${months[months.length - 1].anio}`
+                )}
+              </span>
+              <button
+                onClick={() => setMonthsBack(b => Math.max(b - 1, 0))}
+                disabled={monthsBack <= 0}
+                title="Meses más recientes"
+                className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              >
+                <span className="material-symbols-outlined text-xl">chevron_right</span>
+              </button>
+            </div>
           </div>
 
           <div
             className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm"
             style={{ overflowX: 'auto' }}
           >
-            <table style={{ borderCollapse: 'collapse', minWidth: '100%' }}>
+            {/* Ancho exacto según las columnas que haya (nunca más de
+                VENTANA_MESES) — así ninguna columna se estira cuando el
+                bloque queda incompleto (ej. un mes recién habilitado y
+                solo): el espacio sobrante queda libre, no repartido. */}
+            <table
+              style={{
+                borderCollapse: 'collapse',
+                tableLayout: 'fixed',
+                // Bloque completo (VENTANA_MESES meses): llena el ancho
+                // disponible. Bloque parcial: ancho exacto de sus columnas,
+                // sin estirarse — el sobrante queda libre.
+                width: months.length === VENTANA_MESES ? '100%' : 240 + months.length * 200,
+              }}
+            >
+              <colgroup>
+                <col style={{ width: 240 }} />
+                {months.map(m => (
+                  <Fragment key={m.ym}>
+                    <col style={{ width: 100 }} />
+                    <col style={{ width: 100 }} />
+                  </Fragment>
+                ))}
+              </colgroup>
               <thead>
                 {/* Fila 1: Empresa (rowSpan=2) + mes encabezado (colSpan=2) */}
                 <tr>
@@ -680,7 +1046,7 @@ export default function FondoEmprenderPagosPage() {
                     style={{
                       position: 'sticky', left: 0, zIndex: 3,
                       padding: '10px 12px',
-                      width: 200, minWidth: 160, maxWidth: 200,
+                      width: 240, minWidth: 200, maxWidth: 240,
                       textAlign: 'left', fontSize: 13, fontWeight: 600,
                       boxShadow: '2px 0 4px rgba(0,0,0,0.04)',
                       overflow: 'hidden',
@@ -737,7 +1103,7 @@ export default function FondoEmprenderPagosPage() {
                         position: 'sticky', left: 0, zIndex: 2,
                         padding: '8px 10px',
                         boxShadow: '2px 0 4px rgba(0,0,0,0.04)',
-                        width: 200, minWidth: 160, maxWidth: 200,
+                        width: 240, minWidth: 200, maxWidth: 240,
                         verticalAlign: 'middle',
                         overflow: 'hidden',
                         whiteSpace: 'nowrap',
@@ -757,16 +1123,6 @@ export default function FondoEmprenderPagosPage() {
                           style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}
                         >
                           {row.empresa.name}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, flexShrink: 0,
-                            ...((row.empresa.categoria ?? 'contable') === 'contable'
-                              ? { background: '#f0f4ff', color: '#004ac6' }
-                              : { background: '#f0fdf4', color: '#16a34a' }),
-                          }}
-                        >
-                          {(row.empresa.categoria ?? 'contable') === 'contable' ? 'CON' : 'TRI'}
                         </span>
                       </div>
                       {row.mesesDebidos.length > 0 && (
@@ -788,12 +1144,55 @@ export default function FondoEmprenderPagosPage() {
                         mesesDebidos={row.mesesDebidos}
                         historialCompleto={row.historialCompleto}
                         onAction={handleAction}
+                        canAutorizar={canAutorizar}
                       />
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirmación habilitar/deshacer mes ──────────────────────────── */}
+      {confirmMes && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setConfirmMes(null)}>
+          <div
+            className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef] dark:border-[#2e3148]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <span
+                className="material-symbols-outlined text-2xl"
+                style={{ color: confirmMes.tipo === 'habilitar' ? '#16a34a' : '#6b7280' }}
+              >
+                {confirmMes.tipo === 'habilitar' ? 'event_available' : 'undo'}
+              </span>
+              <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
+                {confirmMes.tipo === 'habilitar' ? `¿Habilitar ${confirmMes.label}?` : `¿Volver a ${confirmMes.label}?`}
+              </p>
+            </div>
+            <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-4">
+              {confirmMes.tipo === 'habilitar'
+                ? 'Todas las empresas podrán empezar a tramitar ese mes.'
+                : 'Se ocultará el mes habilitado actualmente.'}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmMes(null)}
+                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarAccionMes}
+                className="flex-1 py-2 text-xs font-semibold rounded-lg text-white transition hover:opacity-90"
+                style={{ background: confirmMes.tipo === 'habilitar' ? '#16a34a' : '#6b7280' }}
+              >
+                Confirmar
+              </button>
+            </div>
           </div>
         </div>
       )}
