@@ -178,6 +178,17 @@ export const api = {
   updateFondoDetalle: (empresaId, macroId, anio, mes, data) =>
     request(`/fondo/detalle/${empresaId}/${macroId}`, { method: 'PUT', body: JSON.stringify({ anio, mes, ...data }) }),
 
+  // Fondo Emprender — Checklist de impuestos (mp6 / Información tributaria)
+  getFondoImpuestos: (empresaId, anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/impuestos/${empresaId}?${qs}`);
+  },
+  updateFondoImpuestoItem: (empresaId, impuestoId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/impuestos/${empresaId}/item/${impuestoId}?${qs}`,
+      { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
   // Fondo Emprender — Pagos
   getFondoPagos:    (empresaId)         => request(`/fondo/pagos/${empresaId}`),
   getFondoPagosTodasEmpresas: () => request('/fondo/pagos/todas'),

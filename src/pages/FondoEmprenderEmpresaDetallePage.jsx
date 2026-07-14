@@ -14,6 +14,40 @@ const MACRO_STATUS = {
   done:        { label: 'Completado',  icon: 'check_circle',           color: '#16a34a', bg: '#dcfce7' },
 }
 
+// Usado solo para el ícono/color del header de tarjetas con estado auto-derivado
+// (mp5, mp6) — 'na' no es un estado válido para el resto de macroprocesos.
+const AUTO_STATUS = {
+  ...MACRO_STATUS,
+  na: { label: 'N/A', icon: 'do_not_disturb_on', color: '#0ea5e9', bg: '#e0f2fe' },
+}
+
+// Estados de un ítem individual del checklist de impuestos (mp6). Independiente
+// del checklist mensual de Seguimiento Mensual — mismo lenguaje visual (grid de
+// botones, colores) pero dominio de datos separado.
+const IMPUESTO_ITEM_STATUS = {
+  pending:   { label: 'Pendiente',  color: MACRO_STATUS.pending.color, bg: MACRO_STATUS.pending.bg },
+  presented: { label: 'Presentado', color: MACRO_STATUS.done.color,    bg: MACRO_STATUS.done.bg },
+  na:        { label: 'N/A',        color: AUTO_STATUS.na.color,       bg: AUTO_STATUS.na.bg },
+}
+
+const IMPUESTOS_TEXTO = {
+  done:        'Todos los impuestos presentados',
+  in_progress: 'Impuestos en proceso',
+  pending:     'Impuestos pendientes',
+  na:          'Sin impuestos aplicables este mes',
+}
+
+// Debe coincidir con deriveImpuestosEstado en
+// backend/src/controllers/fondoDetalleController.js — usado para reflejar el
+// estado de mp6 al instante tras editar un ítem, sin esperar un refetch.
+function deriveImpuestosEstado(items) {
+  const noNa = items.map(i => i.estado).filter(e => e !== 'na')
+  if (noNa.length === 0) return 'na'
+  if (noNa.every(e => e === 'presented')) return 'done'
+  if (noNa.some(e => e === 'presented')) return 'in_progress'
+  return 'pending'
+}
+
 const TASK_STATUS = {
   pending:    { icon: 'radio_button_unchecked', color: '#6b7280' },
   in_progress:{ icon: 'timelapse',              color: '#d97706' },
@@ -31,6 +65,30 @@ const MACRO_RESPONSABLES = {
   5: [{ name: 'Katerin Pineda' }, { name: 'Ruben Parada' }],
   6: [{ name: 'Diana Gutierrez' }],
   7: [{ name: 'Diana Gutierrez', note: 'Producción' }, { name: 'Mauricio Gutierrez', note: 'Ventas' }],
+}
+
+function EstadoButtonGroup({ options, value, onChange, columns = 3 }) {
+  return (
+    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+      {Object.entries(options).map(([key, cfg]) => {
+        const active = value === key
+        return (
+          <button
+            key={key}
+            onClick={() => onChange(key)}
+            className="py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:opacity-90 active:scale-95"
+            style={{
+              background: active ? cfg.bg : 'transparent',
+              color:      active ? cfg.color : '#9ca3af',
+              border:     `1.5px solid ${active ? cfg.color : '#e2e4ef'}`,
+            }}
+          >
+            {cfg.label}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 function ResponsableBadges({ macroId }) {
@@ -72,6 +130,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
 
   const [company, setCompany]           = useState(null)
   const [macroprocesos, setMacros]      = useState([])
+  const [impuestosItems, setImpuestosItems] = useState([])
   const [loading, setLoading]           = useState(true)
   const [error, setError]               = useState(null)
   // notasDraft tracks in-progress edits; saves on blur to avoid per-keystroke API calls
@@ -81,12 +140,14 @@ export default function FondoEmprenderEmpresaDetallePage() {
     try {
       setLoading(true)
       setError(null)
-      const [empresaData, detalleData] = await Promise.all([
+      const [empresaData, detalleData, impuestosData] = await Promise.all([
         api.getFondoEmpresa(empresaId),
         api.getFondoDetalle(empresaId, anio, mes),
+        api.getFondoImpuestos(empresaId, anio, mes),
       ])
       setCompany(empresaData)
       setMacros(detalleData.macroprocesos)
+      setImpuestosItems(impuestosData.items)
       const drafts = {}
       detalleData.macroprocesos.forEach(m => { drafts[m.id] = m.nota ?? '' })
       setNotasDraft(drafts)
@@ -138,6 +199,25 @@ export default function FondoEmprenderEmpresaDetallePage() {
       }
     }
   }, [empresaId, anio, mes])
+
+  const handleUpdateImpuesto = useCallback(async (item, updates) => {
+    const previous = impuestosItems
+    const optimistic = previous.map(it => it.id === item.id ? { ...it, ...updates } : it)
+    setImpuestosItems(optimistic)
+    setMacros(prev => prev.map(m => m.id !== 6 ? m : { ...m, estado: deriveImpuestosEstado(optimistic) }))
+    try {
+      const actualizado = await api.updateFondoImpuestoItem(empresaId, item.impuestoId, anio, mes, updates)
+      setImpuestosItems(prev => prev.map(it => it.id === item.id ? { ...it, ...actualizado } : it))
+    } catch (err) {
+      setImpuestosItems(previous)
+      setMacros(prev => prev.map(m => m.id !== 6 ? m : { ...m, estado: deriveImpuestosEstado(previous) }))
+      if (err.status === 403) {
+        alert('No tienes permiso para editar el checklist de impuestos')
+      } else {
+        alert('Error: ' + err.message)
+      }
+    }
+  }, [empresaId, anio, mes, impuestosItems])
 
   // Progress summary
   const mp5        = macroprocesos.find(m => m.id === 5)
@@ -212,9 +292,12 @@ export default function FondoEmprenderEmpresaDetallePage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {macroprocesos.map(proc => {
           const isContabilidad = proc.id === 5
+          const isImpuestos    = proc.id === 6
           const cfgStatus = isContabilidad
             ? (proc.confirmed ? MACRO_STATUS.done : MACRO_STATUS.pending)
-            : (MACRO_STATUS[proc.estado] ?? MACRO_STATUS.pending)
+            : isImpuestos
+              ? (AUTO_STATUS[proc.estado] ?? AUTO_STATUS.pending)
+              : (MACRO_STATUS[proc.estado] ?? MACRO_STATUS.pending)
 
           return (
             <div
@@ -234,14 +317,14 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     {proc.nombre}
                   </h3>
                 </div>
-                {isContabilidad && (
+                {(isContabilidad || isImpuestos) && (
                   <span className="text-[9px] font-bold uppercase tracking-wide text-[#8890b5] bg-[#f3f4f6] dark:bg-[#252840] px-1.5 py-0.5 rounded flex-shrink-0">
                     Auto
                   </span>
                 )}
               </div>
 
-              {/* Status — readonly for mp5, buttons for the rest */}
+              {/* Status — readonly for mp5/mp6, buttons for the rest */}
               {isContabilidad ? (
                 <div className="rounded-lg p-2.5 text-xs leading-relaxed" style={{ background: cfgStatus.bg }}>
                   {proc.confirmed ? (
@@ -264,25 +347,43 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     Estado calculado desde el checklist mensual
                   </p>
                 </div>
+              ) : isImpuestos ? (
+                <div className="rounded-lg p-2.5 text-xs leading-relaxed" style={{ background: cfgStatus.bg }}>
+                  <p className="font-semibold" style={{ color: cfgStatus.color }}>
+                    {IMPUESTOS_TEXTO[proc.estado] ?? IMPUESTOS_TEXTO.pending}
+                  </p>
+                  <p className="text-[#9ca3af] mt-1" style={{ fontSize: 10 }}>
+                    Estado calculado desde el checklist de impuestos
+                  </p>
+                </div>
               ) : (
-                <div className="grid grid-cols-3 gap-1">
-                  {Object.entries(MACRO_STATUS).map(([key, cfg]) => {
-                    const active = proc.estado === key
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => handleEditarMacro(proc.id, { estado: key })}
-                        className="py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:opacity-90 active:scale-95"
-                        style={{
-                          background: active ? cfg.bg : 'transparent',
-                          color:      active ? cfg.color : '#9ca3af',
-                          border:     `1.5px solid ${active ? cfg.color : '#e2e4ef'}`,
-                        }}
-                      >
-                        {cfg.label}
-                      </button>
-                    )
-                  })}
+                <EstadoButtonGroup
+                  options={MACRO_STATUS}
+                  value={proc.estado}
+                  onChange={key => handleEditarMacro(proc.id, { estado: key })}
+                />
+              )}
+
+              {/* Checklist de impuestos (mp6) */}
+              {isImpuestos && (
+                <div>
+                  <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1.5">
+                    Impuestos
+                  </label>
+                  <div className="space-y-2">
+                    {impuestosItems.map(item => (
+                      <div key={item.id} className="flex flex-col gap-1">
+                        <span className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8]">
+                          {item.nombre}
+                        </span>
+                        <EstadoButtonGroup
+                          options={IMPUESTO_ITEM_STATUS}
+                          value={item.estado}
+                          onChange={key => handleUpdateImpuesto(item, { estado: key })}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
