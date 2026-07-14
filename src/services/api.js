@@ -133,6 +133,7 @@ export const api = {
   deleteGroup: (id) => request(`/groups/${id}`, { method: 'DELETE' }),
   addGroupMember: (groupId, userId) => request(`/groups/${groupId}/members`, { method: 'POST', body: JSON.stringify({ userId }) }),
   removeGroupMember: (groupId, userId) => request(`/groups/${groupId}/members/${userId}`, { method: 'DELETE' }),
+  setGroupLeader: (groupId, userId, isLeader) => request(`/groups/${groupId}/members/${userId}/leader`, { method: 'PUT', body: JSON.stringify({ isLeader }) }),
 
   // Tags
   getTags: () => request('/tags'),
@@ -142,6 +143,7 @@ export const api = {
 
   // Stats
   getStats: () => request('/stats'),
+  getWorkload: () => request('/stats/workload'),
   getAuditLog: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/audit${qs ? `?${qs}` : ''}`);

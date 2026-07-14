@@ -216,7 +216,7 @@ Si usaste el flujo B (Node local + Postgres en Docker):
 Necesito hacer una tarea de mantenimiento sobre la base de datos PostgreSQL
 (corriendo en Docker, vía docker-compose):
 
-- Backup: ./scripts/backup-db.sh
+- Backup: ./scripts/backup.sh
   Genera un dump con pg_dump en backups/taskflow_<timestamp>.sql
   (usa las variables de .env en la raíz; crea la carpeta backups/ si no existe).
 
@@ -264,5 +264,5 @@ se aplican los defaults del rol.
 | `docker compose down` | Detiene y elimina contenedores |
 | `./scripts/start-dev.sh` | Levanta todo (postgres + backend + frontend) en Docker, migra y sigue logs (flujo A) |
 | `./scripts/stop-dev.sh` | Detiene y elimina los contenedores (`docker compose down`) |
-| `./scripts/backup-db.sh` | Vuelca la BD a `backups/taskflow_<timestamp>.sql` con `pg_dump` |
+| `./scripts/backup.sh` | Backup completo: BD comprimida + .env + backend.env + certs SSL, con rotación automática de 7 días |
 | `./scripts/reset-db.sh` | Borra y recrea la BD con migraciones + seed (pide confirmación) |

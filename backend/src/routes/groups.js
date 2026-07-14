@@ -1,7 +1,8 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { getGroups, createGroup, updateGroup, deleteGroup, addMember, removeMember } = require('../controllers/groupController');
+const { getGroups, createGroup, updateGroup, deleteGroup, addMember, removeMember, setMemberLeader } = require('../controllers/groupController');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+const { requireGroupLeader } = require('../middleware/groupAccess');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 
@@ -29,17 +30,17 @@ router.post('/',
 
 router.put('/:id',
   validateUUIDParam('id'),
-  roleMiddleware('admin', 'leader'),
+  requireGroupLeader,
   body('name').optional().trim().notEmpty(),
   validate,
   updateGroup
 );
 
-router.delete('/:id', validateUUIDParam('id'), roleMiddleware('admin', 'leader'), deleteGroup);
+router.delete('/:id', validateUUIDParam('id'), requireGroupLeader, deleteGroup);
 
 router.post('/:id/members',
   validateUUIDParam('id'),
-  roleMiddleware('admin', 'leader'),
+  requireGroupLeader,
   body('userId').notEmpty(),
   validate,
   addMember
@@ -48,8 +49,38 @@ router.post('/:id/members',
 router.delete('/:id/members/:userId',
   validateUUIDParam('id'),
   validateUUIDParam('userId'),
-  roleMiddleware('admin', 'leader'),
+  requireGroupLeader,
   removeMember
+);
+
+/**
+ * @openapi
+ * /api/groups/{id}/members/{userId}/leader:
+ *   put:
+ *     tags: [Groups]
+ *     summary: Asignar o quitar el liderazgo de un grupo a una persona (solo admin)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+ *       - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [isLeader]
+ *             properties:
+ *               isLeader: { type: boolean }
+ */
+router.put('/:id/members/:userId/leader',
+  validateUUIDParam('id'),
+  validateUUIDParam('userId'),
+  roleMiddleware('admin'),
+  body('isLeader').isBoolean(),
+  validate,
+  setMemberLeader
 );
 
 module.exports = router;

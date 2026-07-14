@@ -3,7 +3,7 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for middleware/errorHandler.js</title>
+    <title>Code coverage report for middleware/groupAccess.js</title>
     <meta charset="utf-8" />
     <link rel="stylesheet" href="../prettify.css" />
     <link rel="stylesheet" href="../base.css" />
@@ -19,34 +19,34 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">middleware</a> errorHandler.js</h1>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">middleware</a> groupAccess.js</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>17/17</span>
+                <span class='fraction'>18/18</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">91.66% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>11/12</span>
+                <span class='fraction'>8/8</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>2/2</span>
+                <span class='fraction'>1/1</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>17/17</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
@@ -91,62 +91,71 @@
 <a name='L26'></a><a href='#L26'>26</a>
 <a name='L27'></a><a href='#L27'>27</a>
 <a name='L28'></a><a href='#L28'>28</a>
-<a name='L29'></a><a href='#L29'>29</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">3x</span>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">6x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">5x</span>
-<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">const logger = require('../utils/logger');
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">const db = require('../config/database');
+const logger = require('../utils/logger');
 &nbsp;
-const errorHandler = (err, req, res, next) =&gt; {
-  logger.error({ err, url: req.url, method: req.method }, 'Unhandled error');
+const requireGroupLeader = async (req, res, next) =&gt; {
+  if (!req.user) return res.status(401).json({ error: 'No autenticado' });
+  if (req.user.role === 'admin') return next();
 &nbsp;
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({ error: err.message, details: err.details });
-  }
-  if (err.name === 'UnauthorizedError') {
-    return res.status(401).json({ error: 'No autorizado' });
-  }
-  if (err.code === '23505') {
-    return res.status(409).json({ error: 'El recurso ya existe' });
-  }
-  if (err.code === '23503') {
-    return res.status(400).json({ error: 'Referencia inválida' });
+  if (req.user.role !== 'leader') {
+    return res.status(403).json({ error: 'Permisos insuficientes' });
   }
 &nbsp;
-  const status = err.status || 500;
-  const message = process.env.NODE_ENV === 'production' ? <span class="branch-0 cbranch-no" title="branch not covered" >'Error interno del servidor' </span>: err.message;
-  res.status(status).json({ error: message });
+  const groupId = req.params.id;
+  try {
+    const result = await db.query(
+      'SELECT 1 FROM group_members WHERE group_id = $1 AND user_id = $2 AND is_leader = true',
+      [groupId, req.user.userId]
+    );
+    if (result.rows.length === 0) {
+      logger.warn(
+        { userId: req.user.userId, groupId, path: req.path },
+        'requireGroupLeader — no es líder de este grupo'
+      );
+      return res.status(403).json({ error: 'Solo el líder de este grupo puede hacer esta acción' });
+    }
+    next();
+  } catch (err) {
+    next(err);
+  }
 };
 &nbsp;
-const notFound = (req, res) =&gt; {
-  res.status(404).json({ error: `Ruta no encontrada: ${req.method} ${req.originalUrl}` });
-};
-&nbsp;
-module.exports = { errorHandler, notFound };
+module.exports = { requireGroupLeader };
 &nbsp;</pre></td></tr></table></pre>
 
                 <div class='push'></div><!-- for sticky footer -->

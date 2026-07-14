@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { validators } from '../utils/validators'
 import { today, generateId, getInitials, getAvatarColor, normalizeAssignedTo } from '../utils/helpers'
 import { useTeam } from '../hooks/useTeam'
+import { useTasks } from '../hooks/useTasks'
 import { useGroups } from '../context/GroupContext'
 import TagSelector from './Tags/TagSelector'
 import FondoLinkSelector from './FondoLinkSelector'
@@ -27,6 +28,7 @@ const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
 
 export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = false }) {
   const { members } = useTeam()
+  const { tasks } = useTasks()
   const { groups } = useGroups()
   const [form, setForm] = useState(task
     ? { ...task, dueTime: task.dueTime ?? '', assignedTo: normalizeAssignedTo(task.assignedTo), isRecurring: task.isRecurring ?? false, recurrence: task.recurrence ?? null }
@@ -38,6 +40,39 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
   const [assigneeSearch, setAssigneeSearch] = useState('')
   const assigneeRef = useRef(null)
   const [fondoLink, setFondoLink] = useState(null)
+
+  // Carga actual por persona (tareas abiertas) — solo se calcula/usa al crear una tarea nueva,
+  // para sugerir a quién menos cargado asignar. No aplica al editar tareas existentes.
+  // Si ya se eligió un grupo, la carga se cuenta SOLO dentro de ese grupo (misma lógica que
+  // las recomendaciones del Tablero de Carga de Trabajo): a alguien de Desarrollo no se le
+  // suma carga de Fondo Emprender ni se le sugiere para tareas de otro equipo.
+  const selectedGroup = groups.find((g) => g.id === form.groupId)
+  const groupMemberIds = selectedGroup ? new Set(selectedGroup.memberIds || []) : null
+
+  const workloadByMember = useMemo(() => {
+    const map = new Map()
+    if (task) return map
+    for (const t of tasks) {
+      if (t.status === 'completed') continue
+      if (form.groupId && t.groupId !== form.groupId) continue
+      for (const id of normalizeAssignedTo(t.assignedTo)) {
+        map.set(id, (map.get(id) || 0) + 1)
+      }
+    }
+    return map
+  }, [tasks, task, form.groupId])
+
+  const filteredMembers = members.filter(m => m.name.toLowerCase().includes(assigneeSearch.toLowerCase()))
+  const visibleMembers = task
+    ? filteredMembers
+    : [...filteredMembers].sort((a, b) => (workloadByMember.get(a.id) || 0) - (workloadByMember.get(b.id) || 0))
+
+  // La sugerencia ("Sugerido") solo recae en alguien del grupo elegido — si no hay grupo
+  // seleccionado, se sugiere entre todos como antes.
+  const suggestionPool = groupMemberIds
+    ? visibleMembers.filter((m) => groupMemberIds.has(m.id))
+    : visibleMembers
+  const suggestedId = !task && suggestionPool.length > 0 ? suggestionPool[0].id : null
 
   useEffect(() => {
     if (!assigneeOpen) { setAssigneeSearch(''); return }
@@ -121,7 +156,14 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
       </div>
 
       <div ref={assigneeRef} className="relative">
-        <label className={labelCls}>Asignado a <span className="text-[#EF4444]">*</span></label>
+        <label className={labelCls}>
+          Asignado a <span className="text-[#EF4444]">*</span>
+          {!task && selectedGroup && (
+            <span className="ml-1.5 font-normal normal-case text-[10px] text-[#888]">
+              (carga dentro de {selectedGroup.name})
+            </span>
+          )}
+        </label>
 
         {/* Trigger */}
         <button
@@ -178,8 +220,9 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
               </div>
             </div>
             <div className="max-h-48 overflow-y-auto">
-              {members.filter(m => m.name.toLowerCase().includes(assigneeSearch.toLowerCase())).map((m) => {
+              {visibleMembers.map((m) => {
                 const selected = (form.assignedTo || []).includes(m.id)
+                const load = workloadByMember.get(m.id) || 0
                 return (
                   <label
                     key={m.id}
@@ -198,6 +241,16 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
                       {getInitials(m.name)}
                     </div>
                     <span className="text-sm text-[#191c1e] dark:text-[#e4e6f0] flex-1">{m.name}</span>
+                    {!task && (
+                      <span className="flex items-center gap-1 flex-shrink-0">
+                        {m.id === suggestedId && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#dcfce7] text-[#10B981]">Sugerido</span>
+                        )}
+                        <span className="text-[10px] font-semibold text-[#888] dark:text-[#6b7280]">
+                          {load} abierta{load !== 1 ? 's' : ''}
+                        </span>
+                      </span>
+                    )}
                     {selected && <span className="material-symbols-outlined text-sm text-[#004ac6]">check</span>}
                   </label>
                 )

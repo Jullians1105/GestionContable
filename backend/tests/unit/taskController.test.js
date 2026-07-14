@@ -299,7 +299,7 @@ describe('updateTask', () => {
 });
 
 describe('deleteTask', () => {
-  test('elimina la tarea y retorna success', async () => {
+  test('admin elimina la tarea y retorna success', async () => {
     db.query
       .mockResolvedValueOnce({ rows: [rawTask] })
       .mockResolvedValueOnce({ rows: [] })
@@ -307,7 +307,7 @@ describe('deleteTask', () => {
 
     const req = {
       params: { id: 'mock-uuid' },
-      user: { userId: 'user-1' },
+      user: { userId: 'user-1', role: 'admin' },
       io: null,
     };
     const res = mockRes();
@@ -321,7 +321,7 @@ describe('deleteTask', () => {
 
     const req = {
       params: { id: 'bad-id' },
-      user: { userId: 'user-1' },
+      user: { userId: 'user-1', role: 'admin' },
       io: null,
     };
     const res = mockRes();
@@ -333,11 +333,59 @@ describe('deleteTask', () => {
   test('llama a next en caso de error', async () => {
     db.query.mockRejectedValueOnce(new Error('DB error'));
 
-    const req = { params: { id: 'mock-uuid' }, user: { userId: 'user-1' }, io: null };
+    const req = { params: { id: 'mock-uuid' }, user: { userId: 'user-1', role: 'admin' }, io: null };
     const res = mockRes();
     await deleteTask(req, res, mockNext);
 
     expect(mockNext).toHaveBeenCalled();
+  });
+
+  test('leader NO puede eliminar una tarea sin grupo', async () => {
+    db.query.mockResolvedValueOnce({ rows: [rawTask] }); // group_id null
+
+    const req = {
+      params: { id: 'mock-uuid' },
+      user: { userId: 'user-2', role: 'leader' },
+      io: null,
+    };
+    const res = mockRes();
+    await deleteTask(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  test('leader NO puede eliminar una tarea de un grupo que no lidera', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ ...rawTask, group_id: 'group-1' }] })
+      .mockResolvedValueOnce({ rows: [] }); // no es líder de group-1
+
+    const req = {
+      params: { id: 'mock-uuid' },
+      user: { userId: 'user-2', role: 'leader' },
+      io: null,
+    };
+    const res = mockRes();
+    await deleteTask(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+  });
+
+  test('leader SÍ puede eliminar una tarea del grupo que lidera', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ ...rawTask, group_id: 'group-1' }] })
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }] }) // sí es líder de group-1
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const req = {
+      params: { id: 'mock-uuid' },
+      user: { userId: 'user-2', role: 'leader' },
+      io: null,
+    };
+    const res = mockRes();
+    await deleteTask(req, res, mockNext);
+
+    expect(res.json).toHaveBeenCalledWith({ success: true, id: 'mock-uuid' });
   });
 });
 
