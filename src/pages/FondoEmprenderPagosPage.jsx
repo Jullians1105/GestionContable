@@ -58,9 +58,8 @@ const TD_STYLE = {
 const TD_EMPTY_CLS = 'border border-[#E5E7EB] bg-[#F9FAFB]'
 const TD_PEND_CLS  = 'border border-[#E5E7EB] bg-[#F9FAFB]'
 const TD_BLOQ_CLS  = 'border border-[#D1D5DB] bg-[#E5E7EB]'
-const TD_ENV_CLS   = 'border border-[#93C5FD] bg-[#DBEAFE]'
+const TD_ENV_CLS   = 'border border-[#93C5FD]'
 const TD_PAG_CLS   = 'border border-[#86EFAC] bg-[#DCFCE7]'
-const TD_ENV_RES_CLS = 'border border-[#93C5FD] bg-[#F0F9FF]'
 
 // Wrappers flex para usar DENTRO de cada td
 const ROW = { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }
@@ -89,10 +88,18 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   const [hovEditar,    setHovEditar]    = useState(false)
   const [hovNota,      setHovNota]      = useState(false)
   const [hovBloqueado, setHovBloqueado] = useState(false)
-  const [notaInput,    setNotaInput]    = useState({ open: false, draft: '' })
-  // Editor de nota genérico — disponible en cualquier estado, independiente
-  // del flujo de "Rechazado" (notaInput arriba). Un solo campo nota vigente
-  // por fila, sin historial — mismo patrón que Seguimiento Mensual.
+  // Separado de hovBloqueado a propósito: aunque el chip "Bloqueado" y el
+  // ícono de esquina "Bloquear" nunca se muestran a la vez (dependen de
+  // autorizado), compartir el mismo booleano hacía que al hacer clic en
+  // "Autorizar" el ícono de esquina apareciera ya "en hover" — el mouse
+  // nunca dispara mouseleave porque el elemento bajo el cursor desaparece
+  // al re-renderizar, así que el estado quedaba pegado en true.
+  const [hovBloquear,  setHovBloquear]  = useState(false)
+  const [hovEnviado,      setHovEnviado]      = useState(false)
+  const [hovEnvPagado,    setHovEnvPagado]    = useState(false)
+  const [hovEnvRechazado, setHovEnvRechazado] = useState(false)
+  // Editor de nota genérico — disponible en cualquier estado. Un solo campo
+  // nota vigente por fila, sin historial — mismo patrón que Seguimiento Mensual.
   const [notaEditor,   setNotaEditor]   = useState({ open: false, draft: '' })
 
   const debito    = mesesDebidos.find(md => md.anio === anio && md.mes === mes) ?? null
@@ -198,48 +205,6 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
     )
   }
 
-  // Vista de solo lectura de la nota — sin ícono genérico clickeable, solo
-  // hover para previsualizar. Usada en Rechazado, que ya tiene su propio
-  // flujo de nota (motivo de rechazo) y donde el ícono genérico se superpone
-  // con el texto/badge del estado.
-  function renderNotaPreview(theme, notaValue) {
-    if (!notaValue?.trim()) return null
-    const c = NOTA_THEMES[theme]
-    return (
-      <>
-        <div
-          style={{
-            position: 'absolute', bottom: 6, right: 6, height: 22,
-            width: hovNota ? 60 : 22,
-            background: hovNota ? c.hover : c.soft,
-            borderRadius: 11, overflow: 'hidden',
-            transition: 'width 220ms ease-out, background 150ms ease-out',
-            display: 'flex', alignItems: 'center', paddingLeft: 4, gap: 2,
-            cursor: 'default', whiteSpace: 'nowrap', zIndex: 1,
-          }}
-          onMouseEnter={(e) => { e.stopPropagation(); setHovNota(true) }}
-          onMouseLeave={() => setHovNota(false)}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 13, color: c.icon, lineHeight: 1, flexShrink: 0 }}>sticky_note_2</span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: c.label, opacity: hovNota ? 1 : 0, transition: 'opacity 140ms ease-out 60ms' }}>Nota</span>
-        </div>
-
-        <div style={{
-          position: 'absolute', bottom: 34, right: 6, width: 190,
-          background: 'white', borderRadius: 8,
-          boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
-          border: `1px solid ${c.border}`, padding: '10px 12px', zIndex: 200,
-          opacity: hovNota ? 1 : 0, pointerEvents: 'none',
-          transform: hovNota ? 'translateY(0)' : 'translateY(6px)',
-          transition: 'opacity 160ms ease-out, transform 160ms ease-out',
-        }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: c.heading, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 5 }}>Nota</div>
-          <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5, wordBreak: 'break-word' }}>{notaValue}</div>
-        </div>
-      </>
-    )
-  }
-
   // ── Fuera de mesesDebidos ────────────────────────────────────────────────────
   if (!debito) {
     if (histEntry?.estado === 'aprobado') {
@@ -292,69 +257,90 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   if (estado === 'pendiente') {
     return (
       <td colSpan={2} className={autorizado ? TD_PEND_CLS : TD_BLOQ_CLS} style={{ ...TD_STYLE, position: 'relative' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+        {/* padding horizontal reserva la franja de las esquinas (nota abajo,
+            bloquear arriba) para que el contenido centrado nunca quede debajo
+            de esos íconos, aunque el texto/pill crezca */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 46, padding: '0 28px' }}>
           {autorizado ? (
-            <>
-              <div style={ROW}>
-                <span style={{ ...BTN.base, ...BTN.pendiente }}>Pendiente</span>
-                <button
-                  className="hover:opacity-80"
-                  onClick={() => act('enviado')}
-                  style={{ ...BTN.base, ...BTN.pill, ...BTN.enviado }}
-                >
-                  Enviado →
-                </button>
-              </div>
-
-              {/* Toggle de autorización — ícono simple, tenue por defecto y a
-                  toda opacidad al hover; el significado va en el title. En su
-                  propia fila para que nunca invada el resto de la celda. */}
-              {canAutorizar && (
-                <button
-                  onClick={() => act('autorizar', { autorizado: false })}
-                  title="Bloquear envío hasta nueva orden"
-                  className="opacity-50 hover:opacity-100 transition-opacity duration-150"
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
-                  }}
-                >
-                  <span
-                    className="material-symbols-outlined"
-                    style={{ fontSize: 14, color: '#9CA3AF', lineHeight: 1 }}
-                  >
-                    lock_open
-                  </span>
-                </button>
-              )}
-            </>
+            <div style={ROW}>
+              <span style={{ ...BTN.base, ...BTN.pendiente }}>Pendiente</span>
+              <button
+                className="hover:opacity-80"
+                onClick={() => act('enviado')}
+                style={{ ...BTN.base, ...BTN.pill, ...BTN.enviado }}
+              >
+                Enviado →
+              </button>
+            </div>
           ) : canAutorizar ? (
-            // Chip único clickeable: icono + texto fusionados, ejecuta la autorización real
+            // Chip único clickeable: pill con fondo propio (contrasta contra
+            // TD_BLOQ_CLS que ya es gris) para que el ícono tenga espacio real
+            // y no se vea recortado, y para comunicar affordance de clic —
+            // mismo mecanismo de fondo+label que cambia en hover que usan
+            // Rechazado ("Pendiente reenvío") y Enviado (split).
             <button
-              onClick={() => act('autorizar', { autorizado: true })}
+              onClick={() => { act('autorizar', { autorizado: true }); setHovBloqueado(false) }}
               onMouseEnter={() => setHovBloqueado(true)}
               onMouseLeave={() => setHovBloqueado(false)}
-              title="Autorizar envío"
-              className="transition-colors duration-150"
+              title="Clic para autorizar envío"
               style={{
                 ...BTN.base,
-                display: 'flex', alignItems: 'center', gap: 4,
-                border: 'none', background: 'transparent', padding: 0, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                borderRadius: 9999, padding: '5px 12px', cursor: 'pointer',
+                border: `1px solid ${hovBloqueado ? '#86EFAC' : '#D1D5DB'}`,
+                background: hovBloqueado ? '#DCFCE7' : '#FFFFFF',
                 color: hovBloqueado ? '#166534' : '#4B5563', fontWeight: 600, fontSize: 12,
+                transition: 'background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out',
               }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14, lineHeight: 1, flexShrink: 0 }}>
                 {hovBloqueado ? 'lock_open' : 'lock'}
               </span>
-              Bloqueado
+              {hovBloqueado ? 'Autorizar' : 'Bloqueado'}
             </button>
           ) : (
-            <span style={{ ...BTN.base, color: '#4B5563', fontWeight: 600, fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>lock</span>
+            <span style={{
+              ...BTN.base,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+              borderRadius: 9999, padding: '5px 12px',
+              border: '1px solid #D1D5DB', background: '#FFFFFF',
+              color: '#4B5563', fontWeight: 600, fontSize: 12,
+            }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 14, lineHeight: 1, flexShrink: 0 }}>lock</span>
               Bloqueado
             </span>
           )}
         </div>
+
+        {/* Toggle de bloqueo — esquina superior derecha, fuera del flujo,
+            mismo patrón de "editar" en Pagado: ícono fijo que expande con
+            label al hacer hover, nunca empuja la altura de la celda.
+            Estado propio (hovBloquear) — ver comentario junto a su
+            declaración sobre por qué no comparte hovBloqueado. */}
+        {canAutorizar && autorizado && (
+          <div
+            onClick={() => { act('autorizar', { autorizado: false }); setHovBloquear(false) }}
+            onMouseEnter={() => setHovBloquear(true)}
+            onMouseLeave={() => setHovBloquear(false)}
+            title="Bloquear envío hasta nueva orden"
+            style={{
+              position: 'absolute', top: 6, right: 6, height: 22,
+              width: hovBloquear ? 76 : 22,
+              background: hovBloquear ? '#FED7AA' : 'rgba(107,114,128,0.08)',
+              border: 'none', borderRadius: 11, overflow: 'hidden',
+              transition: 'width 220ms ease-out, background 150ms ease-out',
+              display: 'flex', alignItems: 'center', paddingLeft: 4, gap: 2,
+              cursor: 'pointer', whiteSpace: 'nowrap', zIndex: 2,
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 13, color: hovBloquear ? '#B45309' : '#9CA3AF', lineHeight: 1, flexShrink: 0 }}>
+              {hovBloquear ? 'lock' : 'lock_open'}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#B45309', opacity: hovBloquear ? 1 : 0, transition: 'opacity 140ms ease-out 60ms' }}>
+              Bloquear
+            </span>
+          </div>
+        )}
         {renderNotaButton('gray', nota)}
       </td>
     )
@@ -363,57 +349,71 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
   // ── Enviado ──────────────────────────────────────────────────────────────────
   if (estado === 'enviado') {
     return (
-      <>
-        <td className={TD_ENV_CLS} style={TD_STYLE}>
-          <span style={{ ...BTN.base, ...BTN.enviadoFix }}>Enviado</span>
-        </td>
-        <td className={TD_ENV_RES_CLS} style={{ ...TD_STYLE, padding: '6px 12px', position: 'relative' }}>
-          {notaInput.open ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%' }}>
-              <input
-                autoFocus
-                value={notaInput.draft}
-                onChange={e => setNotaInput(s => ({ ...s, draft: e.target.value }))}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { act('rechazado', { nota: notaInput.draft }); setNotaInput({ open: false, draft: '' }) }
-                  if (e.key === 'Escape') setNotaInput({ open: false, draft: '' })
-                }}
-                placeholder="Motivo del rechazo..."
-                style={{
-                  width: '100%', padding: '4px 8px', fontSize: 11, borderRadius: 6,
-                  border: '1px solid #93C5FD', outline: 'none', boxSizing: 'border-box',
-                  background: 'rgba(255,255,255,0.8)',
-                }}
-              />
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button
-                  className="hover:opacity-80"
-                  onClick={() => { act('rechazado', { nota: notaInput.draft }); setNotaInput({ open: false, draft: '' }) }}
-                  style={{ flex: 1, padding: '4px 0', borderRadius: 6, border: 'none', background: '#EF4444', color: '#fff', fontWeight: 600, fontSize: 11, cursor: 'pointer', transition: 'all 150ms ease-out' }}
-                >OK</button>
-                <button
-                  onClick={() => setNotaInput({ open: false, draft: '' })}
-                  style={{ padding: '4px 8px', borderRadius: 6, border: 'none', background: 'rgba(255,255,255,0.6)', color: '#444441', fontWeight: 400, fontSize: 11, cursor: 'pointer' }}
-                >×</button>
-              </div>
+      <td
+        colSpan={2}
+        className={TD_ENV_CLS}
+        style={{
+          ...TD_STYLE,
+          position: 'relative',
+          background: hovEnviado ? '#BFDBFE' : '#DBEAFE',
+          transition: 'background-color 200ms ease-out',
+        }}
+        onMouseEnter={() => setHovEnviado(true)}
+        onMouseLeave={() => { setHovEnviado(false); setHovEnvPagado(false); setHovEnvRechazado(false) }}
+      >
+        {hovEnviado ? (
+          // Ocupa la casilla completa de borde a borde (inset:0 respecto al
+          // td relative — el "padding box" incluye el padding del td, así
+          // que cubre el mismo espacio visual que ya cubre el fondo de
+          // Rechazado standalone, sin dejar ver el azul del fondo detrás).
+          <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+            <div
+              onClick={() => act('aprobado')}
+              onMouseEnter={() => setHovEnvPagado(true)}
+              onMouseLeave={() => setHovEnvPagado(false)}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                // paddingBottom reserva la franja del ícono de nota (bottom-
+                // right) — el fondo sigue llegando hasta el borde (cubre
+                // todo el padding-box), solo el texto se corre hacia arriba.
+                paddingBottom: 22,
+                cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                color: '#166534',
+                // Reposo: gris neutro (misma idea "aún por elegir" que otros
+                // grises del archivo, ej. el botón cancelar del editor de nota).
+                // Hover: el mismo bg que ya usa la celda Pagado standalone
+                // (TD_PAG_CLS) — previsualiza literalmente el resultado.
+                background: hovEnvPagado ? '#DCFCE7' : '#F3F4F6',
+                transition: 'background-color 200ms ease-out',
+              }}
+            >
+              Pagado
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-              <button
-                className="hover:opacity-80"
-                onClick={() => act('aprobado')}
-                style={{ ...BTN.base, ...BTN.pill, ...BTN.pagado, width: 90, padding: '4px 14px' }}
-              >Pagado</button>
-              <button
-                className="hover:opacity-80"
-                onClick={() => setNotaInput({ open: true, draft: '' })}
-                style={{ ...BTN.base, ...BTN.pill, ...BTN.rechazado, width: 90, padding: '4px 14px' }}
-              >Rechazado</button>
+            <div
+              onClick={() => act('rechazado')}
+              onMouseEnter={() => setHovEnvRechazado(true)}
+              onMouseLeave={() => setHovEnvRechazado(false)}
+              style={{
+                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                paddingBottom: 22,
+                cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                color: '#B91C1C',
+                // Mismo criterio: reposo neutro, hover = bg real de la celda
+                // Rechazado standalone (en reposo, sin su propio hover).
+                background: hovEnvRechazado ? '#FEE2E2' : '#F3F4F6',
+                transition: 'background-color 200ms ease-out',
+              }}
+            >
+              Rechazado
             </div>
-          )}
-          {!notaInput.open && renderNotaButton('blue', nota)}
-        </td>
-      </>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 46 }}>
+            <span style={{ ...BTN.base, ...BTN.enviadoFix }}>Enviado</span>
+          </div>
+        )}
+        {renderNotaButton('blue', nota)}
+      </td>
     )
   }
 
@@ -434,8 +434,10 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
         onClick={() => act('pendiente')}
         title="Clic para reenviar"
       >
-        {/* Texto centrado — separado de la nota para no desplazarse */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 46 }}>
+        {/* Texto centrado — separado de la nota para no desplazarse. Padding
+            horizontal reserva la franja del ícono de nota (bottom-right) para
+            que "Pendiente reenvío" nunca quede debajo al hacer hover. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 46, padding: '0 28px' }}>
           <span style={{
             ...BTN.base,
             fontWeight: 600,
@@ -447,7 +449,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
           </span>
         </div>
 
-        {renderNotaPreview('red', nota)}
+        {renderNotaButton('red', nota)}
       </td>
     )
   }
@@ -623,13 +625,16 @@ export default function FondoEmprenderPagosPage() {
       }
 
       case 'rechazado': {
+        // nota es opcional (rechazo directo desde el split de Enviado) — solo
+        // se sobrescribe localmente si vino definida, para no pisar con
+        // undefined una nota existente mientras el backend la preserva (COALESCE).
         updateRow(r => ({
           ...r,
           mesesDebidos: r.mesesDebidos.map(md =>
-            md.anio === anio && md.mes === mes ? { ...md, estado: 'rechazado', nota } : md
+            md.anio === anio && md.mes === mes ? { ...md, estado: 'rechazado', ...(nota !== undefined ? { nota } : {}) } : md
           ),
           historialCompleto: r.historialCompleto.map(h =>
-            h.id === pagoId ? { ...h, estado: 'rechazado', nota } : h
+            h.id === pagoId ? { ...h, estado: 'rechazado', ...(nota !== undefined ? { nota } : {}) } : h
           ),
         }))
         try {
