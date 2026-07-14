@@ -103,7 +103,6 @@ GestionTareasOficina/
 ├── scripts/
 │   ├── start-dev.sh            # Levanta Docker Compose para desarrollo
 │   ├── stop-dev.sh
-│   ├── backup-db.sh            # pg_dump manual (legacy, usar backup.sh)
 │   ├── backup.sh               # Backup completo: BD + .env + certs, comprimido, rotación 7 días
 │   ├── restore.sh              # Restaura desde backup_TIMESTAMP.tar.gz
 │   ├── setup-cron.sh           # Instala cron de backup diario a las 6 PM
@@ -404,7 +403,7 @@ docker compose down
 # Scripts auxiliares
 chmod +x scripts/*.sh
 ./scripts/start-dev.sh
-./scripts/backup-db.sh
+./scripts/backup.sh
 ```
 
 ---

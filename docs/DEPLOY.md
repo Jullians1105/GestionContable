@@ -172,7 +172,7 @@ Configurar un backup diario de la base de datos a las 2:00 AM:
 
 ```bash
 # Dar permisos al script
-chmod +x scripts/backup-db.sh
+chmod +x scripts/backup.sh
 
 # Editar el crontab del usuario actual
 crontab -e
@@ -180,16 +180,10 @@ crontab -e
 
 Añadir esta línea al crontab:
 ```cron
-0 2 * * * /home/$USER/taskflow/scripts/backup-db.sh >> /home/$USER/taskflow/backups/backup.log 2>&1
+0 2 * * * /home/$USER/taskflow/scripts/backup.sh >> /home/$USER/taskflow/backups/backup.log 2>&1
 ```
 
-Los backups se guardan en `backups/taskflow_YYYYMMDD_HHMMSS.sql`.
-
-Limpiar backups antiguos (mantener solo los últimos 7 días):
-```bash
-# Añadir también al crontab
-0 3 * * * find /home/$USER/taskflow/backups -name "*.sql" -mtime +7 -delete
-```
+Los backups se guardan comprimidos en `backups/backup_YYYYMMDD_HHMMSS.tar.gz`. La rotación automática (mantener últimos 7 días) está integrada en el script, no requiere cron adicional.
 
 ---
 

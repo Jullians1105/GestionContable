@@ -131,7 +131,7 @@ if (process.env.N8N_WEBHOOK_TASK_ASSIGNED) {
 **Trigger:** Schedule → cada domingo a las 3:00 AM  
 **Flujo:**
 1. `Schedule Trigger` → cron: `0 3 * * 0`
-2. `Execute Command` → `./scripts/backup-db.sh` (si n8n tiene acceso al host)
+2. `Execute Command` → `./scripts/backup.sh` (si n8n tiene acceso al host)
 3. `Send Email` → confirmar backup completado con timestamp
 
 > Alternativa más simple: configurar el crontab del servidor directamente (ver `docs/DEPLOY.md`).
