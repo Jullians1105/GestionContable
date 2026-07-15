@@ -1,5 +1,5 @@
 -- Fondo Emprender — checklist de impuestos de la tarjeta "Información tributaria" (mp6)
--- Migración 020
+-- Migración 023
 --
 -- Independiente del checklist mensual (fondo_procesos / fondo_checklist_meses /
 -- fondo_checklist_items, migración 008): esas tablas pertenecen a Seguimiento

@@ -135,6 +135,8 @@ export default function FondoEmprenderEmpresaDetallePage() {
   const [error, setError]               = useState(null)
   // notasDraft tracks in-progress edits; saves on blur to avoid per-keystroke API calls
   const [notasDraft, setNotasDraft]     = useState({})
+  // Qué ítem de impuesto tiene el textarea de nota desplegado (inline, no flotante)
+  const [notaAbiertaId, setNotaAbiertaId] = useState(null)
 
   const fetchDetalle = useCallback(async () => {
     try {
@@ -150,6 +152,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
       setImpuestosItems(impuestosData.items)
       const drafts = {}
       detalleData.macroprocesos.forEach(m => { drafts[m.id] = m.nota ?? '' })
+      impuestosData.items.forEach(it => { drafts[it.id] = it.nota ?? '' })
       setNotasDraft(drafts)
     } catch (err) {
       setError(err.message || 'Error al cargar detalle')
@@ -208,6 +211,9 @@ export default function FondoEmprenderEmpresaDetallePage() {
     try {
       const actualizado = await api.updateFondoImpuestoItem(empresaId, item.impuestoId, anio, mes, updates)
       setImpuestosItems(prev => prev.map(it => it.id === item.id ? { ...it, ...actualizado } : it))
+      if ('nota' in updates) {
+        setNotasDraft(prev => ({ ...prev, [item.id]: actualizado.nota ?? '' }))
+      }
     } catch (err) {
       setImpuestosItems(previous)
       setMacros(prev => prev.map(m => m.id !== 6 ? m : { ...m, estado: deriveImpuestosEstado(previous) }))
@@ -371,18 +377,64 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     Impuestos
                   </label>
                   <div className="space-y-2">
-                    {impuestosItems.map(item => (
-                      <div key={item.id} className="flex flex-col gap-1">
-                        <span className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8]">
-                          {item.nombre}
-                        </span>
-                        <EstadoButtonGroup
-                          options={IMPUESTO_ITEM_STATUS}
-                          value={item.estado}
-                          onChange={key => handleUpdateImpuesto(item, { estado: key })}
-                        />
-                      </div>
-                    ))}
+                    {impuestosItems.map(item => {
+                      const notaAbierta = notaAbiertaId === item.id
+                      const tieneNota   = !!item.nota?.trim()
+                      return (
+                        <div key={item.id} className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8]">
+                              {item.nombre}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setNotasDraft(prev => ({ ...prev, [item.id]: item.nota ?? '' }))
+                                setNotaAbiertaId(prev => prev === item.id ? null : item.id)
+                              }}
+                              title={tieneNota ? 'Editar nota' : 'Agregar nota'}
+                              className="flex-shrink-0 text-[#9ca3af] hover:text-[#6b7280] dark:hover:text-[#c4c8e8] transition"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 13, lineHeight: 1 }}>edit</span>
+                            </button>
+                          </div>
+                          <EstadoButtonGroup
+                            options={IMPUESTO_ITEM_STATUS}
+                            value={item.estado}
+                            onChange={key => handleUpdateImpuesto(item, { estado: key })}
+                          />
+                          {tieneNota && !notaAbierta && (
+                            <div className="rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] px-2.5 py-1.5">
+                              <p className="text-[9px] font-semibold text-[#8890b5] uppercase tracking-wide mb-0.5">
+                                Nota
+                              </p>
+                              <p
+                                className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate"
+                                title={item.nota}
+                              >
+                                {item.nota}
+                              </p>
+                            </div>
+                          )}
+                          {notaAbierta && (
+                            <textarea
+                              autoFocus
+                              value={notasDraft[item.id] ?? ''}
+                              onChange={e => setNotasDraft(prev => ({ ...prev, [item.id]: e.target.value }))}
+                              onBlur={e => {
+                                const newNota = e.target.value
+                                if (newNota !== (item.nota ?? '')) {
+                                  handleUpdateImpuesto(item, { nota: newNota })
+                                }
+                                setNotaAbiertaId(null)
+                              }}
+                              placeholder="Notas adicionales..."
+                              rows={2}
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
