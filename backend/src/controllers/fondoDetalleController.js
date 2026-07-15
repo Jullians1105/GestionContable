@@ -29,13 +29,24 @@ const normalizeDetalle = (row) => ({
   })),
 });
 
+// mp6 (Información tributaria) deriva su estado de fondo_impuestos_items —
+// tabla independiente de fondo_checklist_meses/fondo_checklist_items (esas
+// pertenecen a Seguimiento Mensual y solo alimentan mp5/Contabilidad).
+const deriveImpuestosEstado = (rows) => {
+  const noNa = rows.map(r => r.estado).filter(e => e !== 'na');
+  if (noNa.length === 0) return 'na';
+  if (noNa.every(e => e === 'presented')) return 'done';
+  if (noNa.some(e => e === 'presented')) return 'in_progress';
+  return 'pending';
+};
+
 const getDetalle = async (req, res, next) => {
   try {
     const { empresaId } = req.params;
     const anio = parseInt(req.query.anio, 10);
     const mes  = parseInt(req.query.mes, 10);
 
-    const [mpResult, mp5Result] = await Promise.all([
+    const [mpResult, mp5Result, impuestosResult] = await Promise.all([
       db.query(
         `SELECT mp.id, mp.nombre, d.estado, d.responsable_id, d.nota, d.updated_at,
                 (
@@ -75,11 +86,33 @@ const getDetalle = async (req, res, next) => {
          LIMIT 1`,
         [empresaId, anio, mes]
       ),
+      db.query(
+        `SELECT COALESCE(fi.estado, 'pending') AS estado
+         FROM fondo_impuestos i
+         LEFT JOIN fondo_impuestos_items fi
+                ON fi.impuesto_id = i.id
+               AND fi.empresa_id  = $1
+               AND fi.anio        = $2
+               AND fi.mes         = $3`,
+        [empresaId, anio, mes]
+      ),
     ]);
 
     const mp5Confirmed = mp5Result.rows.length > 0 ? mp5Result.rows[0].confirmed : false;
 
     const macroprocesos = mpResult.rows.map(normalizeDetalle);
+
+    // mp6 (Información tributaria): el estado propio de la fila se reemplaza por
+    // el derivado del checklist de impuestos; responsable/nota/tareasVinculadas
+    // siguen viniendo de fondo_detalle_macroprocesos y se mantienen editables.
+    const mp6Index = macroprocesos.findIndex(m => m.id === 6);
+    if (mp6Index !== -1) {
+      macroprocesos[mp6Index] = {
+        ...macroprocesos[mp6Index],
+        estado: deriveImpuestosEstado(impuestosResult.rows),
+        readonly: true,
+      };
+    }
 
     // mp5 (Contabilidad) es readonly — se deriva de fondo_checklist_meses.confirmed
     const mp5 = {

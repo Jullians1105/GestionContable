@@ -28,6 +28,7 @@ const fondoEmpresasRoutes   = require('./routes/fondoEmpresas');
 const fondoProcesosRoutes   = require('./routes/fondoProcesos');
 const fondoChecklistRoutes  = require('./routes/fondoChecklist');
 const fondoDetalleRoutes    = require('./routes/fondoDetalle');
+const fondoImpuestosRoutes  = require('./routes/fondoImpuestos');
 const fondoPagosRoutes      = require('./routes/fondoPagos');
 const fondoLinksRoutes      = require('./routes/fondoLinks');
 
@@ -142,6 +143,7 @@ app.use('/api/fondo/empresas',   fondoEmpresasRoutes);
 app.use('/api/fondo/procesos',   fondoProcesosRoutes);
 app.use('/api/fondo/checklist',  fondoChecklistRoutes);
 app.use('/api/fondo/detalle',    fondoDetalleRoutes);
+app.use('/api/fondo/impuestos',  fondoImpuestosRoutes);
 app.use('/api/fondo/pagos',      fondoPagosRoutes);
 app.use('/api/tasks',            fondoLinksRoutes);
 
