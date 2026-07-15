@@ -209,7 +209,11 @@ export default function FondoEmprenderEmpresaDetallePage() {
         setNotasDraft(prev => ({ ...prev, [macroId]: actualizado.nota ?? '' }))
       }
     } catch (err) {
-      alert(err.status === 403 ? err.message : 'Error: ' + err.message)
+      if (err.status === 403) {
+        alert('No tienes permiso para editar macroprocesos')
+      } else {
+        alert('Error: ' + err.message)
+      }
     }
   }, [empresaId, anio, mes])
 
@@ -227,7 +231,11 @@ export default function FondoEmprenderEmpresaDetallePage() {
     } catch (err) {
       setImpuestosItems(previous)
       setMacros(prev => prev.map(m => m.id !== 6 ? m : { ...m, estado: deriveImpuestosEstado(previous) }))
-      alert(err.status === 403 ? err.message : 'Error: ' + err.message)
+      if (err.status === 403) {
+        alert('No tienes permiso para editar el checklist de impuestos')
+      } else {
+        alert('Error: ' + err.message)
+      }
     }
   }, [empresaId, anio, mes, impuestosItems])
 

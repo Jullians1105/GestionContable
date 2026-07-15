@@ -1,7 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
-const { isMesHabilitado } = require('../utils/mesVencido');
 
 const MP_CATALOG = [
   { id: 1, nombre: 'Facturación' },
@@ -186,10 +185,6 @@ const updateDetalle = async (req, res, next) => {
 
     const { responsableId, nota, estado, anio, mes } = req.body;
     const mpKey = `mp${macroNum}`;
-
-    if (!isMesHabilitado(anio, mes)) {
-      return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
-    }
 
     const result = await db.query(
       `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, anio, mes, estado, responsable_id, nota)

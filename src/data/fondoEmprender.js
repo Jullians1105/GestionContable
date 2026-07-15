@@ -9,36 +9,6 @@
 // 'mp5' (Contabilidad) is always auto-calculated from the monthly confirmed flag
 // and must never accept a manual status change.
 
-// ── Mes habilitado para Seguimiento Mensual (checklist/macroprocesos/impuestos) ──
-// Mes vencido: el mes en curso todavía no ha "vencido", así que el mes
-// habilitado para editar es siempre el mes calendario anterior. Debe
-// coincidir con getMesVencidoHabilitado en backend/src/utils/mesVencido.js
-// (duplicado a propósito para no depender de una llamada de red solo para
-// esto — mismo criterio que deriveImpuestosEstado en
-// FondoEmprenderEmpresaDetallePage.jsx).
-export function getMesVencidoHabilitado(now = new Date()) {
-  const mesActual  = now.getMonth() + 1 // 1-12
-  const anioActual = now.getFullYear()
-  if (mesActual === 1) return { anio: anioActual - 1, mes: 12 }
-  return { anio: anioActual, mes: mesActual - 1 }
-}
-
-// Punto de partida de month/year (0-indexed) para las páginas de Seguimiento
-// Mensual: usa anio/mes de la URL solo si están dentro del rango habilitado;
-// si no vienen, o si apuntan a un mes bloqueado (ej. un enlace viejo a julio
-// antes de este límite), cae al mes habilitado en vez de "hoy" — así nunca
-// se aterriza en un mes que de todos modos no se puede editar.
-export function resolveMesInicial(searchParams) {
-  const habilitado = getMesVencidoHabilitado()
-  const m = parseInt(searchParams.get('mes')  ?? '', 10)
-  const y = parseInt(searchParams.get('anio') ?? '', 10)
-  const dentroDeRango = m >= 1 && m <= 12 && y >= 2000
-    && (y * 100 + m) <= (habilitado.anio * 100 + habilitado.mes)
-  return dentroDeRango
-    ? { year: y, month: m - 1 }
-    : { year: habilitado.anio, month: habilitado.mes - 1 }
-}
-
 export const MACRO_PROCESSES = [
   { id: 'mp1', name: 'Facturación' },
   { id: 'mp2', name: 'Nómina' },
