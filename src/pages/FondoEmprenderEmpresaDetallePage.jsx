@@ -37,6 +37,17 @@ const IMPUESTOS_TEXTO = {
   na:          'Sin impuestos aplicables este mes',
 }
 
+// Texto para mp4 (Documentos contador - Pagos), keyed por el estado crudo de
+// fondo_pagos (no por el estado agregado de 3 valores) para poder distinguir
+// "enviado" de "aprobado" aunque ambos deriven a 'done' (mp4 rastrea que los
+// documentos se enviaron, no si la fiduciaria ya confirmó el pago).
+const PAGOS_TEXTO = {
+  aprobado:  'Documentos enviados',
+  enviado:   'Documentos enviados',
+  rechazado: 'Pago rechazado — requiere corrección',
+  pendiente: 'Pago pendiente',
+}
+
 // Debe coincidir con deriveImpuestosEstado en
 // backend/src/controllers/fondoDetalleController.js — usado para reflejar el
 // estado de mp6 al instante tras editar un ítem, sin esperar un refetch.
@@ -307,9 +318,10 @@ export default function FondoEmprenderEmpresaDetallePage() {
         {macroprocesos.map(proc => {
           const isContabilidad = proc.id === 5
           const isImpuestos    = proc.id === 6
+          const isPagos        = proc.id === 4
           const cfgStatus = isContabilidad
             ? (proc.confirmed ? MACRO_STATUS.done : MACRO_STATUS.pending)
-            : isImpuestos
+            : (isImpuestos || isPagos)
               ? (AUTO_STATUS[proc.estado] ?? AUTO_STATUS.pending)
               : (MACRO_STATUS[proc.estado] ?? MACRO_STATUS.pending)
 
@@ -331,7 +343,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     {proc.nombre}
                   </h3>
                 </div>
-                {(isContabilidad || isImpuestos) && (
+                {(isContabilidad || isImpuestos || isPagos) && (
                   <span className="text-[9px] font-bold uppercase tracking-wide text-[#8890b5] bg-[#f3f4f6] dark:bg-[#252840] px-1.5 py-0.5 rounded flex-shrink-0">
                     Auto
                   </span>
@@ -368,6 +380,22 @@ export default function FondoEmprenderEmpresaDetallePage() {
                   </p>
                   <p className="text-[#9ca3af] mt-1" style={{ fontSize: 10 }}>
                     Estado calculado desde el checklist de impuestos
+                  </p>
+                </div>
+              ) : isPagos ? (
+                <div className="rounded-lg p-2.5 text-xs leading-relaxed" style={{ background: cfgStatus.bg }}>
+                  <p className="font-semibold" style={{ color: cfgStatus.color }}>
+                    {PAGOS_TEXTO[proc.pagoEstado] ?? PAGOS_TEXTO.pendiente}
+                  </p>
+                  <p className="text-[#9ca3af] mt-1" style={{ fontSize: 10 }}>
+                    Estado calculado desde el módulo de Pagos ·{' '}
+                    <Link
+                      to="/fondo-emprender/pagos"
+                      className="underline underline-offset-2 font-medium"
+                      style={{ color: '#004ac6' }}
+                    >
+                      ir a pagos
+                    </Link>
                   </p>
                 </div>
               ) : (
