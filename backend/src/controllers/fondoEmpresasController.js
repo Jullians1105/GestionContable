@@ -35,7 +35,28 @@ const getEmpresas = async (req, res, next) => {
                 SELECT COUNT(*)::int FROM fondo_detalle_macroprocesos d
                 WHERE d.empresa_id = e.id AND d.estado = 'done'
                   AND d.anio = $1 AND d.mes = $2
-              ), 0) AS macros_done,
+                  AND d.macroproceso_id <> 'mp6'
+              ), 0)
+              +
+              -- mp6/Información tributaria no vive en fondo_detalle_macroprocesos —
+              -- se deriva de fondo_impuestos_items, misma lógica que
+              -- deriveImpuestosEstado en fondoDetalleController.js: cuenta como
+              -- done si ningún ítem quedó en 'pending' (los 4 en 'na' también
+              -- cuentan como done — ya se revisó y no había nada que presentar).
+              CASE WHEN COALESCE((
+                SELECT
+                  CASE
+                    WHEN COUNT(*) FILTER (WHERE COALESCE(fi.estado, 'pending') NOT IN ('na', 'presented')) > 0 THEN false
+                    ELSE true
+                  END
+                FROM fondo_impuestos i
+                LEFT JOIN fondo_impuestos_items fi
+                       ON fi.impuesto_id = i.id
+                      AND fi.empresa_id  = e.id
+                      AND fi.anio        = $1
+                      AND fi.mes         = $2
+              ), false) THEN 1 ELSE 0 END
+              AS macros_done,
               COALESCE((
                 SELECT COUNT(*)::int FROM fondo_detalle_macroprocesos d
                 WHERE d.empresa_id = e.id AND d.estado = 'in_progress'

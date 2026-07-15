@@ -32,9 +32,13 @@ const normalizeDetalle = (row) => ({
 // mp6 (Información tributaria) deriva su estado de fondo_impuestos_items —
 // tabla independiente de fondo_checklist_meses/fondo_checklist_items (esas
 // pertenecen a Seguimiento Mensual y solo alimentan mp5/Contabilidad).
+// Los 4 en 'na' cuentan como 'done': ya se revisó la empresa ese mes y no
+// tenía impuestos que presentar, el proceso queda resuelto (no pendiente).
+// El texto distinto para ese caso ("Sin impuestos aplicables...") se resuelve
+// aparte en el frontend a partir de los items crudos, no de este estado.
 const deriveImpuestosEstado = (rows) => {
   const noNa = rows.map(r => r.estado).filter(e => e !== 'na');
-  if (noNa.length === 0) return 'na';
+  if (noNa.length === 0) return 'done';
   if (noNa.every(e => e === 'presented')) return 'done';
   if (noNa.some(e => e === 'presented')) return 'in_progress';
   return 'pending';

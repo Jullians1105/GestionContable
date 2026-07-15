@@ -40,9 +40,12 @@ const IMPUESTOS_TEXTO = {
 // Debe coincidir con deriveImpuestosEstado en
 // backend/src/controllers/fondoDetalleController.js — usado para reflejar el
 // estado de mp6 al instante tras editar un ítem, sin esperar un refetch.
+// Los 4 en 'na' cuentan como 'done' (ya se revisó, no había nada que
+// presentar) — el texto distinto para ese caso se resuelve aparte, ver
+// impuestosTexto más abajo.
 function deriveImpuestosEstado(items) {
   const noNa = items.map(i => i.estado).filter(e => e !== 'na')
-  if (noNa.length === 0) return 'na'
+  if (noNa.length === 0) return 'done'
   if (noNa.every(e => e === 'presented')) return 'done'
   if (noNa.some(e => e === 'presented')) return 'in_progress'
   return 'pending'
@@ -231,6 +234,11 @@ export default function FondoEmprenderEmpresaDetallePage() {
   const manualDone = macroprocesos.filter(m => m.id !== 5 && m.estado === 'done').length
   const totalDone  = manualDone + (contabDone ? 1 : 0)
 
+  // Texto del badge de mp6 — independiente del estado agregado (que ahora es
+  // 'done' tanto si se presentó todo como si los 4 quedaron en N/A), para
+  // poder seguir diferenciando el mensaje sin afectar color/conteo.
+  const impuestosTodoNa = impuestosItems.length > 0 && impuestosItems.every(it => it.estado === 'na')
+
   // ── Loading / error ───────────────────────────────────────────────────────
   if (loading) return (
     <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
@@ -356,7 +364,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
               ) : isImpuestos ? (
                 <div className="rounded-lg p-2.5 text-xs leading-relaxed" style={{ background: cfgStatus.bg }}>
                   <p className="font-semibold" style={{ color: cfgStatus.color }}>
-                    {IMPUESTOS_TEXTO[proc.estado] ?? IMPUESTOS_TEXTO.pending}
+                    {impuestosTodoNa ? IMPUESTOS_TEXTO.na : (IMPUESTOS_TEXTO[proc.estado] ?? IMPUESTOS_TEXTO.pending)}
                   </p>
                   <p className="text-[#9ca3af] mt-1" style={{ fontSize: 10 }}>
                     Estado calculado desde el checklist de impuestos
