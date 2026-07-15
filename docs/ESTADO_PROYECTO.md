@@ -1,14 +1,24 @@
 # Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
 
-**Última actualización:** 2026-07-11 (sesión 12 — revisión de seguridad de despliegue para
-`feat/funcionesNuevas`; fix en `CalendarPage` para días dentro del rango de vigencia de un
-template recurrente; corrección de `docs/DEPLOY.md` §6)  
-**Rama activa:** `feat/funcionesNuevas` (local, sin push aún; contiene Tablero de Carga de
-Trabajo + liderazgo por grupo, pendiente de merge a `main`)  
+**Última actualización:** 2026-07-13 (sesión 14 — subtareas: quién completó cada una; Equipo:
+editar/remover solo admin; filtro "Creadas por mí"; botón "Nueva Tarea" en el Header; solicitud
+de eliminación de tareas con aprobación de admin/líder — checklist #52-56)  
+**Rama activa:** `feat/ajustesResponsiveArregloBugs11/07` (local, sin push aún; sobre `main`
+tras el merge de `feat/funcionesNuevas` vía PR #13). Working tree **sin commitear todavía**,
+acumulando la sesión 13 (progreso individual por asignado — checklist #51) más toda la sesión 14
+(checklist #52-56): incluye `backend/migrations/019` a `021` sin trackear, más los archivos
+modificados de ambas sesiones. Plan: el usuario va a commitear, pushear la rama (sin abrir PR
+todavía — no hace falta para poder seguir trabajándola en otra máquina, `git fetch` +
+`git checkout` alcanza) y continuar desde un MacBook.  
+**Ojo si se retoma desde otra máquina:** `CLAUDE.md` (raíz) y toda la carpeta `.claude/`
+(incluida esta memoria de sesión) están en `.gitignore` — **no viajan con git push/pull/clone**.
+Si el trabajo continúa en el Mac, ese Claude Code arranca sin este contexto salvo que alguien
+copie esos archivos manualmente (AirDrop/USB/etc.), no vía git.  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
-**Ramas activas en remoto:** `main` (última: `f096c5e`, 2026-07-03 — filtros seguimiento
-mensual Fondo Emprender)  
+**Ramas activas en remoto:** `main` (`feat/funcionesNuevas` ya mergeada vía PR #13 —
+Tablero de Carga de Trabajo + liderazgo por grupo + fix `CalendarPage`; verificar con
+`git fetch` antes de asumir vigencia)  
 **Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)
 
 ---
@@ -155,6 +165,9 @@ GestionTareasOficina/
 | member | ❌ | ❌ | ✅ | ❌ |
 | viewer | ❌ | ❌ | ❌ | ❌ |
 
+Nota: member (y cualquiera que no sea viewer) puede *solicitar* la eliminación de una tarea con
+un motivo aunque no pueda borrarla directamente — ver checklist #56 (`task_delete_requests`).
+
 ### Backend API REST
 
 **Endpoints implementados:**
@@ -222,6 +235,16 @@ GET    /api/tasks/:id/fondo-link
 POST   /api/tasks/:id/fondo-link
 DELETE /api/tasks/:id/fondo-link
 
+PATCH  /api/tasks/:id/assignees/me         → marca el status individual del usuario autenticado
+                                              como asignado; tasks.status se recalcula como
+                                              agregado (completed solo si todos completaron)
+
+POST   /api/tasks/:id/delete-request       → solicita eliminar una tarea con motivo (cualquiera
+                                              que no sea viewer); notifica a admins + líder(es)
+                                              del grupo de la tarea
+PATCH  /api/tasks/:id/delete-request/:requestId → aprueba/rechaza (admin o líder del grupo);
+                                              mismo criterio de autorización que DELETE /:id
+
 GET    /api/tasks/templates                  → lista templates recurrentes (admin/leader)
 
 GET    /api/notifications
@@ -278,9 +301,12 @@ GET    /api/stats/workload                 → solo admin/leader; carga por pers
 | 016 | Columna `reminder_sent_at TIMESTAMPTZ` en tasks |
 | 017 | Elimina etiquetas de muestra del seed (bug, feature, urgente, documentación) vía DELETE por UUID |
 | 018 | `group_members.is_leader BOOLEAN` — soporte multi-líder por grupo (índice parcial `WHERE is_leader = true`) |
+| 019 | Tabla `task_assignees` (task_id, user_id, status, completed_at) — estado individual por asignado; backfill desde `tasks.assigned_to`/`status` existentes |
+| 020 | Columnas `completed_by`/`completed_at` en `task_subtasks` — quién completó cada subtarea; backfill best-effort de `completed_at` desde `updated_at` |
+| 021 | Tabla `task_delete_requests` (task_id, requested_by, reason, status, resolved_by, resolved_at) — solicitudes de eliminación con motivo; índice único parcial evita duplicar solicitudes pendientes por tarea |
 
 **Tests:**
-- Cobertura actual: **~79% statements / ~71% functions** (umbral: 70%)
+- Cobertura actual: **~81% statements / ~74% functions** (umbral: 70%)
 - 8 archivos unitarios: authController, taskController, groupController, statsController, middleware, routes, helpers, validators
 - 2 archivos de integración: auth.test.js, tasks.test.js
 - Excluidos de cobertura: `pushService.js`, `recurringTaskService.js`, `reminderService.js` (servicios de infraestructura)
@@ -471,3 +497,9 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 48 | Revisión de seguridad de BD antes de deploy de `feat/funcionesNuevas`: migración 018 es aditiva/idempotente (`ADD COLUMN IF NOT EXISTS` + `DEFAULT false`, `CREATE INDEX IF NOT EXISTS`), no toca datos existentes; `GET /api/stats/workload` es 100% de solo lectura; todas las columnas usadas en las queries nuevas ya existían salvo `is_leader` (la crea la propia 018). El orden migrar→arrancar backend ya está garantizado por `docker-compose.yml` (`backend` tiene `depends_on: migrate: condition: service_completed_successfully`), así que `docker compose up -d` solo es seguro sin pasos manuales extra — ver `docs/DEPLOY.md` §6 (actualizado con backup previo vía `scripts/backup.sh`) | ✅ Revisado 2026-07-11 |
 | 49 | Fix `CalendarPage`: al hacer clic en un día dentro del rango de vigencia (`recurrence.start_date`→`end_date`) de un template recurrente, el panel derecho ahora muestra el template como si fuera una tarea de ese día (antes solo aparecía en el día exacto proyectado `approx_day`, y el resto de días del rango sombreado mostraban "Sin tareas este día"). Verificado end-to-end con Playwright headless contra los contenedores `_dev` (usuario admin temporal creado y borrado en la BD para el test, no se usaron credenciales reales) | ✅ Implementado 2026-07-11 |
 | 50 | Corrección `docs/DEPLOY.md` §6: el paso de migración ya no depende de que la persona que despliega "revise si hay migraciones nuevas" — se descubrió que `docker-compose.yml` ya fuerza el orden correcto vía `backend: depends_on: migrate: condition: service_completed_successfully` (el `migrate` de ese archivo no tiene `profiles:`, a diferencia de lo que sugería la doc vieja con `--profile migrate`). Guía simplificada a 3 comandos (`git pull` → `build` → `up -d`) + backup previo recomendado con `./scripts/backup.sh` | ✅ Resuelto 2026-07-11 |
+| 51 | Progreso individual por asignado en tareas multi-persona: migración 019 (`task_assignees`, aditiva/idempotente, backfill desde `tasks.assigned_to`/`status`), fix del bug preexistente que descartaba todos los asignados salvo el primero al guardar, endpoint `PATCH /api/tasks/:id/assignees/me` (cada asignado marca su propio estado), `tasks.status` recalculado como agregado (completed solo si todos completaron), barra de progreso "X/Y completaron" en `TaskCard`/`TaskDetailModal` (mismo patrón visual que la barra de subtareas). Verificado end-to-end contra la API real de `taskflow_backend_dev` con usuarios temporales (creados y borrados en la BD para la prueba) | ✅ Implementado 2026-07-12 |
+| 52 | Quién completó cada subtarea: migración 020 (`task_subtasks.completed_by`/`completed_at`, aditiva), `updateSubtask` setea `completed_by` desde el usuario autenticado al marcar/desmarcar, texto "Completado por X" bajo cada subtarea tildada en `SubtaskList`. Alcance acotado a propósito (elegido por el usuario entre dos opciones): sin asignación previa de subtareas a personas específicas, cualquier responsable de la tarea puede tildar cualquier subtarea, solo se traza quién lo hizo. Verificado en la UI real (Playwright + usuario temporal) contra `taskflow_backend_dev`/`taskflow_frontend_dev` | ✅ Implementado 2026-07-13 |
+| 53 | Fix `TeamManager.jsx` (página `/team` "Equipo"): los botones "Editar" y "Remover del equipo" ahora solo se muestran si `isAdmin()` — antes se mostraban a cualquier rol autenticado (leader/member/viewer), aunque el backend (`PUT`/`DELETE /api/employees/:id`) ya exigía admin. "Agregar Miembro" queda fuera de este cambio (no se pidió). Verificado en la UI con dos usuarios temporales (admin ve 17/17 botones, member ve 0) | ✅ Implementado 2026-07-13 |
+| 54 | Filtro "Creadas por mí" en Mis Tareas (`TaskFilters.jsx`/`TaskList.jsx`): nuevo campo `createdBy` (= `tasks.user_id`) expuesto por `normalizeTask` (antes solo se exponía `createdByName`, sin el id, insuficiente para filtrar). Checkbox visible solo para admin/leader (mismo gate que el resto de `TaskFilters`, `canSeeAll`), ya que member/viewer no pueden crear tareas y de por sí solo ven las suyas asignadas. Sin migración (el dato ya existía en `tasks.user_id`). Verificado en la UI real: con el filtro activo pasó de 9 a 1 tarea (la creada por el usuario de prueba) | ✅ Implementado 2026-07-13 |
+| 55 | Botón "Nueva Tarea" siempre accesible desde `Header.jsx` (icono "+" azul, con label en `sm:` y superior), independiente de la barra lateral y disponible en cualquier página, no solo en `/tasks`. Antes la única forma de crear una tarea fuera de `/tasks` era el botón dentro de `Sidebar.jsx`, que en mobile exige primero abrir el drawer (hamburguesa) — ahora no hace falta. De paso se corrigió un overflow horizontal real en el header a 375px/360px (el avatar del usuario quedaba fuera de la pantalla, invisible/no clickeable): al formulario de búsqueda le faltaba `min-w-0`, por lo que no podía encoger más allá de su ancho mínimo de contenido y empujaba al resto de los íconos fuera del viewport (no se detectaba por `scrollWidth` porque es un elemento `fixed`, solo visible comparando screenshots). Verificado con Playwright en 4 anchos (360/375/768/1440px, sin overflow) y flujo completo de creación de tarea desde el Dashboard sin tocar el sidebar | ✅ Implementado 2026-07-13 |
+| 56 | Solicitud de eliminación de tareas: migración 021 (`task_delete_requests`, aditiva, índice único parcial evita solicitudes duplicadas pendientes), `POST /api/tasks/:id/delete-request` (motivo obligatorio, cualquiera que no sea viewer) y `PATCH /api/tasks/:id/delete-request/:requestId` (aprobar/rechazar — admin o líder del grupo de la tarea, mismo criterio que `DELETE /api/tasks/:id`). Notifica a todos los admins + líder(es) del grupo de la tarea (o solo admins si no tiene grupo); botones "Aprobar"/"Rechazar" inline en la notificación (`NotificationBell`/`NotificationsPage`) y banner con motivo + acciones en `TaskDetailModal` cuando hay una solicitud pendiente. Alcance elegido explícitamente por el usuario entre opciones: cualquiera con acceso a la tarea puede solicitar (no solo el asignado), notifica admin + líder del grupo (no solo admin), rechazo sin motivo adicional. 13 tests unitarios nuevos (`createDeleteRequest`/`respondDeleteRequest`), cobertura subió a 82%/75%. Bug encontrado y corregido durante la verificación: `resolveDeleteRequest` en `TaskContext.jsx` devolvía éxito falso si la tarea ya no estaba en el estado local (notificación vieja tras resolver dos veces) — la rama de backend real ahora llama a la API primero, sin depender del estado local; y como `notifications.task_id` queda `NULL` cuando se borra la tarea referenciada (`ON DELETE SET NULL`), se agregó un guard en el frontend para notificaciones con `taskId` nulo. Verificado end-to-end con Playwright (2 usuarios temporales, aprobación + rechazo + ambos casos de solicitud ya resuelta) | ✅ Implementado 2026-07-13 |

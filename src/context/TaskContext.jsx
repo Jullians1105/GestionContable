@@ -3,7 +3,7 @@ import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { api } from '../services/api'
 import { storage } from '../utils/storage'
-import { generateId, today, normalizeAssignedTo, isDueDateOverdue } from '../utils/helpers'
+import { generateId, today, normalizeAssignedTo, isDueDateOverdue, computeAggregateStatus } from '../utils/helpers'
 import { useAuth } from './AuthContext'
 import { useTeam } from './TeamContext'
 import { useSocket } from './SocketContext'
@@ -172,6 +172,90 @@ export function TaskProvider({ children }) {
     api.deleteTask(id).catch(() => {})
   }, [])
 
+  // Pide eliminar una tarea sin permiso directo de borrado (member): queda pendiente
+  // hasta que un admin o el líder del grupo de la tarea la apruebe o rechace.
+  const requestDeleteTask = useCallback(async (id, reason) => {
+    if (!user) return
+
+    if (useRealBackend) {
+      const res = await api.createDeleteRequest(id, reason)
+      const pendingDeleteRequest = {
+        id: res.id, reason: res.reason, requestedBy: user.id, requestedByName: user.name, createdAt: today(),
+      }
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, pendingDeleteRequest } : t))
+      return
+    }
+
+    const task = tasksRef.current.find(t => t.id === id)
+    if (!task) return
+    if (task.pendingDeleteRequest) throw new Error('Ya hay una solicitud de eliminación pendiente para esta tarea')
+    const pendingDeleteRequest = {
+      id: generateId('delreq'), reason, requestedBy: user.id, requestedByName: user.name, createdAt: today(),
+    }
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, pendingDeleteRequest } : t))
+    notifyLeaders(members, 'delete_request',
+      `${user.name} solicitó eliminar la tarea "${task.title}"`, id, user.id, { requestId: pendingDeleteRequest.id, reason })
+  }, [user, members, useRealBackend])
+
+  // Resuelve (aprueba/rechaza) una solicitud de eliminación pendiente. En aprobación,
+  // borra la tarea; en rechazo, solo limpia el flag pendiente.
+  const resolveDeleteRequest = useCallback(async (id, requestId, action) => {
+    // En modo backend real, la llamada a la API es la fuente de verdad — no depende de
+    // que la tarea siga en el estado local (p.ej. una notificación vieja que apunta a una
+    // solicitud ya resuelta debe fallar con el error del servidor, no devolver éxito falso).
+    if (useRealBackend) {
+      await api.respondDeleteRequest(id, requestId, action)
+      if (action === 'approve') {
+        setTasks(prev => prev.filter(t => t.id !== id))
+      } else {
+        setTasks(prev => prev.map(t => t.id === id ? { ...t, pendingDeleteRequest: null } : t))
+      }
+      return
+    }
+
+    const task = tasksRef.current.find(t => t.id === id)
+    if (!task) return
+    const requesterId = task.pendingDeleteRequest?.requestedBy
+    if (action === 'approve') {
+      setTasks(prev => prev.filter(t => t.id !== id))
+      api.deleteTask(id).catch(() => {})
+      if (requesterId) push(requesterId, 'delete_request_approved', `${user?.name ?? 'Alguien'} aprobó tu solicitud para eliminar "${task.title}"`, null)
+    } else {
+      setTasks(prev => prev.map(t => t.id === id ? { ...t, pendingDeleteRequest: null } : t))
+      if (requesterId) push(requesterId, 'delete_request_rejected', `${user?.name ?? 'Alguien'} rechazó tu solicitud para eliminar "${task.title}"`, id)
+    }
+  }, [user, useRealBackend])
+
+  // Marca el estado individual del usuario actual como asignado de la tarea.
+  // El status agregado de la tarea (usado por el badge/Kanban) se recalcula server-side
+  // en modo backend real; en modo localStorage se recalcula acá con el mismo criterio.
+  const updateMyAssigneeStatus = useCallback((taskId, status) => {
+    const task = tasksRef.current.find(t => t.id === taskId)
+    if (!task || !user) return
+
+    if (useRealBackend) {
+      api.updateMyAssigneeStatus(taskId, status)
+        .then(fullTask => setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t)))
+        .catch(() => {})
+      return
+    }
+
+    const baseAssignees = (task.assignees && task.assignees.length > 0)
+      ? task.assignees
+      : normalizeAssignedTo(task.assignedTo).map(uid => ({ userId: uid, status: task.status, completedAt: null }))
+    const nextAssignees = baseAssignees.map(a =>
+      a.userId === user.id ? { ...a, status, completedAt: status === 'completed' ? new Date().toISOString() : null } : a
+    )
+    const aggregateStatus = computeAggregateStatus(nextAssignees) ?? task.status
+    const updated = { ...task, assignees: nextAssignees, status: aggregateStatus, updatedAt: today() }
+    setTasks(prev => prev.map(t => t.id === taskId ? updated : t))
+    if (aggregateStatus === 'completed' && task.status !== 'completed') {
+      notifyLeaders(members, 'task_completed',
+        `${user?.name ?? 'Alguien'} completó su parte de "${task.title}" y la tarea quedó completa`, taskId, user?.id)
+    }
+    api.updateTask(taskId, updated).catch(() => {})
+  }, [user, members, useRealBackend])
+
   const getTaskById = useCallback((id) => tasksRef.current.find(t => t.id === id), [])
   const getTasksByMember = useCallback((memberId) => tasksRef.current.filter(t => normalizeAssignedTo(t.assignedTo).includes(memberId)), [])
   const getTasksByGroup = useCallback((groupId) => tasksRef.current.filter(t => t.groupId === groupId), [])
@@ -198,22 +282,29 @@ export function TaskProvider({ children }) {
     const subtask = (task.subtasks || []).find(s => s.id === subtaskId)
     if (!subtask) return
 
+    const nextCompleted = !subtask.completed
     const optimistic = {
       ...task,
-      subtasks: (task.subtasks || []).map(s => s.id === subtaskId ? { ...s, completed: !s.completed } : s),
+      subtasks: (task.subtasks || []).map(s => s.id === subtaskId ? {
+        ...s,
+        completed: nextCompleted,
+        completedBy: nextCompleted ? (user?.id ?? null) : null,
+        completedByName: nextCompleted ? (user?.name ?? null) : null,
+        completedAt: nextCompleted ? today() : null,
+      } : s),
       updatedAt: today(),
     }
     setTasks(prev => prev.map(t => t.id === taskId ? optimistic : t))
 
     if (useRealBackend) {
-      api.updateSubtask(taskId, subtaskId, { completed: !subtask.completed })
+      api.updateSubtask(taskId, subtaskId, { completed: nextCompleted })
         .then(fullTask => setTasks(prev => prev.map(t => t.id === taskId ? fullTask : t)))
         .catch(() => setTasks(prev => prev.map(t => t.id === taskId ? task : t)))
       return
     }
 
     api.updateTask(taskId, optimistic).catch(() => {})
-    if (!subtask.completed) {
+    if (nextCompleted) {
       notifyLeaders(members, 'subtask_done',
         `Subtarea completada en "${task.title}": ${subtask.title}`, taskId, user?.id)
     }
@@ -298,7 +389,8 @@ export function TaskProvider({ children }) {
   return (
     <TaskContext.Provider value={{
       tasks, loading,
-      addTask, updateTask, deleteTask,
+      addTask, updateTask, deleteTask, updateMyAssigneeStatus,
+      requestDeleteTask, resolveDeleteRequest,
       getTaskById, getTasksByMember, getTasksByGroup,
       addSubtask, toggleSubtask, deleteSubtask,
       addComment, updateComment, deleteComment,

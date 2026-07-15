@@ -15,13 +15,16 @@ import { useSocket } from './SocketContext'
 import { useToast } from './ToastContext'
 
 const NOTIF_TITLES = {
-  task_assigned:        'Tarea asignada',
-  task_completed:       'Tarea completada',
-  task_overdue:         'Tarea vencida',
-  task_in_progress:     'Tarea en progreso',
-  comment_added:        'Nuevo comentario',
-  subtask_done:         'Subtarea completada',
-  task_reminder_pending:'Tarea recurrente pendiente de fecha',
+  task_assigned:          'Tarea asignada',
+  task_completed:         'Tarea completada',
+  task_overdue:           'Tarea vencida',
+  task_in_progress:       'Tarea en progreso',
+  comment_added:          'Nuevo comentario',
+  subtask_done:           'Subtarea completada',
+  task_reminder_pending:  'Tarea recurrente pendiente de fecha',
+  delete_request:         'Solicitud de eliminación',
+  delete_request_approved:'Solicitud aprobada',
+  delete_request_rejected:'Solicitud rechazada',
 }
 
 export const NotificationContext = createContext(null)

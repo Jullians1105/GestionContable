@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext'
 import { normalizeAssignedTo } from '../utils/helpers'
 
 const PAGE_SIZE = 9
-const EMPTY_FILTERS = { search: '', status: '', priority: '', assignedTo: '', groupId: '', tagId: '' }
+const EMPTY_FILTERS = { search: '', status: '', priority: '', assignedTo: '', groupId: '', tagId: '', createdByMe: false }
 
 export default function TaskList({ initialFilters = {}, openTaskId = null, openCommentId = null }) {
   const { tasks, updateTask, deleteTask } = useTasks()
@@ -47,6 +47,7 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
     if (filters.assignedTo && !normalizeAssignedTo(t.assignedTo).includes(filters.assignedTo)) return false
     if (filters.groupId && t.groupId !== filters.groupId) return false
     if (filters.tagId && !(t.tagIds || []).includes(filters.tagId)) return false
+    if (filters.createdByMe && t.createdBy !== user?.id) return false
     return true
   })
 

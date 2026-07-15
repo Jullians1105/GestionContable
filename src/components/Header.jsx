@@ -5,19 +5,28 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useSocket } from '../context/SocketContext'
+import { useToast } from '../context/ToastContext'
 import { getInitials, getAvatarColor, ROLE_LABELS, normalizeAssignedTo } from '../utils/helpers'
 import NotificationBell from './Notifications/NotificationBell'
 import GroupSelector from './Groups/GroupSelector'
+import TaskModal from './TaskModal'
 
 export default function Header({ onMenuToggle }) {
   const [search, setSearch] = useState('')
   const { tasks } = useTasks()
-  const { user, logout, isAdmin, isLeader } = useAuth()
+  const { user, logout, isAdmin, isLeader, hasPermission } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const { connected } = useSocket()
+  const { addToast } = useToast()
   const isOnline = useOnlineStatus()
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [showTaskModal, setShowTaskModal] = useState(false)
+
+  const openNewTask = () => {
+    if (hasPermission('canCreateTask')) setShowTaskModal(true)
+    else addToast('No tienes permiso para crear tareas', 'error')
+  }
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -33,6 +42,7 @@ export default function Header({ onMenuToggle }) {
     : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id)).length
 
   return (
+    <>
     <header className="fixed top-0 right-0 left-0 lg:left-[var(--sidebar-w,112px)] h-16 z-40 bg-white dark:bg-[#1e2030] border-b border-[#c3c6d7] dark:border-[#2e3148] shadow-sm flex items-center justify-between px-4 gap-3 transition-[left] duration-200">
       <button
         onClick={onMenuToggle}
@@ -40,7 +50,18 @@ export default function Header({ onMenuToggle }) {
       >
         <span className="material-symbols-outlined text-xl">menu</span>
       </button>
-      <form onSubmit={handleSearch} className="flex-1 max-w-md">
+
+      <button
+        onClick={openNewTask}
+        title="Nueva tarea"
+        className="flex items-center justify-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-lg text-white text-sm font-semibold hover:opacity-90 transition active:scale-[0.97] flex-shrink-0"
+        style={{ background: '#004ac6' }}
+      >
+        <span className="material-symbols-outlined text-xl">add</span>
+        <span className="hidden sm:inline">Nueva Tarea</span>
+      </button>
+
+      <form onSubmit={handleSearch} className="flex-1 min-w-0 max-w-md">
         <div className="relative focus-within:ring-2 focus-within:ring-[#004ac6] rounded-lg transition-all">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655] dark:text-[#c4c8e8]" style={{ fontSize: 18 }}>search</span>
           <input
@@ -139,5 +160,8 @@ export default function Header({ onMenuToggle }) {
         </div>
       </div>
     </header>
+
+    {showTaskModal && <TaskModal onClose={() => setShowTaskModal(false)} />}
+    </>
   )
 }
