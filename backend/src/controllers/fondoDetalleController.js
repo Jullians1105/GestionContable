@@ -44,13 +44,26 @@ const deriveImpuestosEstado = (rows) => {
   return 'pending';
 };
 
+// mp4 (Documentos contador - Pagos) deriva su estado del registro de
+// fondo_pagos del mismo mes (módulo de Pagos a la fiduciaria) — no hay fila
+// propia editable en fondo_detalle_macroprocesos para el campo estado, igual
+// que mp6. mp4 rastrea si los documentos ya se ENVIARON (no si la fiduciaria
+// ya aprobó el pago) — 'enviado' y 'aprobado' ambos cuentan como 'done'.
+// 'rechazado' vuelve a 'in_progress' porque el envío falló y requiere
+// corrección. Sin registro aún (mes no gestionado) cuenta como 'pending'.
+const derivePagoMacroEstado = (estadoPago) => {
+  if (estadoPago === 'enviado' || estadoPago === 'aprobado') return 'done';
+  if (estadoPago === 'rechazado') return 'in_progress';
+  return 'pending';
+};
+
 const getDetalle = async (req, res, next) => {
   try {
     const { empresaId } = req.params;
     const anio = parseInt(req.query.anio, 10);
     const mes  = parseInt(req.query.mes, 10);
 
-    const [mpResult, mp5Result, impuestosResult] = await Promise.all([
+    const [mpResult, mp5Result, impuestosResult, pagoResult] = await Promise.all([
       db.query(
         `SELECT mp.id, mp.nombre, d.estado, d.responsable_id, d.nota, d.updated_at,
                 (
@@ -100,11 +113,32 @@ const getDetalle = async (req, res, next) => {
                AND fi.mes         = $3`,
         [empresaId, anio, mes]
       ),
+      db.query(
+        `SELECT estado FROM fondo_pagos
+         WHERE empresa_id = $1 AND anio = $2 AND mes = $3
+         LIMIT 1`,
+        [empresaId, anio, mes]
+      ),
     ]);
 
     const mp5Confirmed = mp5Result.rows.length > 0 ? mp5Result.rows[0].confirmed : false;
 
     const macroprocesos = mpResult.rows.map(normalizeDetalle);
+
+    // mp4 (Documentos contador - Pagos): el estado propio de la fila se
+    // reemplaza por el derivado del pago del mes en el módulo de Pagos;
+    // responsable/nota/tareasVinculadas siguen viniendo de
+    // fondo_detalle_macroprocesos y se mantienen editables.
+    const pagoEstado = pagoResult.rows.length > 0 ? pagoResult.rows[0].estado : 'pendiente';
+    const mp4Index = macroprocesos.findIndex(m => m.id === 4);
+    if (mp4Index !== -1) {
+      macroprocesos[mp4Index] = {
+        ...macroprocesos[mp4Index],
+        estado:     derivePagoMacroEstado(pagoEstado),
+        pagoEstado,
+        readonly:   true,
+      };
+    }
 
     // mp6 (Información tributaria): el estado propio de la fila se reemplaza por
     // el derivado del checklist de impuestos; responsable/nota/tareasVinculadas

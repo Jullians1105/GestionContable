@@ -35,7 +35,7 @@ const getEmpresas = async (req, res, next) => {
                 SELECT COUNT(*)::int FROM fondo_detalle_macroprocesos d
                 WHERE d.empresa_id = e.id AND d.estado = 'done'
                   AND d.anio = $1 AND d.mes = $2
-                  AND d.macroproceso_id <> 'mp6'
+                  AND d.macroproceso_id NOT IN ('mp4', 'mp6')
               ), 0)
               +
               -- mp6/Información tributaria no vive en fondo_detalle_macroprocesos —
@@ -56,12 +56,31 @@ const getEmpresas = async (req, res, next) => {
                       AND fi.anio        = $1
                       AND fi.mes         = $2
               ), false) THEN 1 ELSE 0 END
+              +
+              -- mp4/Documentos contador - Pagos tampoco vive en
+              -- fondo_detalle_macroprocesos — se deriva de fondo_pagos, misma
+              -- lógica que derivePagoMacroEstado en fondoDetalleController.js:
+              -- 'enviado' o 'aprobado' cuentan como done (mp4 rastrea el envío,
+              -- no la aprobación final de la fiduciaria).
+              CASE WHEN (
+                SELECT estado FROM fondo_pagos
+                WHERE empresa_id = e.id AND anio = $1 AND mes = $2
+                LIMIT 1
+              ) IN ('enviado', 'aprobado') THEN 1 ELSE 0 END
               AS macros_done,
               COALESCE((
                 SELECT COUNT(*)::int FROM fondo_detalle_macroprocesos d
                 WHERE d.empresa_id = e.id AND d.estado = 'in_progress'
                   AND d.anio = $1 AND d.mes = $2
-              ), 0) AS macros_in_progress,
+                  AND d.macroproceso_id <> 'mp4'
+              ), 0)
+              +
+              CASE WHEN (
+                SELECT estado FROM fondo_pagos
+                WHERE empresa_id = e.id AND anio = $1 AND mes = $2
+                LIMIT 1
+              ) = 'rechazado' THEN 1 ELSE 0 END
+              AS macros_in_progress,
               COALESCE((
                 SELECT m.confirmed FROM fondo_checklist_meses m
                 WHERE m.empresa_id = e.id
