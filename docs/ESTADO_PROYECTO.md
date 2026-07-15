@@ -291,6 +291,16 @@ GET    /api/stats/workload                 → solo admin/leader; carga por pers
 
 **Sistema de tracking:** `run.js` crea tabla `schema_migrations` (PRIMARY KEY `filename`). Saltar migraciones ya aplicadas. Opción `--reset` para limpiar y reaplicar todo. Todos los `CREATE INDEX` deben usar `IF NOT EXISTS` para ser idempotentes.
 
+**Números duplicados (007 y 018) — intencionalmente sin renombrar:** existen dos pares de
+archivos con el mismo prefijo numérico (`007_due_time.sql`/`007_fondo_empresas.sql` y
+`018_fondo_pagos_autorizado.sql`/`018_group_leaders.sql`). El tracking es por **nombre de
+archivo completo** (no por el número), así que no hay colisión real ni problema de
+dependencias entre ellos. **No renombrar estos archivos**: ya corrieron en producción
+(`gestcon.work`), y `run.js` solo reconoce una migración como "ya aplicada" si el nombre
+coincide exactamente con lo que hay en `schema_migrations`. Renombrar `007_fondo_empresas.sql`
+la haría re-ejecutarse en el próximo deploy y duplicaría el `INSERT` de las 30 empresas
+(no tiene protección `ON CONFLICT`).
+
 | Migración | Contenido |
 |---|---|
 | 007 | Columna `due_time TIME` en tasks |
@@ -301,9 +311,11 @@ GET    /api/stats/workload                 → solo admin/leader; carga por pers
 | 016 | Columna `reminder_sent_at TIMESTAMPTZ` en tasks |
 | 017 | Elimina etiquetas de muestra del seed (bug, feature, urgente, documentación) vía DELETE por UUID |
 | 018 | `group_members.is_leader BOOLEAN` — soporte multi-líder por grupo (índice parcial `WHERE is_leader = true`) |
-| 019 | Tabla `task_assignees` (task_id, user_id, status, completed_at) — estado individual por asignado; backfill desde `tasks.assigned_to`/`status` existentes |
-| 020 | Columnas `completed_by`/`completed_at` en `task_subtasks` — quién completó cada subtarea; backfill best-effort de `completed_at` desde `updated_at` |
-| 021 | Tabla `task_delete_requests` (task_id, requested_by, reason, status, resolved_by, resolved_at) — solicitudes de eliminación con motivo; índice único parcial evita duplicar solicitudes pendientes por tarea |
+| 019 | Tabla `fondo_pagos_mes_actual` (singleton) — mes vencido habilitado para pagos, controlado manualmente por las jefas en vez de derivarse de la fecha del sistema |
+| 020 | Tabla `task_assignees` (task_id, user_id, status, completed_at) — estado individual por asignado; backfill desde `tasks.assigned_to`/`status` existentes |
+| 021 | Columnas `completed_by`/`completed_at` en `task_subtasks` — quién completó cada subtarea; backfill best-effort de `completed_at` desde `updated_at` |
+| 022 | Tabla `task_delete_requests` (task_id, requested_by, reason, status, resolved_by, resolved_at) — solicitudes de eliminación con motivo; índice único parcial evita duplicar solicitudes pendientes por tarea |
+| 023 | Tablas `fondo_impuestos` (catálogo fijo: autorretención, retención, IVA, consumo) y `fondo_impuestos_items` (registro por empresa × impuesto × mes) — checklist de la tarjeta "Información tributaria" (mp6), independiente del checklist mensual |
 
 **Tests:**
 - Cobertura actual: **~81% statements / ~74% functions** (umbral: 70%)
