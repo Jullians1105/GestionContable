@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
+const { isMesHabilitado } = require('../utils/mesVencido');
 
 const getChecklistMes = async (req, res, next) => {
   try {
@@ -103,6 +104,10 @@ const updateChecklistItem = async (req, res, next) => {
     const mes  = parseInt(req.query.mes, 10);
     const { estado, nota } = req.body;
 
+    if (!isMesHabilitado(anio, mes)) {
+      return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
+    }
+
     // Crear la fila del mes solo si no existe aún
     await db.query(
       `INSERT INTO fondo_checklist_meses (id, empresa_id, anio, mes)
@@ -151,6 +156,10 @@ const updateChecklistConfirmado = async (req, res, next) => {
     const anio = parseInt(req.query.anio, 10);
     const mes  = parseInt(req.query.mes, 10);
     const { confirmed } = req.body;
+
+    if (!isMesHabilitado(anio, mes)) {
+      return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
+    }
 
     const result = await db.query(
       `INSERT INTO fondo_checklist_meses (id, empresa_id, anio, mes, confirmed)
