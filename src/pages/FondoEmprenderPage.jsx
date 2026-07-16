@@ -43,12 +43,13 @@ const emptyCell = { status: 'pending', note: '' }
 // Extraídos porque cada uno necesita su propio hook de dnd-kit
 // (useSortable/useDroppable no se pueden llamar dentro de un .map inline).
 
-function SortableProcessHeader({ proc, editingProcess, editProcessName, setEditProcessName, saveEditProcess, setEditingProcess, startEditProcess, setDeleteConfirm }) {
+function SortableProcessHeader({ proc, rowSpan, editingProcess, editProcessName, setEditProcessName, saveEditProcess, setEditingProcess, startEditProcess, setDeleteConfirm }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: proc.id })
   const isEditing = editingProcess?.id === proc.id
   return (
     <th
       ref={setNodeRef}
+      rowSpan={rowSpan}
       title={proc.name}
       className="sticky top-0 z-10 bg-[#f8f9fc] dark:bg-[#1a1d2e] group/col"
       style={{
@@ -119,19 +120,24 @@ function GroupHeaderCell({ grupo, procesos, collapsed, onToggleCollapse, editing
   const isEditing = editingGroup?.id === grupo.id
   const showAsSingleCell = collapsed || procesos.length === 0
 
+  const GROUP_ROW_HEIGHT = 20 // "reglóncito" — franja delgada, no una celda de altura completa
+
   return (
     <th
       ref={setNodeRef}
       colSpan={showAsSingleCell ? 1 : procesos.length}
       rowSpan={showAsSingleCell ? 2 : 1}
-      className="sticky top-0 z-10 bg-[#eef1fb] dark:bg-[#20233a] group/grp"
+      className="sticky top-0 z-10 bg-[#eef1fb] dark:bg-[#20233a] group/grp overflow-hidden"
       style={{
+        width: showAsSingleCell ? 46 : procesos.length * 46,
+        maxWidth: showAsSingleCell ? 46 : procesos.length * 46,
         border: BORDER, borderBottom: BORDER_STR, borderLeft: BORDER_STR, borderRight: BORDER_STR,
-        padding: 0, outline: isOver ? '2px solid #7c3aed' : 'none', outlineOffset: -2,
+        padding: 0, overflow: 'hidden',
+        outline: isOver ? '2px solid #7c3aed' : 'none', outlineOffset: -2,
       }}
     >
       {isEditing ? (
-        <div style={{ height: showAsSingleCell ? 120 : 28, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+        <div style={{ height: showAsSingleCell ? 120 : GROUP_ROW_HEIGHT, display: 'flex', alignItems: 'center', padding: '0 2px' }}>
           <input
             autoFocus
             value={editGroupName}
@@ -141,48 +147,46 @@ function GroupHeaderCell({ grupo, procesos, collapsed, onToggleCollapse, editing
               if (e.key === 'Escape') setEditingGroup(null)
             }}
             onBlur={saveEditGroup}
-            className="w-full px-1 py-0.5 text-[10px] rounded border border-[#7c3aed] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+            className="w-full px-1 py-0.5 text-[9px] rounded border border-[#7c3aed] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
           />
         </div>
       ) : showAsSingleCell ? (
-        // Colapsado o vacío — el nombre del grupo sigue horizontal (como
-        // expandido), solo que angosto y sin sub-columnas debajo.
+        // Colapsado o vacío — mismo ancho angosto que una sub-columna,
+        // nombre en vertical (como un proceso suelto) para no forzar ancho.
         <button
           onClick={onToggleCollapse}
-          className="w-full h-full flex flex-col items-center justify-center gap-1 px-1"
-          style={{ minHeight: 120, width: 70 }}
+          className="relative w-full flex items-center justify-center"
+          style={{ height: 120, width: 46 }}
           title={procesos.length === 0 ? `${grupo.name} (sin procesos — arrastrá uno acá)` : `${grupo.name} — clic para expandir`}
         >
-          {procesos.length > 0 && (
-            <span className="material-symbols-outlined text-[#7c3aed]" style={{ fontSize: 14 }}>chevron_right</span>
-          )}
-          <span className="text-[10px] font-bold text-[#7c3aed] text-center leading-tight break-words">
-            {grupo.name}
+          <span
+            className="text-[10px] font-bold text-[#7c3aed]"
+            style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)', whiteSpace: 'nowrap', overflow: 'hidden' }}
+          >
+            {grupo.name}{procesos.length > 0 ? ` (${procesos.length})` : ''}
           </span>
-          {procesos.length > 0 && (
-            <span className="text-[9px] font-bold text-[#7c3aed] bg-white dark:bg-[#1e2030] rounded-full px-1.5">{procesos.length}</span>
-          )}
         </button>
       ) : (
-        <div className="flex items-center gap-1 px-2" style={{ height: 28 }}>
-          <button onClick={onToggleCollapse} className="text-[#7c3aed] hover:opacity-70 transition" title="Colapsar grupo">
-            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>expand_less</span>
+        <div className="relative flex items-center gap-0.5 px-1 overflow-hidden" style={{ height: GROUP_ROW_HEIGHT }}>
+          <button onClick={onToggleCollapse} className="flex-shrink-0 text-[#7c3aed] hover:opacity-70 transition" title="Colapsar grupo">
+            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>expand_less</span>
           </button>
-          <span className="text-[10px] font-bold text-[#7c3aed] flex-1 truncate" title={grupo.name}>{grupo.name}</span>
-          <div className="hidden group-hover/grp:flex items-center gap-0.5">
+          <span className="text-[9px] font-bold text-[#7c3aed] flex-1 min-w-0 truncate" title={grupo.name}>{grupo.name}</span>
+          {/* Acciones solo en hover, fuera del flujo — igual que en los procesos individuales, para que nunca empujen el ancho */}
+          <div className="absolute inset-0 hidden group-hover/grp:flex items-center justify-end gap-0.5 px-1" style={{ background: '#eef1fb' }}>
             <button
               onClick={() => startEditGroup(grupo)}
               className="p-0.5 rounded hover:bg-white dark:hover:bg-[#252840] text-[#7c3aed] transition"
               title="Renombrar grupo"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>edit</span>
             </button>
             <button
               onClick={() => setDeleteConfirm({ type: 'grupo', id: grupo.id, name: grupo.name })}
               className="p-0.5 rounded hover:bg-white dark:hover:bg-[#252840] text-red-500 transition"
               title="Eliminar grupo (los procesos quedan sin grupo)"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>delete</span>
             </button>
           </div>
         </div>
@@ -208,8 +212,8 @@ function SinGrupoDropZone() {
       title="Soltar acá para sacar un proceso de su grupo"
     >
       <div
-        className="h-full flex items-center justify-center text-[9px] font-semibold text-[#c3c6d7] dark:text-[#3a3e5c]"
-        style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}
+        className="flex items-center justify-center text-[9px] font-semibold text-[#c3c6d7] dark:text-[#3a3e5c]"
+        style={{ height: 120, writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}
       >
         Sin grupo
       </div>
@@ -790,26 +794,27 @@ export default function FondoEmprenderPage() {
   )
   const pct = totalCells ? Math.round((doneCells / totalCells) * 100) : 0
 
-  // ── layout de la tabla: total de columnas hoja y ancho, contando grupos ──
-  const groupLeafColumns = sortedGrupos.reduce((acc, g) => {
-    const children = processes.filter(p => p.grupoId === g.id)
-    const collapsedOrEmpty = collapsedGroupIds.has(g.id) || children.length === 0
-    return acc + (collapsedOrEmpty ? 1 : children.length)
-  }, 0)
-  const totalLeafColumns = 1 + groupLeafColumns + (grupos.length > 0 ? 1 : 0) + sueltos.length + (addingProcess ? 1 : 0) + 1
+  // ── layout de la tabla: un <col> por columna hoja, con su ancho exacto ──
+  // Se usa <colgroup> en vez de confiar en que el navegador reparta el
+  // colSpan de los grupos entre sus sub-columnas — con <col> explícito el
+  // ancho de cada columna queda inequívoco bajo table-layout: fixed.
   const hasExpandedGroupRow = sortedGrupos.some(g =>
     !collapsedGroupIds.has(g.id) && processes.some(p => p.grupoId === g.id)
   )
-  const gridWidth = 220
-    + sortedGrupos.reduce((acc, g) => {
-        const children = processes.filter(p => p.grupoId === g.id)
-        const collapsedOrEmpty = collapsedGroupIds.has(g.id) || children.length === 0
-        return acc + (collapsedOrEmpty ? 70 : children.length * 46)
-      }, 0)
-    + (grupos.length > 0 ? 22 : 0)
-    + sueltos.length * 46
-    + (addingProcess ? 100 : 0)
-    + 90
+  const columnWidths = [
+    220, // Empresa
+    ...sortedGrupos.flatMap(g => {
+      const children = processes.filter(p => p.grupoId === g.id)
+      const collapsedOrEmpty = collapsedGroupIds.has(g.id) || children.length === 0
+      return collapsedOrEmpty ? [46] : children.map(() => 46)
+    }),
+    ...(grupos.length > 0 ? [22] : []), // Sin grupo (catch-all)
+    ...sueltos.map(() => 46),
+    ...(addingProcess ? [100] : []),
+    88, // Confirmar Contabilidad
+  ]
+  const totalLeafColumns = columnWidths.length
+  const gridWidth = columnWidths.reduce((a, b) => a + b, 0)
 
   function renderProcessCell(company, proc, rowBg) {
     const cell = company.cells[proc.id] ?? emptyCell
@@ -1017,7 +1022,15 @@ export default function FondoEmprenderPage() {
         style={{ maxHeight: 'calc(100vh - 17rem)' }}
       >
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-          <table style={{ borderCollapse: 'collapse', minWidth: `${gridWidth}px` }}>
+          {/* table-layout: fixed + <colgroup> explícito: sin esto, el colSpan de
+              los grupos hace que el navegador reparta el ancho "como pueda" y
+              termina estirando todas las columnas. Con <col> explícito el ancho
+              de cada columna es inequívoco, sin importar cuántas columnas
+              abarque el header de un grupo. */}
+          <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: `${gridWidth}px`, minWidth: `${gridWidth}px` }}>
+            <colgroup>
+              {columnWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
+            </colgroup>
             <thead>
               <tr>
                 {/* Company column header */}
@@ -1055,6 +1068,7 @@ export default function FondoEmprenderPage() {
                     <SortableProcessHeader
                       key={proc.id}
                       proc={proc}
+                      rowSpan={2}
                       editingProcess={editingProcess}
                       editProcessName={editProcessName}
                       setEditProcessName={setEditProcessName}
@@ -1160,14 +1174,14 @@ export default function FondoEmprenderPage() {
                     {sortedGrupos.map(grupo => {
                       const children = processes.filter(p => p.grupoId === grupo.id)
                       if (children.length === 0) {
-                        return <td key={grupo.id} style={{ width: 70, minWidth: 70, border: BORDER, background: rowBg }} />
+                        return <td key={grupo.id} style={{ width: 46, minWidth: 46, border: BORDER, background: rowBg }} />
                       }
                       if (collapsedGroupIds.has(grupo.id)) {
                         const doneCount = children.filter(p => ['done', 'na'].includes(company.cells[p.id]?.status ?? 'pending')).length
                         const allDone = doneCount === children.length
                         const noneDone = doneCount === 0
                         return (
-                          <td key={grupo.id} style={{ width: 70, minWidth: 70, border: BORDER, padding: 2, background: rowBg }}>
+                          <td key={grupo.id} style={{ width: 46, minWidth: 46, border: BORDER, padding: 2, background: rowBg }}>
                             <button
                               onClick={() => toggleCollapsed(grupo.id)}
                               title={`${grupo.name}: ${doneCount}/${children.length} — clic para expandir`}
