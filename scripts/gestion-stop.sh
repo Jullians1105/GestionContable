@@ -26,10 +26,9 @@ echo "  Gestion — detener sistema"
 echo "  $(date '+%Y-%m-%d %H:%M:%S')"
 echo "════════════════════════════════════════"
 echo "⚠️  ADVERTENCIA:"
-echo "   Esto detiene el sistema para TODA la oficina (~14 personas)"
-echo "   y los 3 líderes remotos que acceden vía gestcon.work."
-echo "   Además, esto APAGA FÍSICAMENTE el servidor — no es una suspensión."
-echo "   Alguien debe estar presente para volver a encenderlo."
+echo "   Vas a apagar el servidor. Esto afecta a toda la oficina y a"
+echo "   quienes acceden remoto vía gestcon.work — no vuelve a estar"
+echo "   disponible hasta que alguien lo encienda mañana."
 echo
 
 if [ "$SKIP_CONFIRM" -eq 0 ]; then
