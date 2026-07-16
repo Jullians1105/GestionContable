@@ -462,8 +462,10 @@ export default function FondoEmprenderPage() {
     : companies.filter(c => (c.categoria ?? 'contable') === activeTab)
 
   const totalCells = scopedCompanies.length * processes.length
+  // 'na' cuenta como completada — mismo criterio que el resto del sistema
+  // (mp6/impuestos derivado en el backend): ya se revisó y no aplicaba.
   const doneCells  = scopedCompanies.reduce(
-    (acc, c) => acc + processes.filter(p => (c.cells[p.id]?.status ?? 'pending') === 'done').length,
+    (acc, c) => acc + processes.filter(p => ['done', 'na'].includes(c.cells[p.id]?.status ?? 'pending')).length,
     0
   )
   const pct = totalCells ? Math.round((doneCells / totalCells) * 100) : 0
