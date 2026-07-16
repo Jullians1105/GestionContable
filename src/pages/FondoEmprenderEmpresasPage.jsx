@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import StatsCard from '../components/StatsCard'
-import { getMacroStats } from '../data/fondoEmprender'
+import { getMacroStats, getMesVencidoHabilitado, resolveMesInicial } from '../data/fondoEmprender'
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
 
@@ -25,24 +25,36 @@ export default function FondoEmprenderEmpresasPage() {
   const navigate = useNavigate()
   const { socket } = useSocket()
 
-  const [searchParams] = useSearchParams()
-  const today = new Date()
-  const [month, setMonth] = useState(() => {
-    const m = parseInt(searchParams.get('mes') ?? '', 10)
-    return m >= 1 && m <= 12 ? m - 1 : today.getMonth()
-  })
-  const [year, setYear] = useState(() => {
-    const y = parseInt(searchParams.get('anio') ?? '', 10)
-    return y >= 2000 ? y : today.getFullYear()
-  })
+  const [searchParams, setSearchParams] = useSearchParams()
+  // month/year se inicializan desde la URL (si viene y está dentro del mes
+  // habilitado) para que un reload conserve la posición; si no, caen al mes
+  // habilitado (nunca a "hoy", que puede estar bloqueado por mes vencido).
+  const [mesInicial]      = useState(() => resolveMesInicial(searchParams))
+  const [month, setMonth] = useState(mesInicial.month)
+  const [year, setYear]   = useState(mesInicial.year)
 
+  // Seguimiento Mensual es de mes vencido: no se puede navegar más allá del
+  // mes calendario anterior (el mes en curso todavía no ha "vencido").
+  const mesHabilitado = getMesVencidoHabilitado()
+  const habilitadoYM = mesHabilitado.anio * 100 + mesHabilitado.mes
+  const atMesHabilitado = (year * 100 + (month + 1)) >= habilitadoYM
+
+  function goToMonth(newMonth, newYear) {
+    setMonth(newMonth)
+    setYear(newYear)
+    setSearchParams({ anio: String(newYear), mes: String(newMonth + 1) }, { replace: true })
+  }
   function prevMonth() {
-    if (month === 0) { setMonth(11); setYear(y => y - 1) }
-    else setMonth(m => m - 1)
+    if (month === 0) goToMonth(11, year - 1)
+    else goToMonth(month - 1, year)
   }
   function nextMonth() {
-    if (month === 11) { setMonth(0); setYear(y => y + 1) }
-    else setMonth(m => m + 1)
+    // Bloquea siempre que el DESTINO exceda el mes habilitado, sin importar
+    // en qué mes se esté parado ahora.
+    const targetMonth = month === 11 ? 0 : month + 1
+    const targetYear  = month === 11 ? year + 1 : year
+    if ((targetYear * 100 + (targetMonth + 1)) > habilitadoYM) return
+    goToMonth(targetMonth, targetYear)
   }
 
   // ── server state ──────────────────────────────────────────────────────────
@@ -239,7 +251,12 @@ export default function FondoEmprenderEmpresasPage() {
             <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] px-2 min-w-[130px] text-center">
               {MONTHS[month]} {year}
             </span>
-            <button onClick={nextMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280]">
+            <button
+              onClick={nextMonth}
+              disabled={atMesHabilitado}
+              title={atMesHabilitado ? 'El mes en curso aún no está habilitado (mes vencido)' : undefined}
+              className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            >
               <span className="material-symbols-outlined text-xl">chevron_right</span>
             </button>
           </div>
