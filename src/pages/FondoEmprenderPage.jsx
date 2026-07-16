@@ -41,6 +41,9 @@ export default function FondoEmprenderPage() {
   const [openCell, setOpenCell]     = useState(null)  // { companyId, procId, left, top }
   const dropdownRef    = useRef(null)
   const noteTextareaRef = useRef(null)
+  const openCellRef    = useRef(openCell)   // lets effects read the latest openCell without re-subscribing
+  openCellRef.current  = openCell
+  const noteDirtyRef   = useRef(false)      // true while the open textarea has unsaved keystrokes
 
   // tooltip for notes (Excel-style, resizable, per-cell size)
   const [tooltip, setTooltip]         = useState(null)
@@ -113,13 +116,35 @@ export default function FondoEmprenderPage() {
     }
   }, [year, month])
 
+  // Single place that persists a note to the backend. Used both by the
+  // textarea's onBlur and by flushPendingNote() below.
+  const saveNote = useCallback(async (companyId, procId, note) => {
+    noteDirtyRef.current = false
+    try {
+      await api.updateFondoChecklistItem(companyId, procId, year, month + 1, { nota: note || null })
+    } catch (err) {
+      console.error('Error al guardar nota:', err.message)
+      fetchGrid()
+    }
+  }, [year, month, fetchGrid])
+
+  // A refetch (window focus, another user's edit) replaces `companies`
+  // wholesale. If the note popup is open with unsaved keystrokes, that
+  // refetch would silently revert them — save first so nothing is lost.
+  const flushPendingNote = useCallback(() => {
+    const oc = openCellRef.current
+    if (!oc || !noteDirtyRef.current || !noteTextareaRef.current) return Promise.resolve()
+    return saveNote(oc.companyId, oc.procId, noteTextareaRef.current.value)
+  }, [saveNote])
+
   useEffect(() => { setLoading(true); fetchGrid() }, [fetchGrid])
 
   // Refresh on window focus (catches changes made in another tab)
   useEffect(() => {
-    window.addEventListener('focus', fetchGrid)
-    return () => window.removeEventListener('focus', fetchGrid)
-  }, [fetchGrid])
+    const onFocus = () => { flushPendingNote().then(fetchGrid) }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [fetchGrid, flushPendingNote])
 
   // Refresh (debounced) when another user edits the same month, or the
   // company list changes — debounced so a burst of edits from one user
@@ -129,14 +154,14 @@ export default function FondoEmprenderPage() {
     const handler = (payload) => {
       if (payload?.tipo === 'checklist' && (payload.anio !== year || payload.mes !== month + 1)) return
       clearTimeout(refetchTimerRef.current)
-      refetchTimerRef.current = setTimeout(fetchGrid, 1200)
+      refetchTimerRef.current = setTimeout(() => { flushPendingNote().then(fetchGrid) }, 1200)
     }
     socket.on('empresa:updated', handler)
     return () => {
       socket.off('empresa:updated', handler)
       clearTimeout(refetchTimerRef.current)
     }
-  }, [socket, year, month, fetchGrid])
+  }, [socket, year, month, fetchGrid, flushPendingNote])
 
   // Auto-resize textarea when popup opens; overflow only at max height
   useEffect(() => {
@@ -148,15 +173,19 @@ export default function FondoEmprenderPage() {
     ta.style.overflowY = h >= 200 ? 'auto' : 'hidden'
   }, [openCell])
 
-  // Close cell popup on outside click
+  // Close cell popup on outside click. Flush first: if the popup unmounts
+  // before the textarea's native blur fires, the keystroke would be lost.
   useEffect(() => {
     if (!openCell) return
     const h = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setOpenCell(null)
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        flushPendingNote()
+        setOpenCell(null)
+      }
     }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
-  }, [openCell])
+  }, [openCell, flushPendingNote])
 
   // ── month nav ────────────────────────────────────────────────────────────
 
@@ -180,6 +209,7 @@ export default function FondoEmprenderPage() {
     if (left < 8) left = 8
     if (top  + PH > window.innerHeight - 8) top  = rect.top - PH - 4
     if (top  < 8) top  = 8
+    noteDirtyRef.current = false
     setOpenCell({ companyId, procId, left, top })
   }
 
@@ -204,16 +234,17 @@ export default function FondoEmprenderPage() {
   }
 
   function handleNoteChange(companyId, procId, note) {
+    noteDirtyRef.current = true
     updateCellLocal(companyId, procId, { note })
   }
 
-  async function handleNoteBlur(companyId, procId, note) {
-    try {
-      await api.updateFondoChecklistItem(companyId, procId, year, month + 1, { nota: note || null })
-    } catch (err) {
-      console.error('Error al guardar nota:', err.message)
-      fetchGrid()
-    }
+  function handleNoteBlur(companyId, procId, note) {
+    saveNote(companyId, procId, note)
+  }
+
+  function handleClearNote(companyId, procId) {
+    updateCellLocal(companyId, procId, { note: '' })
+    saveNote(companyId, procId, '')
   }
 
   const openCompany  = openCell ? companies.find(c => c.id === openCell.companyId) : null
@@ -733,19 +764,22 @@ export default function FondoEmprenderPage() {
                   {processes.map(proc => {
                     const cell = company.cells[proc.id] ?? emptyCell
                     const cfg  = STATUS[cell.status] ?? STATUS.pending
+                    // Whitespace-only notes must not count as "has a note" — otherwise
+                    // the dot/tooltip shows for a cell that looks empty when opened.
+                    const hasNote = !!cell.note?.trim()
                     return (
                       <td key={proc.id} style={{ width: 46, minWidth: 46, border: BORDER, padding: 2 }}>
                         <button
                           onClick={e => handleCellClick(company.id, proc.id, e)}
-                          onMouseEnter={cell.note ? e => showTooltip(e, cell.note, `${company.id}_${proc.id}`) : undefined}
-                          onMouseLeave={cell.note ? scheduleHide : undefined}
+                          onMouseEnter={hasNote ? e => showTooltip(e, cell.note, `${company.id}_${proc.id}`) : undefined}
+                          onMouseLeave={hasNote ? scheduleHide : undefined}
                           className="w-full flex items-center justify-center relative transition-all hover:opacity-75 hover:scale-90 active:scale-75 rounded"
                           style={{ height: 32, background: cfg.bg }}
                         >
                           <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 17 }}>
                             {cfg.icon}
                           </span>
-                          {cell.note && (
+                          {hasNote && (
                             <span
                               className="absolute bg-amber-400 rounded-full border border-white"
                               style={{ width: 6, height: 6, top: 1, right: 1 }}
@@ -851,12 +885,21 @@ export default function FondoEmprenderPage() {
             className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
             style={{ minHeight: 52, overflowY: 'hidden' }}
           />
-          <button
-            onClick={() => setOpenCell(null)}
-            className="mt-2 w-full py-1 text-xs text-[#6b7280] hover:text-[#191c1e] dark:hover:text-[#e4e6f0] transition text-center"
-          >
-            Cerrar
-          </button>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={() => handleClearNote(openCell.companyId, openCell.procId)}
+              disabled={!openCellData.note?.trim()}
+              className="flex-1 py-1 text-xs text-red-500 hover:text-red-600 transition text-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-red-500"
+            >
+              Borrar nota
+            </button>
+            <button
+              onClick={() => { flushPendingNote(); setOpenCell(null) }}
+              className="flex-1 py-1 text-xs text-[#6b7280] hover:text-[#191c1e] dark:hover:text-[#e4e6f0] transition text-center"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       )}
 
