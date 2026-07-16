@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/.."
+
+# "$0" puede ser el symlink en /usr/local/bin (gestion-stop) en vez de la
+# ruta real del script — resolverlo con readlink -f antes de calcular la
+# raíz del repo, o "cd" termina en /usr/local en vez de en el proyecto.
+SCRIPT_PATH="$(readlink -f "$0")"
+cd "$(dirname "$SCRIPT_PATH")/.."
 
 SKIP_CONFIRM=0
 for arg in "$@"; do
