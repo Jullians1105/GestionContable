@@ -58,18 +58,14 @@ export default function FondoEmprenderPage() {
   const tooltipKeyRef   = useRef(null)        // key of the cell whose size is active
   tooltipSizeRef.current = tooltipSize        // kept in sync on every render
 
-  // edit company name inline
-  const [editingCompany, setEditingCompany] = useState(null)  // { id }
-  const [editCompanyName, setEditCompanyName] = useState('')
-
   // add / edit process
   const [addingProcess, setAddingProcess]   = useState(false)
   const [newProcessName, setNewProcessName] = useState('')
   const [editingProcess, setEditingProcess] = useState(null) // { id, name }
   const [editProcessName, setEditProcessName] = useState('')
 
-  // delete confirmation
-  const [deleteConfirm, setDeleteConfirm] = useState(null) // { type, id, name }
+  // delete confirmation (solo procesos — empresas se editan/eliminan desde Empresas)
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // { id, name }
 
   // filters: category tabs + search
   const [search, setSearch]       = useState('')
@@ -273,26 +269,6 @@ export default function FondoEmprenderPage() {
 
   // ── company actions ──────────────────────────────────────────────────────
 
-  function startEditCompany(company) {
-    setEditingCompany({ id: company.id })
-    setEditCompanyName(company.name)
-  }
-
-  async function saveEditCompany() {
-    const name = editCompanyName.trim().toUpperCase()
-    const companyId = editingCompany.id
-    setEditingCompany(null)
-    if (!name) return
-    const previous = companies.find(c => c.id === companyId)?.name
-    setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, name } : c))
-    try {
-      await api.updateFondoEmpresa(companyId, { name })
-    } catch (err) {
-      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, name: previous } : c))
-      alert('Error al renombrar empresa: ' + err.message)
-    }
-  }
-
   async function toggleConfirmed(companyId) {
     const company = companies.find(c => c.id === companyId)
     const newConfirmed = !company?.confirmed
@@ -414,24 +390,15 @@ export default function FondoEmprenderPage() {
 
   async function confirmDelete() {
     if (!deleteConfirm) return
-    const { type, id } = deleteConfirm
+    const { id } = deleteConfirm
     setDeleteConfirm(null)
-    if (type === 'process') {
-      try {
-        // Procesos con historial no se pueden borrar de verdad — se desactivan
-        // para dejar de ofrecerlos en meses nuevos sin perder lo ya registrado.
-        await api.updateFondoProceso(id, { activo: false })
-        setProcesses(prev => prev.filter(p => p.id !== id))
-      } catch (err) {
-        alert('Error al eliminar proceso: ' + err.message)
-      }
-    } else {
-      try {
-        await api.deleteFondoEmpresa(id)
-        setCompanies(prev => prev.filter(c => c.id !== id))
-      } catch (err) {
-        alert('Error al eliminar empresa: ' + err.message)
-      }
+    try {
+      // Procesos con historial no se pueden borrar de verdad — se desactivan
+      // para dejar de ofrecerlos en meses nuevos sin perder lo ya registrado.
+      await api.updateFondoProceso(id, { activo: false })
+      setProcesses(prev => prev.filter(p => p.id !== id))
+    } catch (err) {
+      alert('Error al eliminar proceso: ' + err.message)
     }
   }
 
@@ -681,7 +648,7 @@ export default function FondoEmprenderPage() {
                           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
                         </button>
                         <button
-                          onClick={() => setDeleteConfirm({ type: 'process', id: proc.id, name: proc.name })}
+                          onClick={() => setDeleteConfirm({ id: proc.id, name: proc.name })}
                           className="p-1 rounded bg-white dark:bg-[#252840] shadow-sm text-[#6b7280] hover:text-red-500 transition"
                           title="Eliminar"
                         >
@@ -739,52 +706,19 @@ export default function FondoEmprenderPage() {
             )}
             {filteredCompanies.map((company, idx) => {
               const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fbff'
-              const isEditingName = editingCompany?.id === company.id
               return (
                 <tr key={company.id} style={{ background: rowBg }}>
 
-                  {/* Company name cell */}
+                  {/* Company name cell — editar/eliminar empresa se hace desde Empresas, no acá */}
                   <td
-                    className="sticky left-0 z-10 group/company"
+                    className="sticky left-0 z-10"
                     style={{ width: 220, minWidth: 220, maxWidth: 220, border: BORDER, borderRight: BORDER_STR, background: rowBg, height: 36, padding: 0 }}
                   >
-                    {isEditingName ? (
-                      <div className="flex items-center h-full px-2 gap-1">
-                        <input
-                          autoFocus
-                          value={editCompanyName}
-                          onChange={e => setEditCompanyName(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') saveEditCompany()
-                            if (e.key === 'Escape') setEditingCompany(null)
-                          }}
-                          onBlur={saveEditCompany}
-                          className="flex-1 px-2 py-0.5 text-xs rounded border border-[#004ac6] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex items-center h-full px-3 gap-1">
-                        <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={company.name}>
-                          {company.name}
-                        </span>
-                        <div className="opacity-0 group-hover/company:opacity-100 flex gap-0.5 flex-shrink-0 transition-opacity">
-                          <button
-                            onClick={() => startEditCompany(company)}
-                            className="p-0.5 rounded hover:bg-[#e8eaff] text-[#8890b5] hover:text-[#004ac6] transition"
-                            title="Editar empresa"
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm({ type: 'company', id: company.id, name: company.name })}
-                            className="p-0.5 rounded hover:bg-red-50 text-[#8890b5] hover:text-red-500 transition"
-                            title="Eliminar empresa"
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    <div className="flex items-center h-full px-2">
+                      <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={company.name}>
+                        {company.name}
+                      </span>
+                    </div>
                   </td>
 
                   {/* Process cells */}
@@ -980,7 +914,7 @@ export default function FondoEmprenderPage() {
             <div className="flex items-center gap-3 mb-3">
               <span className="material-symbols-outlined text-red-500 text-2xl">warning</span>
               <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
-                ¿Eliminar {deleteConfirm.type === 'process' ? 'proceso' : 'empresa'}?
+                ¿Eliminar proceso?
               </p>
             </div>
             <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-4 truncate">&ldquo;{deleteConfirm.name}&rdquo;</p>
