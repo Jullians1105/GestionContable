@@ -90,10 +90,10 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60" />
 
-      <div className="absolute inset-0 overflow-y-auto flex items-start justify-center p-4 py-8" onClick={onClose}>
-      <div className="relative bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col border border-[#c3c6d7] dark:border-[#2e3148] animate-in my-auto" onClick={e => e.stopPropagation()}>
+      <div className="absolute inset-0 overflow-y-auto flex items-start justify-center p-4 py-8">
+      <div className="relative bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col border border-[#c3c6d7] dark:border-[#2e3148] animate-in my-auto">
 
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-5 border-b border-[#edeef0] dark:border-[#2e3148]">
