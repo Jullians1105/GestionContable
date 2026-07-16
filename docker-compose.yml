@@ -1,3 +1,7 @@
+# Despliegue de producción — construye imágenes estáticas con `docker build`, sin hot-reload.
+# Para desarrollo local (Mac, Windows o Linux) usá docker-compose.dev.yml, no este archivo:
+# cambios en el código NO se reflejan acá hasta reconstruir manualmente las imágenes.
+
 services:
   postgres:
     image: postgres:16-alpine
