@@ -209,6 +209,47 @@ sudo systemctl status docker
 
 ---
 
+## 10. Configuración manual del servidor — gestion-start / gestion-stop
+
+Los scripts `scripts/gestion-start.sh` y `scripts/gestion-stop.sh` (ver sección 5 para el resto
+de comandos del día a día) dependen de tres cambios hechos directamente en el sistema operativo
+del servidor — **no están versionados en el repo**. Si el servidor se reinstala o migra a otro
+equipo, hay que rehacerlos.
+
+**1. Sudo sin contraseña, solo para shutdown**
+
+Archivo `/etc/sudoers.d/gestion-stop`:
+```
+gestionc-server ALL=(ALL) NOPASSWD: /usr/sbin/shutdown
+```
+Verificar con `sudo -n shutdown --help` — no debe pedir contraseña.
+
+**2. Lid switch en ignore** (evita que cerrar la tapa suspenda el servidor por accidente)
+
+Archivo `/etc/systemd/logind.conf.d/99-gestion-lid.conf`:
+```ini
+[Login]
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+```
+Aplicar con:
+```bash
+sudo systemctl restart systemd-logind
+```
+
+**3. Symlinks de los scripts**
+
+```bash
+sudo ln -sf ~/GestionTareasOficina/scripts/gestion-start.sh /usr/local/bin/gestion-start
+sudo ln -sf ~/GestionTareasOficina/scripts/gestion-stop.sh  /usr/local/bin/gestion-stop
+```
+
+**Uso diario:** `gestion-start` al llegar, `gestion-stop` al terminar el día (pide confirmación
+escribiendo `si`, apaga físicamente el servidor). Solo funciona parado frente al servidor o
+conectado por SSH.
+
+---
+
 ## Troubleshooting
 
 ### El frontend carga pero no puede conectar con la API
