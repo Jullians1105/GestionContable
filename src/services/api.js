@@ -235,6 +235,12 @@ export const api = {
   createFondoProceso: (data) => request('/fondo/procesos', { method: 'POST', body: JSON.stringify(data) }),
   updateFondoProceso: (id, data) => request(`/fondo/procesos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
+  // Fondo Emprender — Grupos de procesos (agrupar columnas del checklist)
+  getFondoProcesoGrupos: () => request('/fondo/proceso-grupos'),
+  createFondoProcesoGrupo: (data) => request('/fondo/proceso-grupos', { method: 'POST', body: JSON.stringify(data) }),
+  updateFondoProcesoGrupo: (id, data) => request(`/fondo/proceso-grupos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteFondoProcesoGrupo: (id) => request(`/fondo/proceso-grupos/${id}`, { method: 'DELETE' }),
+
   // Notifications
   getNotifications: () => request('/notifications'),
   markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: 'PUT' }),

@@ -1,10 +1,26 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+  useDroppable,
+} from '@dnd-kit/core'
+import { SortableContext, useSortable, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { migrateLegacyLocalStorage, getMigrationReport, dismissMigrationReport, getMesVencidoHabilitado, resolveMesInicial } from '../data/fondoEmprender'
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
 
 // ─── page-level constants ─────────────────────────────────────────────────────
+
+// Sentinel para el contenedor de "sin grupo" en el drag & drop — no es un
+// grupo real en la base de datos, solo el id que usa el DndContext para
+// identificar la zona de procesos sueltos.
+const SIN_GRUPO_ID = '__sin_grupo__'
 
 const STATUS = {
   pending:     { label: 'Pendiente',  icon: 'radio_button_unchecked', color: '#6b7280', bg: '#f3f4f6' },
@@ -22,6 +38,184 @@ const BORDER     = '1px solid #e2e4ef'
 const BORDER_STR = '2px solid #c3c6d7'
 
 const emptyCell = { status: 'pending', note: '' }
+
+// ─── header sub-components ─────────────────────────────────────────────────
+// Extraídos porque cada uno necesita su propio hook de dnd-kit
+// (useSortable/useDroppable no se pueden llamar dentro de un .map inline).
+
+function SortableProcessHeader({ proc, editingProcess, editProcessName, setEditProcessName, saveEditProcess, setEditingProcess, startEditProcess, setDeleteConfirm }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: proc.id })
+  const isEditing = editingProcess?.id === proc.id
+  return (
+    <th
+      ref={setNodeRef}
+      title={proc.name}
+      className="sticky top-0 z-10 bg-[#f8f9fc] dark:bg-[#1a1d2e] group/col"
+      style={{
+        width: 46, minWidth: 46, border: BORDER, borderBottom: BORDER_STR, padding: 0,
+        transform: CSS.Transform.toString(transform), transition,
+        opacity: isDragging ? 0.4 : 1,
+      }}
+      {...(isEditing ? {} : { ...attributes, ...listeners })}
+    >
+      {isEditing ? (
+        <div style={{ height: 120, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+          <input
+            autoFocus
+            value={editProcessName}
+            onChange={e => setEditProcessName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') saveEditProcess()
+              if (e.key === 'Escape') setEditingProcess(null)
+            }}
+            onBlur={saveEditProcess}
+            className="w-full px-1 py-0.5 text-[10px] rounded border border-[#004ac6] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+          />
+        </div>
+      ) : (
+        <div className="relative cursor-grab active:cursor-grabbing" style={{ height: 120 }}>
+          {/* Vertical text */}
+          <div
+            className="text-[10px] font-semibold text-[#6b7280] dark:text-[#8890b5] h-full flex items-center"
+            style={{
+              writingMode: 'vertical-lr',
+              transform: 'rotate(180deg)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              padding: '8px 12px',
+            }}
+          >
+            {proc.name}
+          </div>
+          {/* Hover overlay with actions */}
+          <div className="absolute inset-0 hidden group-hover/col:flex flex-col items-center justify-center gap-1.5 rounded" style={{ background: 'rgba(240,244,255,0.92)' }}>
+            <button
+              onClick={() => startEditProcess(proc)}
+              className="p-1 rounded bg-white dark:bg-[#252840] shadow-sm text-[#6b7280] hover:text-[#004ac6] transition"
+              title="Editar"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+            </button>
+            <button
+              onClick={() => setDeleteConfirm({ type: 'proceso', id: proc.id, name: proc.name })}
+              className="p-1 rounded bg-white dark:bg-[#252840] shadow-sm text-[#6b7280] hover:text-red-500 transition"
+              title="Eliminar"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </th>
+  )
+}
+
+// Cabecera de fila 1 para un grupo: colSpan sobre sus columnas hijas (o una
+// sola celda angosta si está colapsado o todavía no tiene procesos). Es
+// droppable para poder soltar un proceso directo sobre el grupo (agregarlo
+// al final, o ser el primero si el grupo está vacío/colapsado).
+function GroupHeaderCell({ grupo, procesos, collapsed, onToggleCollapse, editingGroup, setEditingGroup, editGroupName, setEditGroupName, saveEditGroup, startEditGroup, setDeleteConfirm }) {
+  const { setNodeRef, isOver } = useDroppable({ id: grupo.id })
+  const isEditing = editingGroup?.id === grupo.id
+  const showAsSingleCell = collapsed || procesos.length === 0
+
+  return (
+    <th
+      ref={setNodeRef}
+      colSpan={showAsSingleCell ? 1 : procesos.length}
+      rowSpan={showAsSingleCell ? 2 : 1}
+      className="sticky top-0 z-10 bg-[#eef1fb] dark:bg-[#20233a] group/grp"
+      style={{
+        border: BORDER, borderBottom: BORDER_STR, borderLeft: BORDER_STR, borderRight: BORDER_STR,
+        padding: 0, outline: isOver ? '2px solid #7c3aed' : 'none', outlineOffset: -2,
+      }}
+    >
+      {isEditing ? (
+        <div style={{ height: showAsSingleCell ? 120 : 28, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+          <input
+            autoFocus
+            value={editGroupName}
+            onChange={e => setEditGroupName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') saveEditGroup()
+              if (e.key === 'Escape') setEditingGroup(null)
+            }}
+            onBlur={saveEditGroup}
+            className="w-full px-1 py-0.5 text-[10px] rounded border border-[#7c3aed] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+          />
+        </div>
+      ) : showAsSingleCell ? (
+        // Colapsado o vacío — el nombre del grupo sigue horizontal (como
+        // expandido), solo que angosto y sin sub-columnas debajo.
+        <button
+          onClick={onToggleCollapse}
+          className="w-full h-full flex flex-col items-center justify-center gap-1 px-1"
+          style={{ minHeight: 120, width: 70 }}
+          title={procesos.length === 0 ? `${grupo.name} (sin procesos — arrastrá uno acá)` : `${grupo.name} — clic para expandir`}
+        >
+          {procesos.length > 0 && (
+            <span className="material-symbols-outlined text-[#7c3aed]" style={{ fontSize: 14 }}>chevron_right</span>
+          )}
+          <span className="text-[10px] font-bold text-[#7c3aed] text-center leading-tight break-words">
+            {grupo.name}
+          </span>
+          {procesos.length > 0 && (
+            <span className="text-[9px] font-bold text-[#7c3aed] bg-white dark:bg-[#1e2030] rounded-full px-1.5">{procesos.length}</span>
+          )}
+        </button>
+      ) : (
+        <div className="flex items-center gap-1 px-2" style={{ height: 28 }}>
+          <button onClick={onToggleCollapse} className="text-[#7c3aed] hover:opacity-70 transition" title="Colapsar grupo">
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>expand_less</span>
+          </button>
+          <span className="text-[10px] font-bold text-[#7c3aed] flex-1 truncate" title={grupo.name}>{grupo.name}</span>
+          <div className="hidden group-hover/grp:flex items-center gap-0.5">
+            <button
+              onClick={() => startEditGroup(grupo)}
+              className="p-0.5 rounded hover:bg-white dark:hover:bg-[#252840] text-[#7c3aed] transition"
+              title="Renombrar grupo"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
+            </button>
+            <button
+              onClick={() => setDeleteConfirm({ type: 'grupo', id: grupo.id, name: grupo.name })}
+              className="p-0.5 rounded hover:bg-white dark:hover:bg-[#252840] text-red-500 transition"
+              title="Eliminar grupo (los procesos quedan sin grupo)"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </th>
+  )
+}
+
+// Columna angosta siempre presente cuando hay al menos un grupo — garantiza
+// que siempre haya un lugar donde soltar un proceso para sacarlo de su
+// grupo, incluso si por el momento no queda ningún proceso suelto visible.
+function SinGrupoDropZone() {
+  const { setNodeRef, isOver } = useDroppable({ id: SIN_GRUPO_ID })
+  return (
+    <th
+      ref={setNodeRef}
+      rowSpan={2}
+      className="sticky top-0 z-10 bg-[#f8f9fc] dark:bg-[#1a1d2e]"
+      style={{
+        width: 22, minWidth: 22, border: BORDER, borderBottom: BORDER_STR, borderStyle: 'dashed',
+        borderColor: isOver ? '#7c3aed' : '#c3c6d7', padding: 0,
+      }}
+      title="Soltar acá para sacar un proceso de su grupo"
+    >
+      <div
+        className="h-full flex items-center justify-center text-[9px] font-semibold text-[#c3c6d7] dark:text-[#3a3e5c]"
+        style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}
+      >
+        Sin grupo
+      </div>
+    </th>
+  )
+}
 
 // ─── component ───────────────────────────────────────────────────────────────
 
@@ -41,6 +235,24 @@ export default function FondoEmprenderPage() {
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
   const [migrationReport, setMigrationReport] = useState(() => getMigrationReport())
+
+  // grupos de columnas (agrupar procesos relacionados)
+  const [grupos, setGrupos] = useState([])
+  const [addingGroup, setAddingGroup] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
+  const [editingGroup, setEditingGroup] = useState(null) // { id, oldName }
+  const [editGroupName, setEditGroupName] = useState('')
+  // Colapsar/expandir es solo una preferencia visual de este navegador, no
+  // se sincroniza entre usuarios — no tiene sentido de "dato" que valga la
+  // pena persistir en el backend.
+  const [collapsedGroupIds, setCollapsedGroupIds] = useState(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('fondoSeguimientoGruposColapsados') ?? '[]'))
+    } catch {
+      return new Set()
+    }
+  })
+  const [activeDragProc, setActiveDragProc] = useState(null)
 
   // cell popup
   const [openCell, setOpenCell]     = useState(null)  // { companyId, procId, left, top }
@@ -64,8 +276,8 @@ export default function FondoEmprenderPage() {
   const [editingProcess, setEditingProcess] = useState(null) // { id, name }
   const [editProcessName, setEditProcessName] = useState('')
 
-  // delete confirmation (solo procesos — empresas se editan/eliminan desde Empresas)
-  const [deleteConfirm, setDeleteConfirm] = useState(null) // { id, name }
+  // delete confirmation (proceso o grupo — empresas se editan/eliminan desde Empresas)
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // { type: 'proceso' | 'grupo', id, name }
 
   // filters: category tabs + search
   const [search, setSearch]       = useState('')
@@ -78,11 +290,13 @@ export default function FondoEmprenderPage() {
   const fetchGrid = useCallback(async () => {
     try {
       setError(null)
-      const [empresas, procesos, checklistsPorEmpresa] = await Promise.all([
+      const [empresas, procesos, checklistsPorEmpresa, gruposData] = await Promise.all([
         api.getFondoEmpresas(),
         api.getFondoProcesos(),
         api.getFondoChecklistMes(year, month + 1),
+        api.getFondoProcesoGrupos(),
       ])
+      setGrupos(gruposData)
 
       // One-time, best-effort recovery of whatever is still stuck in
       // localStorage from before the grid was wired to the backend.
@@ -139,6 +353,10 @@ export default function FondoEmprenderPage() {
   }, [saveNote])
 
   useEffect(() => { setLoading(true); fetchGrid() }, [fetchGrid])
+
+  useEffect(() => {
+    localStorage.setItem('fondoSeguimientoGruposColapsados', JSON.stringify([...collapsedGroupIds]))
+  }, [collapsedGroupIds])
 
   // Refresh on window focus (catches changes made in another tab)
   useEffect(() => {
@@ -390,8 +608,20 @@ export default function FondoEmprenderPage() {
 
   async function confirmDelete() {
     if (!deleteConfirm) return
-    const { id } = deleteConfirm
+    const { type, id } = deleteConfirm
     setDeleteConfirm(null)
+    if (type === 'grupo') {
+      try {
+        // Un grupo no tiene historial propio — se borra de verdad. Sus
+        // procesos quedan sin grupo (el backend hace el ON DELETE SET NULL).
+        await api.deleteFondoProcesoGrupo(id)
+        setGrupos(prev => prev.filter(g => g.id !== id))
+        setProcesses(prev => prev.map(p => p.grupoId === id ? { ...p, grupoId: null } : p))
+      } catch (err) {
+        alert('Error al eliminar grupo: ' + err.message)
+      }
+      return
+    }
     try {
       // Procesos con historial no se pueden borrar de verdad — se desactivan
       // para dejar de ofrecerlos en meses nuevos sin perder lo ya registrado.
@@ -401,6 +631,129 @@ export default function FondoEmprenderPage() {
       alert('Error al eliminar proceso: ' + err.message)
     }
   }
+
+  // ── grupos de columnas ────────────────────────────────────────────────────
+
+  async function handleAddGroup() {
+    const name = newGroupName.trim()
+    if (!name) return
+    setNewGroupName('')
+    setAddingGroup(false)
+    try {
+      const created = await api.createFondoProcesoGrupo({ name })
+      setGrupos(prev => [...prev, created])
+    } catch (err) {
+      alert('Error al crear grupo: ' + err.message)
+    }
+  }
+
+  function startEditGroup(grupo) {
+    setEditingGroup({ id: grupo.id, oldName: grupo.name })
+    setEditGroupName(grupo.name)
+  }
+
+  async function saveEditGroup() {
+    const newName = editGroupName.trim()
+    const editing = editingGroup
+    setEditingGroup(null)
+    if (!newName || !editing || newName === editing.oldName) return
+    setGrupos(prev => prev.map(g => g.id === editing.id ? { ...g, name: newName } : g))
+    try {
+      await api.updateFondoProcesoGrupo(editing.id, { name: newName })
+    } catch (err) {
+      setGrupos(prev => prev.map(g => g.id === editing.id ? { ...g, name: editing.oldName } : g))
+      alert('Error al renombrar grupo: ' + err.message)
+    }
+  }
+
+  function toggleCollapsed(grupoId) {
+    setCollapsedGroupIds(prev => {
+      const next = new Set(prev)
+      if (next.has(grupoId)) next.delete(grupoId)
+      else next.add(grupoId)
+      return next
+    })
+  }
+
+  // ── drag & drop de columnas entre grupos ─────────────────────────────────
+  // Mismo patrón multi-contenedor que KanbanPage (tareas entre columnas de
+  // estado): acá los "contenedores" son los grupos (+ el sentinel de "sin
+  // grupo") y las "cards" son las columnas de proceso.
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  )
+
+  function containerIdOf(procId) {
+    const proc = processes.find(p => p.id === procId)
+    return proc?.grupoId ?? SIN_GRUPO_ID
+  }
+
+  function containerItems(containerId) {
+    return containerId === SIN_GRUPO_ID
+      ? processes.filter(p => !p.grupoId)
+      : processes.filter(p => p.grupoId === containerId)
+  }
+
+  function findContainer(overId) {
+    if (overId === SIN_GRUPO_ID || grupos.some(g => g.id === overId)) return overId
+    const proc = processes.find(p => p.id === overId)
+    return proc ? containerIdOf(proc.id) : null
+  }
+
+  function handleDragStart({ active }) {
+    setActiveDragProc(processes.find(p => p.id === active.id) ?? null)
+  }
+
+  async function handleDragEnd({ active, over }) {
+    setActiveDragProc(null)
+    if (!over) return
+    const activeId = active.id
+    const fromContainer = containerIdOf(activeId)
+    const toContainer = findContainer(over.id)
+    if (!toContainer) return
+
+    if (fromContainer === toContainer) {
+      // Reordenar dentro del mismo grupo (o de "sin grupo")
+      const items = containerItems(toContainer)
+      const oldIndex = items.findIndex(p => p.id === activeId)
+      const newIndex = over.id === toContainer ? items.length - 1 : items.findIndex(p => p.id === over.id)
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+      const reordered = arrayMove(items, oldIndex, newIndex)
+      setProcesses(prev => {
+        const withNewOrden = new Map(reordered.map((p, idx) => [p.id, idx]))
+        return prev.map(p => withNewOrden.has(p.id) ? { ...p, orden: withNewOrden.get(p.id) } : p)
+      })
+      try {
+        await Promise.all(
+          reordered.map((p, idx) => api.updateFondoProceso(p.id, { orden: idx }))
+        )
+      } catch (err) {
+        alert('Error al reordenar: ' + err.message)
+        fetchGrid()
+      }
+      return
+    }
+
+    // Mover a otro grupo (o sacar a "sin grupo") — se agrega al final
+    const grupoIdDestino = toContainer === SIN_GRUPO_ID ? null : toContainer
+    const newOrden = containerItems(toContainer).length
+    const previous = processes.find(p => p.id === activeId)
+    setProcesses(prev => prev.map(p => p.id === activeId ? { ...p, grupoId: grupoIdDestino, orden: newOrden } : p))
+    try {
+      await api.updateFondoProceso(activeId, { grupoId: grupoIdDestino, orden: newOrden })
+    } catch (err) {
+      setProcesses(prev => prev.map(p => p.id === activeId ? previous : p))
+      alert('Error al mover el proceso: ' + err.message)
+    }
+  }
+
+  // ── grupos de columnas: estructura para el header de dos filas ──────────
+  // Los grupos se renderizan primero (en su `orden`), y los procesos sin
+  // grupo quedan al final en su orden actual — evita mezclar el orden de
+  // dos tablas distintas (grupos y procesos) en un mismo espacio numérico.
+  const sortedGrupos = [...grupos].sort((a, b) => a.orden - b.orden)
+  const sueltos = processes.filter(p => !p.grupoId)
 
   // ── filters: category tabs + search ──────────────────────────────────────
 
@@ -436,6 +789,56 @@ export default function FondoEmprenderPage() {
     0
   )
   const pct = totalCells ? Math.round((doneCells / totalCells) * 100) : 0
+
+  // ── layout de la tabla: total de columnas hoja y ancho, contando grupos ──
+  const groupLeafColumns = sortedGrupos.reduce((acc, g) => {
+    const children = processes.filter(p => p.grupoId === g.id)
+    const collapsedOrEmpty = collapsedGroupIds.has(g.id) || children.length === 0
+    return acc + (collapsedOrEmpty ? 1 : children.length)
+  }, 0)
+  const totalLeafColumns = 1 + groupLeafColumns + (grupos.length > 0 ? 1 : 0) + sueltos.length + (addingProcess ? 1 : 0) + 1
+  const hasExpandedGroupRow = sortedGrupos.some(g =>
+    !collapsedGroupIds.has(g.id) && processes.some(p => p.grupoId === g.id)
+  )
+  const gridWidth = 220
+    + sortedGrupos.reduce((acc, g) => {
+        const children = processes.filter(p => p.grupoId === g.id)
+        const collapsedOrEmpty = collapsedGroupIds.has(g.id) || children.length === 0
+        return acc + (collapsedOrEmpty ? 70 : children.length * 46)
+      }, 0)
+    + (grupos.length > 0 ? 22 : 0)
+    + sueltos.length * 46
+    + (addingProcess ? 100 : 0)
+    + 90
+
+  function renderProcessCell(company, proc, rowBg) {
+    const cell = company.cells[proc.id] ?? emptyCell
+    const cfg  = STATUS[cell.status] ?? STATUS.pending
+    // Whitespace-only notes must not count as "has a note" — otherwise
+    // the dot/tooltip shows for a cell that looks empty when opened.
+    const hasNote = !!cell.note?.trim()
+    return (
+      <td key={proc.id} style={{ width: 46, minWidth: 46, border: BORDER, padding: 2, background: rowBg }}>
+        <button
+          onClick={e => handleCellClick(company.id, proc.id, e)}
+          onMouseEnter={hasNote ? e => showTooltip(e, cell.note, `${company.id}_${proc.id}`) : undefined}
+          onMouseLeave={hasNote ? scheduleHide : undefined}
+          className="w-full flex items-center justify-center relative transition-all hover:opacity-75 hover:scale-90 active:scale-75 rounded"
+          style={{ height: 32, background: cfg.bg }}
+        >
+          <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 17 }}>
+            {cfg.icon}
+          </span>
+          {hasNote && (
+            <span
+              className="absolute bg-amber-400 rounded-full border border-white"
+              style={{ width: 6, height: 6, top: 1, right: 1 }}
+            />
+          )}
+        </button>
+      </td>
+    )
+  }
 
   // ── loading / error states ────────────────────────────────────────────────
   if (loading) return (
@@ -488,6 +891,29 @@ export default function FondoEmprenderPage() {
               <span className="material-symbols-outlined text-xl">chevron_right</span>
             </button>
           </div>
+          {addingGroup ? (
+            <input
+              autoFocus
+              value={newGroupName}
+              onChange={e => setNewGroupName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleAddGroup()
+                if (e.key === 'Escape') { setAddingGroup(false); setNewGroupName('') }
+              }}
+              onBlur={() => { if (!newGroupName.trim()) setAddingGroup(false); else handleAddGroup() }}
+              placeholder="Nombre del grupo..."
+              className="px-3 py-2 text-sm rounded-xl border border-[#7c3aed] outline-none bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0]"
+            />
+          ) : (
+            <button
+              onClick={() => setAddingGroup(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#7c3aed] border border-[#7c3aed] hover:bg-[#7c3aed]/5 transition active:scale-[0.97]"
+              title="Agrupar procesos relacionados en una sola columna con sub-columnas"
+            >
+              <span className="material-symbols-outlined text-lg">create_new_folder</span>
+              Nuevo grupo
+            </button>
+          )}
           <button
             onClick={() => setAddingProcess(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
@@ -590,204 +1016,231 @@ export default function FondoEmprenderPage() {
         className="overflow-auto rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm"
         style={{ maxHeight: 'calc(100vh - 17rem)' }}
       >
-        <table style={{ borderCollapse: 'collapse', minWidth: `${220 + processes.length * 46 + 90}px` }}>
-          <thead>
-            <tr>
-              {/* Company column header */}
-              <th
-                className="sticky left-0 top-0 z-30 bg-[#f8f9fc] dark:bg-[#1a1d2e] text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
-                style={{ width: 220, minWidth: 220, border: BORDER, borderBottom: BORDER_STR, borderRight: BORDER_STR, verticalAlign: 'bottom', padding: '6px 12px 8px' }}
-              >
-                Empresa
-              </th>
-
-              {/* Process column headers */}
-              {processes.map(proc => (
-                <th
-                  key={proc.id}
-                  title={proc.name}
-                  className="sticky top-0 z-10 bg-[#f8f9fc] dark:bg-[#1a1d2e] group/col"
-                  style={{ width: 46, minWidth: 46, border: BORDER, borderBottom: BORDER_STR, padding: 0 }}
-                >
-                  {editingProcess?.id === proc.id ? (
-                    <div style={{ height: 120, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
-                      <input
-                        autoFocus
-                        value={editProcessName}
-                        onChange={e => setEditProcessName(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === 'Enter') saveEditProcess()
-                          if (e.key === 'Escape') setEditingProcess(null)
-                        }}
-                        onBlur={saveEditProcess}
-                        className="w-full px-1 py-0.5 text-[10px] rounded border border-[#004ac6] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
-                      />
-                    </div>
-                  ) : (
-                    <div className="relative" style={{ height: 120 }}>
-                      {/* Vertical text */}
-                      <div
-                        className="text-[10px] font-semibold text-[#6b7280] dark:text-[#8890b5] h-full flex items-center"
-                        style={{
-                          writingMode: 'vertical-lr',
-                          transform: 'rotate(180deg)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          padding: '8px 12px',
-                        }}
-                      >
-                        {proc.name}
-                      </div>
-                      {/* Hover overlay with actions */}
-                      <div className="absolute inset-0 hidden group-hover/col:flex flex-col items-center justify-center gap-1.5 rounded" style={{ background: 'rgba(240,244,255,0.92)' }}>
-                        <button
-                          onClick={() => startEditProcess(proc)}
-                          className="p-1 rounded bg-white dark:bg-[#252840] shadow-sm text-[#6b7280] hover:text-[#004ac6] transition"
-                          title="Editar"
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirm({ id: proc.id, name: proc.name })}
-                          className="p-1 rounded bg-white dark:bg-[#252840] shadow-sm text-[#6b7280] hover:text-red-500 transition"
-                          title="Eliminar"
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </th>
-              ))}
-
-              {/* Add process column header */}
-              {addingProcess ? (
-                <th
-                  className="sticky top-0 z-10 bg-[#f8f9fc] dark:bg-[#1a1d2e]"
-                  style={{ width: 100, minWidth: 100, border: BORDER, borderBottom: BORDER_STR, verticalAlign: 'bottom', padding: 4 }}
-                >
-                  <input
-                    autoFocus
-                    value={newProcessName}
-                    onChange={e => setNewProcessName(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleAddProcess()
-                      if (e.key === 'Escape') { setAddingProcess(false); setNewProcessName('') }
-                    }}
-                    onBlur={() => { if (!newProcessName.trim()) setAddingProcess(false) }}
-                    placeholder="Nombre..."
-                    className="w-full px-2 py-1 text-[10px] rounded border border-[#7c3aed] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
-                  />
-                </th>
-              ) : null}
-
-              {/* Confirmar Contabilidad – sticky right */}
-              <th
-                className="sticky right-0 top-0 z-30 bg-[#f0fdf4] dark:bg-[#0d2e1a] text-[10px] font-bold text-[#16a34a] uppercase tracking-wide"
-                style={{ width: 88, minWidth: 88, border: BORDER, borderBottom: BORDER_STR, borderLeft: BORDER_STR, verticalAlign: 'bottom', padding: '4px 6px 6px' }}
-              >
-                Confirmar Contabilidad
-              </th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {filteredCompanies.length === 0 && (
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+          <table style={{ borderCollapse: 'collapse', minWidth: `${gridWidth}px` }}>
+            <thead>
               <tr>
-                <td
-                  colSpan={1 + processes.length + (addingProcess ? 1 : 0) + 1}
-                  className="text-center py-10 text-xs text-[#8890b5] dark:text-[#5a5f7a]"
+                {/* Company column header */}
+                <th
+                  rowSpan={2}
+                  className="sticky left-0 top-0 z-30 bg-[#f8f9fc] dark:bg-[#1a1d2e] text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
+                  style={{ width: 220, minWidth: 220, border: BORDER, borderBottom: BORDER_STR, borderRight: BORDER_STR, verticalAlign: 'bottom', padding: '6px 12px 8px' }}
                 >
-                  {search || activeTab !== 'todas'
-                    ? 'No hay empresas que coincidan con el filtro'
-                    : 'No se encontraron empresas'}
-                </td>
+                  Empresa
+                </th>
+
+                {/* Group headers (row 1) */}
+                {sortedGrupos.map(grupo => (
+                  <GroupHeaderCell
+                    key={grupo.id}
+                    grupo={grupo}
+                    procesos={processes.filter(p => p.grupoId === grupo.id)}
+                    collapsed={collapsedGroupIds.has(grupo.id)}
+                    onToggleCollapse={() => toggleCollapsed(grupo.id)}
+                    editingGroup={editingGroup}
+                    setEditingGroup={setEditingGroup}
+                    editGroupName={editGroupName}
+                    setEditGroupName={setEditGroupName}
+                    saveEditGroup={saveEditGroup}
+                    startEditGroup={startEditGroup}
+                    setDeleteConfirm={setDeleteConfirm}
+                  />
+                ))}
+
+                {grupos.length > 0 && <SinGrupoDropZone />}
+
+                {/* Sueltos (sin grupo) — ocupan las dos filas, igual que antes */}
+                <SortableContext items={sueltos.map(p => p.id)} strategy={horizontalListSortingStrategy}>
+                  {sueltos.map(proc => (
+                    <SortableProcessHeader
+                      key={proc.id}
+                      proc={proc}
+                      editingProcess={editingProcess}
+                      editProcessName={editProcessName}
+                      setEditProcessName={setEditProcessName}
+                      saveEditProcess={saveEditProcess}
+                      setEditingProcess={setEditingProcess}
+                      startEditProcess={startEditProcess}
+                      setDeleteConfirm={setDeleteConfirm}
+                    />
+                  ))}
+                </SortableContext>
+
+                {/* Add process column header */}
+                {addingProcess ? (
+                  <th
+                    rowSpan={2}
+                    className="sticky top-0 z-10 bg-[#f8f9fc] dark:bg-[#1a1d2e]"
+                    style={{ width: 100, minWidth: 100, border: BORDER, borderBottom: BORDER_STR, verticalAlign: 'bottom', padding: 4 }}
+                  >
+                    <input
+                      autoFocus
+                      value={newProcessName}
+                      onChange={e => setNewProcessName(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleAddProcess()
+                        if (e.key === 'Escape') { setAddingProcess(false); setNewProcessName('') }
+                      }}
+                      onBlur={() => { if (!newProcessName.trim()) setAddingProcess(false) }}
+                      placeholder="Nombre..."
+                      className="w-full px-2 py-1 text-[10px] rounded border border-[#7c3aed] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+                    />
+                  </th>
+                ) : null}
+
+                {/* Confirmar Contabilidad – sticky right */}
+                <th
+                  rowSpan={2}
+                  className="sticky right-0 top-0 z-30 bg-[#f0fdf4] dark:bg-[#0d2e1a] text-[10px] font-bold text-[#16a34a] uppercase tracking-wide"
+                  style={{ width: 88, minWidth: 88, border: BORDER, borderBottom: BORDER_STR, borderLeft: BORDER_STR, verticalAlign: 'bottom', padding: '4px 6px 6px' }}
+                >
+                  Confirmar Contabilidad
+                </th>
               </tr>
-            )}
-            {filteredCompanies.map((company, idx) => {
-              const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fbff'
-              return (
-                <tr key={company.id} style={{ background: rowBg }}>
 
-                  {/* Company name cell — editar/eliminar empresa se hace desde Empresas, no acá */}
+              {/* Sub-columnas de cada grupo (row 2) — solo si hay algún grupo expandido con procesos */}
+              {hasExpandedGroupRow && (
+              <tr>
+                {sortedGrupos.map(grupo => {
+                  const children = processes.filter(p => p.grupoId === grupo.id)
+                  if (collapsedGroupIds.has(grupo.id) || children.length === 0) return null
+                  return (
+                    <SortableContext key={grupo.id} items={children.map(p => p.id)} strategy={horizontalListSortingStrategy}>
+                      {children.map(proc => (
+                        <SortableProcessHeader
+                          key={proc.id}
+                          proc={proc}
+                          editingProcess={editingProcess}
+                          editProcessName={editProcessName}
+                          setEditProcessName={setEditProcessName}
+                          saveEditProcess={saveEditProcess}
+                          setEditingProcess={setEditingProcess}
+                          startEditProcess={startEditProcess}
+                          setDeleteConfirm={setDeleteConfirm}
+                        />
+                      ))}
+                    </SortableContext>
+                  )
+                })}
+              </tr>
+              )}
+            </thead>
+
+            <tbody>
+              {filteredCompanies.length === 0 && (
+                <tr>
                   <td
-                    className="sticky left-0 z-10"
-                    style={{ width: 220, minWidth: 220, maxWidth: 220, border: BORDER, borderRight: BORDER_STR, background: rowBg, height: 36, padding: 0 }}
+                    colSpan={totalLeafColumns}
+                    className="text-center py-10 text-xs text-[#8890b5] dark:text-[#5a5f7a]"
                   >
-                    <div className="flex items-center h-full px-2">
-                      <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={company.name}>
-                        {company.name}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Process cells */}
-                  {processes.map(proc => {
-                    const cell = company.cells[proc.id] ?? emptyCell
-                    const cfg  = STATUS[cell.status] ?? STATUS.pending
-                    // Whitespace-only notes must not count as "has a note" — otherwise
-                    // the dot/tooltip shows for a cell that looks empty when opened.
-                    const hasNote = !!cell.note?.trim()
-                    return (
-                      <td key={proc.id} style={{ width: 46, minWidth: 46, border: BORDER, padding: 2 }}>
-                        <button
-                          onClick={e => handleCellClick(company.id, proc.id, e)}
-                          onMouseEnter={hasNote ? e => showTooltip(e, cell.note, `${company.id}_${proc.id}`) : undefined}
-                          onMouseLeave={hasNote ? scheduleHide : undefined}
-                          className="w-full flex items-center justify-center relative transition-all hover:opacity-75 hover:scale-90 active:scale-75 rounded"
-                          style={{ height: 32, background: cfg.bg }}
-                        >
-                          <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 17 }}>
-                            {cfg.icon}
-                          </span>
-                          {hasNote && (
-                            <span
-                              className="absolute bg-amber-400 rounded-full border border-white"
-                              style={{ width: 6, height: 6, top: 1, right: 1 }}
-                            />
-                          )}
-                        </button>
-                      </td>
-                    )
-                  })}
-
-                  {/* Empty cell under "add process" input */}
-                  {addingProcess ? (
-                    <td style={{ width: 100, minWidth: 100, border: BORDER, background: rowBg }} />
-                  ) : null}
-
-                  {/* Confirmar Contabilidad cell */}
-                  <td
-                    className="sticky right-0 z-10"
-                    style={{ width: 88, minWidth: 88, border: BORDER, borderLeft: BORDER_STR, background: company.confirmed ? '#f0fdf4' : rowBg, padding: 3 }}
-                  >
-                    {company.confirmed ? (
-                      <button
-                        onClick={() => toggleConfirmed(company.id)}
-                        title={`Confirmado el ${company.confirmed.date}. Clic para revertir.`}
-                        className="w-full h-8 rounded flex flex-col items-center justify-center gap-0.5 transition hover:opacity-80"
-                        style={{ background: '#dcfce7' }}
-                      >
-                        <span className="material-symbols-outlined" style={{ color: '#16a34a', fontSize: 15 }}>verified</span>
-                        <span className="text-[9px] font-semibold text-[#16a34a] leading-none">{company.confirmed.date}</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => toggleConfirmed(company.id)}
-                        className="w-full h-8 rounded flex items-center justify-center gap-1 text-[10px] font-semibold transition hover:opacity-80 border"
-                        style={{ color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }}
-                      >
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle_outline</span>
-                        Confirmar
-                      </button>
-                    )}
+                    {search || activeTab !== 'todas'
+                      ? 'No hay empresas que coincidan con el filtro'
+                      : 'No se encontraron empresas'}
                   </td>
                 </tr>
-              )
-            })}
+              )}
+              {filteredCompanies.map((company, idx) => {
+                const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fbff'
+                return (
+                  <tr key={company.id} style={{ background: rowBg }}>
 
-          </tbody>
-        </table>
+                    {/* Company name cell — editar/eliminar empresa se hace desde Empresas, no acá */}
+                    <td
+                      className="sticky left-0 z-10"
+                      style={{ width: 220, minWidth: 220, maxWidth: 220, border: BORDER, borderRight: BORDER_STR, background: rowBg, height: 36, padding: 0 }}
+                    >
+                      <div className="flex items-center h-full px-2">
+                        <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={company.name}>
+                          {company.name}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Group cells: colapsado → resumen; expandido → una celda por proceso */}
+                    {sortedGrupos.map(grupo => {
+                      const children = processes.filter(p => p.grupoId === grupo.id)
+                      if (children.length === 0) {
+                        return <td key={grupo.id} style={{ width: 70, minWidth: 70, border: BORDER, background: rowBg }} />
+                      }
+                      if (collapsedGroupIds.has(grupo.id)) {
+                        const doneCount = children.filter(p => ['done', 'na'].includes(company.cells[p.id]?.status ?? 'pending')).length
+                        const allDone = doneCount === children.length
+                        const noneDone = doneCount === 0
+                        return (
+                          <td key={grupo.id} style={{ width: 70, minWidth: 70, border: BORDER, padding: 2, background: rowBg }}>
+                            <button
+                              onClick={() => toggleCollapsed(grupo.id)}
+                              title={`${grupo.name}: ${doneCount}/${children.length} — clic para expandir`}
+                              className="w-full flex items-center justify-center rounded text-[9px] font-bold transition hover:opacity-75"
+                              style={{
+                                height: 32,
+                                color: allDone ? '#16a34a' : noneDone ? '#8890b5' : '#d97706',
+                                background: allDone ? '#dcfce7' : noneDone ? '#f3f4f6' : '#fef9c3',
+                              }}
+                            >
+                              {doneCount}/{children.length}
+                            </button>
+                          </td>
+                        )
+                      }
+                      return children.map(proc => renderProcessCell(company, proc, rowBg))
+                    })}
+
+                    {grupos.length > 0 && (
+                      <td style={{ width: 22, minWidth: 22, border: BORDER, background: rowBg }} />
+                    )}
+
+                    {/* Sueltos (sin grupo) */}
+                    {sueltos.map(proc => renderProcessCell(company, proc, rowBg))}
+
+                    {/* Empty cell under "add process" input */}
+                    {addingProcess ? (
+                      <td style={{ width: 100, minWidth: 100, border: BORDER, background: rowBg }} />
+                    ) : null}
+
+                    {/* Confirmar Contabilidad cell */}
+                    <td
+                      className="sticky right-0 z-10"
+                      style={{ width: 88, minWidth: 88, border: BORDER, borderLeft: BORDER_STR, background: company.confirmed ? '#f0fdf4' : rowBg, padding: 3 }}
+                    >
+                      {company.confirmed ? (
+                        <button
+                          onClick={() => toggleConfirmed(company.id)}
+                          title={`Confirmado el ${company.confirmed.date}. Clic para revertir.`}
+                          className="w-full h-8 rounded flex flex-col items-center justify-center gap-0.5 transition hover:opacity-80"
+                          style={{ background: '#dcfce7' }}
+                        >
+                          <span className="material-symbols-outlined" style={{ color: '#16a34a', fontSize: 15 }}>verified</span>
+                          <span className="text-[9px] font-semibold text-[#16a34a] leading-none">{company.confirmed.date}</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => toggleConfirmed(company.id)}
+                          className="w-full h-8 rounded flex items-center justify-center gap-1 text-[10px] font-semibold transition hover:opacity-80 border"
+                          style={{ color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle_outline</span>
+                          Confirmar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+
+            </tbody>
+          </table>
+
+          <DragOverlay>
+            {activeDragProc && (
+              <div
+                className="px-3 py-1.5 rounded-lg shadow-lg text-xs font-semibold bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] border border-[#7c3aed]"
+              >
+                {activeDragProc.name}
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       {/* ── Legend ───────────────────────────────────────────────────────── */}
@@ -914,10 +1367,15 @@ export default function FondoEmprenderPage() {
             <div className="flex items-center gap-3 mb-3">
               <span className="material-symbols-outlined text-red-500 text-2xl">warning</span>
               <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
-                ¿Eliminar proceso?
+                ¿Eliminar {deleteConfirm.type === 'grupo' ? 'grupo' : 'proceso'}?
               </p>
             </div>
-            <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-4 truncate">&ldquo;{deleteConfirm.name}&rdquo;</p>
+            <p className={`text-xs text-[#6b7280] dark:text-[#8890b5] truncate ${deleteConfirm.type === 'grupo' ? 'mb-1' : 'mb-4'}`}>
+              &ldquo;{deleteConfirm.name}&rdquo;
+            </p>
+            {deleteConfirm.type === 'grupo' && (
+              <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-3">Sus procesos no se borran, quedan sin grupo.</p>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
