@@ -172,6 +172,11 @@ export const api = {
     return request(`/fondo/checklist/${empresaId}/confirmado?${qs}`,
       { method: 'PUT', body: JSON.stringify(data) });
   },
+  updateFondoChecklistEnviado: (empresaId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/${empresaId}/enviado?${qs}`,
+      { method: 'PUT', body: JSON.stringify(data) });
+  },
 
   // Fondo Emprender — Detalle macroprocesos
   getFondoDetalle: (empresaId, anio, mes) => {

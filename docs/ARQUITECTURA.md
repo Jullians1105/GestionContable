@@ -244,16 +244,18 @@ Checklist de 23 procesos (`fondo_procesos`) × cada empresa, agrupado por mes (`
 | ID | Nombre | Fuente del estado |
 |---|---|---|
 | mp1 | Facturación | `fondo_detalle_macroprocesos` — editable directo |
-| mp2 | Nómina | `fondo_detalle_macroprocesos` — editable directo |
-| mp3 | Nómina electrónica | `fondo_detalle_macroprocesos` — editable directo |
+| mp2 | Nómina | **Derivado en lectura** del agregado de TODOS los procesos del grupo NOMINA del checklist mensual (Seguimiento Mensual), vinculado por `fondo_proceso_grupos.macroproceso_id = 'mp2'` (por id, no por nombre). `readonly: true`. `na` en todos → `done`; algún avance sin terminar → `in_progress`. Responsable/nota siguen editables. La ficha muestra además el desglose por proceso (`checklistItems`). |
+| mp3 | Nómina electrónica | **Derivado en lectura** del ítem "nomina electronica" del checklist mensual (Seguimiento Mensual), vinculado por `fondo_procesos.macroproceso_id = 'mp3'` (por id, no por nombre — sobrevive a renombrados). `readonly: true`. `na` → `done`. Responsable/nota siguen editables. |
 | mp4 | Documentos contador - Pagos | **Derivado en lectura** de `fondo_pagos` del mismo mes (módulo de Pagos). `readonly: true`. `enviado`/`aprobado` → `done`; `rechazado` → `in_progress`; sin registro → `pending`. Responsable/nota siguen editables. |
-| mp5 | Contabilidad | **Derivado** de `fondo_checklist_meses.confirmed` (Seguimiento Mensual). `readonly: true`, sin responsable/nota. |
+| mp5 | Contabilidad | **Derivado en lectura** del agregado de TODOS los procesos del grupo CONTABILIDAD del checklist mensual, mismo criterio que mp2, vinculado por `fondo_proceso_grupos.macroproceso_id = 'mp5'`. `readonly: true`, sin responsable/nota. `confirmed`/`enviado` (flujo "Listo para enviar" → "Enviada" de Seguimiento Mensual) ya NO son la fuente del estado — quedan como un paso manual posterior e independiente, mostrado aparte en la ficha. El botón "Listo para enviar" en Seguimiento Mensual se deshabilita mientras falte algún proceso del grupo CONTABILIDAD por resolver. |
 | mp6 | Información tributaria | **Derivado** de `fondo_impuestos_items` (los 4 impuestos). `readonly: true`. Los 4 en `'na'` cuentan como `done` ("Sin impuestos aplicables"). Responsable/nota editables. |
 | mp7 | Producción y ventas | `fondo_detalle_macroprocesos` — editable directo |
 
 Cada macroproceso puede tener **tareas vinculadas** del Gestor de Tareas vía `task_fondo_links` (tabla puente, `link_type: 'macroproceso' | 'checklist'`), visibles en la ficha y con badge en `TaskCard`/`TaskForm` del lado de Tareas (`FondoLinkSelector.jsx`).
 
-**Por qué derivación en lectura y no un trigger al confirmar:** se decidió así para mp4 (jul-2026) porque garantiza que el estado nunca quede desincronizado sin importar cómo cambie `fondo_pagos` (aprobar, rechazar, o revertir un "Pagado") — no hay lógica de sync adicional que mantener. Mismo patrón ya usado para mp5 y mp6.
+**Por qué derivación en lectura y no un trigger al confirmar:** se decidió así para mp4 (jul-2026) porque garantiza que el estado nunca quede desincronizado sin importar cómo cambie `fondo_pagos` (aprobar, rechazar, o revertir un "Pagado") — no hay lógica de sync adicional que mantener. Mismo patrón usado para mp2, mp3, mp5 y mp6.
+
+**`getEmpresas` (lista de Empresas) recalcula el agregado "X/7" con su propia consulta SQL**, independiente de `fondoDetalleController.getDetalle` — cualquier macroproceso nuevo que se vuelva derivado (mp2, mp3, mp5 así fue) hay que excluirlo del conteo crudo de `fondo_detalle_macroprocesos` ahí también y sumar su contribución derivada, o la lista queda desincronizada de la ficha aunque esta última esté bien.
 
 ### 3. Pagos a la fiduciaria (`/fondo-emprender/pagos`)
 

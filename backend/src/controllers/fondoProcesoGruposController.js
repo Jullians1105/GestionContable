@@ -3,16 +3,19 @@ const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 
 const normalizeGrupo = (row) => ({
-  id:        row.id,
-  name:      row.name,
-  orden:     row.orden,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at,
+  id:             row.id,
+  name:           row.name,
+  orden:          row.orden,
+  // Vínculo estable a un macroproceso (ej. 'mp5' para el grupo que alimenta
+  // Contabilidad) — se setea por migración, no editable desde acá.
+  macroprocesoId: row.macroproceso_id ?? null,
+  createdAt:      row.created_at,
+  updatedAt:      row.updated_at,
 });
 
 const getGrupos = async (req, res, next) => {
   try {
-    const result = await db.query('SELECT * FROM fondo_proceso_grupos ORDER BY orden ASC');
+    const result = await db.query('SELECT * FROM fondo_proceso_grupos ORDER BY orden ASC, created_at ASC');
     res.json(result.rows.map(normalizeGrupo));
   } catch (err) {
     next(err);

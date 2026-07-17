@@ -14,6 +14,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { migrateLegacyLocalStorage, getMigrationReport, dismissMigrationReport, getMesVencidoHabilitado, resolveMesInicial } from '../data/fondoEmprender'
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
+import { useAuth } from '../context/AuthContext'
 
 // ─── page-level constants ─────────────────────────────────────────────────────
 
@@ -34,75 +35,170 @@ const MONTHS = [
   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
 ]
 
-const BORDER     = '1px solid #e2e4ef'
-const BORDER_STR = '2px solid #c3c6d7'
+const BORDER     = '1px solid #e2e4ef' // separador horizontal (entre filas), sutil a propósito
+const BORDER_COL = '1px solid #d5d9ea' // separador vertical entre columnas — un poco más visible que el horizontal
+
+const COL_WIDTH = 48
+
+// Convierte un string de borde ("1px solid #hex") en un segmento de
+// box-shadow inset para ese lado. Los headers viven dentro de un <thead>
+// sticky con la tabla en border-collapse — esa combinación tiene un bug de
+// Chrome donde los bordes de las celdas se "pierden" al hacer scroll (se
+// pintan mal, no es que se muevan). box-shadow es una capa de pintado
+// totalmente aparte del border-collapse de la tabla, así que no le pasa lo
+// mismo — por eso los headers arman su borde así en vez de con `border`.
+function sideShadow(side, borderStr) {
+  if (!borderStr) return null
+  const [width, , color] = borderStr.split(' ')
+  const w = parseFloat(width)
+  const offset = {
+    top:    `0 ${w}px`,
+    bottom: `0 -${w}px`,
+    left:   `${w}px 0`,
+    right:  `-${w}px 0`,
+  }[side]
+  return `inset ${offset} 0 0 ${color}`
+}
+
+function headerBoxShadow({ top, bottom, left, right }) {
+  return [sideShadow('top', top), sideShadow('bottom', bottom), sideShadow('left', left), sideShadow('right', right)]
+    .filter(Boolean)
+    .join(', ')
+}
+
+// Alto de la franja de grupo (fila 1 del header).
+const GROUP_ROW_HEIGHT = 34
+// Alto del header de cada columna (nombre en vertical). Medido a mano (con
+// Chrome headless) contra el nombre más largo real, "Egreso Seguridad
+// Social" — a 155px entra completo tanto en vista normal (11px) como en
+// modo edición (10px, con el handle/franja de acciones recortados a la
+// medida justa para que también entre ahí).
+const HEADER_HEIGHT = 155
+
+// Paleta por grupo — se cicla por índice (grupo 0, 1, 2…). Reusa exactamente
+// los mismos tonos que ya usa el resto de la app para distinguir categorías
+// (la insignia Contable/Tributario de FondoEmprenderEmpresasPage: fondo casi
+// blanco + texto de color, nunca un relleno sólido) en vez de inventar
+// colores nuevos — así se siente parte del mismo sistema, no algo pegado
+// encima. `accent` es el color plano para bordes (no hay forma de expresar
+// eso como clase de Tailwind).
+// Clases completas (no interpoladas) para que Tailwind las detecte al escanear el archivo.
+const GROUP_PALETTE = [
+  { bg: 'bg-[#f0f4ff] dark:bg-[#182544]', text: 'text-[#004ac6] dark:text-[#7ba8f0]', accent: '#004ac6' },
+  { bg: 'bg-[#f0fdf4] dark:bg-[#0d2e1a]', text: 'text-[#16a34a] dark:text-[#4ade80]', accent: '#16a34a' },
+  { bg: 'bg-[#fffbeb] dark:bg-[#2e2410]', text: 'text-[#d97706] dark:text-[#fbbf24]', accent: '#d97706' },
+]
 
 const emptyCell = { status: 'pending', note: '' }
+
+// año*12+mes da un entero comparable — evita comparar año y mes por separado
+// para saber si (year, month) cae dentro del rango de vigencia de un proceso.
+const monthKey = (anio, mes) => anio * 12 + mes
+
+function isVigente(proc, year, month) {
+  const key = monthKey(year, month)
+  if (proc.vigenteDesde && key < monthKey(proc.vigenteDesde.anio, proc.vigenteDesde.mes)) return false
+  if (proc.vigenteHasta && key > monthKey(proc.vigenteHasta.anio, proc.vigenteHasta.mes)) return false
+  return true
+}
+
+// Suma `n` meses (n=0 → el mismo mes) a un (año, mes), con acarreo de año.
+function addMonths(year, month, n) {
+  const total = (year * 12 + (month - 1)) + n
+  return { anio: Math.floor(total / 12), mes: (total % 12) + 1 }
+}
 
 // ─── header sub-components ─────────────────────────────────────────────────
 // Extraídos porque cada uno necesita su propio hook de dnd-kit
 // (useSortable/useDroppable no se pueden llamar dentro de un .map inline).
 
-function SortableProcessHeader({ proc, rowSpan, editingProcess, editProcessName, setEditProcessName, saveEditProcess, setEditingProcess, startEditProcess, setDeleteConfirm }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: proc.id })
-  const isEditing = editingProcess?.id === proc.id
+function SortableProcessHeader({ proc, rowSpan, editable, groupColor, hasTopBorder = true, startEditProcess, setDeleteConfirm }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: proc.id, disabled: !editable })
+  // Mismo fondo y texto gris neutro de siempre, agrupada o no — el color del
+  // grupo ya se ve arriba, en su franja. Acá solo se hereda un filo de color
+  // abajo, como una línea que conecta visualmente con esa franja, sin que
+  // cada columna individual sea un bloque de color aparte.
+  //
+  // Cada celda dibuja solo su propio borde derecho (nunca el izquierdo) — la
+  // celda vecina de la izquierda ya lo puso. Declarar los dos lados de una
+  // misma línea compartida (como hacía antes) hace que se dibuje dos veces
+  // encimada y se vea borrosa/gruesa en vez de una línea limpia.
+  const textClass = 'text-[#6b7280] dark:text-[#8890b5]'
   return (
     <th
       ref={setNodeRef}
       rowSpan={rowSpan}
       title={proc.name}
-      className="sticky top-0 z-10 bg-[#f8f9fc] dark:bg-[#1a1d2e] group/col"
+      className="bg-[#f8f9fc] dark:bg-[#1a1d2e]"
       style={{
-        width: 46, minWidth: 46, border: BORDER, borderBottom: BORDER_STR, padding: 0,
+        width: COL_WIDTH, minWidth: COL_WIDTH, padding: 0,
+        boxShadow: headerBoxShadow({
+          top: hasTopBorder ? BORDER : null,
+          bottom: groupColor ? `3px solid ${groupColor.accent}` : BORDER,
+          right: BORDER_COL,
+        }),
         transform: CSS.Transform.toString(transform), transition,
         opacity: isDragging ? 0.4 : 1,
       }}
-      {...(isEditing ? {} : { ...attributes, ...listeners })}
     >
-      {isEditing ? (
-        <div style={{ height: 120, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
-          <input
-            autoFocus
-            value={editProcessName}
-            onChange={e => setEditProcessName(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') saveEditProcess()
-              if (e.key === 'Escape') setEditingProcess(null)
-            }}
-            onBlur={saveEditProcess}
-            className="w-full px-1 py-0.5 text-[10px] rounded border border-[#004ac6] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
-          />
+      {!editable ? (
+        // Vista normal — solo el nombre, sin ningún control. Nada de hover,
+        // nada que arrastrar: eso queda reservado al modo "Editar estructura".
+        <div
+          className={`text-[11px] font-semibold flex items-center ${textClass}`}
+          style={{
+            height: HEADER_HEIGHT,
+            writingMode: 'vertical-lr',
+            transform: 'rotate(180deg)',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            padding: '8px 12px',
+          }}
+        >
+          {proc.name}
         </div>
       ) : (
-        <div className="relative cursor-grab active:cursor-grabbing" style={{ height: 120 }}>
-          {/* Vertical text */}
+        // Modo edición — franjas fijas arriba (arrastrar) y abajo (acciones),
+        // siempre visibles, para no depender de hover (eso era lo que
+        // trababa el drag: el overlay competía con el handle).
+        <div className="flex flex-col" style={{ height: HEADER_HEIGHT }}>
           <div
-            className="text-[10px] font-semibold text-[#6b7280] dark:text-[#8890b5] h-full flex items-center"
+            {...attributes}
+            {...listeners}
+            className="flex items-center justify-center cursor-grab active:cursor-grabbing hover:brightness-95 dark:hover:brightness-125 transition flex-shrink-0"
+            style={{ height: 12 }}
+            title="Arrastrar para reordenar"
+          >
+            <span className={`material-symbols-outlined ${textClass}`} style={{ fontSize: 12, transform: 'rotate(90deg)' }}>
+              drag_indicator
+            </span>
+          </div>
+          <div
+            className={`text-[10px] font-semibold flex items-center justify-center flex-1 min-h-0 ${textClass}`}
             style={{
               writingMode: 'vertical-lr',
               transform: 'rotate(180deg)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
-              padding: '8px 12px',
+              padding: '1px 12px',
             }}
           >
             {proc.name}
           </div>
-          {/* Hover overlay with actions */}
-          <div className="absolute inset-0 hidden group-hover/col:flex flex-col items-center justify-center gap-1.5 rounded" style={{ background: 'rgba(240,244,255,0.92)' }}>
+          <div className="flex items-center justify-center gap-0.5 flex-shrink-0" style={{ height: 16 }}>
             <button
               onClick={() => startEditProcess(proc)}
-              className="p-1 rounded bg-white dark:bg-[#252840] shadow-sm text-[#6b7280] hover:text-[#004ac6] transition"
-              title="Editar"
+              className="p-0.5 rounded hover:bg-[#e2e4ef] dark:hover:bg-[#252840] text-[#6b7280] hover:text-[#004ac6] transition"
+              title="Editar nombre"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>edit</span>
             </button>
             <button
               onClick={() => setDeleteConfirm({ type: 'proceso', id: proc.id, name: proc.name })}
-              className="p-1 rounded bg-white dark:bg-[#252840] shadow-sm text-[#6b7280] hover:text-red-500 transition"
+              className="p-0.5 rounded hover:bg-[#e2e4ef] dark:hover:bg-[#252840] text-[#6b7280] hover:text-red-500 transition"
               title="Eliminar"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
+              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>delete</span>
             </button>
           </div>
         </div>
@@ -115,29 +211,34 @@ function SortableProcessHeader({ proc, rowSpan, editingProcess, editProcessName,
 // sola celda angosta si está colapsado o todavía no tiene procesos). Es
 // droppable para poder soltar un proceso directo sobre el grupo (agregarlo
 // al final, o ser el primero si el grupo está vacío/colapsado).
-function GroupHeaderCell({ grupo, procesos, collapsed, onToggleCollapse, editingGroup, setEditingGroup, editGroupName, setEditGroupName, saveEditGroup, startEditGroup, setDeleteConfirm }) {
-  const { setNodeRef, isOver } = useDroppable({ id: grupo.id })
+function GroupHeaderCell({ grupo, procesos, collapsed, editable, paletteIndex, onToggleCollapse, editingGroup, setEditingGroup, editGroupName, setEditGroupName, saveEditGroup, startEditGroup, setDeleteConfirm }) {
+  const { setNodeRef, isOver } = useDroppable({ id: grupo.id, disabled: !editable })
   const isEditing = editingGroup?.id === grupo.id
   const showAsSingleCell = collapsed || procesos.length === 0
-
-  const GROUP_ROW_HEIGHT = 20 // "reglóncito" — franja delgada, no una celda de altura completa
+  const palette = GROUP_PALETTE[paletteIndex % GROUP_PALETTE.length]
 
   return (
     <th
       ref={setNodeRef}
       colSpan={showAsSingleCell ? 1 : procesos.length}
       rowSpan={showAsSingleCell ? 2 : 1}
-      className="sticky top-0 z-10 bg-[#eef1fb] dark:bg-[#20233a] group/grp overflow-hidden"
+      className={`overflow-hidden ${palette.bg}`}
       style={{
-        width: showAsSingleCell ? 46 : procesos.length * 46,
-        maxWidth: showAsSingleCell ? 46 : procesos.length * 46,
-        border: BORDER, borderBottom: BORDER_STR, borderLeft: BORDER_STR, borderRight: BORDER_STR,
+        width: showAsSingleCell ? COL_WIDTH : procesos.length * COL_WIDTH,
+        maxWidth: showAsSingleCell ? COL_WIDTH : procesos.length * COL_WIDTH,
+        // El acento de color va solo arriba, como el borde de color de las
+        // tarjetas de resumen (StatsCard) — el resto de los bordes son los
+        // grises normales de la tabla, para que el grupo se lea como parte
+        // de la misma grilla y no como un bloque plantado encima. Sin
+        // izquierda: la celda anterior (Empresa u otro grupo) ya puso su
+        // propio borde derecho ahí — declarar los dos duplica la línea.
+        boxShadow: headerBoxShadow({ top: `4px solid ${palette.accent}`, bottom: BORDER, right: BORDER_COL }),
         padding: 0, overflow: 'hidden',
-        outline: isOver ? '2px solid #7c3aed' : 'none', outlineOffset: -2,
+        outline: isOver ? `2px solid ${palette.accent}` : 'none', outlineOffset: -2,
       }}
     >
       {isEditing ? (
-        <div style={{ height: showAsSingleCell ? 120 : GROUP_ROW_HEIGHT, display: 'flex', alignItems: 'center', padding: '0 2px' }}>
+        <div style={{ height: showAsSingleCell ? 120 : GROUP_ROW_HEIGHT, display: 'flex', alignItems: 'center', padding: '0 4px' }}>
           <input
             autoFocus
             value={editGroupName}
@@ -147,7 +248,7 @@ function GroupHeaderCell({ grupo, procesos, collapsed, onToggleCollapse, editing
               if (e.key === 'Escape') setEditingGroup(null)
             }}
             onBlur={saveEditGroup}
-            className="w-full px-1 py-0.5 text-[9px] rounded border border-[#7c3aed] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+            className="w-full px-1 py-0.5 text-[11px] rounded border border-[#004ac6] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
           />
         </div>
       ) : showAsSingleCell ? (
@@ -156,67 +257,44 @@ function GroupHeaderCell({ grupo, procesos, collapsed, onToggleCollapse, editing
         <button
           onClick={onToggleCollapse}
           className="relative w-full flex items-center justify-center"
-          style={{ height: 120, width: 46 }}
-          title={procesos.length === 0 ? `${grupo.name} (sin procesos — arrastrá uno acá)` : `${grupo.name} — clic para expandir`}
+          style={{ height: 120, width: COL_WIDTH }}
+          title={procesos.length === 0 ? `${grupo.name} (sin procesos)` : `${grupo.name} — clic para expandir`}
         >
           <span
-            className="text-[10px] font-bold text-[#7c3aed]"
+            className={`text-[12px] font-bold ${palette.text}`}
             style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)', whiteSpace: 'nowrap', overflow: 'hidden' }}
           >
             {grupo.name}{procesos.length > 0 ? ` (${procesos.length})` : ''}
           </span>
         </button>
       ) : (
-        <div className="relative flex items-center gap-0.5 px-1 overflow-hidden" style={{ height: GROUP_ROW_HEIGHT }}>
-          <button onClick={onToggleCollapse} className="flex-shrink-0 text-[#7c3aed] hover:opacity-70 transition" title="Colapsar grupo">
-            <span className="material-symbols-outlined" style={{ fontSize: 12 }}>expand_less</span>
+        <div className="flex items-center gap-1 px-2" style={{ height: GROUP_ROW_HEIGHT }}>
+          <button onClick={onToggleCollapse} className={`flex-shrink-0 hover:opacity-70 transition ${palette.text}`} title="Colapsar grupo">
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>expand_less</span>
           </button>
-          <span className="text-[9px] font-bold text-[#7c3aed] flex-1 min-w-0 truncate" title={grupo.name}>{grupo.name}</span>
-          {/* Acciones solo en hover, fuera del flujo — igual que en los procesos individuales, para que nunca empujen el ancho */}
-          <div className="absolute inset-0 hidden group-hover/grp:flex items-center justify-end gap-0.5 px-1" style={{ background: '#eef1fb' }}>
-            <button
-              onClick={() => startEditGroup(grupo)}
-              className="p-0.5 rounded hover:bg-white dark:hover:bg-[#252840] text-[#7c3aed] transition"
-              title="Renombrar grupo"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>edit</span>
-            </button>
-            <button
-              onClick={() => setDeleteConfirm({ type: 'grupo', id: grupo.id, name: grupo.name })}
-              className="p-0.5 rounded hover:bg-white dark:hover:bg-[#252840] text-red-500 transition"
-              title="Eliminar grupo (los procesos quedan sin grupo)"
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>delete</span>
-            </button>
-          </div>
+          <span className={`text-[14px] font-bold flex-1 min-w-0 truncate text-center ${palette.text}`} title={grupo.name}>{grupo.name}</span>
+          {/* En modo edición las acciones quedan siempre visibles (no en hover)
+              para no repetir el problema del handle de arrastre tapado. */}
+          {editable && (
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              <button
+                onClick={() => startEditGroup(grupo)}
+                className={`p-0.5 rounded hover:bg-white/60 dark:hover:bg-black/20 transition ${palette.text}`}
+                title="Renombrar grupo"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+              </button>
+              <button
+                onClick={() => setDeleteConfirm({ type: 'grupo', id: grupo.id, name: grupo.name })}
+                className="p-0.5 rounded hover:bg-white/60 dark:hover:bg-black/20 text-red-500 transition"
+                title="Eliminar grupo (los procesos quedan sin grupo)"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
-    </th>
-  )
-}
-
-// Columna angosta siempre presente cuando hay al menos un grupo — garantiza
-// que siempre haya un lugar donde soltar un proceso para sacarlo de su
-// grupo, incluso si por el momento no queda ningún proceso suelto visible.
-function SinGrupoDropZone() {
-  const { setNodeRef, isOver } = useDroppable({ id: SIN_GRUPO_ID })
-  return (
-    <th
-      ref={setNodeRef}
-      rowSpan={2}
-      className="sticky top-0 z-10 bg-[#f8f9fc] dark:bg-[#1a1d2e]"
-      style={{
-        width: 22, minWidth: 22, border: BORDER, borderBottom: BORDER_STR, borderStyle: 'dashed',
-        borderColor: isOver ? '#7c3aed' : '#c3c6d7', padding: 0,
-      }}
-      title="Soltar acá para sacar un proceso de su grupo"
-    >
-      <div
-        className="flex items-center justify-center text-[9px] font-semibold text-[#c3c6d7] dark:text-[#3a3e5c]"
-        style={{ height: 120, writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}
-      >
-        Sin grupo
-      </div>
     </th>
   )
 }
@@ -225,7 +303,14 @@ function SinGrupoDropZone() {
 
 export default function FondoEmprenderPage() {
   const { socket } = useSocket()
+  const { isAdmin } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
+
+  // Estructura (grupos/procesos: crear, renombrar, borrar, mover, arrastrar)
+  // — solo el admin puede tocarla, y solo cuando activa este modo. Todos los
+  // demás ven siempre la tabla de solo lectura, sin controles ni handles.
+  const [editMode, setEditMode] = useState(false)
+  const canEditStructure = isAdmin() && editMode
 
   // ── state ────────────────────────────────────────────────────────────────
   // month/year se inicializan desde la URL (si viene y está dentro del mes
@@ -274,11 +359,10 @@ export default function FondoEmprenderPage() {
   const tooltipKeyRef   = useRef(null)        // key of the cell whose size is active
   tooltipSizeRef.current = tooltipSize        // kept in sync on every render
 
-  // add / edit process
-  const [addingProcess, setAddingProcess]   = useState(false)
-  const [newProcessName, setNewProcessName] = useState('')
-  const [editingProcess, setEditingProcess] = useState(null) // { id, name }
-  const [editProcessName, setEditProcessName] = useState('')
+  // add / edit process — un solo modal para ambos casos (ver procesoModal
+  // más abajo), en vez de inputs sueltos por header. mode: 'create' | 'edit',
+  // hastaMode: 'siempre' | 'esteMes' | 'porMeses'.
+  const [procesoModal, setProcesoModal] = useState(null)
 
   // delete confirmation (proceso o grupo — empresas se editan/eliminan desde Empresas)
   const [deleteConfirm, setDeleteConfirm] = useState(null) // { type: 'proceso' | 'grupo', id, name }
@@ -312,7 +396,7 @@ export default function FondoEmprenderPage() {
       )
 
       const built = empresas.map((e) => {
-        const chk = checklistPorEmpresaId.get(e.id) ?? { items: [], confirmed: false, confirmedAt: null }
+        const chk = checklistPorEmpresaId.get(e.id) ?? { items: [], confirmed: false, confirmedAt: null, enviado: false, enviadoAt: null }
         const cells = {}
         chk.items.forEach(it => { cells[it.id] = { status: it.estado, note: it.nota ?? '' } })
         return {
@@ -322,6 +406,9 @@ export default function FondoEmprenderPage() {
           cells,
           confirmed: chk.confirmed
             ? { date: (chk.confirmedAt ?? new Date().toISOString()).slice(0, 10) }
+            : null,
+          enviado: chk.enviado
+            ? { date: (chk.enviadoAt ?? new Date().toISOString()).slice(0, 10) }
             : null,
         }
       })
@@ -494,12 +581,20 @@ export default function FondoEmprenderPage() {
   async function toggleConfirmed(companyId) {
     const company = companies.find(c => c.id === companyId)
     const newConfirmed = !company?.confirmed
-    const previous = company?.confirmed ?? null
+    const previousConfirmed = company?.confirmed ?? null
+    const previousEnviado = company?.enviado ?? null
 
+    // Revertir la confirmación también revierte el envío (el backend hace
+    // la misma cascada) — no puede quedar "enviada" una contabilidad que ya
+    // no está confirmada.
     setCompanies(prev =>
       prev.map(c =>
         c.id === companyId
-          ? { ...c, confirmed: newConfirmed ? { date: new Date().toISOString().slice(0, 10) } : null }
+          ? {
+              ...c,
+              confirmed: newConfirmed ? { date: new Date().toISOString().slice(0, 10) } : null,
+              enviado: newConfirmed ? c.enviado : null,
+            }
           : c
       )
     )
@@ -509,13 +604,45 @@ export default function FondoEmprenderPage() {
       setCompanies(prev =>
         prev.map(c =>
           c.id === companyId
-            ? { ...c, confirmed: result.confirmed ? { date: (result.updatedAt ?? new Date().toISOString()).slice(0, 10) } : null }
+            ? {
+                ...c,
+                confirmed: result.confirmed ? { date: (result.confirmedAt ?? new Date().toISOString()).slice(0, 10) } : null,
+                enviado: result.enviado ? { date: (result.enviadoAt ?? new Date().toISOString()).slice(0, 10) } : null,
+              }
             : c
         )
       )
     } catch (err) {
-      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, confirmed: previous } : c))
+      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, confirmed: previousConfirmed, enviado: previousEnviado } : c))
       console.error('Error al confirmar contabilidad:', err.message)
+    }
+  }
+
+  async function toggleEnviado(companyId) {
+    const company = companies.find(c => c.id === companyId)
+    const newEnviado = !company?.enviado
+    const previous = company?.enviado ?? null
+
+    setCompanies(prev =>
+      prev.map(c =>
+        c.id === companyId
+          ? { ...c, enviado: newEnviado ? { date: new Date().toISOString().slice(0, 10) } : null }
+          : c
+      )
+    )
+
+    try {
+      const result = await api.updateFondoChecklistEnviado(companyId, year, month + 1, { enviado: newEnviado })
+      setCompanies(prev =>
+        prev.map(c =>
+          c.id === companyId
+            ? { ...c, enviado: result.enviado ? { date: (result.enviadoAt ?? new Date().toISOString()).slice(0, 10) } : null }
+            : c
+        )
+      )
+    } catch (err) {
+      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, enviado: previous } : c))
+      console.error('Error al marcar como enviada:', err.message)
     }
   }
 
@@ -577,36 +704,60 @@ export default function FondoEmprenderPage() {
   }
 
   // ── process (column) actions ─────────────────────────────────────────────
+  // Un solo modal para crear y editar procesos — ambos casos necesitan
+  // elegir "¿hasta cuándo aplica?", así que comparten la misma UI.
 
-  async function handleAddProcess() {
-    const name = newProcessName.trim()
-    if (!name) return
-    setNewProcessName('')
-    setAddingProcess(false)
-    try {
-      const created = await api.createFondoProceso({ name })
-      setProcesses(prev => [...prev, created])
-    } catch (err) {
-      alert('Error al crear proceso: ' + err.message)
+  function openCreateProcesoModal() {
+    setProcesoModal({ mode: 'create', id: null, name: '', hastaMode: 'siempre', porMeses: 3 })
+  }
+
+  function openEditProcesoModal(proc) {
+    setProcesoModal({ mode: 'edit', id: proc.id, name: proc.name, hastaMode: 'siempre', porMeses: 3 })
+  }
+
+  function closeProcesoModal() {
+    setProcesoModal(null)
+  }
+
+  // `month` (state) es 0-indexed (Enero=0), como el resto de la página — pero
+  // vigente_desde/hasta.mes en la base es 1-12, igual que en todo fondo_*.
+  function computeVigenteHasta(hastaMode, porMeses) {
+    if (hastaMode === 'esteMes') return { anio: year, mes: month + 1 }
+    if (hastaMode === 'porMeses') return addMonths(year, month + 1, Math.max(1, porMeses || 1) - 1)
+    return null // 'siempre'
+  }
+
+  async function submitProcesoModal() {
+    const modal = procesoModal
+    const name = modal?.name.trim()
+    if (!modal || !name) return
+    setProcesoModal(null)
+
+    const vigenteHasta = computeVigenteHasta(modal.hastaMode, modal.porMeses)
+
+    if (modal.mode === 'create') {
+      try {
+        const created = await api.createFondoProceso({
+          name,
+          vigenteDesde: { anio: year, mes: month + 1 },
+          vigenteHasta,
+        })
+        setProcesses(prev => [...prev, created])
+      } catch (err) {
+        alert('Error al crear proceso: ' + err.message)
+      }
+      return
     }
-  }
 
-  function startEditProcess(proc) {
-    setEditingProcess({ id: proc.id, oldName: proc.name })
-    setEditProcessName(proc.name)
-  }
-
-  async function saveEditProcess() {
-    const newName = editProcessName.trim()
-    const editing = editingProcess
-    setEditingProcess(null)
-    if (!newName || !editing || newName === editing.oldName) return
-    setProcesses(prev => prev.map(p => p.id === editing.id ? { ...p, name: newName } : p))
+    // mode === 'edit'
+    const previous = processes.find(p => p.id === modal.id)
+    if (!previous) return
+    setProcesses(prev => prev.map(p => p.id === modal.id ? { ...p, name, vigenteHasta } : p))
     try {
-      await api.updateFondoProceso(editing.id, { name: newName })
+      await api.updateFondoProceso(modal.id, { name, vigenteHasta })
     } catch (err) {
-      setProcesses(prev => prev.map(p => p.id === editing.id ? { ...p, name: editing.oldName } : p))
-      alert('Error al renombrar proceso: ' + err.message)
+      setProcesses(prev => prev.map(p => p.id === modal.id ? previous : p))
+      alert('Error al editar proceso: ' + err.message)
     }
   }
 
@@ -679,6 +830,12 @@ export default function FondoEmprenderPage() {
     })
   }
 
+  // Solo lo vigente para el mes que se está viendo — una columna con rango
+  // de vigencia (ver migración 025) no debería aparecer, ni ser arrastrable,
+  // fuera de su rango. Para editar algo fuera de su rango actual, el admin
+  // navega al mes correspondiente primero.
+  const visibleProcesses = processes.filter(p => isVigente(p, year, month + 1))
+
   // ── drag & drop de columnas entre grupos ─────────────────────────────────
   // Mismo patrón multi-contenedor que KanbanPage (tareas entre columnas de
   // estado): acá los "contenedores" son los grupos (+ el sentinel de "sin
@@ -689,24 +846,24 @@ export default function FondoEmprenderPage() {
   )
 
   function containerIdOf(procId) {
-    const proc = processes.find(p => p.id === procId)
+    const proc = visibleProcesses.find(p => p.id === procId)
     return proc?.grupoId ?? SIN_GRUPO_ID
   }
 
   function containerItems(containerId) {
     return containerId === SIN_GRUPO_ID
-      ? processes.filter(p => !p.grupoId)
-      : processes.filter(p => p.grupoId === containerId)
+      ? visibleProcesses.filter(p => !p.grupoId)
+      : visibleProcesses.filter(p => p.grupoId === containerId)
   }
 
   function findContainer(overId) {
     if (overId === SIN_GRUPO_ID || grupos.some(g => g.id === overId)) return overId
-    const proc = processes.find(p => p.id === overId)
+    const proc = visibleProcesses.find(p => p.id === overId)
     return proc ? containerIdOf(proc.id) : null
   }
 
   function handleDragStart({ active }) {
-    setActiveDragProc(processes.find(p => p.id === active.id) ?? null)
+    setActiveDragProc(visibleProcesses.find(p => p.id === active.id) ?? null)
   }
 
   async function handleDragEnd({ active, over }) {
@@ -741,7 +898,7 @@ export default function FondoEmprenderPage() {
 
     // Mover a otro grupo (o sacar a "sin grupo") — se agrega al final
     const grupoIdDestino = toContainer === SIN_GRUPO_ID ? null : toContainer
-    const newOrden = containerItems(toContainer).length
+    const newOrden = nextOrdenFor(toContainer)
     const previous = processes.find(p => p.id === activeId)
     setProcesses(prev => prev.map(p => p.id === activeId ? { ...p, grupoId: grupoIdDestino, orden: newOrden } : p))
     try {
@@ -752,12 +909,35 @@ export default function FondoEmprenderPage() {
     }
   }
 
+  // Próximo `orden` para agregar un proceso al final de un contenedor — usa el
+  // máximo real de sus hijos en vez de la cantidad, porque si ese contenedor
+  // tuviera huecos en la numeración (herencia de su `orden` global previo a
+  // agruparse) agregar por cantidad podría insertarlo en el medio en vez del final.
+  function nextOrdenFor(containerId) {
+    const items = containerItems(containerId)
+    return items.length === 0 ? 0 : Math.max(...items.map(p => p.orden)) + 1
+  }
+
   // ── grupos de columnas: estructura para el header de dos filas ──────────
   // Los grupos se renderizan primero (en su `orden`), y los procesos sin
   // grupo quedan al final en su orden actual — evita mezclar el orden de
   // dos tablas distintas (grupos y procesos) en un mismo espacio numérico.
   const sortedGrupos = [...grupos].sort((a, b) => a.orden - b.orden)
-  const sueltos = processes.filter(p => !p.grupoId)
+  const sueltos = visibleProcesses.filter(p => !p.grupoId)
+
+  // ── grupo vinculado a mp5/Contabilidad (por id, no por nombre — ver
+  // migración 028) — controla cuándo el botón "Listo para enviar" se
+  // habilita: solo cuando cada proceso de ese grupo ya tiene un estado
+  // resuelto (hecho o no aplica) para esa empresa/mes. Si no hay grupo
+  // vinculado (renombrado sin volver a linkear, o borrado), no se bloquea el
+  // botón — mejor dejarlo disponible que trabar el flujo por completo.
+  const contabilidadGrupo = grupos.find(g => g.macroprocesoId === 'mp5')
+  const contabilidadProcesos = contabilidadGrupo
+    ? visibleProcesses.filter(p => p.grupoId === contabilidadGrupo.id)
+    : []
+  function contabilidadPendientes(company) {
+    return contabilidadProcesos.filter(p => !['done', 'na'].includes(company.cells[p.id]?.status ?? 'pending')).length
+  }
 
   // ── filters: category tabs + search ──────────────────────────────────────
 
@@ -785,11 +965,11 @@ export default function FondoEmprenderPage() {
     ? companies
     : companies.filter(c => (c.categoria ?? 'contable') === activeTab)
 
-  const totalCells = scopedCompanies.length * processes.length
+  const totalCells = scopedCompanies.length * visibleProcesses.length
   // 'na' cuenta como completada — mismo criterio que el resto del sistema
   // (mp6/impuestos derivado en el backend): ya se revisó y no aplicaba.
   const doneCells  = scopedCompanies.reduce(
-    (acc, c) => acc + processes.filter(p => ['done', 'na'].includes(c.cells[p.id]?.status ?? 'pending')).length,
+    (acc, c) => acc + visibleProcesses.filter(p => ['done', 'na'].includes(c.cells[p.id]?.status ?? 'pending')).length,
     0
   )
   const pct = totalCells ? Math.round((doneCells / totalCells) * 100) : 0
@@ -799,23 +979,26 @@ export default function FondoEmprenderPage() {
   // colSpan de los grupos entre sus sub-columnas — con <col> explícito el
   // ancho de cada columna queda inequívoco bajo table-layout: fixed.
   const hasExpandedGroupRow = sortedGrupos.some(g =>
-    !collapsedGroupIds.has(g.id) && processes.some(p => p.grupoId === g.id)
+    !collapsedGroupIds.has(g.id) && visibleProcesses.some(p => p.grupoId === g.id)
   )
   const columnWidths = [
     220, // Empresa
     ...sortedGrupos.flatMap(g => {
-      const children = processes.filter(p => p.grupoId === g.id)
+      const children = visibleProcesses.filter(p => p.grupoId === g.id)
       const collapsedOrEmpty = collapsedGroupIds.has(g.id) || children.length === 0
-      return collapsedOrEmpty ? [46] : children.map(() => 46)
+      return collapsedOrEmpty ? [COL_WIDTH] : children.map(() => COL_WIDTH)
     }),
-    ...(grupos.length > 0 ? [22] : []), // Sin grupo (catch-all)
-    ...sueltos.map(() => 46),
-    ...(addingProcess ? [100] : []),
+    ...sueltos.map(() => COL_WIDTH),
     88, // Confirmar Contabilidad
   ]
   const totalLeafColumns = columnWidths.length
   const gridWidth = columnWidths.reduce((a, b) => a + b, 0)
 
+  // Línea divisoria entre el bloque de columnas agrupadas y lo que sigue
+  // (reemplaza a la vieja columna angosta "Sin grupo") — solo tiene sentido
+  // si hay al menos un grupo, y se dibuja en el primer elemento después de
+  // los grupos, sea un proceso suelto, el input de "nuevo proceso" o la
+  // columna de Confirmar Contabilidad si no hay nada de lo anterior.
   function renderProcessCell(company, proc, rowBg) {
     const cell = company.cells[proc.id] ?? emptyCell
     const cfg  = STATUS[cell.status] ?? STATUS.pending
@@ -823,7 +1006,14 @@ export default function FondoEmprenderPage() {
     // the dot/tooltip shows for a cell that looks empty when opened.
     const hasNote = !!cell.note?.trim()
     return (
-      <td key={proc.id} style={{ width: 46, minWidth: 46, border: BORDER, padding: 2, background: rowBg }}>
+      <td
+        key={proc.id}
+        style={{
+          width: COL_WIDTH, minWidth: COL_WIDTH, padding: 2, background: rowBg,
+          borderTop: BORDER, borderBottom: BORDER,
+          borderLeft: BORDER_COL, borderRight: BORDER_COL,
+        }}
+      >
         <button
           onClick={e => handleCellClick(company.id, proc.id, e)}
           onMouseEnter={hasNote ? e => showTooltip(e, cell.note, `${company.id}_${proc.id}`) : undefined}
@@ -896,37 +1086,68 @@ export default function FondoEmprenderPage() {
               <span className="material-symbols-outlined text-xl">chevron_right</span>
             </button>
           </div>
-          {addingGroup ? (
-            <input
-              autoFocus
-              value={newGroupName}
-              onChange={e => setNewGroupName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleAddGroup()
-                if (e.key === 'Escape') { setAddingGroup(false); setNewGroupName('') }
-              }}
-              onBlur={() => { if (!newGroupName.trim()) setAddingGroup(false); else handleAddGroup() }}
-              placeholder="Nombre del grupo..."
-              className="px-3 py-2 text-sm rounded-xl border border-[#7c3aed] outline-none bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0]"
-            />
-          ) : (
+          {/* Modo edición de estructura — solo el admin lo ve. El resto de la
+              oficina le pide cambios al admin en vez de tocar la tabla. */}
+          {isAdmin() && (
             <button
-              onClick={() => setAddingGroup(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#7c3aed] border border-[#7c3aed] hover:bg-[#7c3aed]/5 transition active:scale-[0.97]"
-              title="Agrupar procesos relacionados en una sola columna con sub-columnas"
+              onClick={() => setEditMode(v => {
+                // Al salir del modo edición, se cierra cualquier input o
+                // renombre que hubiera quedado abierto a mitad de camino.
+                if (v) {
+                  setAddingGroup(false)
+                  setEditingGroup(null)
+                  setProcesoModal(null)
+                }
+                return !v
+              })}
+              className={
+                'flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition active:scale-[0.97] ' +
+                (editMode
+                  ? 'text-white'
+                  : 'text-[#6b7280] dark:text-[#8890b5] border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]')
+              }
+              style={editMode ? { background: '#004ac6' } : undefined}
+              title="Crear, renombrar, borrar o reordenar grupos y procesos"
             >
-              <span className="material-symbols-outlined text-lg">create_new_folder</span>
-              Nuevo grupo
+              <span className="material-symbols-outlined text-lg">{editMode ? 'lock_open' : 'edit'}</span>
+              {editMode ? 'Editando estructura' : 'Editar estructura'}
             </button>
           )}
-          <button
-            onClick={() => setAddingProcess(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-            style={{ background: '#7c3aed' }}
-          >
-            <span className="material-symbols-outlined text-lg">add_column_right</span>
-            Nuevo proceso
-          </button>
+          {canEditStructure && (
+            <>
+              {addingGroup ? (
+                <input
+                  autoFocus
+                  value={newGroupName}
+                  onChange={e => setNewGroupName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleAddGroup()
+                    if (e.key === 'Escape') { setAddingGroup(false); setNewGroupName('') }
+                  }}
+                  onBlur={() => { if (!newGroupName.trim()) setAddingGroup(false); else handleAddGroup() }}
+                  placeholder="Nombre del grupo..."
+                  className="px-3 py-2 text-sm rounded-xl border border-[#004ac6] outline-none bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0]"
+                />
+              ) : (
+                <button
+                  onClick={() => setAddingGroup(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#004ac6] dark:text-[#7ba8f0] border border-[#004ac6] dark:border-[#7ba8f0] hover:bg-[#004ac6]/5 transition active:scale-[0.97]"
+                  title="Agrupar procesos relacionados en una sola columna con sub-columnas"
+                >
+                  <span className="material-symbols-outlined text-lg">create_new_folder</span>
+                  Nuevo grupo
+                </button>
+              )}
+              <button
+                onClick={openCreateProcesoModal}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
+                style={{ background: '#004ac6' }}
+              >
+                <span className="material-symbols-outlined text-lg">add_column_right</span>
+                Nuevo proceso
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1019,7 +1240,7 @@ export default function FondoEmprenderPage() {
       {/* ── Table ────────────────────────────────────────────────────────── */}
       <div
         className="overflow-auto rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm"
-        style={{ maxHeight: 'calc(100vh - 17rem)' }}
+        style={{ maxHeight: 'calc(100vh - 13rem)' }}
       >
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           {/* table-layout: fixed + <colgroup> explícito: sin esto, el colSpan de
@@ -1031,24 +1252,40 @@ export default function FondoEmprenderPage() {
             <colgroup>
               {columnWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
             </colgroup>
-            <thead>
+            {/* sticky en el <thead> completo (no celda por celda): así las dos
+                filas del header se mueven pegadas como una sola unidad al
+                hacer scroll, sin tener que calcularle a mano la altura exacta
+                de la fila 1 para offsetear la fila 2 — eso es lo que fallaba
+                antes y hacía que los bordes de color se vieran raros. Sin
+                will-change: eso promovía el thead a una capa compuesta por
+                GPU y ahí los box-shadow se rasterizaban borrosos; el fix real
+                del bug de scroll es que los bordes ya no son `border` (que es
+                lo que rompía con `border-collapse` + sticky), así que
+                will-change ya no hacía falta. */}
+            <thead className="sticky top-0 z-20">
+
               <tr>
                 {/* Company column header */}
                 <th
                   rowSpan={2}
                   className="sticky left-0 top-0 z-30 bg-[#f8f9fc] dark:bg-[#1a1d2e] text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
-                  style={{ width: 220, minWidth: 220, border: BORDER, borderBottom: BORDER_STR, borderRight: BORDER_STR, verticalAlign: 'bottom', padding: '6px 12px 8px' }}
+                  style={{
+                    width: 220, minWidth: 220, verticalAlign: 'bottom', padding: '6px 12px 8px',
+                    boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, left: BORDER, right: BORDER_COL }),
+                  }}
                 >
                   Empresa
                 </th>
 
                 {/* Group headers (row 1) */}
-                {sortedGrupos.map(grupo => (
+                {sortedGrupos.map((grupo, grupoIndex) => (
                   <GroupHeaderCell
                     key={grupo.id}
                     grupo={grupo}
-                    procesos={processes.filter(p => p.grupoId === grupo.id)}
+                    procesos={visibleProcesses.filter(p => p.grupoId === grupo.id)}
                     collapsed={collapsedGroupIds.has(grupo.id)}
+                    editable={canEditStructure}
+                    paletteIndex={grupoIndex}
                     onToggleCollapse={() => toggleCollapsed(grupo.id)}
                     editingGroup={editingGroup}
                     setEditingGroup={setEditingGroup}
@@ -1060,8 +1297,6 @@ export default function FondoEmprenderPage() {
                   />
                 ))}
 
-                {grupos.length > 0 && <SinGrupoDropZone />}
-
                 {/* Sueltos (sin grupo) — ocupan las dos filas, igual que antes */}
                 <SortableContext items={sueltos.map(p => p.id)} strategy={horizontalListSortingStrategy}>
                   {sueltos.map(proc => (
@@ -1069,44 +1304,21 @@ export default function FondoEmprenderPage() {
                       key={proc.id}
                       proc={proc}
                       rowSpan={2}
-                      editingProcess={editingProcess}
-                      editProcessName={editProcessName}
-                      setEditProcessName={setEditProcessName}
-                      saveEditProcess={saveEditProcess}
-                      setEditingProcess={setEditingProcess}
-                      startEditProcess={startEditProcess}
+                      editable={canEditStructure}
+                      startEditProcess={openEditProcesoModal}
                       setDeleteConfirm={setDeleteConfirm}
                     />
                   ))}
                 </SortableContext>
 
-                {/* Add process column header */}
-                {addingProcess ? (
-                  <th
-                    rowSpan={2}
-                    className="sticky top-0 z-10 bg-[#f8f9fc] dark:bg-[#1a1d2e]"
-                    style={{ width: 100, minWidth: 100, border: BORDER, borderBottom: BORDER_STR, verticalAlign: 'bottom', padding: 4 }}
-                  >
-                    <input
-                      autoFocus
-                      value={newProcessName}
-                      onChange={e => setNewProcessName(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleAddProcess()
-                        if (e.key === 'Escape') { setAddingProcess(false); setNewProcessName('') }
-                      }}
-                      onBlur={() => { if (!newProcessName.trim()) setAddingProcess(false) }}
-                      placeholder="Nombre..."
-                      className="w-full px-2 py-1 text-[10px] rounded border border-[#7c3aed] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
-                    />
-                  </th>
-                ) : null}
-
                 {/* Confirmar Contabilidad – sticky right */}
                 <th
                   rowSpan={2}
                   className="sticky right-0 top-0 z-30 bg-[#f0fdf4] dark:bg-[#0d2e1a] text-[10px] font-bold text-[#16a34a] uppercase tracking-wide"
-                  style={{ width: 88, minWidth: 88, border: BORDER, borderBottom: BORDER_STR, borderLeft: BORDER_STR, verticalAlign: 'bottom', padding: '4px 6px 6px' }}
+                  style={{
+                    width: 88, minWidth: 88, verticalAlign: 'bottom', padding: '4px 6px 6px',
+                    boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER }),
+                  }}
                 >
                   Confirmar Contabilidad
                 </th>
@@ -1115,8 +1327,8 @@ export default function FondoEmprenderPage() {
               {/* Sub-columnas de cada grupo (row 2) — solo si hay algún grupo expandido con procesos */}
               {hasExpandedGroupRow && (
               <tr>
-                {sortedGrupos.map(grupo => {
-                  const children = processes.filter(p => p.grupoId === grupo.id)
+                {sortedGrupos.map((grupo, grupoIndex) => {
+                  const children = visibleProcesses.filter(p => p.grupoId === grupo.id)
                   if (collapsedGroupIds.has(grupo.id) || children.length === 0) return null
                   return (
                     <SortableContext key={grupo.id} items={children.map(p => p.id)} strategy={horizontalListSortingStrategy}>
@@ -1124,12 +1336,10 @@ export default function FondoEmprenderPage() {
                         <SortableProcessHeader
                           key={proc.id}
                           proc={proc}
-                          editingProcess={editingProcess}
-                          editProcessName={editProcessName}
-                          setEditProcessName={setEditProcessName}
-                          saveEditProcess={saveEditProcess}
-                          setEditingProcess={setEditingProcess}
-                          startEditProcess={startEditProcess}
+                          editable={canEditStructure}
+                          groupColor={GROUP_PALETTE[grupoIndex % GROUP_PALETTE.length]}
+                          hasTopBorder={false}
+                          startEditProcess={openEditProcesoModal}
                           setDeleteConfirm={setDeleteConfirm}
                         />
                       ))}
@@ -1161,7 +1371,7 @@ export default function FondoEmprenderPage() {
                     {/* Company name cell — editar/eliminar empresa se hace desde Empresas, no acá */}
                     <td
                       className="sticky left-0 z-10"
-                      style={{ width: 220, minWidth: 220, maxWidth: 220, border: BORDER, borderRight: BORDER_STR, background: rowBg, height: 36, padding: 0 }}
+                      style={{ width: 220, minWidth: 220, maxWidth: 220, border: BORDER, background: rowBg, height: 36, padding: 0 }}
                     >
                       <div className="flex items-center h-full px-2">
                         <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={company.name}>
@@ -1172,16 +1382,16 @@ export default function FondoEmprenderPage() {
 
                     {/* Group cells: colapsado → resumen; expandido → una celda por proceso */}
                     {sortedGrupos.map(grupo => {
-                      const children = processes.filter(p => p.grupoId === grupo.id)
+                      const children = visibleProcesses.filter(p => p.grupoId === grupo.id)
                       if (children.length === 0) {
-                        return <td key={grupo.id} style={{ width: 46, minWidth: 46, border: BORDER, background: rowBg }} />
+                        return <td key={grupo.id} style={{ width: COL_WIDTH, minWidth: COL_WIDTH, borderTop: BORDER, borderBottom: BORDER, borderLeft: BORDER_COL, borderRight: BORDER_COL, background: rowBg }} />
                       }
                       if (collapsedGroupIds.has(grupo.id)) {
                         const doneCount = children.filter(p => ['done', 'na'].includes(company.cells[p.id]?.status ?? 'pending')).length
                         const allDone = doneCount === children.length
                         const noneDone = doneCount === 0
                         return (
-                          <td key={grupo.id} style={{ width: 46, minWidth: 46, border: BORDER, padding: 2, background: rowBg }}>
+                          <td key={grupo.id} style={{ width: COL_WIDTH, minWidth: COL_WIDTH, padding: 2, background: rowBg, borderTop: BORDER, borderBottom: BORDER, borderLeft: BORDER_COL, borderRight: BORDER_COL }}>
                             <button
                               onClick={() => toggleCollapsed(grupo.id)}
                               title={`${grupo.name}: ${doneCount}/${children.length} — clic para expandir`}
@@ -1200,42 +1410,79 @@ export default function FondoEmprenderPage() {
                       return children.map(proc => renderProcessCell(company, proc, rowBg))
                     })}
 
-                    {grupos.length > 0 && (
-                      <td style={{ width: 22, minWidth: 22, border: BORDER, background: rowBg }} />
-                    )}
-
                     {/* Sueltos (sin grupo) */}
                     {sueltos.map(proc => renderProcessCell(company, proc, rowBg))}
-
-                    {/* Empty cell under "add process" input */}
-                    {addingProcess ? (
-                      <td style={{ width: 100, minWidth: 100, border: BORDER, background: rowBg }} />
-                    ) : null}
 
                     {/* Confirmar Contabilidad cell */}
                     <td
                       className="sticky right-0 z-10"
-                      style={{ width: 88, minWidth: 88, border: BORDER, borderLeft: BORDER_STR, background: company.confirmed ? '#f0fdf4' : rowBg, padding: 3 }}
+                      style={{
+                        width: 88, minWidth: 88, border: BORDER, padding: 3,
+                        background: company.enviado ? '#eff6ff' : company.confirmed ? '#f0fdf4' : rowBg,
+                      }}
                     >
-                      {company.confirmed ? (
-                        <button
-                          onClick={() => toggleConfirmed(company.id)}
-                          title={`Confirmado el ${company.confirmed.date}. Clic para revertir.`}
-                          className="w-full h-8 rounded flex flex-col items-center justify-center gap-0.5 transition hover:opacity-80"
-                          style={{ background: '#dcfce7' }}
-                        >
-                          <span className="material-symbols-outlined" style={{ color: '#16a34a', fontSize: 15 }}>verified</span>
-                          <span className="text-[9px] font-semibold text-[#16a34a] leading-none">{company.confirmed.date}</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => toggleConfirmed(company.id)}
-                          className="w-full h-8 rounded flex items-center justify-center gap-1 text-[10px] font-semibold transition hover:opacity-80 border"
-                          style={{ color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }}
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 14 }}>check_circle_outline</span>
-                          Confirmar
-                        </button>
+                      {!company.confirmed ? (() => {
+                        const pendientes = contabilidadPendientes(company)
+                        const listo = pendientes === 0
+                        return (
+                          <button
+                            onClick={() => listo && toggleConfirmed(company.id)}
+                            disabled={!listo}
+                            title={listo ? undefined : `Faltan ${pendientes} proceso${pendientes === 1 ? '' : 's'} del grupo Contabilidad por marcar`}
+                            className={`w-full h-8 rounded flex flex-col items-center justify-center gap-0.5 font-semibold leading-none border ${listo ? 'transition hover:opacity-80' : 'cursor-not-allowed'}`}
+                            style={listo
+                              ? { color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }
+                              : { color: '#9ca3af', borderColor: '#e2e4ef', background: '#f8f9fc' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
+                              {listo ? 'check_circle_outline' : 'hourglass_empty'}
+                            </span>
+                            {listo ? (
+                              <span className="text-center" style={{ fontSize: 8.5 }}>Listo para<br />enviar</span>
+                            ) : (
+                              <span style={{ fontSize: 9 }}>Faltan {pendientes}</span>
+                            )}
+                          </button>
+                        )
+                      })() : (
+                        // Confirmada (y tal vez ya enviada) — por defecto se ve
+                        // la insignia compacta; al pasar el mouse se parte en
+                        // los controles reales, para que un solo click nunca
+                        // tenga que decidir entre "revertir" y "avanzar".
+                        <div className="group relative w-full h-8">
+                          <div
+                            className="absolute inset-0 rounded flex flex-col items-center justify-center gap-0.5 transition group-hover:opacity-0"
+                            style={{ background: company.enviado ? '#dbeafe' : '#dcfce7' }}
+                          >
+                            <span className="material-symbols-outlined" style={{ color: company.enviado ? '#004ac6' : '#16a34a', fontSize: 15 }}>
+                              {company.enviado ? 'send' : 'verified'}
+                            </span>
+                            <span className="text-[9px] font-semibold leading-none" style={{ color: company.enviado ? '#004ac6' : '#16a34a' }}>
+                              {(company.enviado ?? company.confirmed).date}
+                            </span>
+                          </div>
+
+                          <div className="absolute inset-0 flex items-center gap-0.5 opacity-0 pointer-events-none transition group-hover:opacity-100 group-hover:pointer-events-auto">
+                            <button
+                              onClick={() => company.enviado ? toggleEnviado(company.id) : toggleConfirmed(company.id)}
+                              title={company.enviado ? 'Revertir envío' : 'Revertir confirmación'}
+                              className="flex-1 h-8 rounded flex items-center justify-center transition hover:opacity-80"
+                              style={{ background: '#f3f4f6', color: '#6b7280' }}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>undo</span>
+                            </button>
+                            {!company.enviado && (
+                              <button
+                                onClick={() => toggleEnviado(company.id)}
+                                title="Marcar como enviada"
+                                className="flex-1 h-8 rounded flex items-center justify-center transition hover:opacity-80"
+                                style={{ background: '#004ac6', color: '#fff' }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>send</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -1248,7 +1495,7 @@ export default function FondoEmprenderPage() {
           <DragOverlay>
             {activeDragProc && (
               <div
-                className="px-3 py-1.5 rounded-lg shadow-lg text-xs font-semibold bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] border border-[#7c3aed]"
+                className="px-3 py-1.5 rounded-lg shadow-lg text-xs font-semibold bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] border border-[#004ac6]"
               >
                 {activeDragProc.name}
               </div>
@@ -1368,6 +1615,99 @@ export default function FondoEmprenderPage() {
               pointerEvents: 'auto',
             }}
           />
+        </div>
+      )}
+
+      {/* ── Crear / editar proceso ───────────────────────────────────────────── */}
+      {procesoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={closeProcesoModal}>
+          <div
+            className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-[#e2e4ef] dark:border-[#2e3148]"
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] mb-4">
+              {procesoModal.mode === 'create' ? 'Nuevo proceso' : 'Editar proceso'}
+            </p>
+
+            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Nombre</label>
+            <input
+              autoFocus
+              value={procesoModal.name}
+              onChange={e => setProcesoModal(m => ({ ...m, name: e.target.value }))}
+              onKeyDown={e => { if (e.key === 'Enter') submitProcesoModal() }}
+              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+            />
+
+            {procesoModal.mode === 'create' && (
+              <p className="text-xs text-[#8890b5] mb-3">
+                Va a aparecer desde {MONTHS[month]} {year} en adelante, salvo que le pongas un límite abajo.
+              </p>
+            )}
+            {procesoModal.mode === 'edit' && (() => {
+              const current = processes.find(p => p.id === procesoModal.id)
+              const vh = current?.vigenteHasta
+              return (
+                <p className="text-xs text-[#8890b5] mb-3">
+                  Actualmente: {vh ? `hasta ${MONTHS[vh.mes - 1]} ${vh.anio}` : 'sin fecha de fin'}.
+                </p>
+              )
+            })()}
+
+            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">
+              ¿Hasta cuándo aplica?
+            </label>
+            <div className="flex flex-col gap-1.5 mb-5">
+              {[
+                { value: 'siempre',  label: 'Sin fecha de fin (de aquí en adelante)' },
+                { value: 'esteMes',  label: `Solo ${MONTHS[month]} ${year}` },
+                { value: 'porMeses', label: 'Por una cantidad de meses' },
+              ].map(opt => (
+                <label key={opt.value} className="flex items-center gap-2 text-xs text-[#191c1e] dark:text-[#e4e6f0] cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={procesoModal.hastaMode === opt.value}
+                    onChange={() => setProcesoModal(m => ({ ...m, hastaMode: opt.value }))}
+                    className="accent-[#004ac6]"
+                  />
+                  {opt.label}
+                </label>
+              ))}
+              {procesoModal.hastaMode === 'porMeses' && (
+                <div className="flex items-center gap-2 pl-6 mt-1">
+                  <input
+                    type="number"
+                    min={1}
+                    value={procesoModal.porMeses}
+                    onChange={e => setProcesoModal(m => ({ ...m, porMeses: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                    className="w-16 px-2 py-1 text-xs rounded border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+                  />
+                  <span className="text-xs text-[#8890b5]">
+                    meses — hasta {(() => {
+                      const h = addMonths(year, month + 1, Math.max(1, procesoModal.porMeses || 1) - 1)
+                      return `${MONTHS[h.mes - 1]} ${h.anio}`
+                    })()}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={closeProcesoModal}
+                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={submitProcesoModal}
+                disabled={!procesoModal.name.trim()}
+                className="flex-1 py-2 text-xs font-semibold rounded-lg text-white transition disabled:opacity-40"
+                style={{ background: '#004ac6' }}
+              >
+                {procesoModal.mode === 'create' ? 'Crear' : 'Guardar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

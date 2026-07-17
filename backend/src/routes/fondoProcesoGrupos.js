@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
-const { requireFondoAccess } = require('../middleware/fondoAccess');
+const { requireFondoAdmin } = require('../middleware/fondoAccess');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const { getGrupos, createGrupo, updateGrupo, deleteGrupo } = require('../controllers/fondoProcesoGruposController');
@@ -48,7 +48,7 @@ router.get('/', getGrupos);
  *         description: Sin permiso de edición en Fondo Emprender
  */
 router.post('/',
-  requireFondoAccess,
+  requireFondoAdmin,
   body('name').trim().notEmpty().withMessage('El nombre es obligatorio').isLength({ max: 255 }),
   body('orden').optional({ nullable: true }).isInt({ min: 0 }).withMessage('orden debe ser un entero >= 0'),
   validate,
@@ -81,7 +81,7 @@ router.post('/',
  */
 router.put('/:id',
   ...validateUUIDParam('id'),
-  requireFondoAccess,
+  requireFondoAdmin,
   body('name').optional().trim().notEmpty().isLength({ max: 255 }),
   body('orden').optional({ nullable: true }).isInt({ min: 0 }).withMessage('orden debe ser un entero >= 0'),
   validate,
@@ -106,7 +106,7 @@ router.put('/:id',
  */
 router.delete('/:id',
   ...validateUUIDParam('id'),
-  requireFondoAccess,
+  requireFondoAdmin,
   deleteGrupo
 );
 

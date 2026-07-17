@@ -50,13 +50,14 @@ export const MACRO_PROCESSES = [
 ]
 
 // ── Quick macro-stats for a company (used in card views) ──────────────────────
+// mp5/Contabilidad ya no se cuenta aparte a partir de "confirmed" — el
+// backend deriva su estado del grupo CONTABILIDAD del checklist mensual y lo
+// suma directo a macrosDone/macrosInProgress, igual que el resto de
+// macroprocesos derivados (mp2, mp3, mp4, mp6).
 
 export function getMacroStats(company) {
-  const macrosDone       = company.macrosDone       ?? 0
+  const totalDone        = company.macrosDone       ?? 0
   const macrosInProgress = company.macrosInProgress ?? 0
-  const contabilidadDone = !!company.confirmed
-
-  const totalDone = macrosDone + (contabilidadDone ? 1 : 0)
 
   let semaphore = 'red'
   if (totalDone === 7)                             semaphore = 'green'
