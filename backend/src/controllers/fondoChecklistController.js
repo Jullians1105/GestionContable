@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
+const { isMesHabilitado } = require('../utils/mesVencido');
 
 const getChecklistMes = async (req, res, next) => {
   try {
@@ -13,7 +14,9 @@ const getChecklistMes = async (req, res, next) => {
               COALESCE(i.estado, 'pending') AS estado,
               i.nota,
               COALESCE(m.confirmed, false) AS confirmed,
-              m.updated_at AS confirmed_at
+              m.confirmed_at,
+              COALESCE(m.enviado, false) AS enviado,
+              m.enviado_at
        FROM fondo_procesos p
        LEFT JOIN fondo_checklist_meses m
               ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
@@ -27,6 +30,8 @@ const getChecklistMes = async (req, res, next) => {
     const rows = result.rows;
     const confirmed   = rows.length > 0 ? rows[0].confirmed : false;
     const confirmedAt = rows.length > 0 ? rows[0].confirmed_at : null;
+    const enviado      = rows.length > 0 ? rows[0].enviado : false;
+    const enviadoAt    = rows.length > 0 ? rows[0].enviado_at : null;
     const items = rows.map(row => ({
       id:     row.id,
       name:   row.name,
@@ -36,7 +41,7 @@ const getChecklistMes = async (req, res, next) => {
       nota:   row.nota,
     }));
 
-    res.json({ confirmed, confirmedAt, items });
+    res.json({ confirmed, confirmedAt, enviado, enviadoAt, items });
   } catch (err) {
     next(err);
   }
@@ -56,7 +61,9 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
               COALESCE(i.estado, 'pending') AS estado,
               i.nota,
               COALESCE(m.confirmed, false) AS confirmed,
-              m.updated_at AS confirmed_at
+              m.confirmed_at,
+              COALESCE(m.enviado, false) AS enviado,
+              m.enviado_at
        FROM fondo_empresas e
        CROSS JOIN fondo_procesos p
        LEFT JOIN fondo_checklist_meses m
@@ -76,6 +83,8 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
           empresaId: row.empresa_id,
           confirmed: row.confirmed,
           confirmedAt: row.confirmed_at,
+          enviado: row.enviado,
+          enviadoAt: row.enviado_at,
           items: [],
         };
         porEmpresa.set(row.empresa_id, entry);
@@ -102,6 +111,10 @@ const updateChecklistItem = async (req, res, next) => {
     const anio = parseInt(req.query.anio, 10);
     const mes  = parseInt(req.query.mes, 10);
     const { estado, nota } = req.body;
+
+    if (!isMesHabilitado(anio, mes)) {
+      return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
+    }
 
     // Distinguir "el frontend no envió nota" (no tocar el valor guardado) de
     // "el frontend envió nota explícitamente" (incluido vaciarla) — antes
@@ -163,11 +176,20 @@ const updateChecklistConfirmado = async (req, res, next) => {
     const mes  = parseInt(req.query.mes, 10);
     const { confirmed } = req.body;
 
+    if (!isMesHabilitado(anio, mes)) {
+      return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
+    }
+
+    // Revertir la confirmación también revierte el envío: no tiene sentido
+    // dejar "enviado" en pie sobre una contabilidad que ya no está confirmada.
     const result = await db.query(
-      `INSERT INTO fondo_checklist_meses (id, empresa_id, anio, mes, confirmed)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO fondo_checklist_meses (id, empresa_id, anio, mes, confirmed, confirmed_at)
+       VALUES ($1, $2, $3, $4, $5, CASE WHEN $5 THEN NOW() ELSE NULL END)
        ON CONFLICT (empresa_id, anio, mes) DO UPDATE
-       SET confirmed = EXCLUDED.confirmed
+       SET confirmed    = EXCLUDED.confirmed,
+           confirmed_at = CASE WHEN EXCLUDED.confirmed THEN NOW() ELSE NULL END,
+           enviado      = CASE WHEN EXCLUDED.confirmed THEN fondo_checklist_meses.enviado ELSE false END,
+           enviado_at   = CASE WHEN EXCLUDED.confirmed THEN fondo_checklist_meses.enviado_at ELSE NULL END
        RETURNING *`,
       [uuidv4(), empresaId, anio, mes, confirmed]
     );
@@ -179,12 +201,62 @@ const updateChecklistConfirmado = async (req, res, next) => {
     req.io.emit('empresa:updated', { empresaId, anio, mes, tipo: 'checklist' });
 
     res.json({
-      id:        result.rows[0].id,
-      empresaId: result.rows[0].empresa_id,
-      anio:      result.rows[0].anio,
-      mes:       result.rows[0].mes,
-      confirmed: result.rows[0].confirmed,
-      updatedAt: result.rows[0].updated_at,
+      id:          result.rows[0].id,
+      empresaId:   result.rows[0].empresa_id,
+      anio:        result.rows[0].anio,
+      mes:         result.rows[0].mes,
+      confirmed:   result.rows[0].confirmed,
+      confirmedAt: result.rows[0].confirmed_at,
+      enviado:     result.rows[0].enviado,
+      enviadoAt:   result.rows[0].enviado_at,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateChecklistEnviado = async (req, res, next) => {
+  try {
+    const { empresaId } = req.params;
+    const anio = parseInt(req.query.anio, 10);
+    const mes  = parseInt(req.query.mes, 10);
+    const { enviado } = req.body;
+
+    if (!isMesHabilitado(anio, mes)) {
+      return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
+    }
+
+    const existing = await db.query(
+      `SELECT confirmed FROM fondo_checklist_meses WHERE empresa_id = $1 AND anio = $2 AND mes = $3`,
+      [empresaId, anio, mes]
+    );
+    if (enviado && !existing.rows[0]?.confirmed) {
+      return res.status(409).json({ error: 'No se puede marcar como enviada una contabilidad que aún no está confirmada' });
+    }
+
+    const result = await db.query(
+      `UPDATE fondo_checklist_meses
+       SET enviado = $1, enviado_at = CASE WHEN $1 THEN NOW() ELSE NULL END
+       WHERE empresa_id = $2 AND anio = $3 AND mes = $4
+       RETURNING *`,
+      [enviado, empresaId, anio, mes]
+    );
+
+    await auditLog(req.user.userId, 'UPDATE', 'fondo_checklist_meses', result.rows[0].id, {
+      empresaId, anio, mes, enviado,
+    });
+
+    req.io.emit('empresa:updated', { empresaId, anio, mes, tipo: 'checklist' });
+
+    res.json({
+      id:          result.rows[0].id,
+      empresaId:   result.rows[0].empresa_id,
+      anio:        result.rows[0].anio,
+      mes:         result.rows[0].mes,
+      confirmed:   result.rows[0].confirmed,
+      confirmedAt: result.rows[0].confirmed_at,
+      enviado:     result.rows[0].enviado,
+      enviadoAt:   result.rows[0].enviado_at,
     });
   } catch (err) {
     next(err);
@@ -196,4 +268,5 @@ module.exports = {
   getChecklistMesTodasEmpresas,
   updateChecklistItem,
   updateChecklistConfirmado,
+  updateChecklistEnviado,
 };

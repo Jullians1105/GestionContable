@@ -3,6 +3,7 @@ jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
 
 const db = require('../../src/config/database');
 const { updateChecklistItem } = require('../../src/controllers/fondoChecklistController');
+const { getMesVencidoHabilitado } = require('../../src/utils/mesVencido');
 
 function mockRes() {
   const res = {};
@@ -13,10 +14,15 @@ function mockRes() {
 
 const mockNext = jest.fn();
 
+// El mes habilitado es siempre "mes vencido" (mes calendario anterior al de
+// hoy) — se calcula en cada test en vez de hardcodear una fecha para que la
+// suite no falle sola al pasar el mes.
+const { anio: mesHabilitadoAnio, mes: mesHabilitadoMes } = getMesVencidoHabilitado();
+
 function baseReq(overrides = {}) {
   return {
     params: { empresaId: 'empresa-1', procesoId: 'proceso-1' },
-    query: { anio: '2026', mes: '7' },
+    query: { anio: String(mesHabilitadoAnio), mes: String(mesHabilitadoMes) },
     body: {},
     user: { userId: 'user-1' },
     io: { emit: jest.fn() },
@@ -92,5 +98,19 @@ describe('updateChecklistItem — manejo de nota', () => {
     const params = upsertCall[1];
     expect(params[4]).toBe('reunión con el contador');
     expect(params[5]).toBe(true);
+  });
+});
+
+describe('updateChecklistItem — mes vencido', () => {
+  test('rechaza con 403 un mes posterior al mes habilitado, sin tocar la base de datos', async () => {
+    const mesFuturo = mesHabilitadoMes === 12 ? 1 : mesHabilitadoMes + 1;
+    const anioFuturo = mesHabilitadoMes === 12 ? mesHabilitadoAnio + 1 : mesHabilitadoAnio;
+
+    const req = baseReq({ query: { anio: String(anioFuturo), mes: String(mesFuturo) }, body: { estado: 'done' } });
+    const res = mockRes();
+    await updateChecklistItem(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(db.query).not.toHaveBeenCalled();
   });
 });

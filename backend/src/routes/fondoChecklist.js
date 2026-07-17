@@ -9,6 +9,7 @@ const {
   getChecklistMesTodasEmpresas,
   updateChecklistItem,
   updateChecklistConfirmado,
+  updateChecklistEnviado,
 } = require('../controllers/fondoChecklistController');
 
 const router = Router();
@@ -143,6 +144,44 @@ router.put('/:empresaId/confirmado',
   body('confirmed').isBoolean().withMessage('confirmed debe ser boolean'),
   validate,
   updateChecklistConfirmado
+);
+
+/**
+ * @openapi
+ * /api/fondo/checklist/{empresaId}/enviado:
+ *   put:
+ *     tags: [FondoChecklist]
+ *     summary: Marcar/desmarcar el mes como enviado (una vez confirmada la contabilidad)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: empresaId, in: path, required: true, schema: { type: string, format: uuid } }
+ *       - { name: anio, in: query, required: true, schema: { type: integer } }
+ *       - { name: mes,  in: query, required: true, schema: { type: integer, minimum: 1, maximum: 12 } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [enviado]
+ *             properties:
+ *               enviado: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Mes actualizado
+ *       403:
+ *         description: Sin permiso de edición en Fondo Emprender
+ *       409:
+ *         description: No se puede marcar como enviada una contabilidad que aún no está confirmada
+ */
+router.put('/:empresaId/enviado',
+  ...validateUUIDParam('empresaId'),
+  ...validateAnioMes,
+  requireFondoAccess,
+  body('enviado').isBoolean().withMessage('enviado debe ser boolean'),
+  validate,
+  updateChecklistEnviado
 );
 
 module.exports = router;

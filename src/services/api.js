@@ -172,6 +172,11 @@ export const api = {
     return request(`/fondo/checklist/${empresaId}/confirmado?${qs}`,
       { method: 'PUT', body: JSON.stringify(data) });
   },
+  updateFondoChecklistEnviado: (empresaId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/${empresaId}/enviado?${qs}`,
+      { method: 'PUT', body: JSON.stringify(data) });
+  },
 
   // Fondo Emprender — Detalle macroprocesos
   getFondoDetalle: (empresaId, anio, mes) => {
@@ -234,6 +239,12 @@ export const api = {
   },
   createFondoProceso: (data) => request('/fondo/procesos', { method: 'POST', body: JSON.stringify(data) }),
   updateFondoProceso: (id, data) => request(`/fondo/procesos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Fondo Emprender — Grupos de procesos (agrupar columnas del checklist)
+  getFondoProcesoGrupos: () => request('/fondo/proceso-grupos'),
+  createFondoProcesoGrupo: (data) => request('/fondo/proceso-grupos', { method: 'POST', body: JSON.stringify(data) }),
+  updateFondoProcesoGrupo: (id, data) => request(`/fondo/proceso-grupos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteFondoProcesoGrupo: (id) => request(`/fondo/proceso-grupos/${id}`, { method: 'DELETE' }),
 
   // Notifications
   getNotifications: () => request('/notifications'),

@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
+const { isMesHabilitado } = require('../utils/mesVencido');
 
 const getImpuestos = async (req, res, next) => {
   try {
@@ -53,6 +54,10 @@ const updateImpuestoItem = async (req, res, next) => {
     const anio = parseInt(req.query.anio, 10);
     const mes  = parseInt(req.query.mes, 10);
     const { estado, nota } = req.body;
+
+    if (!isMesHabilitado(anio, mes)) {
+      return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
+    }
 
     const result = await db.query(
       `INSERT INTO fondo_impuestos_items (empresa_id, impuesto_id, anio, mes, estado, nota)

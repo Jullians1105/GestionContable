@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
+const { isMesHabilitado } = require('../utils/mesVencido');
 
 const MP_CATALOG = [
   { id: 1, nombre: 'Facturación' },
@@ -57,13 +58,39 @@ const derivePagoMacroEstado = (estadoPago) => {
   return 'pending';
 };
 
+// mp3 (Nómina electrónica) deriva su estado del ítem "nomina electronica" del
+// checklist de Seguimiento Mensual (vínculo por id en fondo_procesos.macroproceso_id,
+// no por nombre — el proceso se puede renombrar desde "Editar estructura" y un
+// match por texto se rompería en silencio). 'na' cuenta como 'done', mismo
+// criterio que mp6: ya se revisó y no aplicaba, no queda pendiente.
+const deriveNominaElectronicaEstado = (estado) => {
+  if (estado === 'na') return 'done';
+  if (estado === 'in_progress' || estado === 'done') return estado;
+  return 'pending';
+};
+
+// mp2 (Nómina) y mp5 (Contabilidad) derivan su estado de TODOS los procesos
+// del grupo NOMINA / CONTABILIDAD del checklist de Seguimiento Mensual
+// (vínculo por id en fondo_proceso_grupos.macroproceso_id — mismo criterio
+// que mp3, el grupo se puede renombrar sin romper el vínculo). Mismo criterio
+// de 'na' que el resto: si TODOS los del grupo son 'na', el grupo queda
+// 'done' (se revisó y no aplicaba nada). Si falta alguno por resolver pero
+// ya hay avance (algún 'done'/'in_progress'), queda 'in_progress'.
+const deriveGrupoEstado = (estados) => {
+  const noNa = estados.filter(e => e !== 'na');
+  if (noNa.length === 0) return 'done';
+  if (noNa.every(e => e === 'done')) return 'done';
+  if (noNa.some(e => e === 'done' || e === 'in_progress')) return 'in_progress';
+  return 'pending';
+};
+
 const getDetalle = async (req, res, next) => {
   try {
     const { empresaId } = req.params;
     const anio = parseInt(req.query.anio, 10);
     const mes  = parseInt(req.query.mes, 10);
 
-    const [mpResult, mp5Result, impuestosResult, pagoResult] = await Promise.all([
+    const [mpResult, mp5Result, impuestosResult, pagoResult, nominaElecResult, nominaGrupoResult, contabilidadGrupoResult] = await Promise.all([
       db.query(
         `SELECT mp.id, mp.nombre, d.estado, d.responsable_id, d.nota, d.updated_at,
                 (
@@ -98,7 +125,7 @@ const getDetalle = async (req, res, next) => {
         [empresaId, anio, mes]
       ),
       db.query(
-        `SELECT confirmed FROM fondo_checklist_meses
+        `SELECT confirmed, enviado FROM fondo_checklist_meses
          WHERE empresa_id = $1 AND anio = $2 AND mes = $3
          LIMIT 1`,
         [empresaId, anio, mes]
@@ -119,11 +146,78 @@ const getDetalle = async (req, res, next) => {
          LIMIT 1`,
         [empresaId, anio, mes]
       ),
+      db.query(
+        `SELECT COALESCE(i.estado, 'pending') AS estado
+         FROM fondo_procesos p
+         LEFT JOIN fondo_checklist_meses m
+                ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
+         LEFT JOIN fondo_checklist_items i
+                ON i.mes_id = m.id AND i.proceso_id = p.id
+         WHERE p.macroproceso_id = 'mp3'
+         LIMIT 1`,
+        [empresaId, anio, mes]
+      ),
+      db.query(
+        `SELECT p.id, p.name, COALESCE(i.estado, 'pending') AS estado
+         FROM fondo_procesos p
+         JOIN fondo_proceso_grupos g ON g.id = p.grupo_id AND g.macroproceso_id = 'mp2'
+         LEFT JOIN fondo_checklist_meses m
+                ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
+         LEFT JOIN fondo_checklist_items i
+                ON i.mes_id = m.id AND i.proceso_id = p.id
+         WHERE p.activo = true
+         ORDER BY p.orden`,
+        [empresaId, anio, mes]
+      ),
+      db.query(
+        `SELECT COALESCE(i.estado, 'pending') AS estado
+         FROM fondo_procesos p
+         JOIN fondo_proceso_grupos g ON g.id = p.grupo_id AND g.macroproceso_id = 'mp5'
+         LEFT JOIN fondo_checklist_meses m
+                ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
+         LEFT JOIN fondo_checklist_items i
+                ON i.mes_id = m.id AND i.proceso_id = p.id
+         WHERE p.activo = true`,
+        [empresaId, anio, mes]
+      ),
     ]);
 
     const mp5Confirmed = mp5Result.rows.length > 0 ? mp5Result.rows[0].confirmed : false;
+    const mp5Enviado   = mp5Result.rows.length > 0 ? mp5Result.rows[0].enviado   : false;
 
     const macroprocesos = mpResult.rows.map(normalizeDetalle);
+
+    // mp3 (Nómina electrónica): el estado propio de la fila se reemplaza por
+    // el derivado del checklist mensual; responsable/nota/tareasVinculadas
+    // siguen viniendo de fondo_detalle_macroprocesos y se mantienen editables.
+    const nominaElectronicaEstado = nominaElecResult.rows.length > 0 ? nominaElecResult.rows[0].estado : 'pending';
+    const mp3Index = macroprocesos.findIndex(m => m.id === 3);
+    if (mp3Index !== -1) {
+      macroprocesos[mp3Index] = {
+        ...macroprocesos[mp3Index],
+        estado:          deriveNominaElectronicaEstado(nominaElectronicaEstado),
+        // Estado crudo del ítem del checklist (incluye 'na', que el estado
+        // derivado de arriba ya colapsó a 'done') — el frontend lo usa para
+        // distinguir "Completado" de "Completado - No aplica" en el texto.
+        checklistEstado: nominaElectronicaEstado,
+        readonly:        true,
+      };
+    }
+
+    // mp2 (Nómina): el estado propio de la fila se reemplaza por el agregado
+    // de TODOS los procesos del grupo NOMINA del checklist mensual;
+    // responsable/nota/tareasVinculadas siguen viniendo de
+    // fondo_detalle_macroprocesos y se mantienen editables. checklistItems
+    // trae el desglose por proceso para mostrarlo tipo checklist en la ficha.
+    const mp2Index = macroprocesos.findIndex(m => m.id === 2);
+    if (mp2Index !== -1) {
+      macroprocesos[mp2Index] = {
+        ...macroprocesos[mp2Index],
+        estado: deriveGrupoEstado(nominaGrupoResult.rows.map(r => r.estado)),
+        checklistItems: nominaGrupoResult.rows.map(r => ({ id: r.id, nombre: r.name, estado: r.estado })),
+        readonly: true,
+      };
+    }
 
     // mp4 (Documentos contador - Pagos): el estado propio de la fila se
     // reemplaza por el derivado del pago del mes en el módulo de Pagos;
@@ -152,12 +246,18 @@ const getDetalle = async (req, res, next) => {
       };
     }
 
-    // mp5 (Contabilidad) es readonly — se deriva de fondo_checklist_meses.confirmed
+    // mp5 (Contabilidad) es readonly. El estado (done/in_progress/pending) ya
+    // NO viene de "confirmed" — se deriva del agregado de todos los procesos
+    // del grupo CONTABILIDAD del checklist mensual, mismo criterio que mp2.
+    // "confirmed" (y el flujo confirmar → enviar de Seguimiento Mensual) se
+    // sigue mandando aparte: ahora es un paso manual posterior e
+    // independiente ("listo para enviar"), no la fuente del estado.
     const mp5 = {
       id:               5,
       nombre:           'Contabilidad',
-      estado:           mp5Confirmed ? 'done' : 'pending',
+      estado:           deriveGrupoEstado(contabilidadGrupoResult.rows.map(r => r.estado)),
       confirmed:        mp5Confirmed,
+      enviado:          mp5Enviado,
       responsableId:    null,
       nota:             null,
       updatedAt:        null,
@@ -185,6 +285,10 @@ const updateDetalle = async (req, res, next) => {
 
     const { responsableId, nota, estado, anio, mes } = req.body;
     const mpKey = `mp${macroNum}`;
+
+    if (!isMesHabilitado(anio, mes)) {
+      return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
+    }
 
     const result = await db.query(
       `INSERT INTO fondo_detalle_macroprocesos (id, empresa_id, macroproceso_id, anio, mes, estado, responsable_id, nota)

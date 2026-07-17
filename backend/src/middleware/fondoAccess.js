@@ -34,6 +34,22 @@ const requireFondoAccess = async (req, res, next) => {
   }
 };
 
+// Estructura del Seguimiento Mensual (grupos y catálogo de procesos): a
+// diferencia del resto de Fondo Emprender, esto no se abre por el permiso
+// granular `canEditar` — lo pidió el equipo para que solo el admin pueda
+// reorganizar columnas, y el resto le pida los cambios a él.
+const requireFondoAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'No autenticado' });
+
+  if (req.user.role === 'admin') return next();
+
+  logger.warn(
+    { userId: req.user.userId, path: req.path, method: req.method },
+    'requireFondoAdmin — rol no admin bloqueado'
+  );
+  return res.status(403).json({ error: 'Solo un administrador puede modificar la estructura de columnas' });
+};
+
 const requireFondoAutorizarPagos = async (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: 'No autenticado' });
 
@@ -59,4 +75,4 @@ const requireFondoAutorizarPagos = async (req, res, next) => {
   }
 };
 
-module.exports = { requireFondoAccess, requireFondoAutorizarPagos };
+module.exports = { requireFondoAccess, requireFondoAdmin, requireFondoAutorizarPagos };
