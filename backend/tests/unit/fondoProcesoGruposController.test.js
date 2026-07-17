@@ -42,7 +42,7 @@ describe('getGrupos', () => {
     await getGrupos(req, res, mockNext);
 
     expect(res.json).toHaveBeenCalledWith([
-      { id: 'g1', name: 'Nómina', orden: 0, createdAt: 't1', updatedAt: 't1' },
+      { id: 'g1', name: 'Nómina', orden: 0, macroprocesoId: null, createdAt: 't1', updatedAt: 't1' },
     ]);
   });
 });
