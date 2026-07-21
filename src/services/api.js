@@ -123,6 +123,22 @@ export const api = {
   updateComment: (taskId, commentId, text) => request(`/tasks/${taskId}/comments/${commentId}`, { method: 'PUT', body: JSON.stringify({ text }) }),
   deleteComment: (taskId, commentId) => request(`/tasks/${taskId}/comments/${commentId}`, { method: 'DELETE' }),
 
+  // Tareas pendientes personales
+  getPersonalTasks: () => request('/personal-tasks'),
+  createPersonalTask: (data) => request('/personal-tasks', { method: 'POST', body: JSON.stringify(data) }),
+  updatePersonalTask: (id, data) => request(`/personal-tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePersonalTask: (id) => request(`/personal-tasks/${id}`, { method: 'DELETE' }),
+  addPersonalTaskItem: (taskId, title) => request(`/personal-tasks/${taskId}/items`, { method: 'POST', body: JSON.stringify({ title }) }),
+  updatePersonalTaskItem: (taskId, itemId, data) => request(`/personal-tasks/${taskId}/items/${itemId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePersonalTaskItem: (taskId, itemId) => request(`/personal-tasks/${taskId}/items/${itemId}`, { method: 'DELETE' }),
+
+  // Notas personales
+  getPersonalNotes: () => request('/personal-notes'),
+  getPersonalNote: (id) => request(`/personal-notes/${id}`),
+  createPersonalNote: (data = {}) => request('/personal-notes', { method: 'POST', body: JSON.stringify(data) }),
+  updatePersonalNote: (id, data) => request(`/personal-notes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePersonalNote: (id) => request(`/personal-notes/${id}`, { method: 'DELETE' }),
+
   // Employees
   getEmployees: () => request('/employees'),
   createEmployee: (data) => request('/employees', { method: 'POST', body: JSON.stringify(data) }),
