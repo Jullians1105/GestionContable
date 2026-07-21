@@ -1,4 +1,4 @@
-# CAMBIOS FASE 3 — TaskFlow Pro
+# CAMBIOS FASE 3 — Gestcon
 
 **Fecha:** 2026-06-03
 **Versión:** 3.0.0
@@ -121,10 +121,10 @@ CLIENT_URL=http://localhost:5173
 
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=taskflow
+DB_NAME=gestcon
 DB_USER=postgres
 DB_PASSWORD=tu_password
-DB_TEST_NAME=taskflow_test
+DB_TEST_NAME=gestcon_test
 
 JWT_SECRET=secreto-muy-largo-aleatorio
 JWT_EXPIRES_IN=1h
@@ -133,7 +133,7 @@ JWT_REFRESH_EXPIRES_IN=7d
 
 # Opcionales
 SENDGRID_API_KEY=SG.xxx
-FROM_EMAIL=noreply@taskflow.com
+FROM_EMAIL=noreply@gestcon.com
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
 
@@ -176,8 +176,8 @@ brew install postgresql@16
 brew services start postgresql@16
 
 # Crear BD
-psql -U postgres -c "CREATE DATABASE taskflow;"
-psql -U postgres -c "CREATE DATABASE taskflow_test;"
+psql -U postgres -c "CREATE DATABASE gestcon;"
+psql -U postgres -c "CREATE DATABASE gestcon_test;"
 
 # Ejecutar migraciones
 npm run backend:migrate:seed
@@ -285,7 +285,7 @@ El proyecto está diseñado para correr en servidores locales de la empresa. **N
 ```bash
 brew install postgresql@16 node
 brew services start postgresql@16
-psql -U postgres -c "CREATE DATABASE taskflow;"
+psql -U postgres -c "CREATE DATABASE gestcon;"
 ```
 
 ### Instalación en Ubuntu/Debian
@@ -293,7 +293,7 @@ psql -U postgres -c "CREATE DATABASE taskflow;"
 ```bash
 apt install postgresql-16 nodejs npm
 systemctl start postgresql
-psql -U postgres -c "CREATE DATABASE taskflow;"
+psql -U postgres -c "CREATE DATABASE gestcon;"
 ```
 
 ### Levantar la aplicación
@@ -318,7 +318,7 @@ npm install -g pm2
 
 # Iniciar el backend como servicio
 cd backend
-pm2 start src/index.js --name taskflow
+pm2 start src/index.js --name gestcon
 
 # Guardar configuración y habilitar arranque automático
 pm2 save
@@ -332,7 +332,7 @@ Permite acceder por el puerto 80 (HTTP) o 443 (HTTPS) en lugar del puerto 3000.
 ```nginx
 server {
     listen 80;
-    server_name taskflow.empresa.local;
+    server_name gestcon.empresa.local;
 
     location / {
         proxy_pass http://localhost:3000;

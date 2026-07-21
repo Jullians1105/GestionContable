@@ -33,7 +33,7 @@ Estoy abriendo este proyecto por primera vez en macOS. Necesito que hagas lo sig
    Confirma que tiene al menos estas variables:
      PORT=3000
      DB_PORT=5432
-     DB_NAME=taskflow
+     DB_NAME=gestcon
      DB_USER=postgres
      DB_PASSWORD=<elige un password>
      JWT_SECRET=<cualquier cadena larga>
@@ -217,7 +217,7 @@ Necesito hacer una tarea de mantenimiento sobre la base de datos PostgreSQL
 (corriendo en Docker, vía docker-compose):
 
 - Backup: ./scripts/backup.sh
-  Genera un dump con pg_dump en backups/taskflow_<timestamp>.sql
+  Genera un dump con pg_dump comprimido en backups/backup_<timestamp>.tar.gz
   (usa las variables de .env en la raíz; crea la carpeta backups/ si no existe).
 
 - Reset completo (borra y recrea la BD con migraciones + seed): ./scripts/reset-db.sh

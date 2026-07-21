@@ -463,7 +463,7 @@ export default function FondoEmprenderEmpresasPage() {
               <div key={company.id}>
                 {/* ── Company row ─────────────────────────────────────── */}
                 <div
-                  className={`flex items-center gap-4 px-4 py-3 hover:bg-[#f0f4ff] dark:hover:bg-[#252840] transition-colors group cursor-pointer${
+                  className={`flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 hover:bg-[#f0f4ff] dark:hover:bg-[#252840] transition-colors group cursor-pointer${
                     idx > 0 ? ' border-t border-[#f0f2f8] dark:border-[#2e3148]' : ''
                   }`}
                   onClick={() => navigate(`/fondo-emprender/empresas/${company.id}?anio=${year}&mes=${month + 1}`)}
@@ -492,8 +492,8 @@ export default function FondoEmprenderEmpresasPage() {
                   </span>
 
                   {/* Progress bar + count */}
-                  <div className="flex items-center gap-2.5 flex-shrink-0">
-                    <div className="w-24 h-1.5 rounded-full bg-[#e8eaf0] dark:bg-[#2e3148] overflow-hidden">
+                  <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
+                    <div className="hidden sm:block w-24 h-1.5 rounded-full bg-[#e8eaf0] dark:bg-[#2e3148] overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-300"
                         style={{ width: `${pct}%`, background: color }}

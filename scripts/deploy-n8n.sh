@@ -3,7 +3,7 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-echo "🚀 Desplegando n8n en TaskFlow Pro..."
+echo "🚀 Desplegando n8n en Gestcon..."
 
 # 1. Verificar que .env existe y tiene N8N_ENCRYPTION_KEY
 if [ ! -f .env ]; then

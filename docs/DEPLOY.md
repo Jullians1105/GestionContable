@@ -1,4 +1,4 @@
-# Guía de Deployment — TaskFlow Pro
+# Guía de Deployment — Gestcon
 
 **Servidor de producción:** `192.168.1.12`  
 **Puerto de acceso:** `5173`  
@@ -33,8 +33,8 @@ newgrp docker
 
 ```bash
 cd ~
-git clone <URL_DEL_REPO> taskflow
-cd taskflow
+git clone <URL_DEL_REPO> gestcon
+cd gestcon
 ```
 
 Si el repositorio es privado, configurar SSH key o usar HTTPS con token.
@@ -54,7 +54,7 @@ Valores mínimos que debes cambiar para producción:
 # Base de datos
 DB_USER=postgres
 DB_PASSWORD=CAMBIA_ESTO_POR_UNA_CONTRASEÑA_SEGURA
-DB_NAME=taskflow
+DB_NAME=gestcon
 
 # JWT — usar cadenas largas y aleatorias
 JWT_SECRET=genera-un-secreto-largo-y-aleatorio-aqui
@@ -90,10 +90,10 @@ docker compose ps
 Salida esperada:
 ```
 NAME                 STATUS          PORTS
-taskflow_postgres    running (healthy)   0.0.0.0:5432->5432/tcp
-taskflow_mailhog     running             0.0.0.0:1025->1025/tcp
-taskflow_backend     running (healthy)   0.0.0.0:3000->3000/tcp
-taskflow_frontend    running             0.0.0.0:5173->80/tcp
+gestcon_postgres    running (healthy)   0.0.0.0:5432->5432/tcp
+gestcon_mailhog     running             0.0.0.0:1025->1025/tcp
+gestcon_backend     running (healthy)   0.0.0.0:3000->3000/tcp
+gestcon_frontend    running             0.0.0.0:5173->80/tcp
 ```
 
 ---
@@ -180,7 +180,7 @@ crontab -e
 
 Añadir esta línea al crontab:
 ```cron
-0 2 * * * /home/$USER/taskflow/scripts/backup.sh >> /home/$USER/taskflow/backups/backup.log 2>&1
+0 2 * * * /home/$USER/gestcon/scripts/backup.sh >> /home/$USER/gestcon/backups/backup.log 2>&1
 ```
 
 Los backups se guardan comprimidos en `backups/backup_YYYYMMDD_HHMMSS.tar.gz`. La rotación automática (mantener últimos 7 días) está integrada en el script, no requiere cron adicional.

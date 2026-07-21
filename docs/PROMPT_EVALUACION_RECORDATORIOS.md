@@ -5,7 +5,7 @@
 
 ## 📌 CONTEXTO DEL PROYECTO
 
-**Proyecto:** GestionTareasOficina / TaskFlow Pro  
+**Proyecto:** GestionTareasOficina / Gestcon  
 **Stack:** React 18 + Node.js + Express + PostgreSQL + Docker  
 **Estado:** FASE 3 completa (Backend, WebSockets, Tests ✅)  
 **Servidor:** 192.168.1.12 (HTTPS con mkcert)  

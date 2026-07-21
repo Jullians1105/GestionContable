@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname "$0")/.."
 
-echo "This will drop and recreate the taskflow database. Continue? (y/N)"
+echo "This will drop and recreate the gestcon database. Continue? (y/N)"
 read -r confirm
 if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
   echo "Aborted."

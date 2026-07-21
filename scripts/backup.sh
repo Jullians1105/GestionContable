@@ -13,7 +13,7 @@ source .env 2>/dev/null || true
 set +a
 
 DB_USER="${DB_USER:-postgres}"
-DB_NAME="${DB_NAME:-taskflow}"
+DB_NAME="${DB_NAME:-gestcon}"
 
 # ─── Preparar carpeta ─────────────────────────────────────────────────────────
 mkdir -p "${BACKUP_PATH}"

@@ -1,4 +1,4 @@
-# TaskFlow Pro — GestionTareasOficina
+# Gestcon — GestionTareasOficina
 
 Gestor de tareas para equipos de oficina con backend real en PostgreSQL, autenticación JWT, WebSockets en tiempo real y soporte Docker.
 

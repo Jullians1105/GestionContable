@@ -1,8 +1,8 @@
-﻿# TaskFlow Pro - Contexto del Proyecto
+﻿# Gestcon - Contexto del Proyecto
 
 ## Descripcion General
 
-**TaskFlow Pro** es una aplicacion web de gestion de tareas para equipos empresariales de hasta 25 personas. Es un proyecto personal desarrollado completamente en el lado del cliente, sin backend ni base de datos externa. Toda la persistencia ocurre en el `localStorage` del navegador.
+**Gestcon** es una aplicacion web de gestion de tareas para equipos empresariales de hasta 25 personas. Es un proyecto personal desarrollado completamente en el lado del cliente, sin backend ni base de datos externa. Toda la persistencia ocurre en el `localStorage` del navegador.
 
 El proyecto fue concebido como un MVP funcional (Fase 1) con miras a evolucionar hacia una solucion con autenticacion, backend real y reportes avanzados en fases futuras.
 
@@ -63,7 +63,7 @@ src/
 ├── components/
 │   ├── Dashboard.jsx       # Graficos Recharts: pie (estados) + barras (prioridades)
 │   ├── Header.jsx          # Barra top fija: busqueda global, notificaciones, avatar
-│   ├── Sidebar.jsx         # Nav lateral fija 250px: logo TaskFlow Pro + Material Icons
+│   ├── Sidebar.jsx         # Nav lateral fija 250px: logo Gestcon + Material Icons
 │   ├── StatsCard.jsx       # Tarjeta de metrica con borde de color e icono
 │   ├── TaskCard.jsx        # Tarjeta individual de tarea con badges y selector de estado
 │   ├── TaskFilters.jsx     # Panel de filtros: texto, estado, prioridad, asignado
@@ -135,7 +135,7 @@ Si alguna clave no existe al arrancar, se cargan los datos de `sampleData.js` au
 
 ---
 
-## Design System (Stitch - TaskFlow Pro)
+## Design System (Stitch - Gestcon)
 
 El diseno fue definido en Stitch y luego implementado en codigo. El sistema de diseno es consistente en todas las vistas.
 
@@ -246,8 +246,8 @@ Lo que esta planeado pero NO esta implementado:
 - Persistencia localStorage con datos de ejemplo precargados
 
 ### Actualizacion de UI (Stitch Design System)
-- Implementacion del design system "TaskFlow Pro" basado en prototipos Stitch
-- Renombrado de la aplicacion: "Gestor de Tareas" → "TaskFlow Pro"
+- Implementacion del design system "Gestcon" basado en prototipos Stitch
+- Renombrado de la aplicacion: "Gestor de Tareas" → "Gestcon"
 - Layout cambiado a sidebar fijo (250px) + header fijo (64px)
 - Sustitucion de emojis e iconos SVG por Material Symbols Outlined
 - Fuente cambiada a Inter 400/600/700
