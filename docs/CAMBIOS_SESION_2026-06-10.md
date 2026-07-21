@@ -12,7 +12,7 @@ Registro de lo implementado en esta sesión: despliegue local con Docker en Wind
 
 ### `.env` (raíz, usado por `docker-compose.yml`)
 - `JWT_SECRET` / `JWT_REFRESH_SECRET` alineados con `backend/.env` (`taskflow-dev-secret-key-change-in-production-2026` / `taskflow-refresh-secret-different-key-2026`) para evitar 401 por tokens firmados con secretos distintos entre el flujo Docker y el flujo local.
-- Agregado `FROM_EMAIL=noreply@taskflow.local`.
+- Agregado `FROM_EMAIL=noreply@gestcon.local`.
 
 ### `docker-compose.yml`
 - Quitado el campo obsoleto `version: '3.9'`.
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 );
 CREATE INDEX idx_password_reset_tokens_user ON password_reset_tokens(user_id);
 ```
-Aplicada manualmente vía `docker compose exec -T postgres psql -U postgres -d taskflow < backend/migrations/005_password_reset.sql`, porque `migrations/run.js` no tiene tabla de control de migraciones aplicadas y falla si se reejecuta sobre una BD ya inicializada (`relation "idx_users_email" already exists`). **Pendiente:** agregar tabla `schema_migrations` para que `run.js` sea idempotente.
+Aplicada manualmente vía `docker compose exec -T postgres psql -U postgres -d gestcon < backend/migrations/005_password_reset.sql`, porque `migrations/run.js` no tiene tabla de control de migraciones aplicadas y falla si se reejecuta sobre una BD ya inicializada (`relation "idx_users_email" already exists`). **Pendiente:** agregar tabla `schema_migrations` para que `run.js` sea idempotente.
 
 `backend/migrations/run.js` — el `DROP TABLE` de `--reset` ahora incluye `password_reset_tokens`.
 
@@ -121,7 +121,7 @@ resetPassword: (token, password) => request('/auth/reset-password', { method: 'P
 ## 5. Verificación end-to-end
 
 1. `npm run build` — sin errores (los warnings de `npm run lint` son preexistentes y no relacionados con esta sesión: `vite.config.js` `process is not defined`, hooks con deps faltantes en `GroupContext`/`TagContext`/`TeamContext`, `SAMPLE_TASKS` sin usar).
-2. `docker compose up -d --build` — 4 contenedores corriendo: `taskflow_postgres`, `taskflow_backend`, `taskflow_frontend`, `taskflow_mailhog`.
+2. `docker compose up -d --build` — 4 contenedores corriendo: `gestcon_postgres`, `gestcon_backend`, `gestcon_frontend`, `gestcon_mailhog`.
 3. Migración `005_password_reset.sql` aplicada manualmente.
 4. `POST /api/auth/forgot-password` con `maria@empresa.com`:
    - Email recibido en Mailhog (`localhost:8025`) con link `http://localhost:5173/reset-password?token=...`.

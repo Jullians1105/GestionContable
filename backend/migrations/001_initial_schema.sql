@@ -1,4 +1,4 @@
--- TaskFlow Pro - Esquema inicial PostgreSQL
+-- Gestcon - Esquema inicial PostgreSQL
 -- Migración 001
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

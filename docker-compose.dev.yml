@@ -6,12 +6,12 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: taskflow_postgres_dev
+    container_name: gestcon_postgres_dev
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-taskflow}
+      POSTGRES_DB: ${DB_NAME:-gestcon}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
@@ -24,7 +24,7 @@ services:
 
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: taskflow_mailhog_dev
+    container_name: gestcon_mailhog_dev
     restart: unless-stopped
     ports:
       - "1025:1025"
@@ -48,7 +48,7 @@ services:
   backend:
     image: node:20-alpine
     working_dir: /app
-    container_name: taskflow_backend_dev
+    container_name: gestcon_backend_dev
     restart: unless-stopped
     volumes:
       - ./backend:/app
@@ -72,7 +72,7 @@ services:
   frontend:
     image: node:20-slim
     working_dir: /app
-    container_name: taskflow_frontend_dev
+    container_name: gestcon_frontend_dev
     restart: unless-stopped
     volumes:
       - .:/app

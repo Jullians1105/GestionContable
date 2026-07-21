@@ -39,7 +39,7 @@ export default function SettingsPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `taskflow-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `gestcon-backup-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
     addToast('Datos exportados', 'success')
@@ -123,7 +123,7 @@ export default function SettingsPage() {
           <h3 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">Sobre la aplicación</h3>
           <dl className="space-y-3 mt-4">
             {[
-              { label: 'Nombre', value: 'Gestor de Tareas' },
+              { label: 'Nombre', value: 'Gestcon' },
               { label: 'Versión', value: '2.0.0 - Fase 2' },
               { label: 'Almacenamiento', value: 'localStorage (navegador)' },
               { label: 'Stack', value: 'React 18 + Vite + Tailwind CSS' },

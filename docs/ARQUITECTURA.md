@@ -4,7 +4,12 @@
 **Última actualización de este documento:** 2026-07-16
 **Rama al momento de escribir:** `main`
 
-> **Nota de nombres:** el proyecto nació como "TaskFlow Pro" (queda en `backend/package.json` → `taskflow-backend`, contenedores Docker `taskflow_*`, `<title>` de `index.html` = "Gestor de Tareas - Empresarial") y hoy se identifica como **Gestcon** (`public/manifest.json`: `name: "Gestión Contable"`, `short_name: "Gestcon"`; dominio de producción `https://gestcon.work`). Es una app de gestión interna (tareas + módulo contable "Fondo Emprender") para una firma contable colombiana, no un SaaS multi-tenant.
+> **Nota de nombres:** el proyecto nació como "TaskFlow Pro" y el 2026-07-20 se completó el
+> rename a **Gestcon** en todo el código, docs, scripts e infraestructura (`backend/package.json`
+> → `gestcon-backend`, contenedores Docker `gestcon_*`, `<title>` de `index.html` = "Gestcon",
+> `public/manifest.json`: `name`/`short_name` = "Gestcon"; dominio de producción
+> `https://gestcon.work`). Es una app de gestión interna (tareas + módulo contable "Fondo
+> Emprender") para una firma contable colombiana, no un SaaS multi-tenant.
 
 ---
 

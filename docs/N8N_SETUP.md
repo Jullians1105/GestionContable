@@ -1,9 +1,16 @@
 # n8n — Guía de Setup y Automatizaciones
 
 **URL de acceso:** `http://192.168.1.12:5678`  
-**Contenedor:** `taskflow_n8n`  
-**Base de datos:** PostgreSQL → `n8n` (separada de `taskflow`)  
+**Contenedor:** `gestcon_n8n`  
+**Base de datos:** PostgreSQL → `n8n` (separada de `gestcon`)  
 **Zona horaria:** `America/Bogota`
+
+> ⚠️ El servicio `n8n` (y `n8n-db-init`, referenciados por `scripts/deploy-n8n.sh`) **no está
+> definido en `docker-compose.yml` de este repo** — se configuró aparte, directo en el servidor.
+> Este rename de branding (2026-07-20) actualizó el nombre acá en la doc como referencia, pero
+> **no renombra el contenedor real** en el servidor (que puede seguir llamándose
+> `taskflow_n8n` hasta que se haga ese paso manual ahí). Si vas a tocar n8n, primero corré
+> `docker ps` en el servidor para confirmar el nombre real del contenedor.
 
 ---
 
@@ -18,7 +25,7 @@
 
 ---
 
-## 2. Conectar n8n con la API de TaskFlow Pro
+## 2. Conectar n8n con la API de Gestcon
 
 n8n se conecta al backend usando **HTTP Request** nodes con autenticación JWT.
 
@@ -42,7 +49,7 @@ Respuesta:
 ### Crear una credencial en n8n
 
 1. En n8n: **Credenciales → Nueva → Header Auth**
-2. Nombre: `TaskFlow JWT`
+2. Nombre: `Gestcon JWT`
 3. Header Name: `Authorization`
 4. Header Value: `Bearer eyJhbGc...` (pegar el token)
 5. Guardar
@@ -83,7 +90,7 @@ POST   /notifications         → crear notificación
 // Ejemplo de body del email (en el nodo Code):
 {
   "to": "maria@empresa.com",
-  "subject": "⚠️ Tareas vencidas — TaskFlow Pro",
+  "subject": "⚠️ Tareas vencidas — Gestcon",
   "body": "Tienes {{ $json.count }} tareas vencidas:\n{{ $json.titles }}"
 }
 ```
@@ -173,7 +180,7 @@ docker compose up -d n8n
 | `N8N_PORT` | `5678` | Puerto interno del contenedor |
 | `N8N_EDITOR_BASE_URL` | `http://192.168.1.12:5678` | URL pública del editor |
 | `WEBHOOK_URL` | `http://192.168.1.12:5678/` | Base de los webhooks |
-| `DB_POSTGRESDB_DATABASE` | `n8n` | Base de datos propia (separada de taskflow) |
+| `DB_POSTGRESDB_DATABASE` | `n8n` | Base de datos propia (separada de gestcon) |
 | `N8N_ENCRYPTION_KEY` | `(desde .env)` | Cifra las credenciales guardadas en n8n |
 | `GENERIC_TIMEZONE` | `America/Bogota` | Timezone para los schedules |
 

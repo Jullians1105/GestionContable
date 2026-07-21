@@ -56,8 +56,8 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-[#f3f4f6] dark:bg-[#0f1117] flex items-center justify-center p-4">
       <div className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-lg p-8 w-full max-w-md border border-[#c3c6d7] dark:border-[#2e3148]">
         <div className="flex items-center gap-3 mb-8">
-          <img src={logoIcono} alt="Gestor de Tareas" className="w-10 h-10 rounded-xl object-cover" />
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Gestor de Tareas</h1>
+          <img src={logoIcono} alt="Gestcon" className="w-10 h-10 rounded-xl object-cover" />
+          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Gestcon</h1>
         </div>
 
         <h2 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">Crear cuenta</h2>

@@ -117,10 +117,12 @@ export function TaskProvider({ children }) {
       for (const sub of (taskData.subtasks ?? [])) {
         if (sub.title?.trim()) newTask = await api.addSubtask(newTask.id, sub.title.trim())
       }
-      // Actualización local solo cuando NO hay socket conectado (el socket emitirá task:created)
-      if (!connected) {
-        setTasks(prev => [newTask, ...prev])
-      }
+      // Actualización local siempre — no depender de que el socket entregue task:created de
+      // vuelta al mismo cliente que creó la tarea (en producción, tras el Cloudflare Tunnel,
+      // el evento puede no llegar por reconexiones/latencia, dejando la tarea invisible para
+      // quien la creó hasta recargar). onTaskCreated dedupea por id, así que no hay riesgo de
+      // duplicado si el socket también la entrega.
+      setTasks(prev => [newTask, ...prev.filter(t => t.id !== newTask.id)])
       addingRef.current = false
       if (!useRealBackend) {
         normalizeAssignedTo(newTask.assignedTo)
@@ -133,7 +135,7 @@ export function TaskProvider({ children }) {
       addingRef.current = false
       throw e
     }
-  }, [user, connected, useRealBackend])
+  }, [user, useRealBackend])
 
   const updateTask = useCallback((id, updates) => {
     const current = tasksRef.current.find(t => t.id === id)

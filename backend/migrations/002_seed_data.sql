@@ -1,4 +1,4 @@
--- TaskFlow Pro - Datos de prueba
+-- Gestcon - Datos de prueba
 -- Migración 002 (seed)
 -- Contraseñas: admin123, leader123, member123, viewer123
 
