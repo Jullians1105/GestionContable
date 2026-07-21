@@ -1,16 +1,14 @@
 # Estado del Proyecto — GestionTareasOficina / Gestcon
 
-**Última actualización:** 2026-07-20 (sesión 15 — fix bug "tarea invisible al crearla como
-member en producción"; rebrand completo TaskFlow Pro → Gestcon en todo el repo — checklist
-#57-58)  
-**Rama activa:** `feat/tareasArregloYResponsive` — **0 commits de diferencia con `main`**
-(`main` está en `d80ce00`, merge de PR #24 `fix/fondo-seguimiento-mensual-notas`; entre el
-checklist #56 —sesión 14, 2026-07-13— y hoy se mergearon además PR #22
-`fix/gestion-stop-warning-texto` y PR #23 `arregloMacFondo`, sin documentar en detalle acá —
-revisar `git log main` si hace falta el contexto de esas sesiones). Working tree **sin
-commitear todavía**, con los cambios de la sesión 15 (checklist #57-58): fix de
-`src/context/TaskContext.jsx` (`addTask`) + rebrand de ~36 archivos (código, docs, scripts,
-docker). Plan: el usuario va a revisar, commitear y pushear él mismo.  
+**Última actualización:** 2026-07-21 (sesión 16 — fix responsive de la lista de Empresas en
+mobile; fix de migraciones pendientes en el entorno local; PR #25 y PR #26 mergeados a `main` —
+checklist #59-60)  
+**Rama activa:** `main` — **al día con `origin/main`** (`e9c5222`, merge de PR #26
+`feat/tareasArregloYResponsive` sobre PR #25 `feature/fondo-seguimiento-mensual`). Working tree
+**limpio**, nada pendiente de commitear. El commit/push/merge de la sesión 15 (rebrand Gestcon +
+fix `TaskContext.addTask`, checklist #57-58) y de esta sesión 16 (checklist #59-60) se hizo
+fuera de una sesión de Claude Code — no hubo que resolver conflictos, `git pull` fue
+fast-forward.  
 **Ojo si se retoma desde otra máquina:** `CLAUDE.md` (raíz) y toda la carpeta `.claude/`
 (incluida la memoria de sesión en `.claude/MEMORIA_SESION.md`) están en `.gitignore` — **no
 viajan con git push/pull/clone**. Si el trabajo continúa en otra máquina, ese Claude Code
@@ -18,8 +16,12 @@ arranca sin este contexto salvo que alguien copie esos archivos manualmente (Air
 no vía git.  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
-**Ramas activas en remoto:** `main` en `d80ce00` (ver nota de "Rama activa" arriba; verificar
-con `git fetch` antes de asumir vigencia)  
+**Ramas activas en remoto:** `main` en `e9c5222` (verificar con `git fetch` antes de asumir
+vigencia). Ramas locales ya mergeadas a `main` (remoto borrado en GitHub tras el merge,
+candidatas a limpiar con `git branch -d`): `arregloMacFondo`,
+`feat/ajustesResponsiveArregloBugs11/07`, `feat/tareasArregloYResponsive`. **Pendiente sin
+resolver:** `rollback/d6b852d` tiene 1 commit que nunca se pusheó a ningún lado (sin upstream
+configurado) — ver checklist #60.  
 **Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)  
 **Nombre del proyecto:** desde la sesión 15 (2026-07-20), branding unificado a **Gestcon** en
 todo el repo (antes convivían "TaskFlow Pro", "Gestor de Tareas" y "Gestión Contable" según el
@@ -27,7 +29,8 @@ archivo). Ver checklist #58 para el detalle completo y las excepciones intencion
 (`backend/src/middleware/security.js` conserva los strings `taskflow-*` porque son una lista
 negra de secretos JWT conocidos, no branding; el contenedor `n8n` de producción no está en
 `docker-compose.yml` de este repo, así que su rename es un paso manual aparte — ver
-`docs/N8N_SETUP.md`).
+`docs/N8N_SETUP.md`). **Mergeado a `main` en la sesión 16** (checklist #60) — antes vivía sin
+commitear en `feat/tareasArregloYResponsive`.
 
 ---
 
@@ -229,6 +232,12 @@ POST   /api/fondo/empresas
 PUT    /api/fondo/empresas/:id
 DELETE /api/fondo/empresas/:id
 GET    /api/fondo/procesos
+POST   /api/fondo/procesos
+PUT    /api/fondo/procesos/:id
+GET    /api/fondo/proceso-grupos                → agrupar columnas del Seguimiento Mensual
+POST   /api/fondo/proceso-grupos                   (sesión 16 / PR #25, checklist #59)
+PUT    /api/fondo/proceso-grupos/:id
+DELETE /api/fondo/proceso-grupos/:id
 GET    /api/fondo/checklist/:empresaId
 PUT    /api/fondo/checklist/:empresaId
 GET    /api/fondo/detalle/:empresaId
@@ -324,6 +333,11 @@ la haría re-ejecutarse en el próximo deploy y duplicaría el `INSERT` de las 3
 | 021 | Columnas `completed_by`/`completed_at` en `task_subtasks` — quién completó cada subtarea; backfill best-effort de `completed_at` desde `updated_at` |
 | 022 | Tabla `task_delete_requests` (task_id, requested_by, reason, status, resolved_by, resolved_at) — solicitudes de eliminación con motivo; índice único parcial evita duplicar solicitudes pendientes por tarea |
 | 023 | Tablas `fondo_impuestos` (catálogo fijo: autorretención, retención, IVA, consumo) y `fondo_impuestos_items` (registro por empresa × impuesto × mes) — checklist de la tarjeta "Información tributaria" (mp6), independiente del checklist mensual |
+| 024 | Tabla `fondo_proceso_grupos` (agrupar columnas del Seguimiento Mensual, ej. "Nómina"/"Impuestos") — aditiva, `grupo_id` nace `NULL` en todo proceso existente |
+| 025 | Columnas `vigente_desde_anio`/`vigente_desde_mes`/`vigente_hasta_anio`/`vigente_hasta_mes` en `fondo_procesos` — un proceso puede existir solo en un rango de meses; `NULL` en ambos extremos = sin restricción (comportamiento igual a antes) |
+| 026 | Columnas `enviado`/`enviado_at`/`confirmed_at` en `fondo_checklist_meses` — trackea el envío además de la confirmación; backfill de `confirmed_at` desde `updated_at` para filas ya confirmadas |
+| 027 | Columna `macroproceso_id` en `fondo_procesos` — vínculo estable (por id, no por nombre) entre un proceso y el macroproceso que deriva su estado; solo `nomina electronica` mapeado a `mp3` por ahora |
+| 028 | Columna `macroproceso_id` en `fondo_proceso_grupos` — mismo vínculo pero a nivel de grupo completo (ej. grupo NOMINA → `mp2`) |
 
 **Tests:**
 - Cobertura actual: **~81% statements / ~74% functions** (umbral: 70%)
@@ -525,3 +539,5 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 56 | Solicitud de eliminación de tareas: migración 021 (`task_delete_requests`, aditiva, índice único parcial evita solicitudes duplicadas pendientes), `POST /api/tasks/:id/delete-request` (motivo obligatorio, cualquiera que no sea viewer) y `PATCH /api/tasks/:id/delete-request/:requestId` (aprobar/rechazar — admin o líder del grupo de la tarea, mismo criterio que `DELETE /api/tasks/:id`). Notifica a todos los admins + líder(es) del grupo de la tarea (o solo admins si no tiene grupo); botones "Aprobar"/"Rechazar" inline en la notificación (`NotificationBell`/`NotificationsPage`) y banner con motivo + acciones en `TaskDetailModal` cuando hay una solicitud pendiente. Alcance elegido explícitamente por el usuario entre opciones: cualquiera con acceso a la tarea puede solicitar (no solo el asignado), notifica admin + líder del grupo (no solo admin), rechazo sin motivo adicional. 13 tests unitarios nuevos (`createDeleteRequest`/`respondDeleteRequest`), cobertura subió a 82%/75%. Bug encontrado y corregido durante la verificación: `resolveDeleteRequest` en `TaskContext.jsx` devolvía éxito falso si la tarea ya no estaba en el estado local (notificación vieja tras resolver dos veces) — la rama de backend real ahora llama a la API primero, sin depender del estado local; y como `notifications.task_id` queda `NULL` cuando se borra la tarea referenciada (`ON DELETE SET NULL`), se agregó un guard en el frontend para notificaciones con `taskId` nulo. Verificado end-to-end con Playwright (2 usuarios temporales, aprobación + rechazo + ambos casos de solicitud ya resuelta) | ✅ Implementado 2026-07-13 |
 | 57 | Fix bug reportado: tarea creada por un `member` no aparecía en producción (sí en dev/local) hasta recargar. Causa: en `src/context/TaskContext.jsx`, `addTask` solo agregaba la tarea al estado local cuando el socket **no** estaba conectado (`if (!connected) setTasks(...)`); si estaba conectado, dependía 100% de que el evento `task:created` volviera al mismo cliente que la creó — a diferencia de `updateTask`/`deleteTask`, que siempre actualizan optimista sin depender del socket. En producción (Cloudflare Tunnel, más latencia/reconexiones que Docker local) ese único broadcast podía no llegar, dejando la tarea invisible para su creador; un `member` que se autoasigna depende de esa sola tarea porque `TaskList.jsx` solo le muestra tareas donde figura en `assignedTo` (admin/leader no lo notaban porque ven todo). Fix: `addTask` ahora siempre agrega la tarea local tras la respuesta de la API, igual patrón que `updateTask`/`deleteTask`; seguro porque `onTaskCreated` (listener del socket) ya dedupea por `id`. Sin migración. Pendiente: rebuild + redeploy del frontend en el servidor para que tome efecto | ✅ Implementado 2026-07-20 |
 | 58 | Rebrand completo del proyecto: "TaskFlow Pro" / "Gestor de Tareas" / "Gestión Contable" (nombres que convivían inconsistentemente) → **Gestcon** en todo el repo (~36 archivos): branding visible (`index.html`, `public/manifest.json`, Login/Register/Forgot/Reset Password, `SettingsPage` "Sobre la aplicación", títulos/pie de página de PDF en `ReportsPage`), infraestructura (`docker-compose.yml`/`docker-compose.dev.yml`: contenedores `taskflow_*` → `gestcon_*`, `POSTGRES_DB` default), `backend/package.json` → `gestcon-backend` (+ `package-lock.json` regenerado con `npm install --package-lock-only`), defaults de `DB_NAME`/`DB_TEST_NAME`/`FROM_EMAIL` en `.env.example`, `backend/.env.example`, `env.js`, `run.js`, CI (`.github/workflows/ci.yml`), scripts (`backup.sh`, `restore.sh`, `reset-db.sh`, `deploy-n8n.sh`) y toda la documentación. Excepciones intencionales: `backend/src/middleware/security.js` conserva los strings `taskflow-dev-secret-key-change-in-production-2026`/`taskflow-refresh-secret-different-key-2026` (lista negra de secretos JWT conocidos, no branding — cambiarlos rompería la protección); `Sidebar.jsx`/`UsersManager.jsx` conservan "Gestor de Tareas" como nombre del **módulo** de tareas (no el nombre de la app, igual que "Fondo Emprender"). El `DB_NAME` real de producción no se toca (solo el valor por defecto — el `.env` del servidor ya tiene `DB_NAME=taskflow` explícito, así que la BD productiva sigue funcionando igual sin coordinar un rename real de la base). Los contenedores sí cambian de nombre; un `docker compose up -d` normal los recrea sin perder datos (volumen `postgres_data` es independiente del nombre del contenedor). Encontrados y corregidos 2 errores del reemplazo automático durante la revisión: `docs/ARQUITECTURA.md` (nota de historia de nombres quedó contradictoria) y `docs/CAMBIOS_SESION_2026-06-10.md` (había renombrado por error los mismos secretos JWT que se dejaron intactos en `security.js`). Hallazgo aparte, no relacionado al rename: el contenedor `n8n` de producción (y `n8n-db-init`) no está definido en el `docker-compose.yml` de este repo — se armó aparte en el servidor — así que el nombre `gestcon_n8n` puesto en `docs/N8N_SETUP.md` es solo referencia documental, no renombra el contenedor real (nota de advertencia agregada ahí). Verificado: `npm run lint` y `npm run build` (frontend) limpios, `node -c` sobre los archivos backend tocados, `docker compose config` válido en ambos compose files | ✅ Implementado 2026-07-20 |
+| 59 | **PR #25** `feature/fondo-seguimiento-mensual` (mergeado a `main` como `b4ad3da`): agrupar columnas del Seguimiento Mensual en "grupos de proceso" reordenables por drag & drop (migración 024, tabla `fondo_proceso_grupos`, endpoints `/api/fondo/proceso-grupos`); vigencia por mes de cada proceso — un proceso puede existir solo en un rango de meses, ej. una prima que solo aplicó en junio (migración 025); vínculo estable proceso↔macroproceso y grupo↔macroproceso por id, no por nombre, para que renombrar desde "Editar estructura" no rompa el enlace en silencio (migraciones 027-028); envío del mes trackeado aparte de la confirmación (migración 026, `enviado`/`enviado_at`); permisos: solo admin puede editar la estructura (grupos/vigencia); fixes de UX: la columna "Sin grupo" ya no rompía la altura del header de la tabla, la barra de progreso ya contaba "N/A" como completado, se quitó la opción de editar/borrar una empresa desde la vista de Seguimiento Mensual (queda solo en "Empresas"), se bloqueó la navegación a meses futuros en Seguimiento Mensual y Empresas. Esta rama no se trabajó en una sesión de Claude Code — se documenta acá porque llegó a `main` en paralelo con el trabajo de la sesión 16 (ver nota en el encabezado) y las migraciones 024-028 son las que causaron el fix del checklist #60 en el entorno local | ✅ Mergeado a `main` 2026-07-21 |
+| 60 | Sesión 16: (a) planificación de un módulo personal por trabajador (checklist propio con subtareas + Notas de formato libre tipo Notion con menú "/") — investigado el código existente, decidido con el usuario usar **BlockNote** para el editor de bloques en vez de construirlo a mano, y acordado el orden de fases (personal tasks primero, Notas después); documento `docs/Plan-Modulo-Personal.doc` generado, **nada implementado todavía**, solo planificación; (b) fix responsive real: en `/fondo-emprender/empresas` (`src/pages/FondoEmprenderEmpresasPage.jsx`), la barra de progreso fija de 96px + botones de editar/eliminar dejaban casi sin espacio al nombre de la empresa en mobile, truncándolo a una sola letra en un iPhone 15 (393px) — verificado con capturas de Cypress a `cy.viewport(393, 852)` (extensión de Chrome no disponible en esa sesión) recorriendo Dashboard/Tareas/Kanban/Calendario/Reportes/Equipo/Grupos/Carga de trabajo/Usuarios/Configuración/Fondo — solo esa lista estaba rota, el resto ya era responsive; fix: `hidden sm:block` en la barra + `gap`/`padding` reducidos en mobile, sin regresión verificada en desktop (1280px); (c) fix del entorno de desarrollo local: la base `taskflow` en Docker tenía las migraciones aplicadas solo hasta la 023, le faltaban la 024-028 (recién incorporadas a `main` vía PR #25, ver checklist #59) — todos los endpoints `/api/fondo/*` devolvían 500 (`relation "fondo_proceso_grupos" does not exist`); corridas las 5 migraciones pendientes (todas aditivas, sin riesgo para datos existentes) con `docker exec taskflow_backend_dev node migrations/run.js`, verificados los 4 endpoints principales de Fondo respondiendo 200; (d) auditoría de ramas: `rollback/d6b852d` tiene 1 commit sin pushear a ningún lado (sin upstream configurado, `f1cd74b`, mismo mensaje que `4dff776` en `rollback/f1a24ee` que sí está pusheado — parecen dos intentos del mismo fix, sin resolver cuál es el vigente); `arregloMacFondo`, `feat/ajustesResponsiveArregloBugs11/07` y `feat/tareasArregloYResponsive` quedaron completamente mergeadas a `main` (remoto ya borrado en GitHub), candidatas a `git branch -d` local, no borradas todavía. El commit/push/merge de todo el trabajo de esta sesión + el de la sesión 15 se hizo fuera de la conversación de Claude Code (el usuario, en otra terminal) — confirmado por el mensaje de commit `548699c` y el merge `e9c5222` (PR #26) | ✅ Implementado / mergeado 2026-07-21 |
