@@ -1,14 +1,14 @@
 # Estado del Proyecto — GestionTareasOficina / Gestcon
 
-**Última actualización:** 2026-07-21 (sesión 16 — fix responsive de la lista de Empresas en
-mobile; fix de migraciones pendientes en el entorno local; PR #25 y PR #26 mergeados a `main` —
-checklist #59-60)  
-**Rama activa:** `main` — **al día con `origin/main`** (`e9c5222`, merge de PR #26
-`feat/tareasArregloYResponsive` sobre PR #25 `feature/fondo-seguimiento-mensual`). Working tree
-**limpio**, nada pendiente de commitear. El commit/push/merge de la sesión 15 (rebrand Gestcon +
-fix `TaskContext.addTask`, checklist #57-58) y de esta sesión 16 (checklist #59-60) se hizo
-fuera de una sesión de Claude Code — no hubo que resolver conflictos, `git pull` fue
-fast-forward.  
+**Última actualización:** 2026-07-21 (sesión 17 — Módulo Personal completo: Fase 1 "Tareas
+pendientes" + Fase 2 "Notas" con BlockNote, checklist #61)  
+**Rama activa:** `feat/tareas-personales` (creada desde `main` en `79fc91f`, 0 commits de
+diferencia con `main` — son intercambiables, el working tree sin commitear viaja igual entre
+ambas). El usuario cambió el checkout activo a `main` y de vuelta a `feat/tareas-personales`
+más de una vez durante la sesión, por fuera de Claude Code; **no asumir cuál está activa sin
+correr `git branch --show-current`.** Working tree con 8 archivos nuevos + 7 modificados
+(módulo personal completo), **sin commitear todavía** — decisión del usuario, no hubo que
+resolver conflictos porque ambas ramas comparten el mismo commit base.  
 **Ojo si se retoma desde otra máquina:** `CLAUDE.md` (raíz) y toda la carpeta `.claude/`
 (incluida la memoria de sesión en `.claude/MEMORIA_SESION.md`) están en `.gitignore` — **no
 viajan con git push/pull/clone**. Si el trabajo continúa en otra máquina, ese Claude Code
@@ -17,11 +17,11 @@ no vía git.
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
 **Ramas activas en remoto:** `main` en `e9c5222` (verificar con `git fetch` antes de asumir
-vigencia). Ramas locales ya mergeadas a `main` (remoto borrado en GitHub tras el merge,
-candidatas a limpiar con `git branch -d`): `arregloMacFondo`,
-`feat/ajustesResponsiveArregloBugs11/07`, `feat/tareasArregloYResponsive`. **Pendiente sin
-resolver:** `rollback/d6b852d` tiene 1 commit que nunca se pusheó a ningún lado (sin upstream
-configurado) — ver checklist #60.  
+vigencia). `feat/tareas-personales` es **local, todavía no pusheada** (sin upstream) — no
+confundir con el resto de ramas locales ya mergeadas y con remoto borrado en GitHub, candidatas
+a limpiar con `git branch -d`: `arregloMacFondo`, `feat/ajustesResponsiveArregloBugs11/07`,
+`feat/tareasArregloYResponsive`. **Pendiente sin resolver:** `rollback/d6b852d` tiene 1 commit
+que nunca se pusheó a ningún lado (sin upstream configurado) — ver checklist #60.  
 **Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)  
 **Nombre del proyecto:** desde la sesión 15 (2026-07-20), branding unificado a **Gestcon** en
 todo el repo (antes convivían "TaskFlow Pro", "Gestor de Tareas" y "Gestión Contable" según el
@@ -42,7 +42,7 @@ commitear en `feat/tareasArregloYResponsive`.
 | Estilos | Tailwind CSS 3 (`darkMode: 'class'`) |
 | Estado | Context API + localStorage (fallback) |
 | Tiempo real | Socket.io-client ^4.8.3 |
-| UI extras | @dnd-kit (Kanban), Recharts 2, date-fns 3, jsPDF, xlsx |
+| UI extras | @dnd-kit (Kanban), Recharts 2, date-fns 3, jsPDF, xlsx, BlockNote (`@blocknote/core`+`react`+`ariakit`, editor de bloques de Notas, lazy-loaded) |
 | Backend | Node.js + Express 4 |
 | Base de datos | PostgreSQL 16 (pg + connection pooling) |
 | Auth | JWT (jsonwebtoken) + bcrypt + refresh tokens |
@@ -142,10 +142,14 @@ GestionTareasOficina/
 
 ### Frontend
 
-**Páginas disponibles (18):**
+**Páginas disponibles (20):**
 - `LoginPage`, `RegisterPage`, `ForgotPasswordPage`, `ResetPasswordPage`
 - `DashboardPage` — estadísticas, tareas recientes
 - `TasksPage` — lista de tareas con filtros
+- `PersonalTasksPage` — Mis Pendientes (`/pendientes`): checklist 100% personal con subtareas,
+  sin restricción de rol, filtrado por `user_id`
+- `PersonalNotesPage` — Mis Notas (`/notas`): editor de bloques tipo Notion con BlockNote,
+  cargada con `React.lazy` (no engorda el bundle principal), menú "/" en español
 - `KanbanPage` — tablero drag-and-drop (@dnd-kit)
 - `CalendarPage` — vista de calendario + templates proyectados + barras de rango de fechas
 - `GroupsPage` — gestión de grupos
@@ -276,6 +280,20 @@ GET    /api/stats
 GET    /api/stats/audit                    → solo admin/leader
 GET    /api/stats/workload                 → solo admin/leader; carga por persona (total + por
                                               grupo) y tareas creadas por mes (últimos 6 meses)
+
+GET    /api/personal-tasks                 → checklist personal — sin restricción de rol, cada
+POST   /api/personal-tasks                   quien ve/edita solo lo propio (filtrado por
+PUT    /api/personal-tasks/:id               user_id = req.user.userId en cada query)
+DELETE /api/personal-tasks/:id
+POST   /api/personal-tasks/:id/items
+PUT    /api/personal-tasks/:id/items/:itemId
+DELETE /api/personal-tasks/:id/items/:itemId
+
+GET    /api/personal-notes                 → listado liviano (sin `content`, solo título/fecha)
+GET    /api/personal-notes/:id             → detalle completo con `content` (JSONB, bloques)
+POST   /api/personal-notes
+PUT    /api/personal-notes/:id             → usado también para autoguardado con debounce
+DELETE /api/personal-notes/:id
 ```
 
 **Seguridad:**
@@ -338,6 +356,8 @@ la haría re-ejecutarse en el próximo deploy y duplicaría el `INSERT` de las 3
 | 026 | Columnas `enviado`/`enviado_at`/`confirmed_at` en `fondo_checklist_meses` — trackea el envío además de la confirmación; backfill de `confirmed_at` desde `updated_at` para filas ya confirmadas |
 | 027 | Columna `macroproceso_id` en `fondo_procesos` — vínculo estable (por id, no por nombre) entre un proceso y el macroproceso que deriva su estado; solo `nomina electronica` mapeado a `mp3` por ahora |
 | 028 | Columna `macroproceso_id` en `fondo_proceso_grupos` — mismo vínculo pero a nivel de grupo completo (ej. grupo NOMINA → `mp2`) |
+| 029 | Tablas `personal_tasks` + `personal_task_items` — checklist personal por usuario (Fase 1 del Módulo Personal), `ON DELETE CASCADE` desde `users` |
+| 030 | Tabla `personal_notes` (`content JSONB`, default `''` en `title` — no `'Sin título'` literal, eso es solo placeholder de UI) — Notas tipo Notion (Fase 2 del Módulo Personal) |
 
 **Tests:**
 - Cobertura actual: **~81% statements / ~74% functions** (umbral: 70%)
@@ -370,6 +390,13 @@ migrate:    Perfil "migrate" — corre run.js --seed y termina
 **PWA (iPhone):** `public/manifest.json` con `display: standalone`. Meta tags Apple en `index.html`. Instalar desde Safari → Compartir → "Agregar a pantalla de inicio". Push notifications se suscriben automáticamente al iniciar sesión si el usuario otorga permiso. VAPID keys en `backend/.env`.
 
 **Frontend build:** Se construye localmente con `--platform linux/amd64` si el servidor no tiene RAM suficiente para esbuild.
+
+**Memoria del build de Docker (`Dockerfile` raíz):** `NODE_OPTIONS="--max-old-space-size"` subido
+de 512 a **1024** en la sesión 17 — con 512 el build revienta con OOM desde que se sumó
+BlockNote/Tiptap/ProseMirror (Notas), aunque esa página esté lazy-loaded: Rollup igual necesita
+analizar/minificar todo en build time. Probado: 768 ya compila, se dejó margen en 1024. Si el
+servidor real no tiene esa RAM libre para el build, usar el fallback de siempre (compilar en Mac
+con `--platform linux/amd64` y llevar la imagen).
 
 ### Documentación y scripts
 
@@ -541,3 +568,4 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 58 | Rebrand completo del proyecto: "TaskFlow Pro" / "Gestor de Tareas" / "Gestión Contable" (nombres que convivían inconsistentemente) → **Gestcon** en todo el repo (~36 archivos): branding visible (`index.html`, `public/manifest.json`, Login/Register/Forgot/Reset Password, `SettingsPage` "Sobre la aplicación", títulos/pie de página de PDF en `ReportsPage`), infraestructura (`docker-compose.yml`/`docker-compose.dev.yml`: contenedores `taskflow_*` → `gestcon_*`, `POSTGRES_DB` default), `backend/package.json` → `gestcon-backend` (+ `package-lock.json` regenerado con `npm install --package-lock-only`), defaults de `DB_NAME`/`DB_TEST_NAME`/`FROM_EMAIL` en `.env.example`, `backend/.env.example`, `env.js`, `run.js`, CI (`.github/workflows/ci.yml`), scripts (`backup.sh`, `restore.sh`, `reset-db.sh`, `deploy-n8n.sh`) y toda la documentación. Excepciones intencionales: `backend/src/middleware/security.js` conserva los strings `taskflow-dev-secret-key-change-in-production-2026`/`taskflow-refresh-secret-different-key-2026` (lista negra de secretos JWT conocidos, no branding — cambiarlos rompería la protección); `Sidebar.jsx`/`UsersManager.jsx` conservan "Gestor de Tareas" como nombre del **módulo** de tareas (no el nombre de la app, igual que "Fondo Emprender"). El `DB_NAME` real de producción no se toca (solo el valor por defecto — el `.env` del servidor ya tiene `DB_NAME=taskflow` explícito, así que la BD productiva sigue funcionando igual sin coordinar un rename real de la base). Los contenedores sí cambian de nombre; un `docker compose up -d` normal los recrea sin perder datos (volumen `postgres_data` es independiente del nombre del contenedor). Encontrados y corregidos 2 errores del reemplazo automático durante la revisión: `docs/ARQUITECTURA.md` (nota de historia de nombres quedó contradictoria) y `docs/CAMBIOS_SESION_2026-06-10.md` (había renombrado por error los mismos secretos JWT que se dejaron intactos en `security.js`). Hallazgo aparte, no relacionado al rename: el contenedor `n8n` de producción (y `n8n-db-init`) no está definido en el `docker-compose.yml` de este repo — se armó aparte en el servidor — así que el nombre `gestcon_n8n` puesto en `docs/N8N_SETUP.md` es solo referencia documental, no renombra el contenedor real (nota de advertencia agregada ahí). Verificado: `npm run lint` y `npm run build` (frontend) limpios, `node -c` sobre los archivos backend tocados, `docker compose config` válido en ambos compose files | ✅ Implementado 2026-07-20 |
 | 59 | **PR #25** `feature/fondo-seguimiento-mensual` (mergeado a `main` como `b4ad3da`): agrupar columnas del Seguimiento Mensual en "grupos de proceso" reordenables por drag & drop (migración 024, tabla `fondo_proceso_grupos`, endpoints `/api/fondo/proceso-grupos`); vigencia por mes de cada proceso — un proceso puede existir solo en un rango de meses, ej. una prima que solo aplicó en junio (migración 025); vínculo estable proceso↔macroproceso y grupo↔macroproceso por id, no por nombre, para que renombrar desde "Editar estructura" no rompa el enlace en silencio (migraciones 027-028); envío del mes trackeado aparte de la confirmación (migración 026, `enviado`/`enviado_at`); permisos: solo admin puede editar la estructura (grupos/vigencia); fixes de UX: la columna "Sin grupo" ya no rompía la altura del header de la tabla, la barra de progreso ya contaba "N/A" como completado, se quitó la opción de editar/borrar una empresa desde la vista de Seguimiento Mensual (queda solo en "Empresas"), se bloqueó la navegación a meses futuros en Seguimiento Mensual y Empresas. Esta rama no se trabajó en una sesión de Claude Code — se documenta acá porque llegó a `main` en paralelo con el trabajo de la sesión 16 (ver nota en el encabezado) y las migraciones 024-028 son las que causaron el fix del checklist #60 en el entorno local | ✅ Mergeado a `main` 2026-07-21 |
 | 60 | Sesión 16: (a) planificación de un módulo personal por trabajador (checklist propio con subtareas + Notas de formato libre tipo Notion con menú "/") — investigado el código existente, decidido con el usuario usar **BlockNote** para el editor de bloques en vez de construirlo a mano, y acordado el orden de fases (personal tasks primero, Notas después); documento `docs/Plan-Modulo-Personal.doc` generado, **nada implementado todavía**, solo planificación; (b) fix responsive real: en `/fondo-emprender/empresas` (`src/pages/FondoEmprenderEmpresasPage.jsx`), la barra de progreso fija de 96px + botones de editar/eliminar dejaban casi sin espacio al nombre de la empresa en mobile, truncándolo a una sola letra en un iPhone 15 (393px) — verificado con capturas de Cypress a `cy.viewport(393, 852)` (extensión de Chrome no disponible en esa sesión) recorriendo Dashboard/Tareas/Kanban/Calendario/Reportes/Equipo/Grupos/Carga de trabajo/Usuarios/Configuración/Fondo — solo esa lista estaba rota, el resto ya era responsive; fix: `hidden sm:block` en la barra + `gap`/`padding` reducidos en mobile, sin regresión verificada en desktop (1280px); (c) fix del entorno de desarrollo local: la base `taskflow` en Docker tenía las migraciones aplicadas solo hasta la 023, le faltaban la 024-028 (recién incorporadas a `main` vía PR #25, ver checklist #59) — todos los endpoints `/api/fondo/*` devolvían 500 (`relation "fondo_proceso_grupos" does not exist`); corridas las 5 migraciones pendientes (todas aditivas, sin riesgo para datos existentes) con `docker exec taskflow_backend_dev node migrations/run.js`, verificados los 4 endpoints principales de Fondo respondiendo 200; (d) auditoría de ramas: `rollback/d6b852d` tiene 1 commit sin pushear a ningún lado (sin upstream configurado, `f1cd74b`, mismo mensaje que `4dff776` en `rollback/f1a24ee` que sí está pusheado — parecen dos intentos del mismo fix, sin resolver cuál es el vigente); `arregloMacFondo`, `feat/ajustesResponsiveArregloBugs11/07` y `feat/tareasArregloYResponsive` quedaron completamente mergeadas a `main` (remoto ya borrado en GitHub), candidatas a `git branch -d` local, no borradas todavía. El commit/push/merge de todo el trabajo de esta sesión + el de la sesión 15 se hizo fuera de la conversación de Claude Code (el usuario, en otra terminal) — confirmado por el mensaje de commit `548699c` y el merge `e9c5222` (PR #26) | ✅ Implementado / mergeado 2026-07-21 |
+| 61 | **Módulo Personal completo** (rama `feat/tareas-personales`, sin commitear), Fase 1 + Fase 2 del plan de la sesión 16: **Fase 1 — Tareas pendientes** (migración 029 `personal_tasks`/`personal_task_items`, `personalTaskController.js`/`routes/personalTasks.js` en `/api/personal-tasks` sin restricción de rol, `PersonalTasksPage.jsx` en `/pendientes` reutilizando el patrón visual de `SubtaskList`). **Fase 2 — Notas tipo Notion** (migración 030 `personal_notes` con `content JSONB`, `personalNoteController.js`/`routes/personalNotes.js` en `/api/personal-notes` con listado liviano sin `content` + detalle completo aparte, `PersonalNotesPage.jsx` en `/notas` con editor de bloques **BlockNote** — se eligió `@blocknote/ariakit` en vez del Mantine por defecto para no meter un framework de UI ajeno al proyecto Tailwind-only, y en vez de `@blocknote/shadcn` porque exige Tailwind v4 y el proyecto está en v3; cargada con `React.lazy` para que sus ~273KB gzip no engorden el bundle principal; menú "/" en español vía `dictionary` con el diccionario `es` importado del subpath `@blocknote/core/locales`; autoguardado con debounce 800ms + indicador "Guardando…/Guardado"; popup propio (`ConfirmDeleteModal`, mismo patrón que `DeleteRequestModal.jsx`) en vez del `window.confirm()` nativo del navegador, a pedido explícito del usuario). Ambas fases con aislamiento por `user_id` verificado (un usuario no puede ver ni tocar los pendientes/notas de otro, ni adivinando IDs → 404). Bugs reales encontrados y corregidos durante la verificación en navegador (no del test, del código): título de nota nuevo se guardaba como el string literal `"Sin título"` en vez de `''`; el autoguardado con debounce compartía un solo timer entre título y contenido y el último en dispararse pisaba el payload del otro (fix: acumular cambios pendientes en un objeto y mandarlos juntos); el input de título estaba controlado por un round-trip hijo→padre→hijo en cada tecla y con tipeo rápido se comían caracteres (fix: estado local en el editor). **Bug de deploy encontrado y corregido:** el `Dockerfile` del frontend tiene `NODE_OPTIONS="--max-old-space-size=512"` (límite puesto por un SIGSEGV de esbuild documentado en el servidor real) — con BlockNote sumado el build de producción revienta con OOM aunque la página esté lazy-loaded (Rollup igual analiza/minifica todo en build time); confirmado reproduciendo el build real (`docker build`), subido a 1024MB (mínimo que compila: 768MB, se dejó margen). Verificación de deploy completa: imágenes Docker de producción reales reconstruidas (no solo dev), las 30 migraciones corridas desde cero en un Postgres aislado, backend en `NODE_ENV=production` contra esa base con `/api/health`+login+los 4 endpoints nuevos+`/api/fondo/empresas`+`/api/tasks` respondiendo 200. Hallazgo aparte (preexistente, no de esta sesión): los tests de integración del backend venían saltándose silenciosamente en el host por `node_modules` desactualizado (faltaba `nodemailer`) — sincronizado y creada la base `taskflow_test` con las 30 migraciones, ahora los 219 tests corren de verdad contra Postgres real. Todo el entorno de prueba (contenedores/red/imágenes Docker temporales) limpiado al terminar, sin tocar el stack de desarrollo | ✅ Implementado 2026-07-21, sin commitear |

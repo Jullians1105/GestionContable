@@ -9,6 +9,8 @@ import logoBlanco from '../assets/logo-icono-blanco.png'
 const navItems = [
   { to: '/', label: 'Dashboard', icon: 'dashboard', end: true },
   { to: '/tasks', label: 'Mis Tareas', icon: 'task_alt' },
+  { to: '/pendientes', label: 'Mis Pendientes', icon: 'checklist' },
+  { to: '/notas', label: 'Mis Notas', icon: 'edit_note' },
   { to: '/kanban', label: 'Kanban', icon: 'view_kanban' },
   { to: '/calendar', label: 'Calendario', icon: 'calendar_month' },
   { to: '/tasks/recurrentes', label: 'Recurrentes', icon: 'repeat', leaderOnly: true },

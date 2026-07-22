@@ -19,6 +19,9 @@
     "stop": "node -e \"process.platform === 'win32' ? require('child_process').execSync('taskkill /F /IM node.exe') : require('child_process').execSync('pkill -f node');\""
   },
   "dependencies": {
+    "@blocknote/ariakit": "^0.52.1",
+    "@blocknote/core": "^0.52.1",
+    "@blocknote/react": "^0.52.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

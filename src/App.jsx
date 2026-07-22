@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { usePullToRefresh } from './hooks/usePullToRefresh'
 import { TaskProvider } from './context/TaskContext'
@@ -15,6 +15,10 @@ import Header from './components/Header'
 import Toast from './components/Toast'
 import DashboardPage from './pages/DashboardPage'
 import TasksPage from './pages/TasksPage'
+import PersonalTasksPage from './pages/PersonalTasksPage'
+// BlockNote (Tiptap/ProseMirror) agrega ~230KB gzip al bundle — separado en su
+// propio chunk para que solo se descargue al entrar a /notas, no en cada carga.
+const PersonalNotesPage = lazy(() => import('./pages/PersonalNotesPage'))
 import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
@@ -75,6 +79,19 @@ function Layout() {
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/pendientes" element={<PersonalTasksPage />} />
+            <Route
+              path="/notas"
+              element={
+                <Suspense fallback={
+                  <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
+                    <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                  </div>
+                }>
+                  <PersonalNotesPage />
+                </Suspense>
+              }
+            />
             <Route path="/team" element={<TeamPage />} />
             <Route path="/groups" element={<GroupsPage />} />
             <Route path="/kanban" element={<KanbanPage />} />

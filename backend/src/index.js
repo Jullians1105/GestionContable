@@ -19,6 +19,8 @@ validateProductionEnv();
 
 const authRoutes = require('./routes/auth');
 const taskRoutes = require('./routes/tasks');
+const personalTaskRoutes = require('./routes/personalTasks');
+const personalNoteRoutes = require('./routes/personalNotes');
 const employeeRoutes = require('./routes/employees');
 const groupRoutes = require('./routes/groups');
 const tagRoutes = require('./routes/tags');
@@ -135,6 +137,8 @@ app.get('/api/health', (_req, res) => res.json({ status: 'OK', timestamp: new Da
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/personal-tasks', personalTaskRoutes);
+app.use('/api/personal-notes', personalNoteRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/tags', tagRoutes);
