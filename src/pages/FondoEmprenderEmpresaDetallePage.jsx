@@ -430,6 +430,11 @@ export default function FondoEmprenderEmpresaDetallePage() {
                       ir al checklist
                     </Link>
                   </p>
+                  {proc.confirmed && (
+                    <p className="mt-1.5 pt-1.5 font-semibold" style={{ borderTop: '1px solid rgba(0,0,0,0.08)', color: proc.enviado ? '#004ac6' : '#16a34a' }}>
+                      {proc.enviado ? 'Enviada' : 'Lista para enviar'}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <EstadoButtonGroup

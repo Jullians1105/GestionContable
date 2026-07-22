@@ -180,7 +180,7 @@ const getEmpresas = async (req, res, next) => {
               ) = 'rechazado' THEN 1 ELSE 0 END
               AS macros_in_progress,
               COALESCE((
-                SELECT m.confirmed FROM fondo_checklist_meses m
+                SELECT m.confirmed_contabilidad FROM fondo_checklist_meses m
                 WHERE m.empresa_id = e.id
                   AND m.anio = $1
                   AND m.mes  = $2

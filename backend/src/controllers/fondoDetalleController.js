@@ -90,7 +90,7 @@ const getDetalle = async (req, res, next) => {
     const anio = parseInt(req.query.anio, 10);
     const mes  = parseInt(req.query.mes, 10);
 
-    const [mpResult, mp5Result, impuestosResult, pagoResult, nominaElecResult, nominaGrupoResult, contabilidadGrupoResult] = await Promise.all([
+    const [mpResult, checklistMesResult, impuestosResult, pagoResult, nominaElecResult, nominaGrupoResult, contabilidadGrupoResult] = await Promise.all([
       db.query(
         `SELECT mp.id, mp.nombre, d.estado, d.responsable_id, d.nota, d.updated_at,
                 (
@@ -125,7 +125,8 @@ const getDetalle = async (req, res, next) => {
         [empresaId, anio, mes]
       ),
       db.query(
-        `SELECT confirmed, enviado FROM fondo_checklist_meses
+        `SELECT confirmed_nomina, enviado_nomina, confirmed_contabilidad, enviado_contabilidad
+         FROM fondo_checklist_meses
          WHERE empresa_id = $1 AND anio = $2 AND mes = $3
          LIMIT 1`,
         [empresaId, anio, mes]
@@ -182,8 +183,11 @@ const getDetalle = async (req, res, next) => {
       ),
     ]);
 
-    const mp5Confirmed = mp5Result.rows.length > 0 ? mp5Result.rows[0].confirmed : false;
-    const mp5Enviado   = mp5Result.rows.length > 0 ? mp5Result.rows[0].enviado   : false;
+    const checklistMes = checklistMesResult.rows[0];
+    const mp2Confirmed = checklistMes?.confirmed_nomina ?? false;
+    const mp2Enviado   = checklistMes?.enviado_nomina   ?? false;
+    const mp5Confirmed = checklistMes?.confirmed_contabilidad ?? false;
+    const mp5Enviado   = checklistMes?.enviado_contabilidad   ?? false;
 
     const macroprocesos = mpResult.rows.map(normalizeDetalle);
 
@@ -215,6 +219,10 @@ const getDetalle = async (req, res, next) => {
         ...macroprocesos[mp2Index],
         estado: deriveGrupoEstado(nominaGrupoResult.rows.map(r => r.estado)),
         checklistItems: nominaGrupoResult.rows.map(r => ({ id: r.id, nombre: r.name, estado: r.estado })),
+        // Igual que mp5/Contabilidad: "confirmed"/"enviado" son el paso manual
+        // de Seguimiento Mensual, independiente del estado derivado de arriba.
+        confirmed: mp2Confirmed,
+        enviado:   mp2Enviado,
         readonly: true,
       };
     }
