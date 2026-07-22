@@ -323,7 +323,10 @@ export default function FondoEmprenderEmpresaDetallePage() {
           const isPagos              = proc.id === 4
           const isNominaElectronica  = proc.id === 3
           const isNomina             = proc.id === 2
-          const cfgStatus = (isContabilidad || isImpuestos || isPagos || isNominaElectronica || isNomina)
+          const isProduccionVentas   = proc.id === 7
+          const produccionResponsable = MACRO_RESPONSABLES[7]?.find(r => r.note === 'Producción')
+          const ventasResponsable     = MACRO_RESPONSABLES[7]?.find(r => r.note === 'Ventas')
+          const cfgStatus = (isContabilidad || isImpuestos || isPagos || isNominaElectronica || isNomina || isProduccionVentas)
             ? (AUTO_STATUS[proc.estado] ?? AUTO_STATUS.pending)
             : (MACRO_STATUS[proc.estado] ?? MACRO_STATUS.pending)
 
@@ -345,7 +348,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     {proc.nombre}
                   </h3>
                 </div>
-                {(isContabilidad || isImpuestos || isPagos || isNominaElectronica || isNomina) && (
+                {(isContabilidad || isImpuestos || isPagos || isNominaElectronica || isNomina || isProduccionVentas) && (
                   <span className="text-[9px] font-bold uppercase tracking-wide text-[#8890b5] bg-[#f3f4f6] dark:bg-[#252840] px-1.5 py-0.5 rounded flex-shrink-0">
                     Auto
                   </span>
@@ -435,6 +438,44 @@ export default function FondoEmprenderEmpresaDetallePage() {
                       {proc.enviado ? 'Enviada' : 'Lista para enviar'}
                     </p>
                   )}
+                </div>
+              ) : isProduccionVentas ? (
+                <div className="flex flex-col gap-2">
+                  {[
+                    { key: 'produccion', label: 'Informe de producción', data: proc.produccion, responsable: produccionResponsable },
+                    { key: 'ventas',     label: 'Informe de Ventas',     data: proc.ventas,     responsable: ventasResponsable },
+                  ].map(({ key, label, data, responsable }) => {
+                    const itemCfg = AUTO_STATUS[data?.estado ?? 'pending'] ?? AUTO_STATUS.pending
+                    return (
+                      <div key={key} className="rounded-lg p-2.5" style={{ background: itemCfg.bg }}>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold" style={{ color: itemCfg.color }}>{label}</p>
+                          <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: itemCfg.color }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{itemCfg.icon}</span>
+                            {itemCfg.label}
+                          </span>
+                        </div>
+                        {responsable && (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0 ${getAvatarColor(responsable.name)}`}>
+                              {getInitials(responsable.name)}
+                            </span>
+                            <span className="text-[10px] text-[#8890b5]">{responsable.name.split(' ')[0]}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <p className="text-[#9ca3af]" style={{ fontSize: 10 }}>
+                    Estado calculado desde el checklist mensual ·{' '}
+                    <Link
+                      to="/fondo-emprender"
+                      className="underline underline-offset-2 font-medium"
+                      style={{ color: '#004ac6' }}
+                    >
+                      ir al checklist
+                    </Link>
+                  </p>
                 </div>
               ) : (
                 <EstadoButtonGroup
@@ -545,8 +586,9 @@ export default function FondoEmprenderEmpresaDetallePage() {
                 </div>
               )}
 
-              {/* Responsables */}
-              <ResponsableBadges macroId={proc.id} />
+              {/* Responsables — para mp7 ya se muestran adentro de cada
+                  sub-sección (Producción/Ventas), no hace falta repetir acá */}
+              {!isProduccionVentas && <ResponsableBadges macroId={proc.id} />}
 
               {/* Tareas vinculadas desde el Gestor de Tareas */}
               {proc.tareasVinculadas?.length > 0 && (

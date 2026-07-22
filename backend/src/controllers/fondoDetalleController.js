@@ -90,7 +90,7 @@ const getDetalle = async (req, res, next) => {
     const anio = parseInt(req.query.anio, 10);
     const mes  = parseInt(req.query.mes, 10);
 
-    const [mpResult, checklistMesResult, impuestosResult, pagoResult, nominaElecResult, nominaGrupoResult, contabilidadGrupoResult] = await Promise.all([
+    const [mpResult, checklistMesResult, impuestosResult, pagoResult, nominaElecResult, nominaGrupoResult, contabilidadGrupoResult, produccionResult, ventasResult] = await Promise.all([
       db.query(
         `SELECT mp.id, mp.nombre, d.estado, d.responsable_id, d.nota, d.updated_at,
                 (
@@ -181,6 +181,28 @@ const getDetalle = async (req, res, next) => {
          WHERE p.activo = true`,
         [empresaId, anio, mes]
       ),
+      db.query(
+        `SELECT COALESCE(i.estado, 'pending') AS estado
+         FROM fondo_procesos p
+         LEFT JOIN fondo_checklist_meses m
+                ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
+         LEFT JOIN fondo_checklist_items i
+                ON i.mes_id = m.id AND i.proceso_id = p.id
+         WHERE p.macroproceso_id = 'mp7p'
+         LIMIT 1`,
+        [empresaId, anio, mes]
+      ),
+      db.query(
+        `SELECT COALESCE(i.estado, 'pending') AS estado
+         FROM fondo_procesos p
+         LEFT JOIN fondo_checklist_meses m
+                ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
+         LEFT JOIN fondo_checklist_items i
+                ON i.mes_id = m.id AND i.proceso_id = p.id
+         WHERE p.macroproceso_id = 'mp7v'
+         LIMIT 1`,
+        [empresaId, anio, mes]
+      ),
     ]);
 
     const checklistMes = checklistMesResult.rows[0];
@@ -250,6 +272,27 @@ const getDetalle = async (req, res, next) => {
       macroprocesos[mp6Index] = {
         ...macroprocesos[mp6Index],
         estado: deriveImpuestosEstado(impuestosResult.rows),
+        readonly: true,
+      };
+    }
+
+    // mp7 (Producción y ventas): se separa en dos mitades derivadas de
+    // Seguimiento Mensual, mismo patrón que mp3 (proceso individual, no
+    // grupo entero): "Informe de producción" e "Informe de Ventas". El
+    // estado combinado de la tarjeta usa el mismo criterio que un grupo de
+    // dos procesos (deriveGrupoEstado). El responsable de cada mitad sigue
+    // siendo el texto fijo del frontend (MACRO_RESPONSABLES), no se
+    // convirtió en un dato editable real — decisión explícita para no
+    // ampliar el alcance de este cambio.
+    const produccionEstado = produccionResult.rows.length > 0 ? produccionResult.rows[0].estado : 'pending';
+    const ventasEstado     = ventasResult.rows.length > 0     ? ventasResult.rows[0].estado     : 'pending';
+    const mp7Index = macroprocesos.findIndex(m => m.id === 7);
+    if (mp7Index !== -1) {
+      macroprocesos[mp7Index] = {
+        ...macroprocesos[mp7Index],
+        estado: deriveGrupoEstado([produccionEstado, ventasEstado]),
+        produccion: { estado: deriveNominaElectronicaEstado(produccionEstado), checklistEstado: produccionEstado },
+        ventas:     { estado: deriveNominaElectronicaEstado(ventasEstado),     checklistEstado: ventasEstado },
         readonly: true,
       };
     }
