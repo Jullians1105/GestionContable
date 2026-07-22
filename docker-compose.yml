@@ -57,6 +57,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # El build de Vite (esbuild) se cae con SIGSEGV usando el /dev/shm por
+      # defecto de Docker (64MB) — probado y confirmado en el servidor de
+      # producción: con 1g el mismo build que fallaba compila limpio. No es
+      # un tema de RAM total del host ni de paralelismo, es específicamente
+      # el tamaño de /dev/shm disponible durante el build.
+      shm_size: '1gb'
     container_name: gestcon_frontend
     restart: unless-stopped
     depends_on:
