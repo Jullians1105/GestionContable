@@ -164,6 +164,38 @@ y espera a que termine OK antes de levantar `backend`. `migrations/run.js` es id
 (tabla `schema_migrations` trackea qué archivos ya se aplicaron), así que correrlo en cada
 deploy —incluso sin migraciones nuevas— no tiene efecto ni riesgo, simplemente no hace nada.
 
+### Atajo: alias `deploy`
+
+En el servidor de producción existe un alias `deploy` en `~/.bashrc` (**no versionado en el
+repo** — si el servidor se reinstala hay que volver a crearlo, ver comando abajo) que hace
+exactamente los pasos de esta sección en un solo comando:
+
+```bash
+alias deploy='cd ~/GestionTareasOficina && ./scripts/backup.sh && git pull && docker compose build && docker compose up -d'
+```
+
+Escribir `deploy` en una terminal del servidor: hace backup, trae `main`, reconstruye todas las
+imágenes y levanta todo (lo que dispara `migrate` automáticamente, igual que el paso a paso
+manual).
+
+**Por qué el backup va primero, siempre:** si algo del deploy sale mal (migración que falla,
+imagen que no levanta), el backup ya está hecho *antes* de tocar nada — no depende de acordarse
+de correrlo aparte.
+
+**Historial — versión anterior de este alias (ya corregida):** hasta el 2026-07-21 el alias era
+`git pull && docker compose up -d --build backend && docker compose up -d --build frontend`, sin
+backup y limitando el `--build`/`up` a `backend` y `frontend` únicamente. Eso dejaba un hueco
+real: `migrate` es un contenedor "one-off" (`restart: "no"`) que Compose solo vuelve a correr si
+su condición `service_completed_successfully` no está ya satisfecha por un contenedor previo. Si
+`migrate` ya había corrido y salido con código 0 en un deploy anterior, un `deploy` posterior que
+solo apuntaba a `backend`/`frontend` **no volvía a ejecutar `migrate`** — y encima, como tampoco
+reconstruía la imagen de `migrate` (mismo Dockerfile/contexto que `backend`, pero el `--build` no
+la incluía), si por algún motivo sí llegaba a correr lo hacía con migraciones viejas. Esto es lo
+que obligaba a correr las migraciones a mano antes de cada deploy con cambios de esquema. La
+versión actual del alias evita el problema por completo: `docker compose build` reconstruye
+también la imagen de `migrate`, y `docker compose up -d` (sin restringir a servicios puntuales)
+sí re-evalúa y corre `migrate` como corresponde.
+
 ---
 
 ## 7. Backup automático (cron)
@@ -184,6 +216,13 @@ Añadir esta línea al crontab:
 ```
 
 Los backups se guardan comprimidos en `backups/backup_YYYYMMDD_HHMMSS.tar.gz`. La rotación automática (mantener últimos 7 días) está integrada en el script, no requiere cron adicional.
+
+**Cron real configurado en el servidor de producción actual** (`crontab -l` como
+`gestionc-server`, distinto del ejemplo genérico de arriba):
+```cron
+0 18 * * * cd /home/gestionc-server/GestionTareasOficina && ./scripts/backup.sh >> /var/log/backup-gestion.log 2>&1
+```
+Corre todos los días a las 6:00 PM, log en `/var/log/backup-gestion.log` (no dentro del repo).
 
 ---
 
@@ -211,10 +250,26 @@ sudo systemctl status docker
 
 ## 10. Configuración manual del servidor — gestion-start / gestion-stop
 
-Los scripts `scripts/gestion-start.sh` y `scripts/gestion-stop.sh` (ver sección 5 para el resto
-de comandos del día a día) dependen de tres cambios hechos directamente en el sistema operativo
-del servidor — **no están versionados en el repo**. Si el servidor se reinstala o migra a otro
-equipo, hay que rehacerlos.
+### Qué hace cada script
+
+**`gestion-start.sh`**: corre `docker compose up -d`, después sondea cada 5s (hasta 60s máximo)
+el estado de `docker compose ps --format json` esperando que `backend` y `postgres` (los únicos
+servicios con healthcheck propio — `frontend` y `mailhog` no tienen) queden `healthy`. Al final
+muestra `docker compose ps` completo. Si algún servicio no llegó a `healthy` en los 60s, lista
+cuáles y termina con código de error (sugiere revisar `docker compose logs <servicio>`).
+
+**`gestion-stop.sh`**: muestra una advertencia (apaga el servidor para toda la oficina y para
+quienes entran remoto por `gestcon.work`), pide escribir exactamente `si` para confirmar (se
+puede saltar con `-y`/`--yes`), corre `docker compose down` y termina con `sudo shutdown -h now`.
+Uso diario real: `gestion-start` al llegar, `gestion-stop` al terminar el día.
+
+Ambos resuelven su propia ruta con `readlink -f "$0"` para funcionar igual invocados por el path
+completo o por el symlink en `/usr/local/bin`.
+
+### Instalación
+
+Dependen de tres cambios hechos directamente en el sistema operativo del servidor — **no están
+versionados en el repo**. Si el servidor se reinstala o migra a otro equipo, hay que rehacerlos.
 
 **1. Sudo sin contraseña, solo para shutdown**
 
