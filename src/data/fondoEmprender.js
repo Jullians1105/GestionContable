@@ -148,7 +148,9 @@ export async function migrateLegacyLocalStorage(api, empresas, procesos) {
 
       if (company.confirmed) {
         try {
-          await api.updateFondoChecklistConfirmado(empresaId, year, mes, { confirmed: true })
+          // El localStorage legacy solo conocía un flag — el que siempre fue
+          // "Confirmar Contabilidad" — así que la recuperación mapea ahí.
+          await api.updateFondoChecklistConfirmado(empresaId, year, mes, 'contabilidad', { confirmed: true })
         } catch (err) {
           console.warn('[migración fondo emprender] no se pudo migrar confirmación', company.name, err)
         }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   DndContext,
@@ -7,6 +7,7 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  getFirstCollision,
   useDroppable,
 } from '@dnd-kit/core'
 import { SortableContext, useSortable, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
@@ -39,6 +40,26 @@ const BORDER     = '1px solid #e2e4ef' // separador horizontal (entre filas), su
 const BORDER_COL = '1px solid #d5d9ea' // separador vertical entre columnas — un poco más visible que el horizontal
 
 const COL_WIDTH = 48
+
+// Nómina y Contabilidad tienen cada una su propia columna de confirmar/enviar
+// (antes era una sola, compartida). Angosta y con texto rotado, igual que
+// las columnas de proceso, para no sumar ancho horizontal innecesario.
+const CONFIRM_COL_WIDTH = 64
+
+// company.confirmedNomina / .enviadoNomina / .confirmedContabilidad /
+// .enviadoContabilidad — mapa para no repetir el nombre de campo en cada
+// función que necesita leer/escribir "el par que le toca a este tipo".
+const TIPO_FIELD = {
+  nomina:       { confirmed: 'confirmedNomina',       enviado: 'enviadoNomina' },
+  contabilidad: { confirmed: 'confirmedContabilidad', enviado: 'enviadoContabilidad' },
+}
+
+// Fecha corta ("22 jul") para la insignia de confirmado/enviado — a este
+// ancho de columna una fecha ISO completa no entra cómodo.
+function formatBadgeDate(isoDate) {
+  const d = new Date(isoDate + 'T00:00:00')
+  return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3).toLowerCase()}`
+}
 
 // Convierte un string de borde ("1px solid #hex") en un segmento de
 // box-shadow inset para ese lado. Los headers viven dentro de un <thead>
@@ -75,6 +96,12 @@ const GROUP_ROW_HEIGHT = 34
 // medida justa para que también entre ahí).
 const HEADER_HEIGHT = 155
 
+// Franja fija arriba de cada columna para el ícono de filtro de estado
+// (estilo Excel). Se suma aparte de HEADER_HEIGHT en vez de restarle
+// espacio al nombre — así "Egreso Seguridad Social" sigue entrando
+// completo, igual que antes de que existiera el filtro.
+const FILTER_STRIP_HEIGHT = 16
+
 // Paleta por grupo — se cicla por índice (grupo 0, 1, 2…). Reusa exactamente
 // los mismos tonos que ya usa el resto de la app para distinguir categorías
 // (la insignia Contable/Tributario de FondoEmprenderEmpresasPage: fondo casi
@@ -83,10 +110,21 @@ const HEADER_HEIGHT = 155
 // encima. `accent` es el color plano para bordes (no hay forma de expresar
 // eso como clase de Tailwind).
 // Clases completas (no interpoladas) para que Tailwind las detecte al escanear el archivo.
+// confirmBg/confirmText son la paleta INVERTIDA (fondo sólido del color que
+// normalmente es el texto, texto del color que normalmente es el fondo) —
+// las usa la columna "Confirmar ..." para leerse como una franja de color
+// propia del grupo, no como una celda más con fondo clarito.
+// bgHex es el mismo tono claro de `bg` pero como hex plano — hace falta para
+// los estilos inline de la celda body de "Confirmar ..." (ver renderConfirmCell),
+// que ya usa colores hardcodeados sin variante dark, igual que el resto de
+// esa función.
 const GROUP_PALETTE = [
-  { bg: 'bg-[#f0f4ff] dark:bg-[#182544]', text: 'text-[#004ac6] dark:text-[#7ba8f0]', accent: '#004ac6' },
-  { bg: 'bg-[#f0fdf4] dark:bg-[#0d2e1a]', text: 'text-[#16a34a] dark:text-[#4ade80]', accent: '#16a34a' },
-  { bg: 'bg-[#fffbeb] dark:bg-[#2e2410]', text: 'text-[#d97706] dark:text-[#fbbf24]', accent: '#d97706' },
+  { bg: 'bg-[#f0f4ff] dark:bg-[#182544]', text: 'text-[#004ac6] dark:text-[#7ba8f0]', accent: '#004ac6', bgHex: '#f0f4ff',
+    confirmBg: 'bg-[#004ac6] dark:bg-[#7ba8f0]', confirmText: 'text-[#f0f4ff] dark:text-[#182544]' },
+  { bg: 'bg-[#f0fdf4] dark:bg-[#0d2e1a]', text: 'text-[#16a34a] dark:text-[#4ade80]', accent: '#16a34a', bgHex: '#f0fdf4',
+    confirmBg: 'bg-[#16a34a] dark:bg-[#4ade80]', confirmText: 'text-[#f0fdf4] dark:text-[#0d2e1a]' },
+  { bg: 'bg-[#fffbeb] dark:bg-[#2e2410]', text: 'text-[#d97706] dark:text-[#fbbf24]', accent: '#d97706', bgHex: '#fffbeb',
+    confirmBg: 'bg-[#d97706] dark:bg-[#fbbf24]', confirmText: 'text-[#fffbeb] dark:text-[#2e2410]' },
 ]
 
 const emptyCell = { status: 'pending', note: '' }
@@ -112,7 +150,7 @@ function addMonths(year, month, n) {
 // Extraídos porque cada uno necesita su propio hook de dnd-kit
 // (useSortable/useDroppable no se pueden llamar dentro de un .map inline).
 
-function SortableProcessHeader({ proc, rowSpan, editable, groupColor, hasTopBorder = true, startEditProcess, setDeleteConfirm }) {
+function SortableProcessHeader({ proc, rowSpan, editable, groupColor, hasTopBorder = true, startEditProcess, setDeleteConfirm, onFilterClick, hasFilter }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: proc.id, disabled: !editable })
   // Mismo fondo y texto gris neutro de siempre, agrupada o no — el color del
   // grupo ya se ve arriba, en su franja. Acá solo se hereda un filo de color
@@ -142,20 +180,35 @@ function SortableProcessHeader({ proc, rowSpan, editable, groupColor, hasTopBord
       }}
     >
       {!editable ? (
-        // Vista normal — solo el nombre, sin ningún control. Nada de hover,
-        // nada que arrastrar: eso queda reservado al modo "Editar estructura".
-        <div
-          className={`text-[11px] font-semibold flex items-center ${textClass}`}
-          style={{
-            height: HEADER_HEIGHT,
-            writingMode: 'vertical-lr',
-            transform: 'rotate(180deg)',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            padding: '8px 12px',
-          }}
-        >
-          {proc.name}
+        // Vista normal — nombre + ícono de filtro de estado. Nada de hover
+        // ni de arrastre acá: eso queda reservado al modo "Editar estructura".
+        <div className="flex flex-col" style={{ height: HEADER_HEIGHT + FILTER_STRIP_HEIGHT }}>
+          <div className="flex items-center justify-center flex-shrink-0" style={{ height: FILTER_STRIP_HEIGHT }}>
+            <button
+              onClick={(e) => onFilterClick(proc.id, e)}
+              className={`flex items-center justify-center rounded transition-colors ${
+                hasFilter
+                  ? 'text-[#004ac6] dark:text-[#7ba8f0] bg-[#e8eefc] dark:bg-[#1a2444]'
+                  : 'text-[#b0b4c8] dark:text-[#4b5170] hover:text-[#6b7280] dark:hover:text-[#8890b5] hover:bg-[#edeef0] dark:hover:bg-[#252840]'
+              }`}
+              style={{ width: 20, height: 14 }}
+              title={hasFilter ? `Filtro activo — ${proc.name}` : `Filtrar "${proc.name}" por estado`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 12 }}>filter_alt</span>
+            </button>
+          </div>
+          <div
+            className={`text-[11px] font-semibold flex items-center flex-1 min-h-0 ${textClass}`}
+            style={{
+              writingMode: 'vertical-lr',
+              transform: 'rotate(180deg)',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              padding: '8px 12px',
+            }}
+          >
+            {proc.name}
+          </div>
         </div>
       ) : (
         // Modo edición — franjas fijas arriba (arrastrar) y abajo (acciones),
@@ -203,6 +256,59 @@ function SortableProcessHeader({ proc, rowSpan, editable, groupColor, hasTopBord
           </div>
         </div>
       )}
+    </th>
+  )
+}
+
+// Cabecera de la columna "Confirmar Nómina" / "Confirmar Contabilidad" — va
+// pegada justo después de su grupo, rowSpan 2 (igual que "Empresa" o un
+// proceso suelto) para cubrir las dos filas del header con una sola celda.
+// Texto rotado, como los procesos normales: es lo que la mantiene angosta.
+// Paleta INVERTIDA respecto al grupo (confirmBg/confirmText): el fondo de
+// esta celda es el color que en el grupo es texto, y el texto es el color
+// que en el grupo es fondo — así se lee como una franja de color propia del
+// grupo, no como una columna más con fondo clarito.
+//
+// El texto se centra con position:absolute + translate(-50%,-50%) en vez de
+// flex — con writing-mode:vertical-lr + rotate(180deg) en el mismo elemento
+// que controla justify-content/align-items, la lectura de qué eje es cuál
+// se presta a confusión entre navegadores; centrar por posición absoluta
+// respecto al centro real del <th> no depende de esa lectura, siempre cae
+// en el medio. Solo dice "Confirmar" (no el nombre del grupo): "Confirmar
+// Contabilidad" son 22 caracteres y no entran rotados a un tamaño de letra
+// legible sin desbordar — el nombre del grupo ya se ve al lado en su propia
+// columna, así que no hace falta repetirlo acá. El nombre completo queda
+// como tooltip (fullLabel).
+function ConfirmHeaderCell({ label, fullLabel, groupColor }) {
+  return (
+    <th
+      rowSpan={2}
+      title={fullLabel}
+      className={groupColor.confirmBg}
+      style={{
+        width: CONFIRM_COL_WIDTH, minWidth: CONFIRM_COL_WIDTH, padding: 0,
+        position: 'relative',
+      }}
+    >
+      <div
+        className={`absolute font-bold whitespace-nowrap ${groupColor.confirmText}`}
+        style={{
+          top: '50%', left: '50%', fontSize: 14,
+          transform: 'translate(-50%, -50%) rotate(180deg)',
+          writingMode: 'vertical-lr',
+        }}
+      >
+        {label}
+      </div>
+      {/* Bordes dibujados a mano (abajo y derecha) en vez de con el
+          box-shadow que usan los demás headers: contra un fondo tan
+          saturado como este, ese box-shadow además dejaba un hueco de un
+          par de píxeles justo en las esquinas contra la celda vecina (bug
+          de redondeo de subpíxel de table-layout:fixed). Pintar el
+          rectángulo directamente como contenido no depende de ese cálculo,
+          así que no deja hueco. */}
+      <div className="absolute left-0 right-0 bottom-0" style={{ height: 2, background: 'rgba(0,0,0,0.22)' }} />
+      <div className="absolute top-0 bottom-0 right-0" style={{ width: 2, background: 'rgba(0,0,0,0.22)' }} />
     </th>
   )
 }
@@ -371,6 +477,14 @@ export default function FondoEmprenderPage() {
   const [search, setSearch]       = useState('')
   const [activeTab, setActiveTab] = useState('todas')
 
+  // filtro de estado por subcolumna (proceso), estilo Excel — solo entra acá
+  // el proceso que el usuario efectivamente acotó; ausencia de entrada
+  // equivale a "los 4 estados visibles" (sin filtrar), igual que el checkbox
+  // "seleccionar todo" de un filtro de columna de Excel.
+  const [columnFilters, setColumnFilters] = useState({}) // { [procId]: Set<statusKey> }
+  const [openFilter, setOpenFilter] = useState(null) // { procId, left, top }
+  const filterDropdownRef = useRef(null)
+
   const refetchTimerRef = useRef(null)
 
   // ── load grid from backend ──────────────────────────────────────────────
@@ -396,7 +510,11 @@ export default function FondoEmprenderPage() {
       )
 
       const built = empresas.map((e) => {
-        const chk = checklistPorEmpresaId.get(e.id) ?? { items: [], confirmed: false, confirmedAt: null, enviado: false, enviadoAt: null }
+        const chk = checklistPorEmpresaId.get(e.id) ?? {
+          items: [],
+          confirmedNomina: false, confirmedNominaAt: null, enviadoNomina: false, enviadoNominaAt: null,
+          confirmedContabilidad: false, confirmedContabilidadAt: null, enviadoContabilidad: false, enviadoContabilidadAt: null,
+        }
         const cells = {}
         chk.items.forEach(it => { cells[it.id] = { status: it.estado, note: it.nota ?? '' } })
         return {
@@ -404,11 +522,17 @@ export default function FondoEmprenderPage() {
           name: e.name,
           categoria: e.categoria,
           cells,
-          confirmed: chk.confirmed
-            ? { date: (chk.confirmedAt ?? new Date().toISOString()).slice(0, 10) }
+          confirmedNomina: chk.confirmedNomina
+            ? { date: (chk.confirmedNominaAt ?? new Date().toISOString()).slice(0, 10) }
             : null,
-          enviado: chk.enviado
-            ? { date: (chk.enviadoAt ?? new Date().toISOString()).slice(0, 10) }
+          enviadoNomina: chk.enviadoNomina
+            ? { date: (chk.enviadoNominaAt ?? new Date().toISOString()).slice(0, 10) }
+            : null,
+          confirmedContabilidad: chk.confirmedContabilidad
+            ? { date: (chk.confirmedContabilidadAt ?? new Date().toISOString()).slice(0, 10) }
+            : null,
+          enviadoContabilidad: chk.enviadoContabilidad
+            ? { date: (chk.enviadoContabilidadAt ?? new Date().toISOString()).slice(0, 10) }
             : null,
         }
       })
@@ -497,6 +621,79 @@ export default function FondoEmprenderPage() {
     return () => document.removeEventListener('mousedown', h)
   }, [openCell, flushPendingNote])
 
+  // ── column filter (filtro de estado por subcolumna, estilo Excel) ────────
+
+  function handleFilterIconClick(procId, e) {
+    e.stopPropagation()
+    const rect = e.currentTarget.getBoundingClientRect()
+    const PW = 208
+    let left = rect.left
+    let top  = rect.bottom + 4
+    if (left + PW > window.innerWidth - 8) left = window.innerWidth - PW - 8
+    if (left < 8) left = 8
+    if (top + 220 > window.innerHeight - 8) top = Math.max(8, rect.top - 220 - 4)
+    setOpenFilter(prev => (prev?.procId === procId ? null : { procId, left, top }))
+  }
+
+  function isStatusChecked(procId, statusKey) {
+    const filter = columnFilters[procId]
+    return !filter || filter.has(statusKey)
+  }
+
+  function toggleStatusFilter(procId, statusKey) {
+    setColumnFilters(prev => {
+      // Sin entrada todavía = "los 4 tildados" (nada filtrado) — ese es el
+      // punto de partida real desde el que se destilda el primero.
+      const baseline = prev[procId] ?? new Set(Object.keys(STATUS))
+      const next = new Set(baseline)
+      if (next.has(statusKey)) next.delete(statusKey)
+      else next.add(statusKey)
+      // Volver a tener los 4 tildados equivale a "sin filtro" — se saca la
+      // entrada en vez de dejar un Set completo dando vueltas sin efecto.
+      if (next.size === Object.keys(STATUS).length) {
+        const { [procId]: _omit, ...rest } = prev
+        return rest
+      }
+      return { ...prev, [procId]: next }
+    })
+  }
+
+  function clearColumnFilter(procId) {
+    setColumnFilters(prev => {
+      const { [procId]: _omit, ...rest } = prev
+      return rest
+    })
+  }
+
+  // "Seleccionar todo" del filtro — mismo comportamiento que Excel: si está
+  // todo tildado, destilda todo (Set vacío, no oculta la entrada del
+  // filtro); si falta algo por tildar (parcial o nada), tilda todo (lo que
+  // equivale a "sin filtro", así que se saca la entrada).
+  function toggleSelectAllFilter(procId) {
+    setColumnFilters(prev => {
+      const total = Object.keys(STATUS).length
+      const current = prev[procId] ?? new Set(Object.keys(STATUS))
+      if (current.size === total) return { ...prev, [procId]: new Set() }
+      const { [procId]: _omit, ...rest } = prev
+      return rest
+    })
+  }
+
+  const activeColumnFilterCount = Object.keys(columnFilters).length
+
+  // Cierra el popover de filtro al clickear afuera — mismo patrón que el
+  // popup de celda de arriba.
+  useEffect(() => {
+    if (!openFilter) return
+    const h = (e) => {
+      if (filterDropdownRef.current && !filterDropdownRef.current.contains(e.target)) {
+        setOpenFilter(null)
+      }
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [openFilter])
+
   // ── month nav ────────────────────────────────────────────────────────────
   // Seguimiento Mensual es de mes vencido: no se puede navegar más allá del
   // mes calendario anterior (el mes en curso todavía no ha "vencido").
@@ -575,74 +772,80 @@ export default function FondoEmprenderPage() {
   const openCompany  = openCell ? companies.find(c => c.id === openCell.companyId) : null
   const openProcess  = openCell ? processes.find(p => p.id === openCell.procId) : null
   const openCellData = openCompany?.cells[openCell?.procId] ?? emptyCell
+  const openFilterProcess = openFilter ? processes.find(p => p.id === openFilter.procId) : null
 
   // ── company actions ──────────────────────────────────────────────────────
 
-  async function toggleConfirmed(companyId) {
+  // tipo: 'nomina' | 'contabilidad' — cada uno lee/escribe su propio par de
+  // campos en `company` (ver TIPO_FIELD) y su propio endpoint, son estados
+  // completamente independientes.
+  async function toggleConfirmed(companyId, tipo) {
+    const { confirmed: confirmedKey, enviado: enviadoKey } = TIPO_FIELD[tipo]
     const company = companies.find(c => c.id === companyId)
-    const newConfirmed = !company?.confirmed
-    const previousConfirmed = company?.confirmed ?? null
-    const previousEnviado = company?.enviado ?? null
+    const newConfirmed = !company?.[confirmedKey]
+    const previousConfirmed = company?.[confirmedKey] ?? null
+    const previousEnviado = company?.[enviadoKey] ?? null
 
-    // Revertir la confirmación también revierte el envío (el backend hace
-    // la misma cascada) — no puede quedar "enviada" una contabilidad que ya
-    // no está confirmada.
+    // Revertir la confirmación también revierte el envío de ESE tipo (el
+    // backend hace la misma cascada) — no puede quedar "enviada" una
+    // nómina/contabilidad que ya no está confirmada.
     setCompanies(prev =>
       prev.map(c =>
         c.id === companyId
           ? {
               ...c,
-              confirmed: newConfirmed ? { date: new Date().toISOString().slice(0, 10) } : null,
-              enviado: newConfirmed ? c.enviado : null,
+              [confirmedKey]: newConfirmed ? { date: new Date().toISOString().slice(0, 10) } : null,
+              [enviadoKey]: newConfirmed ? c[enviadoKey] : null,
             }
           : c
       )
     )
 
     try {
-      const result = await api.updateFondoChecklistConfirmado(companyId, year, month + 1, { confirmed: newConfirmed })
+      const result = await api.updateFondoChecklistConfirmado(companyId, year, month + 1, tipo, { confirmed: newConfirmed })
       setCompanies(prev =>
         prev.map(c =>
           c.id === companyId
             ? {
                 ...c,
-                confirmed: result.confirmed ? { date: (result.confirmedAt ?? new Date().toISOString()).slice(0, 10) } : null,
-                enviado: result.enviado ? { date: (result.enviadoAt ?? new Date().toISOString()).slice(0, 10) } : null,
+                [confirmedKey]: result.confirmed ? { date: (result.confirmedAt ?? new Date().toISOString()).slice(0, 10) } : null,
+                [enviadoKey]: result.enviado ? { date: (result.enviadoAt ?? new Date().toISOString()).slice(0, 10) } : null,
               }
             : c
         )
       )
     } catch (err) {
-      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, confirmed: previousConfirmed, enviado: previousEnviado } : c))
-      console.error('Error al confirmar contabilidad:', err.message)
+      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, [confirmedKey]: previousConfirmed, [enviadoKey]: previousEnviado } : c))
+      console.error(`Error al confirmar ${tipo}:`, err.message)
     }
   }
 
-  async function toggleEnviado(companyId) {
+  async function toggleEnviado(companyId, tipo) {
+    const { enviado: enviadoKey } = TIPO_FIELD[tipo]
     const company = companies.find(c => c.id === companyId)
-    const newEnviado = !company?.enviado
-    const previous = company?.enviado ?? null
+    const newEnviado = !company?.[enviadoKey]
+    const previous = company?.[enviadoKey] ?? null
 
     setCompanies(prev =>
       prev.map(c =>
         c.id === companyId
-          ? { ...c, enviado: newEnviado ? { date: new Date().toISOString().slice(0, 10) } : null }
+          ? { ...c, [enviadoKey]: newEnviado ? { date: new Date().toISOString().slice(0, 10) } : null }
           : c
       )
     )
 
     try {
-      const result = await api.updateFondoChecklistEnviado(companyId, year, month + 1, { enviado: newEnviado })
+      const result = await api.updateFondoChecklistEnviado(companyId, year, month + 1, tipo, { enviado: newEnviado })
       setCompanies(prev =>
         prev.map(c =>
           c.id === companyId
-            ? { ...c, enviado: result.enviado ? { date: (result.enviadoAt ?? new Date().toISOString()).slice(0, 10) } : null }
+            ? { ...c, [enviadoKey]: result.enviado ? { date: (result.enviadoAt ?? new Date().toISOString()).slice(0, 10) } : null }
             : c
         )
       )
     } catch (err) {
-      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, enviado: previous } : c))
-      console.error('Error al marcar como enviada:', err.message)
+      setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, [enviadoKey]: previous } : c))
+      console.error(`Error al marcar ${tipo} como enviada:`, err.message)
     }
   }
 
@@ -834,7 +1037,14 @@ export default function FondoEmprenderPage() {
   // de vigencia (ver migración 025) no debería aparecer, ni ser arrastrable,
   // fuera de su rango. Para editar algo fuera de su rango actual, el admin
   // navega al mes correspondiente primero.
-  const visibleProcesses = processes.filter(p => isVigente(p, year, month + 1))
+  // Ordenado por `orden` acá mismo (no solo filtrado): el reorden por
+  // drag-and-drop actualiza el campo `orden` de cada proceso pero nunca
+  // reacomoda el ARRAY de `processes` en sí — sin este sort, la posición
+  // visual quedaba "pegada" al orden de inserción original hasta el
+  // próximo fetch, aunque el backend ya hubiera guardado el orden nuevo.
+  const visibleProcesses = processes
+    .filter(p => isVigente(p, year, month + 1))
+    .sort((a, b) => a.orden - b.orden)
 
   // ── drag & drop de columnas entre grupos ─────────────────────────────────
   // Mismo patrón multi-contenedor que KanbanPage (tareas entre columnas de
@@ -860,6 +1070,38 @@ export default function FondoEmprenderPage() {
     if (overId === SIN_GRUPO_ID || grupos.some(g => g.id === overId)) return overId
     const proc = visibleProcesses.find(p => p.id === overId)
     return proc ? containerIdOf(proc.id) : null
+  }
+
+  // Estrategia de colisión custom, construida ENCIMA de closestCorners (la
+  // que ya sabíamos que funciona bien contra esta tabla — sticky, table-layout
+  // fixed, todo lo que este archivo ya documenta que le complica la vida a
+  // otros algoritmos de colisión). El problema real: soltar "en el medio" de
+  // un grupo terminaba siempre reordenando al final, porque como las columnas
+  // son angostas (48px) y están muy pegadas, closestCorners solía enganchar
+  // con el CONTENEDOR del grupo entero en vez de con la columna puntual sobre
+  // la que soltabas. Acá se corre closestCorners normal y, si el resultado es
+  // el contenedor y no una columna, se vuelve a correr closestCorners pero
+  // restringido solo a las columnas de ESE contenedor, para encontrar la
+  // columna puntual más cercana en vez de quedarse con el contenedor.
+  function collisionDetectionStrategy(args) {
+    const collisions = closestCorners(args)
+    let overId = getFirstCollision(collisions, 'id')
+    if (overId == null) return []
+
+    const isContainer = overId === SIN_GRUPO_ID || grupos.some(g => g.id === overId)
+    if (isContainer) {
+      const items = containerItems(overId)
+      if (items.length > 0) {
+        const itemIds = new Set(items.map(p => p.id))
+        const filteredContainers = args.droppableContainers.filter(c => itemIds.has(c.id))
+        const refined = filteredContainers.length > 0
+          ? closestCorners({ ...args, droppableContainers: filteredContainers })
+          : []
+        const refinedId = getFirstCollision(refined, 'id')
+        if (refinedId != null) overId = refinedId
+      }
+    }
+    return [{ id: overId }]
   }
 
   function handleDragStart({ active }) {
@@ -925,18 +1167,23 @@ export default function FondoEmprenderPage() {
   const sortedGrupos = [...grupos].sort((a, b) => a.orden - b.orden)
   const sueltos = visibleProcesses.filter(p => !p.grupoId)
 
-  // ── grupo vinculado a mp5/Contabilidad (por id, no por nombre — ver
-  // migración 028) — controla cuándo el botón "Listo para enviar" se
-  // habilita: solo cuando cada proceso de ese grupo ya tiene un estado
-  // resuelto (hecho o no aplica) para esa empresa/mes. Si no hay grupo
-  // vinculado (renombrado sin volver a linkear, o borrado), no se bloquea el
-  // botón — mejor dejarlo disponible que trabar el flujo por completo.
+  // ── grupos vinculados a mp2/Nómina y mp5/Contabilidad (por id, no por
+  // nombre — ver migraciones 028) — controlan cuándo el botón "Listo para
+  // enviar" de cada uno se habilita: solo cuando cada proceso de ESE grupo
+  // ya tiene un estado resuelto (hecho o no aplica) para esa empresa/mes. Si
+  // no hay grupo vinculado (renombrado sin volver a linkear, o borrado), no
+  // se bloquea el botón — mejor dejarlo disponible que trabar el flujo.
+  const nominaGrupo = grupos.find(g => g.macroprocesoId === 'mp2')
+  const nominaProcesos = nominaGrupo
+    ? visibleProcesses.filter(p => p.grupoId === nominaGrupo.id)
+    : []
   const contabilidadGrupo = grupos.find(g => g.macroprocesoId === 'mp5')
   const contabilidadProcesos = contabilidadGrupo
     ? visibleProcesses.filter(p => p.grupoId === contabilidadGrupo.id)
     : []
-  function contabilidadPendientes(company) {
-    return contabilidadProcesos.filter(p => !['done', 'na'].includes(company.cells[p.id]?.status ?? 'pending')).length
+  const PROCESOS_POR_TIPO = { nomina: nominaProcesos, contabilidad: contabilidadProcesos }
+  function pendientesDelTipo(company, tipo) {
+    return PROCESOS_POR_TIPO[tipo].filter(p => !['done', 'na'].includes(company.cells[p.id]?.status ?? 'pending')).length
   }
 
   // ── filters: category tabs + search ──────────────────────────────────────
@@ -956,7 +1203,11 @@ export default function FondoEmprenderPage() {
   const filteredCompanies = companies.filter(c => {
     const matchSearch = !q || c.name.toLowerCase().includes(q)
     const matchCat    = activeTab === 'todas' || (c.categoria ?? 'contable') === activeTab
-    return matchSearch && matchCat
+    const matchColumnFilters = Object.entries(columnFilters).every(([procId, allowed]) => {
+      const status = c.cells[procId]?.status ?? 'pending'
+      return allowed.has(status)
+    })
+    return matchSearch && matchCat && matchColumnFilters
   })
 
   // ── stats — scoped to the active category tab, same as Empresas ─────────
@@ -981,15 +1232,19 @@ export default function FondoEmprenderPage() {
   const hasExpandedGroupRow = sortedGrupos.some(g =>
     !collapsedGroupIds.has(g.id) && visibleProcesses.some(p => p.grupoId === g.id)
   )
+  // Cada grupo aporta el ancho de sus columnas y, si es el de Nómina o
+  // Contabilidad, el ancho extra de su columna "Confirmar ..." pegada justo
+  // después — por eso ya no hay un ancho fijo aparte al final para eso.
   const columnWidths = [
     220, // Empresa
     ...sortedGrupos.flatMap(g => {
       const children = visibleProcesses.filter(p => p.grupoId === g.id)
       const collapsedOrEmpty = collapsedGroupIds.has(g.id) || children.length === 0
-      return collapsedOrEmpty ? [COL_WIDTH] : children.map(() => COL_WIDTH)
+      const groupWidths = collapsedOrEmpty ? [COL_WIDTH] : children.map(() => COL_WIDTH)
+      const confirmWidth = (g.macroprocesoId === 'mp2' || g.macroprocesoId === 'mp5') ? [CONFIRM_COL_WIDTH] : []
+      return [...groupWidths, ...confirmWidth]
     }),
     ...sueltos.map(() => COL_WIDTH),
-    88, // Confirmar Contabilidad
   ]
   const totalLeafColumns = columnWidths.length
   const gridWidth = columnWidths.reduce((a, b) => a + b, 0)
@@ -1031,6 +1286,96 @@ export default function FondoEmprenderPage() {
             />
           )}
         </button>
+      </td>
+    )
+  }
+
+  // Celda "Confirmar Nómina" / "Confirmar Contabilidad" — misma lógica para
+  // ambas, parametrizada por tipo ('nomina' | 'contabilidad'): botón
+  // bloqueado hasta que los procesos del grupo correspondiente están
+  // resueltos, insignia compacta una vez confirmada (y opcionalmente
+  // enviada), con controles de revertir/enviar al pasar el mouse.
+  //
+  // Antes de confirmar (bloqueado o listo), el botón usa el color del PROPIO
+  // grupo (groupColor) en vez de un gris/verde genérico — así se lee como
+  // "la celda de acción de este grupo" y no se confunde con una casilla de
+  // estado más (que usa la paleta de STATUS, sin relación con el grupo).
+  function renderConfirmCell(company, tipo, rowBg, groupColor) {
+    const { confirmed: confirmedKey, enviado: enviadoKey } = TIPO_FIELD[tipo]
+    const confirmed = company[confirmedKey]
+    const enviado   = company[enviadoKey]
+    const grupoLabel = tipo === 'nomina' ? 'Nómina' : 'Contabilidad'
+
+    return (
+      <td
+        key={tipo}
+        style={{
+          width: CONFIRM_COL_WIDTH, minWidth: CONFIRM_COL_WIDTH, border: BORDER, padding: 3,
+          // Sin confirmar: un tinte muy sutil del color del grupo (mucho más
+          // tenue que el del botón de adentro) en vez de blanco — así toda la
+          // columna se siente parte de su grupo, no solo el botón.
+          background: enviado ? '#eff6ff' : confirmed ? '#f0fdf4' : `${groupColor.accent}0d`,
+        }}
+      >
+        {!confirmed ? (() => {
+          const pendientes = pendientesDelTipo(company, tipo)
+          const listo = pendientes === 0
+          return (
+            <button
+              onClick={() => listo && toggleConfirmed(company.id, tipo)}
+              disabled={!listo}
+              title={listo ? 'Listo para confirmar' : `Faltan ${pendientes} proceso${pendientes === 1 ? '' : 's'} del grupo ${grupoLabel} por marcar`}
+              className={`w-full h-8 rounded flex items-center justify-center gap-1 font-semibold leading-none border-2 ${listo ? 'transition hover:opacity-80' : 'cursor-not-allowed'}`}
+              style={listo
+                ? { color: groupColor.accent, borderColor: groupColor.accent, background: groupColor.bgHex }
+                : { color: `${groupColor.accent}99`, borderColor: `${groupColor.accent}40`, background: groupColor.bgHex }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+                {listo ? 'check_circle_outline' : 'hourglass_empty'}
+              </span>
+              {!listo && <span style={{ fontSize: 10 }}>{pendientes}</span>}
+            </button>
+          )
+        })() : (
+          // Confirmada (y tal vez ya enviada) — por defecto se ve la insignia
+          // compacta; al pasar el mouse se parte en los controles reales,
+          // para que un solo click nunca tenga que decidir entre "revertir"
+          // y "avanzar".
+          <div className="group relative w-full h-8">
+            <div
+              className="absolute inset-0 rounded flex flex-col items-center justify-center gap-0.5 transition group-hover:opacity-0"
+              style={{ background: enviado ? '#dbeafe' : '#dcfce7' }}
+            >
+              <span className="material-symbols-outlined" style={{ color: enviado ? '#004ac6' : '#16a34a', fontSize: 15 }}>
+                {enviado ? 'send' : 'verified'}
+              </span>
+              <span className="text-[9px] font-semibold leading-none" style={{ color: enviado ? '#004ac6' : '#16a34a' }}>
+                {formatBadgeDate((enviado ?? confirmed).date)}
+              </span>
+            </div>
+
+            <div className="absolute inset-0 flex items-center gap-0.5 opacity-0 pointer-events-none transition group-hover:opacity-100 group-hover:pointer-events-auto">
+              <button
+                onClick={() => enviado ? toggleEnviado(company.id, tipo) : toggleConfirmed(company.id, tipo)}
+                title={enviado ? 'Revertir envío' : 'Revertir confirmación'}
+                className="flex-1 h-8 rounded flex items-center justify-center transition hover:opacity-80"
+                style={{ background: '#f3f4f6', color: '#6b7280' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 15 }}>undo</span>
+              </button>
+              {!enviado && (
+                <button
+                  onClick={() => toggleEnviado(company.id, tipo)}
+                  title="Marcar como enviada"
+                  className="flex-1 h-8 rounded flex items-center justify-center transition hover:opacity-80"
+                  style={{ background: '#004ac6', color: '#fff' }}
+                >
+                  <span className="material-symbols-outlined" style={{ fontSize: 15 }}>send</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </td>
     )
   }
@@ -1199,6 +1544,19 @@ export default function FondoEmprenderPage() {
             className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
           />
         </div>
+
+        {/* Filtros de columna activos — solo aparece si hay alguno */}
+        {activeColumnFilterCount > 0 && (
+          <button
+            onClick={() => setColumnFilters({})}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold flex-shrink-0 transition hover:opacity-80 bg-[#e8eefc] dark:bg-[#1a2444] text-[#004ac6] dark:text-[#7ba8f0]"
+            title="Quitar todos los filtros de columna"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 15 }}>filter_alt</span>
+            {activeColumnFilterCount} {activeColumnFilterCount === 1 ? 'filtro de columna' : 'filtros de columna'}
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+          </button>
+        )}
       </div>
 
       {/* ── Legacy data recovery banner ─────────────────────────────────── */}
@@ -1242,7 +1600,7 @@ export default function FondoEmprenderPage() {
         className="overflow-auto rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm"
         style={{ maxHeight: 'calc(100vh - 13rem)' }}
       >
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={collisionDetectionStrategy} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           {/* table-layout: fixed + <colgroup> explícito: sin esto, el colSpan de
               los grupos hace que el navegador reparta el ancho "como pueda" y
               termina estirando todas las columnas. Con <col> explícito el ancho
@@ -1277,27 +1635,37 @@ export default function FondoEmprenderPage() {
                   Empresa
                 </th>
 
-                {/* Group headers (row 1) */}
+                {/* Group headers (row 1) — Nómina y Contabilidad llevan su
+                    columna "Confirmar ..." pegada justo después del grupo,
+                    no todas juntas al final. */}
                 {sortedGrupos.map((grupo, grupoIndex) => (
-                  <GroupHeaderCell
-                    key={grupo.id}
-                    grupo={grupo}
-                    procesos={visibleProcesses.filter(p => p.grupoId === grupo.id)}
-                    collapsed={collapsedGroupIds.has(grupo.id)}
-                    editable={canEditStructure}
-                    paletteIndex={grupoIndex}
-                    onToggleCollapse={() => toggleCollapsed(grupo.id)}
-                    editingGroup={editingGroup}
-                    setEditingGroup={setEditingGroup}
-                    editGroupName={editGroupName}
-                    setEditGroupName={setEditGroupName}
-                    saveEditGroup={saveEditGroup}
-                    startEditGroup={startEditGroup}
-                    setDeleteConfirm={setDeleteConfirm}
-                  />
+                  <Fragment key={grupo.id}>
+                    <GroupHeaderCell
+                      grupo={grupo}
+                      procesos={visibleProcesses.filter(p => p.grupoId === grupo.id)}
+                      collapsed={collapsedGroupIds.has(grupo.id)}
+                      editable={canEditStructure}
+                      paletteIndex={grupoIndex}
+                      onToggleCollapse={() => toggleCollapsed(grupo.id)}
+                      editingGroup={editingGroup}
+                      setEditingGroup={setEditingGroup}
+                      editGroupName={editGroupName}
+                      setEditGroupName={setEditGroupName}
+                      saveEditGroup={saveEditGroup}
+                      startEditGroup={startEditGroup}
+                      setDeleteConfirm={setDeleteConfirm}
+                    />
+                    {grupo.macroprocesoId === 'mp2' && (
+                      <ConfirmHeaderCell label="CONFIRMAR/ENVIAR" fullLabel="Confirmar Nómina" groupColor={GROUP_PALETTE[grupoIndex % GROUP_PALETTE.length]} />
+                    )}
+                    {grupo.macroprocesoId === 'mp5' && (
+                      <ConfirmHeaderCell label="CONFIRMAR/ENVIAR" fullLabel="Confirmar Contabilidad" groupColor={GROUP_PALETTE[grupoIndex % GROUP_PALETTE.length]} />
+                    )}
+                  </Fragment>
                 ))}
 
-                {/* Sueltos (sin grupo) — ocupan las dos filas, igual que antes */}
+                {/* Sueltos (sin grupo) — van al final, después de ambas
+                    columnas de confirmar, ocupan las dos filas */}
                 <SortableContext items={sueltos.map(p => p.id)} strategy={horizontalListSortingStrategy}>
                   {sueltos.map(proc => (
                     <SortableProcessHeader
@@ -1307,21 +1675,11 @@ export default function FondoEmprenderPage() {
                       editable={canEditStructure}
                       startEditProcess={openEditProcesoModal}
                       setDeleteConfirm={setDeleteConfirm}
+                      onFilterClick={handleFilterIconClick}
+                      hasFilter={Boolean(columnFilters[proc.id])}
                     />
                   ))}
                 </SortableContext>
-
-                {/* Confirmar Contabilidad – sticky right */}
-                <th
-                  rowSpan={2}
-                  className="sticky right-0 top-0 z-30 bg-[#f0fdf4] dark:bg-[#0d2e1a] text-[10px] font-bold text-[#16a34a] uppercase tracking-wide"
-                  style={{
-                    width: 88, minWidth: 88, verticalAlign: 'bottom', padding: '4px 6px 6px',
-                    boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER }),
-                  }}
-                >
-                  Confirmar Contabilidad
-                </th>
               </tr>
 
               {/* Sub-columnas de cada grupo (row 2) — solo si hay algún grupo expandido con procesos */}
@@ -1341,6 +1699,8 @@ export default function FondoEmprenderPage() {
                           hasTopBorder={false}
                           startEditProcess={openEditProcesoModal}
                           setDeleteConfirm={setDeleteConfirm}
+                          onFilterClick={handleFilterIconClick}
+                          hasFilter={Boolean(columnFilters[proc.id])}
                         />
                       ))}
                     </SortableContext>
@@ -1357,7 +1717,7 @@ export default function FondoEmprenderPage() {
                     colSpan={totalLeafColumns}
                     className="text-center py-10 text-xs text-[#8890b5] dark:text-[#5a5f7a]"
                   >
-                    {search || activeTab !== 'todas'
+                    {search || activeTab !== 'todas' || activeColumnFilterCount > 0
                       ? 'No hay empresas que coincidan con el filtro'
                       : 'No se encontraron empresas'}
                   </td>
@@ -1368,10 +1728,19 @@ export default function FondoEmprenderPage() {
                 return (
                   <tr key={company.id} style={{ background: rowBg }}>
 
-                    {/* Company name cell — editar/eliminar empresa se hace desde Empresas, no acá */}
+                    {/* Company name cell — editar/eliminar empresa se hace desde Empresas, no acá.
+                        box-shadow en vez de border: esta celda es sticky (left-0), y un
+                        border de verdad ahí es justo el bug de Chrome que ya evita el
+                        header (ver comentario de sideShadow/headerBoxShadow más arriba) —
+                        se ve bien sin scrollear pero el borde derecho desaparece al
+                        scrollear horizontalmente. Mismos anchos que el <th> de "Empresa"
+                        para que la línea quede continua entre header y body. */}
                     <td
                       className="sticky left-0 z-10"
-                      style={{ width: 220, minWidth: 220, maxWidth: 220, border: BORDER, background: rowBg, height: 36, padding: 0 }}
+                      style={{
+                        width: 220, minWidth: 220, maxWidth: 220, background: rowBg, height: 36, padding: 0,
+                        boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, left: BORDER, right: BORDER_COL }),
+                      }}
                     >
                       <div className="flex items-center h-full px-2">
                         <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={company.name}>
@@ -1380,111 +1749,59 @@ export default function FondoEmprenderPage() {
                       </div>
                     </td>
 
-                    {/* Group cells: colapsado → resumen; expandido → una celda por proceso */}
-                    {sortedGrupos.map(grupo => {
+                    {/* Group cells: colapsado → resumen; expandido → una
+                        celda por proceso. Nómina y Contabilidad además
+                        agregan su celda "Confirmar ..." justo después. */}
+                    {sortedGrupos.map((grupo, grupoIndex) => {
                       const children = visibleProcesses.filter(p => p.grupoId === grupo.id)
+                      const confirmTipo = grupo.macroprocesoId === 'mp2' ? 'nomina' : grupo.macroprocesoId === 'mp5' ? 'contabilidad' : null
+                      const confirmCell = confirmTipo
+                        ? renderConfirmCell(company, confirmTipo, rowBg, GROUP_PALETTE[grupoIndex % GROUP_PALETTE.length])
+                        : null
+
                       if (children.length === 0) {
-                        return <td key={grupo.id} style={{ width: COL_WIDTH, minWidth: COL_WIDTH, borderTop: BORDER, borderBottom: BORDER, borderLeft: BORDER_COL, borderRight: BORDER_COL, background: rowBg }} />
+                        return (
+                          <Fragment key={grupo.id}>
+                            <td style={{ width: COL_WIDTH, minWidth: COL_WIDTH, borderTop: BORDER, borderBottom: BORDER, borderLeft: BORDER_COL, borderRight: BORDER_COL, background: rowBg }} />
+                            {confirmCell}
+                          </Fragment>
+                        )
                       }
                       if (collapsedGroupIds.has(grupo.id)) {
                         const doneCount = children.filter(p => ['done', 'na'].includes(company.cells[p.id]?.status ?? 'pending')).length
                         const allDone = doneCount === children.length
                         const noneDone = doneCount === 0
                         return (
-                          <td key={grupo.id} style={{ width: COL_WIDTH, minWidth: COL_WIDTH, padding: 2, background: rowBg, borderTop: BORDER, borderBottom: BORDER, borderLeft: BORDER_COL, borderRight: BORDER_COL }}>
-                            <button
-                              onClick={() => toggleCollapsed(grupo.id)}
-                              title={`${grupo.name}: ${doneCount}/${children.length} — clic para expandir`}
-                              className="w-full flex items-center justify-center rounded text-[9px] font-bold transition hover:opacity-75"
-                              style={{
-                                height: 32,
-                                color: allDone ? '#16a34a' : noneDone ? '#8890b5' : '#d97706',
-                                background: allDone ? '#dcfce7' : noneDone ? '#f3f4f6' : '#fef9c3',
-                              }}
-                            >
-                              {doneCount}/{children.length}
-                            </button>
-                          </td>
+                          <Fragment key={grupo.id}>
+                            <td style={{ width: COL_WIDTH, minWidth: COL_WIDTH, padding: 2, background: rowBg, borderTop: BORDER, borderBottom: BORDER, borderLeft: BORDER_COL, borderRight: BORDER_COL }}>
+                              <button
+                                onClick={() => toggleCollapsed(grupo.id)}
+                                title={`${grupo.name}: ${doneCount}/${children.length} — clic para expandir`}
+                                className="w-full flex items-center justify-center rounded text-[9px] font-bold transition hover:opacity-75"
+                                style={{
+                                  height: 32,
+                                  color: allDone ? '#16a34a' : noneDone ? '#8890b5' : '#d97706',
+                                  background: allDone ? '#dcfce7' : noneDone ? '#f3f4f6' : '#fef9c3',
+                                }}
+                              >
+                                {doneCount}/{children.length}
+                              </button>
+                            </td>
+                            {confirmCell}
+                          </Fragment>
                         )
                       }
-                      return children.map(proc => renderProcessCell(company, proc, rowBg))
+                      return (
+                        <Fragment key={grupo.id}>
+                          {children.map(proc => renderProcessCell(company, proc, rowBg))}
+                          {confirmCell}
+                        </Fragment>
+                      )
                     })}
 
-                    {/* Sueltos (sin grupo) */}
+                    {/* Sueltos (sin grupo) — van al final, después de ambas
+                        columnas de confirmar */}
                     {sueltos.map(proc => renderProcessCell(company, proc, rowBg))}
-
-                    {/* Confirmar Contabilidad cell */}
-                    <td
-                      className="sticky right-0 z-10"
-                      style={{
-                        width: 88, minWidth: 88, border: BORDER, padding: 3,
-                        background: company.enviado ? '#eff6ff' : company.confirmed ? '#f0fdf4' : rowBg,
-                      }}
-                    >
-                      {!company.confirmed ? (() => {
-                        const pendientes = contabilidadPendientes(company)
-                        const listo = pendientes === 0
-                        return (
-                          <button
-                            onClick={() => listo && toggleConfirmed(company.id)}
-                            disabled={!listo}
-                            title={listo ? undefined : `Faltan ${pendientes} proceso${pendientes === 1 ? '' : 's'} del grupo Contabilidad por marcar`}
-                            className={`w-full h-8 rounded flex flex-col items-center justify-center gap-0.5 font-semibold leading-none border ${listo ? 'transition hover:opacity-80' : 'cursor-not-allowed'}`}
-                            style={listo
-                              ? { color: '#16a34a', borderColor: '#bbf7d0', background: '#f0fdf4' }
-                              : { color: '#9ca3af', borderColor: '#e2e4ef', background: '#f8f9fc' }}
-                          >
-                            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>
-                              {listo ? 'check_circle_outline' : 'hourglass_empty'}
-                            </span>
-                            {listo ? (
-                              <span className="text-center" style={{ fontSize: 8.5 }}>Listo para<br />enviar</span>
-                            ) : (
-                              <span style={{ fontSize: 9 }}>Faltan {pendientes}</span>
-                            )}
-                          </button>
-                        )
-                      })() : (
-                        // Confirmada (y tal vez ya enviada) — por defecto se ve
-                        // la insignia compacta; al pasar el mouse se parte en
-                        // los controles reales, para que un solo click nunca
-                        // tenga que decidir entre "revertir" y "avanzar".
-                        <div className="group relative w-full h-8">
-                          <div
-                            className="absolute inset-0 rounded flex flex-col items-center justify-center gap-0.5 transition group-hover:opacity-0"
-                            style={{ background: company.enviado ? '#dbeafe' : '#dcfce7' }}
-                          >
-                            <span className="material-symbols-outlined" style={{ color: company.enviado ? '#004ac6' : '#16a34a', fontSize: 15 }}>
-                              {company.enviado ? 'send' : 'verified'}
-                            </span>
-                            <span className="text-[9px] font-semibold leading-none" style={{ color: company.enviado ? '#004ac6' : '#16a34a' }}>
-                              {(company.enviado ?? company.confirmed).date}
-                            </span>
-                          </div>
-
-                          <div className="absolute inset-0 flex items-center gap-0.5 opacity-0 pointer-events-none transition group-hover:opacity-100 group-hover:pointer-events-auto">
-                            <button
-                              onClick={() => company.enviado ? toggleEnviado(company.id) : toggleConfirmed(company.id)}
-                              title={company.enviado ? 'Revertir envío' : 'Revertir confirmación'}
-                              className="flex-1 h-8 rounded flex items-center justify-center transition hover:opacity-80"
-                              style={{ background: '#f3f4f6', color: '#6b7280' }}
-                            >
-                              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>undo</span>
-                            </button>
-                            {!company.enviado && (
-                              <button
-                                onClick={() => toggleEnviado(company.id)}
-                                title="Marcar como enviada"
-                                className="flex-1 h-8 rounded flex items-center justify-center transition hover:opacity-80"
-                                style={{ background: '#004ac6', color: '#fff' }}
-                              >
-                                <span className="material-symbols-outlined" style={{ fontSize: 16 }}>send</span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </td>
                   </tr>
                 )
               })}
@@ -1574,6 +1891,90 @@ export default function FondoEmprenderPage() {
             >
               Cerrar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Filtro de columna (por estado) ──────────────────────────────── */}
+      {openFilter && openFilterProcess && (
+        <div
+          ref={filterDropdownRef}
+          className="fixed z-50 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-2xl p-3 w-52"
+          style={{ left: openFilter.left, top: openFilter.top }}
+        >
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <p
+              className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0"
+              title={openFilterProcess.name}
+            >
+              {openFilterProcess.name}
+            </p>
+            {columnFilters[openFilter.procId] && (
+              <button
+                onClick={() => clearColumnFilter(openFilter.procId)}
+                className="text-[10px] font-semibold text-[#004ac6] dark:text-[#7ba8f0] hover:underline flex-shrink-0"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+          {(() => {
+            const statusKeys = Object.keys(STATUS)
+            const checkedCount = statusKeys.filter(k => isStatusChecked(openFilter.procId, k)).length
+            const allChecked = checkedCount === statusKeys.length
+            const noneChecked = checkedCount === 0
+            return (
+              <button
+                onClick={() => toggleSelectAllFilter(openFilter.procId)}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840] mb-1"
+              >
+                <span
+                  className={`flex items-center justify-center rounded flex-shrink-0 ${
+                    noneChecked ? 'border-[#c3c6d7] dark:border-[#3e4260]' : ''
+                  }`}
+                  style={{
+                    width: 15, height: 15,
+                    borderWidth: 1.5, borderStyle: 'solid',
+                    borderColor: noneChecked ? undefined : '#004ac6',
+                    background: noneChecked ? 'transparent' : '#004ac6',
+                  }}
+                >
+                  {!noneChecked && (
+                    <span className="material-symbols-outlined text-white" style={{ fontSize: 11 }}>
+                      {allChecked ? 'check' : 'remove'}
+                    </span>
+                  )}
+                </span>
+                <span className="font-bold text-[#191c1e] dark:text-[#e4e6f0]">Seleccionar todo</span>
+              </button>
+            )
+          })()}
+          <div className="h-px bg-[#e2e4ef] dark:bg-[#2e3148] mb-1" />
+          <div className="flex flex-col gap-0.5">
+            {Object.entries(STATUS).map(([key, cfg]) => {
+              const checked = isStatusChecked(openFilter.procId, key)
+              return (
+                <button
+                  key={key}
+                  onClick={() => toggleStatusFilter(openFilter.procId, key)}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
+                >
+                  <span
+                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7] dark:border-[#3e4260]' : ''}`}
+                    style={{
+                      width: 15, height: 15,
+                      borderWidth: 1.5, borderStyle: 'solid',
+                      borderColor: checked ? cfg.color : undefined,
+                      background: checked ? cfg.color : 'transparent',
+                    }}
+                  >
+                    {checked && <span className="material-symbols-outlined text-white" style={{ fontSize: 11 }}>check</span>}
+                  </span>
+                  <span className="material-symbols-outlined flex-shrink-0" style={{ color: cfg.color, fontSize: 14 }}>{cfg.icon}</span>
+                  <span className="font-medium text-[#191c1e] dark:text-[#e4e6f0]">{cfg.label}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}

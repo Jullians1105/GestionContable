@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { body, query } = require('express-validator');
+const { body, query, param } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
 const { requireFondoAccess } = require('../middleware/fondoAccess');
 const { validate } = require('../middleware/validation');
@@ -40,7 +40,10 @@ const validateAnioMes = [
  *       - { name: mes,  in: query, required: true, schema: { type: integer, minimum: 1, maximum: 12 } }
  *     responses:
  *       200:
- *         description: Array de { empresaId, confirmed, confirmedAt, items[] }, uno por empresa.
+ *         description: >
+ *           Array de { empresaId, confirmedNomina, confirmedNominaAt, enviadoNomina,
+ *           enviadoNominaAt, confirmedContabilidad, confirmedContabilidadAt,
+ *           enviadoContabilidad, enviadoContabilidadAt, items[] }, uno por empresa.
  */
 router.get('/mes',
   ...validateAnioMes,
@@ -62,8 +65,9 @@ router.get('/mes',
  *     responses:
  *       200:
  *         description: >
- *           Lista de procesos con su estado en el mes. confirmed=false si el mes
- *           nunca ha sido tocado (no se crea fila en fondo_checklist_meses al leer).
+ *           Lista de procesos con su estado en el mes, más confirmedNomina/enviadoNomina
+ *           y confirmedContabilidad/enviadoContabilidad (cada uno false si el mes nunca ha
+ *           sido tocado — no se crea fila en fondo_checklist_meses al leer).
  */
 router.get('/:empresaId',
   ...validateUUIDParam('empresaId'),
@@ -112,14 +116,15 @@ router.put('/:empresaId/item/:procesoId',
 
 /**
  * @openapi
- * /api/fondo/checklist/{empresaId}/confirmado:
+ * /api/fondo/checklist/{empresaId}/confirmado/{tipo}:
  *   put:
  *     tags: [FondoChecklist]
- *     summary: Marcar/desmarcar el mes como confirmado (flag "Contabilidad")
+ *     summary: Marcar/desmarcar el mes como confirmado para Nómina o Contabilidad (flags independientes)
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - { name: empresaId, in: path, required: true, schema: { type: string, format: uuid } }
+ *       - { name: tipo, in: path, required: true, schema: { type: string, enum: [nomina, contabilidad] } }
  *       - { name: anio, in: query, required: true, schema: { type: integer } }
  *       - { name: mes,  in: query, required: true, schema: { type: integer, minimum: 1, maximum: 12 } }
  *     requestBody:
@@ -137,8 +142,9 @@ router.put('/:empresaId/item/:procesoId',
  *       403:
  *         description: Sin permiso de edición en Fondo Emprender
  */
-router.put('/:empresaId/confirmado',
+router.put('/:empresaId/confirmado/:tipo',
   ...validateUUIDParam('empresaId'),
+  param('tipo').isIn(['nomina', 'contabilidad']).withMessage('tipo debe ser nomina o contabilidad'),
   ...validateAnioMes,
   requireFondoAccess,
   body('confirmed').isBoolean().withMessage('confirmed debe ser boolean'),
@@ -148,14 +154,15 @@ router.put('/:empresaId/confirmado',
 
 /**
  * @openapi
- * /api/fondo/checklist/{empresaId}/enviado:
+ * /api/fondo/checklist/{empresaId}/enviado/{tipo}:
  *   put:
  *     tags: [FondoChecklist]
- *     summary: Marcar/desmarcar el mes como enviado (una vez confirmada la contabilidad)
+ *     summary: Marcar/desmarcar el mes como enviado para Nómina o Contabilidad (una vez confirmado ese tipo)
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - { name: empresaId, in: path, required: true, schema: { type: string, format: uuid } }
+ *       - { name: tipo, in: path, required: true, schema: { type: string, enum: [nomina, contabilidad] } }
  *       - { name: anio, in: query, required: true, schema: { type: integer } }
  *       - { name: mes,  in: query, required: true, schema: { type: integer, minimum: 1, maximum: 12 } }
  *     requestBody:
@@ -173,10 +180,11 @@ router.put('/:empresaId/confirmado',
  *       403:
  *         description: Sin permiso de edición en Fondo Emprender
  *       409:
- *         description: No se puede marcar como enviada una contabilidad que aún no está confirmada
+ *         description: No se puede marcar como enviada una nómina/contabilidad que aún no está confirmada
  */
-router.put('/:empresaId/enviado',
+router.put('/:empresaId/enviado/:tipo',
   ...validateUUIDParam('empresaId'),
+  param('tipo').isIn(['nomina', 'contabilidad']).withMessage('tipo debe ser nomina o contabilidad'),
   ...validateAnioMes,
   requireFondoAccess,
   body('enviado').isBoolean().withMessage('enviado debe ser boolean'),

@@ -183,14 +183,16 @@ export const api = {
     return request(`/fondo/checklist/${empresaId}/item/${procesoId}?${qs}`,
       { method: 'PUT', body: JSON.stringify(data) });
   },
-  updateFondoChecklistConfirmado: (empresaId, anio, mes, data) => {
+  // tipo: 'nomina' | 'contabilidad' — cada uno tiene su propio flag
+  // confirmado/enviado, independiente del otro.
+  updateFondoChecklistConfirmado: (empresaId, anio, mes, tipo, data) => {
     const qs = new URLSearchParams({ anio, mes }).toString();
-    return request(`/fondo/checklist/${empresaId}/confirmado?${qs}`,
+    return request(`/fondo/checklist/${empresaId}/confirmado/${tipo}?${qs}`,
       { method: 'PUT', body: JSON.stringify(data) });
   },
-  updateFondoChecklistEnviado: (empresaId, anio, mes, data) => {
+  updateFondoChecklistEnviado: (empresaId, anio, mes, tipo, data) => {
     const qs = new URLSearchParams({ anio, mes }).toString();
-    return request(`/fondo/checklist/${empresaId}/enviado?${qs}`,
+    return request(`/fondo/checklist/${empresaId}/enviado/${tipo}?${qs}`,
       { method: 'PUT', body: JSON.stringify(data) });
   },
 
