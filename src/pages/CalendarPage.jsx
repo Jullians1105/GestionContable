@@ -5,11 +5,13 @@ import {
   addMonths, subMonths, getDaysInMonth,
 } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { useNavigate } from 'react-router-dom'
 import { useTasks } from '../hooks/useTasks'
 import { useGroups } from '../context/GroupContext'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../services/api'
-import { isDueDateOverdue, isDueDateSoon, PRIORITY_LABELS } from '../utils/helpers'
+import { isDueDateOverdue, isDueDateSoon, PRIORITY_LABELS, formatReminder, normalizeAssignedTo } from '../utils/helpers'
+import TaskDetailModal from '../components/TaskDetailModal'
 
 const DOT_COLOR = (task) => {
   if (task._isTemplate) return '#f97316'
@@ -23,22 +25,26 @@ const DAY_LABELS = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do']
 export default function CalendarPage() {
   const { tasks } = useTasks()
   const { currentGroupId } = useGroups()
-  const { isAdmin, isLeader } = useAuth()
+  const { user, isAdmin, isLeader } = useAuth()
+  const navigate = useNavigate()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState(null)
   const [templates, setTemplates] = useState([])
+  const [viewTask, setViewTask] = useState(null)
 
   const canSeeTemplates = isAdmin() || isLeader()
+  const canSeeAll = canSeeTemplates
 
   useEffect(() => {
     if (!canSeeTemplates) return
     api.getTemplates().then(data => setTemplates(Array.isArray(data) ? data : [])).catch(() => {})
   }, [canSeeTemplates])
 
-  const filtered = useMemo(() =>
-    currentGroupId ? tasks.filter((t) => t.groupId === currentGroupId) : tasks,
-    [tasks, currentGroupId]
-  )
+  const filtered = useMemo(() => {
+    let result = canSeeAll ? tasks : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id))
+    if (currentGroupId) result = result.filter((t) => t.groupId === currentGroupId)
+    return result
+  }, [tasks, currentGroupId, canSeeAll, user])
 
   // Proyectar templates al mes visible
   const projectedTemplates = useMemo(() => {
@@ -241,7 +247,8 @@ export default function CalendarPage() {
                     {selectedTasks.map((t) => (
                       <div
                         key={t.id}
-                        className={`p-3 rounded-xl border-l-2 ${t._isTemplate ? 'bg-[#fff7ed] dark:bg-[#2a1f0f] border-dashed opacity-80' : 'bg-[#f3f4f6] dark:bg-[#252840]'}`}
+                        onClick={() => !t._isTemplate && setViewTask(t)}
+                        className={`p-3 rounded-xl border-l-2 transition ${t._isTemplate ? 'bg-[#fff7ed] dark:bg-[#2a1f0f] border-dashed opacity-80' : 'bg-[#f3f4f6] dark:bg-[#252840] cursor-pointer hover:ring-2 hover:ring-[#004ac6]'}`}
                         style={{ borderColor: DOT_COLOR(t) }}
                       >
                         <div className="flex items-center gap-1.5 mb-0.5">
@@ -271,6 +278,15 @@ export default function CalendarPage() {
                             </span>
                           )}
                           {t.templateId && !t.dueDate && <span className="text-[10px] font-semibold text-[#c2410c]">Sin fecha</span>}
+                          {t.reminderAt && !t._isTemplate && (
+                            <span
+                              className="text-[10px] font-semibold text-[#b45309] flex items-center gap-0.5"
+                              title={`Recordatorio: ${formatReminder(t.reminderAt)}`}
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 11 }}>notifications_active</span>
+                              Recordatorio
+                            </span>
+                          )}
                           {!t._isTemplate && isDueDateOverdue(t.dueDate, t.dueTime) && <span className="text-xs text-[#EF4444] font-semibold">Vencida</span>}
                           {!t._isTemplate && isDueDateSoon(t.dueDate, t.dueTime) && !isDueDateOverdue(t.dueDate, t.dueTime) && <span className="text-xs text-[#FBBF24] font-semibold">Próxima</span>}
                         </div>
@@ -288,6 +304,14 @@ export default function CalendarPage() {
           </div>
         </div>
       </div>
+
+      {viewTask && (
+        <TaskDetailModal
+          task={viewTask}
+          onClose={() => setViewTask(null)}
+          onEdit={(t) => { setViewTask(null); navigate(`/tasks?openTask=${t.id}`) }}
+        />
+      )}
     </div>
   )
 }

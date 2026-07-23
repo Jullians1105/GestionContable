@@ -113,6 +113,7 @@ router.post('/',
   }),
   body('priority').optional().isIn(['high', 'medium', 'low']),
   body('status').optional().isIn(['pending', 'in_progress', 'completed']),
+  body('reminderAt').optional({ nullable: true }).isISO8601().withMessage('Fecha de recordatorio inválida'),
   validate,
   createTask
 );
@@ -132,6 +133,7 @@ router.put('/:id',
   body('title').optional().trim().notEmpty().isLength({ max: 255 }),
   body('priority').optional().isIn(['high', 'medium', 'low']),
   body('status').optional().isIn(['pending', 'in_progress', 'completed']),
+  body('reminderAt').optional({ nullable: true }).isISO8601().withMessage('Fecha de recordatorio inválida'),
   validate,
   updateTask
 );
