@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
 import { useToast } from '../context/ToastContext'
+import { formatReminder } from '../utils/helpers'
 
-function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggleItem, onDeleteItem }) {
+function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggleItem, onDeleteItem, onSetReminder }) {
   const [newItemTitle, setNewItemTitle] = useState('')
+  const [editingReminder, setEditingReminder] = useState(false)
+  const [reminderInput, setReminderInput] = useState(task.reminderAt || '')
   const items = task.items || []
   const completedCount = items.filter(i => i.completed).length
   const pct = items.length ? Math.round((completedCount / items.length) * 100) : 0
@@ -13,6 +16,16 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
     if (!newItemTitle.trim()) return
     onAddItem(task.id, newItemTitle.trim())
     setNewItemTitle('')
+  }
+
+  const handleSaveReminder = () => {
+    onSetReminder(task.id, reminderInput || null)
+    setEditingReminder(false)
+  }
+
+  const handleOpenReminder = () => {
+    setReminderInput(task.reminderAt || '')
+    setEditingReminder(true)
   }
 
   return (
@@ -28,6 +41,13 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
           {task.title}
         </span>
         <button
+          onClick={handleOpenReminder}
+          className={`flex-shrink-0 transition ${task.reminderAt ? 'text-[#b45309]' : 'text-[#c3c6d7] dark:text-[#3e4260] hover:text-[#b45309]'}`}
+          title={task.reminderAt ? `Recordatorio: ${formatReminder(task.reminderAt)}` : 'Agregar recordatorio (opcional)'}
+        >
+          <span className="material-symbols-outlined text-lg">{task.reminderAt ? 'notifications_active' : 'notification_add'}</span>
+        </button>
+        <button
           onClick={() => onDeleteTask(task.id)}
           className="flex-shrink-0 text-[#c3c6d7] dark:text-[#3e4260] hover:text-[#EF4444] transition"
           title="Eliminar"
@@ -35,6 +55,28 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
           <span className="material-symbols-outlined text-lg">delete</span>
         </button>
       </div>
+
+      {editingReminder && (
+        <div className="mt-2 ml-7 flex items-center gap-2">
+          <input
+            type="datetime-local"
+            value={reminderInput}
+            onChange={(e) => setReminderInput(e.target.value)}
+            className="flex-1 h-8 px-2 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-xs text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+          />
+          <button onClick={handleSaveReminder} className="h-8 px-2.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition" style={{ background: '#004ac6' }}>
+            Guardar
+          </button>
+          {task.reminderAt && (
+            <button onClick={() => { setReminderInput(''); onSetReminder(task.id, null); setEditingReminder(false) }} className="h-8 px-2 text-xs font-semibold text-[#EF4444] hover:underline">
+              Quitar
+            </button>
+          )}
+          <button onClick={() => setEditingReminder(false)} className="h-8 px-2 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] hover:underline">
+            Cancelar
+          </button>
+        </div>
+      )}
 
       {items.length > 0 && (
         <div className="mt-3 ml-7">
@@ -172,6 +214,18 @@ export default function PersonalTasksPage() {
     }
   }
 
+  const handleSetReminder = async (taskId, reminderAt) => {
+    const prev = tasks
+    setTasks(prev.map(t => t.id === taskId ? { ...t, reminderAt } : t))
+    try {
+      const updated = await api.updatePersonalTask(taskId, { reminderAt })
+      setTasks(p => p.map(t => t.id === taskId ? updated : t))
+    } catch {
+      addToast('No se pudo actualizar el recordatorio', 'error')
+      setTasks(prev)
+    }
+  }
+
   const visibleTasks = hideCompleted ? tasks.filter(t => !t.completed) : tasks
 
   return (
@@ -235,6 +289,7 @@ export default function PersonalTasksPage() {
               onAddItem={handleAddItem}
               onToggleItem={handleToggleItem}
               onDeleteItem={handleDeleteItem}
+              onSetReminder={handleSetReminder}
             />
           ))}
         </div>

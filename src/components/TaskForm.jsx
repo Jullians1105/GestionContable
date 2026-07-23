@@ -15,7 +15,6 @@ const EMPTY_TASK = {
   assignedTo: [],
   dueDate: '',
   dueTime: '',
-  reminderAt: '',
   groupId: '',
   tagIds: [],
   subtasks: [],
@@ -32,7 +31,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
   const { tasks } = useTasks()
   const { groups } = useGroups()
   const [form, setForm] = useState(task
-    ? { ...task, dueTime: task.dueTime ?? '', reminderAt: task.reminderAt ?? '', assignedTo: normalizeAssignedTo(task.assignedTo), isRecurring: task.isRecurring ?? false, recurrence: task.recurrence ?? null }
+    ? { ...task, dueTime: task.dueTime ?? '', assignedTo: normalizeAssignedTo(task.assignedTo), isRecurring: task.isRecurring ?? false, recurrence: task.recurrence ?? null }
     : { ...EMPTY_TASK, isRecurring: forceRecurring, recurrence: forceRecurring ? { type: 'monthly', approx_day: '' } : null }
   )
   const [errors, setErrors] = useState({})
@@ -316,21 +315,6 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
           </div>
         </>
       )}
-
-      <div>
-        <label className={labelCls}>
-          Recordatorio <span className="text-[#888] font-normal">(opcional)</span>
-        </label>
-        <input
-          type="datetime-local"
-          value={form.reminderAt || ''}
-          onChange={(e) => handleChange('reminderAt', e.target.value)}
-          className={inputCls}
-        />
-        <p className="text-[10px] text-[#888] mt-1">
-          Se avisa a cada asignado individualmente en la fecha y hora elegidas{(form.assignedTo || []).length > 1 ? ' (a todos por igual)' : ''}
-        </p>
-      </div>
 
       <div>
         <label className={labelCls}>Grupo</label>

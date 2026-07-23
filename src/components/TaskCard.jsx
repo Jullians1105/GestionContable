@@ -1,4 +1,4 @@
-import { formatDate, formatReminder, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo, getTaskProgress } from '../utils/helpers'
+import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo, getTaskProgress } from '../utils/helpers'
 import { useTeam } from '../hooks/useTeam'
 import { useTags } from '../context/TagContext'
 import { useAuth } from '../context/AuthContext'
@@ -80,15 +80,6 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
           >
             <span className="material-symbols-outlined" style={{ fontSize: 10 }}>send</span>
             La creaste para otro
-          </span>
-        )}
-        {task.reminderAt && (
-          <span
-            className="px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-0.5 bg-[#fef3c7] text-[#b45309]"
-            title={`Recordatorio: ${formatReminder(task.reminderAt)}`}
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 10 }}>notifications_active</span>
-            Recordatorio
           </span>
         )}
         {task.templateId && !task.dueDate && (

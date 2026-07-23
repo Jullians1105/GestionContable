@@ -16,7 +16,7 @@ import { useTeam } from '../hooks/useTeam'
 import { normalizeAssignedTo } from '../utils/helpers'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
-import { formatDate, formatReminder, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from '../utils/helpers'
+import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from '../utils/helpers'
 
 const COLUMNS = [
   { id: 'pending', label: 'Pendiente', icon: 'radio_button_unchecked', bg: 'bg-[#f3f4f6] dark:bg-[#1a1c2e]', border: 'border-[#c3c6d7] dark:border-[#2e3148]', dot: '#888' },
@@ -45,16 +45,6 @@ function KanbanCard({ task, members, isDragging }) {
           {PRIORITY_LABELS[task.priority]}
         </span>
       </div>
-
-      {task.reminderAt && (
-        <span
-          className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#fef3c7] text-[#b45309] mb-2"
-          title={`Recordatorio: ${formatReminder(task.reminderAt)}`}
-        >
-          <span className="material-symbols-outlined" style={{ fontSize: 10 }}>notifications_active</span>
-          Recordatorio
-        </span>
-      )}
 
       {subtasks.length > 0 && (
         <div className="mb-2">
@@ -128,7 +118,7 @@ export default function KanbanPage() {
   const [activeTask, setActiveTask] = useState(null)
 
   const filtered = useMemo(() => {
-    let result = canSeeAll ? tasks : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id))
+    let result = canSeeAll ? tasks : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id) || t.createdBy === user?.id)
     if (currentGroupId) result = result.filter((t) => t.groupId === currentGroupId)
     return result
   }, [tasks, currentGroupId, canSeeAll, user])

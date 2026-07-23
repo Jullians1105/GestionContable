@@ -22,6 +22,7 @@ const NOTIF_TITLES = {
   comment_added:          'Nuevo comentario',
   subtask_done:           'Subtarea completada',
   task_reminder_pending:  'Tarea recurrente pendiente de fecha',
+  personal_task_reminder: 'Recordatorio personal',
   delete_request:         'Solicitud de eliminación',
   delete_request_approved:'Solicitud aprobada',
   delete_request_rejected:'Solicitud rechazada',
@@ -138,10 +139,12 @@ export function NotificationProvider({ children }) {
     const onNotification = (notif) => {
       setNotifications(prev => [{ ...notif, read: false }, ...prev].slice(0, 50))
 
-      // Toast in-app con botón "Ver" si hay tarea asociada
+      // Toast in-app con botón "Ver" si hay tarea asociada (o un pendiente personal)
       addToast(notif.message, 'info', 6000, notif.taskId
         ? { label: 'Ver', onClick: () => navigate('/tasks') }
-        : null
+        : notif.type === 'personal_task_reminder'
+          ? { label: 'Ver', onClick: () => navigate('/pendientes') }
+          : null
       )
 
       // Notificación del SO (cuando la app está en background o en otra pestaña)
@@ -156,7 +159,11 @@ export function NotificationProvider({ children }) {
         } else {
           try {
             const osNotif = new Notification(title, options)
-            osNotif.onclick = () => { window.focus(); if (notif.taskId) navigate('/tasks') }
+            osNotif.onclick = () => {
+              window.focus()
+              if (notif.taskId) navigate('/tasks')
+              else if (notif.type === 'personal_task_reminder') navigate('/pendientes')
+            }
           } catch {
             // new Notification() bloqueado en HTTP — las notificaciones in-app siguen funcionando
           }

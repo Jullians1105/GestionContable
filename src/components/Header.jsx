@@ -39,7 +39,7 @@ export default function Header({ onMenuToggle }) {
   const avatarBg = user ? getAvatarColor(user.name) : 'bg-[#004ac6]'
   const visibleTaskCount = (isAdmin() || isLeader())
     ? tasks.length
-    : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id)).length
+    : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id) || t.createdBy === user?.id).length
 
   return (
     <>

@@ -36,7 +36,7 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
   }, [openTaskId, openCommentId, tasks])
 
   const filtered = tasks.filter((t) => {
-    if (!canSeeAll && !normalizeAssignedTo(t.assignedTo).includes(user?.id)) return false
+    if (!canSeeAll && !normalizeAssignedTo(t.assignedTo).includes(user?.id) && t.createdBy !== user?.id) return false
     if (currentGroupId && t.groupId !== currentGroupId) return false
     if (filters.search) {
       const q = filters.search.toLowerCase()

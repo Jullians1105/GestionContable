@@ -72,57 +72,51 @@ async function sendDueReminders(io) {
   }
 }
 
-// Recordatorio personalizado (fecha/hora elegida al crear/editar la tarea, independiente
-// del vencimiento). Se envía UNA notificación individual a cada persona asignada — no una
-// notificación grupal — así cada quien la marca leída por separado.
-async function sendCustomReminders(io) {
+// Recordatorio personalizado (fecha/hora elegida al crear/editar un pendiente personal,
+// espacio 100% privado — ver personal_tasks). Notificación individual al dueño del pendiente.
+async function sendPersonalTaskReminders(io) {
   try {
     const result = await db.query(`
-      SELECT t.id, t.title,
-        (SELECT json_agg(json_build_object('userId', ta.user_id, 'name', u.name))
-         FROM task_assignees ta JOIN users u ON u.id = ta.user_id WHERE ta.task_id = t.id) AS assignees
-      FROM tasks t
-      WHERE t.custom_reminder_at IS NOT NULL
-        AND t.custom_reminder_sent_at IS NULL
-        AND t.custom_reminder_at <= NOW()
-        AND t.status != 'completed'
-        AND (t.is_recurring = false OR t.template_id IS NOT NULL)
+      SELECT pt.id, pt.title, pt.user_id
+      FROM personal_tasks pt
+      WHERE pt.reminder_at IS NOT NULL
+        AND pt.reminder_sent_at IS NULL
+        AND pt.reminder_at <= NOW()
+        AND pt.completed = false
     `);
 
     if (result.rows.length === 0) return;
 
     for (const task of result.rows) {
-      const assignees = task.assignees || [];
+      const notifId = uuidv4();
       const msg = `Recordatorio: "${task.title}"`;
+      const extraData = JSON.stringify({ personalTaskId: task.id });
 
-      await Promise.all(assignees.map(async (a) => {
-        const notifId = uuidv4();
-        await db.query(
-          `INSERT INTO notifications (id, user_id, type, message, task_id) VALUES ($1, $2, 'task_reminder', $3, $4)`,
-          [notifId, a.userId, msg, task.id]
-        );
-        io?.to(`user:${a.userId}`).emit('notification:received', {
-          id: notifId,
-          type: 'task_reminder',
-          message: msg,
-          taskId: task.id,
-          read: false,
-          createdAt: new Date().toISOString(),
-        });
-        sendPushToUser(a.userId, {
-          title: 'Recordatorio de tarea',
-          body: msg,
-          url: '/tasks',
-          tag: notifId,
-        });
-      }));
+      await db.query(
+        `INSERT INTO notifications (id, user_id, type, message, extra_data) VALUES ($1, $2, 'personal_task_reminder', $3, $4)`,
+        [notifId, task.user_id, msg, extraData]
+      );
+      io?.to(`user:${task.user_id}`).emit('notification:received', {
+        id: notifId,
+        type: 'personal_task_reminder',
+        message: msg,
+        extra: { personalTaskId: task.id },
+        read: false,
+        createdAt: new Date().toISOString(),
+      });
+      sendPushToUser(task.user_id, {
+        title: 'Recordatorio personal',
+        body: msg,
+        url: '/pendientes',
+        tag: notifId,
+      });
 
-      await db.query('UPDATE tasks SET custom_reminder_sent_at = NOW() WHERE id = $1', [task.id]);
+      await db.query('UPDATE personal_tasks SET reminder_sent_at = NOW() WHERE id = $1', [task.id]);
 
-      logger.info({ taskId: task.id, assignees: assignees.length }, 'Recordatorio personalizado enviado');
+      logger.info({ personalTaskId: task.id, userId: task.user_id }, 'Recordatorio personal enviado');
     }
   } catch (err) {
-    logger.error({ err }, 'Error enviando recordatorios personalizados');
+    logger.error({ err }, 'Error enviando recordatorios personales');
   }
 }
 
@@ -133,12 +127,12 @@ function initReminderCron(io) {
   });
   logger.info('Cron de recordatorios de vencimiento inicializado (cada 30 min)');
 
-  // Cada 5 minutos — el recordatorio personalizado es a una hora puntual elegida por el
+  // Cada 5 minutos — el recordatorio personal es a una hora puntual elegida por el
   // usuario, así que necesita más precisión que el de vencimiento.
   cron.schedule('*/5 * * * *', () => {
-    sendCustomReminders(io);
+    sendPersonalTaskReminders(io);
   });
-  logger.info('Cron de recordatorios personalizados inicializado (cada 5 min)');
+  logger.info('Cron de recordatorios personales inicializado (cada 5 min)');
 }
 
-module.exports = { initReminderCron, sendDueReminders, sendCustomReminders };
+module.exports = { initReminderCron, sendDueReminders, sendPersonalTaskReminders };

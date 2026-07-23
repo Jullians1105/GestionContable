@@ -10,7 +10,7 @@ import { useTasks } from '../hooks/useTasks'
 import { useGroups } from '../context/GroupContext'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../services/api'
-import { isDueDateOverdue, isDueDateSoon, PRIORITY_LABELS, formatReminder, normalizeAssignedTo } from '../utils/helpers'
+import { isDueDateOverdue, isDueDateSoon, PRIORITY_LABELS, normalizeAssignedTo } from '../utils/helpers'
 import TaskDetailModal from '../components/TaskDetailModal'
 
 const DOT_COLOR = (task) => {
@@ -41,7 +41,7 @@ export default function CalendarPage() {
   }, [canSeeTemplates])
 
   const filtered = useMemo(() => {
-    let result = canSeeAll ? tasks : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id))
+    let result = canSeeAll ? tasks : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id) || t.createdBy === user?.id)
     if (currentGroupId) result = result.filter((t) => t.groupId === currentGroupId)
     return result
   }, [tasks, currentGroupId, canSeeAll, user])
@@ -278,15 +278,6 @@ export default function CalendarPage() {
                             </span>
                           )}
                           {t.templateId && !t.dueDate && <span className="text-[10px] font-semibold text-[#c2410c]">Sin fecha</span>}
-                          {t.reminderAt && !t._isTemplate && (
-                            <span
-                              className="text-[10px] font-semibold text-[#b45309] flex items-center gap-0.5"
-                              title={`Recordatorio: ${formatReminder(t.reminderAt)}`}
-                            >
-                              <span className="material-symbols-outlined" style={{ fontSize: 11 }}>notifications_active</span>
-                              Recordatorio
-                            </span>
-                          )}
                           {!t._isTemplate && isDueDateOverdue(t.dueDate, t.dueTime) && <span className="text-xs text-[#EF4444] font-semibold">Vencida</span>}
                           {!t._isTemplate && isDueDateSoon(t.dueDate, t.dueTime) && !isDueDateOverdue(t.dueDate, t.dueTime) && <span className="text-xs text-[#FBBF24] font-semibold">Próxima</span>}
                         </div>
