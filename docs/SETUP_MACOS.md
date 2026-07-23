@@ -33,7 +33,7 @@ Estoy abriendo este proyecto por primera vez en macOS. Necesito que hagas lo sig
    Confirma que tiene al menos estas variables:
      PORT=3000
      DB_PORT=5432
-     DB_NAME=taskflow
+     DB_NAME=gestcon
      DB_USER=postgres
      DB_PASSWORD=<elige un password>
      JWT_SECRET=<cualquier cadena larga>
@@ -216,8 +216,8 @@ Si usaste el flujo B (Node local + Postgres en Docker):
 Necesito hacer una tarea de mantenimiento sobre la base de datos PostgreSQL
 (corriendo en Docker, vía docker-compose):
 
-- Backup: ./scripts/backup-db.sh
-  Genera un dump con pg_dump en backups/taskflow_<timestamp>.sql
+- Backup: ./scripts/backup.sh
+  Genera un dump con pg_dump comprimido en backups/backup_<timestamp>.tar.gz
   (usa las variables de .env en la raíz; crea la carpeta backups/ si no existe).
 
 - Reset completo (borra y recrea la BD con migraciones + seed): ./scripts/reset-db.sh
@@ -264,5 +264,5 @@ se aplican los defaults del rol.
 | `docker compose down` | Detiene y elimina contenedores |
 | `./scripts/start-dev.sh` | Levanta todo (postgres + backend + frontend) en Docker, migra y sigue logs (flujo A) |
 | `./scripts/stop-dev.sh` | Detiene y elimina los contenedores (`docker compose down`) |
-| `./scripts/backup-db.sh` | Vuelca la BD a `backups/taskflow_<timestamp>.sql` con `pg_dump` |
+| `./scripts/backup.sh` | Backup completo: BD comprimida + .env + backend.env + certs SSL, con rotación automática de 7 días |
 | `./scripts/reset-db.sh` | Borra y recrea la BD con migraciones + seed (pide confirmación) |

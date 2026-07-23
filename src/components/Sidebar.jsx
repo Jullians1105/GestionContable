@@ -9,12 +9,15 @@ import logoBlanco from '../assets/logo-icono-blanco.png'
 const navItems = [
   { to: '/', label: 'Dashboard', icon: 'dashboard', end: true },
   { to: '/tasks', label: 'Mis Tareas', icon: 'task_alt' },
+  { to: '/pendientes', label: 'Mis Pendientes', icon: 'checklist' },
+  { to: '/notas', label: 'Mis Notas', icon: 'edit_note' },
   { to: '/kanban', label: 'Kanban', icon: 'view_kanban' },
   { to: '/calendar', label: 'Calendario', icon: 'calendar_month' },
   { to: '/tasks/recurrentes', label: 'Recurrentes', icon: 'repeat', leaderOnly: true },
   { to: '/team', label: 'Equipo', icon: 'group' },
   { to: '/groups', label: 'Grupos', icon: 'group_work' },
   { to: '/reports', label: 'Reportes', icon: 'bar_chart' },
+  { to: '/workload', label: 'Carga de trabajo', icon: 'balance' },
   { to: '/usuarios', label: 'Usuarios', icon: 'manage_accounts' },
   { to: '/notifications', label: 'Notificaciones', icon: 'notifications' },
   { to: '/settings', label: 'Configuración', icon: 'settings' },
@@ -75,6 +78,7 @@ export default function Sidebar({ open, onClose }) {
   const visible = navItems.filter(item => {
     if (item.leaderOnly && !isAdmin() && !isLeader()) return false
     if (item.to === '/reports' && !isAdmin() && !isLeader()) return false
+    if (item.to === '/workload' && !isAdmin() && !isLeader()) return false
     if (item.to === '/groups' && !isAdmin() && !isLeader()) return false
     if (item.to === '/usuarios' && !isAdmin()) return false
     return true

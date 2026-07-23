@@ -109,6 +109,9 @@ export const api = {
   deleteTask: (id) => request(`/tasks/${id}`, { method: 'DELETE' }),
   searchTasks: (q, limit = 20) => request(`/tasks/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   getTaskHistory: (id) => request(`/tasks/${id}/history`),
+  updateMyAssigneeStatus: (taskId, status) => request(`/tasks/${taskId}/assignees/me`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  createDeleteRequest: (taskId, reason) => request(`/tasks/${taskId}/delete-request`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  respondDeleteRequest: (taskId, requestId, action) => request(`/tasks/${taskId}/delete-request/${requestId}`, { method: 'PATCH', body: JSON.stringify({ action }) }),
 
   // Subtareas
   addSubtask: (taskId, title) => request(`/tasks/${taskId}/subtasks`, { method: 'POST', body: JSON.stringify({ title }) }),
@@ -119,6 +122,22 @@ export const api = {
   addComment: (taskId, text) => request(`/tasks/${taskId}/comments`, { method: 'POST', body: JSON.stringify({ text }) }),
   updateComment: (taskId, commentId, text) => request(`/tasks/${taskId}/comments/${commentId}`, { method: 'PUT', body: JSON.stringify({ text }) }),
   deleteComment: (taskId, commentId) => request(`/tasks/${taskId}/comments/${commentId}`, { method: 'DELETE' }),
+
+  // Tareas pendientes personales
+  getPersonalTasks: () => request('/personal-tasks'),
+  createPersonalTask: (data) => request('/personal-tasks', { method: 'POST', body: JSON.stringify(data) }),
+  updatePersonalTask: (id, data) => request(`/personal-tasks/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePersonalTask: (id) => request(`/personal-tasks/${id}`, { method: 'DELETE' }),
+  addPersonalTaskItem: (taskId, title) => request(`/personal-tasks/${taskId}/items`, { method: 'POST', body: JSON.stringify({ title }) }),
+  updatePersonalTaskItem: (taskId, itemId, data) => request(`/personal-tasks/${taskId}/items/${itemId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePersonalTaskItem: (taskId, itemId) => request(`/personal-tasks/${taskId}/items/${itemId}`, { method: 'DELETE' }),
+
+  // Notas personales
+  getPersonalNotes: () => request('/personal-notes'),
+  getPersonalNote: (id) => request(`/personal-notes/${id}`),
+  createPersonalNote: (data = {}) => request('/personal-notes', { method: 'POST', body: JSON.stringify(data) }),
+  updatePersonalNote: (id, data) => request(`/personal-notes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deletePersonalNote: (id) => request(`/personal-notes/${id}`, { method: 'DELETE' }),
 
   // Employees
   getEmployees: () => request('/employees'),
@@ -133,6 +152,7 @@ export const api = {
   deleteGroup: (id) => request(`/groups/${id}`, { method: 'DELETE' }),
   addGroupMember: (groupId, userId) => request(`/groups/${groupId}/members`, { method: 'POST', body: JSON.stringify({ userId }) }),
   removeGroupMember: (groupId, userId) => request(`/groups/${groupId}/members/${userId}`, { method: 'DELETE' }),
+  setGroupLeader: (groupId, userId, isLeader) => request(`/groups/${groupId}/members/${userId}/leader`, { method: 'PUT', body: JSON.stringify({ isLeader }) }),
 
   // Tags
   getTags: () => request('/tags'),
@@ -142,6 +162,7 @@ export const api = {
 
   // Stats
   getStats: () => request('/stats'),
+  getWorkload: () => request('/stats/workload'),
   getAuditLog: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/audit${qs ? `?${qs}` : ''}`);
@@ -152,14 +173,26 @@ export const api = {
     const qs = new URLSearchParams({ anio, mes }).toString();
     return request(`/fondo/checklist/${empresaId}?${qs}`);
   },
+  // Checklist del mes para todas las empresas en una sola llamada (evita 1 request por empresa)
+  getFondoChecklistMes: (anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/mes?${qs}`);
+  },
   updateFondoChecklistItem: (empresaId, procesoId, anio, mes, data) => {
     const qs = new URLSearchParams({ anio, mes }).toString();
     return request(`/fondo/checklist/${empresaId}/item/${procesoId}?${qs}`,
       { method: 'PUT', body: JSON.stringify(data) });
   },
-  updateFondoChecklistConfirmado: (empresaId, anio, mes, data) => {
+  // tipo: 'nomina' | 'contabilidad' — cada uno tiene su propio flag
+  // confirmado/enviado, independiente del otro.
+  updateFondoChecklistConfirmado: (empresaId, anio, mes, tipo, data) => {
     const qs = new URLSearchParams({ anio, mes }).toString();
-    return request(`/fondo/checklist/${empresaId}/confirmado?${qs}`,
+    return request(`/fondo/checklist/${empresaId}/confirmado/${tipo}?${qs}`,
+      { method: 'PUT', body: JSON.stringify(data) });
+  },
+  updateFondoChecklistEnviado: (empresaId, anio, mes, tipo, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/checklist/${empresaId}/enviado/${tipo}?${qs}`,
       { method: 'PUT', body: JSON.stringify(data) });
   },
 
@@ -171,10 +204,29 @@ export const api = {
   updateFondoDetalle: (empresaId, macroId, anio, mes, data) =>
     request(`/fondo/detalle/${empresaId}/${macroId}`, { method: 'PUT', body: JSON.stringify({ anio, mes, ...data }) }),
 
+  // Fondo Emprender — Checklist de impuestos (mp6 / Información tributaria)
+  getFondoImpuestos: (empresaId, anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/impuestos/${empresaId}?${qs}`);
+  },
+  updateFondoImpuestoItem: (empresaId, impuestoId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/impuestos/${empresaId}/item/${impuestoId}?${qs}`,
+      { method: 'PATCH', body: JSON.stringify(data) });
+  },
+
   // Fondo Emprender — Pagos
   getFondoPagos:    (empresaId)         => request(`/fondo/pagos/${empresaId}`),
+  getFondoPagosTodasEmpresas: () => request('/fondo/pagos/todas'),
   createFondoPago:  (empresaId, data)   => request(`/fondo/pagos/${empresaId}`, { method: 'POST', body: JSON.stringify(data) }),
   updateFondoPago:  (empresaId, pagoId, data) => request(`/fondo/pagos/${empresaId}/${pagoId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  updateFondoPagoAutorizado: (empresaId, anio, mes, autorizado) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/fondo/pagos/${empresaId}/autorizar?${qs}`, { method: 'PUT', body: JSON.stringify({ autorizado }) });
+  },
+  getFondoPagosMesActual: () => request('/fondo/pagos/mes-actual'),
+  avanzarFondoPagosMesActual: () => request('/fondo/pagos/mes-actual/avanzar', { method: 'POST' }),
+  retrocederFondoPagosMesActual: () => request('/fondo/pagos/mes-actual/retroceder', { method: 'POST' }),
 
   // Fondo Emprender — Empresas
   getFondoEmpresas: (categoria, anio, mes) => {
@@ -199,7 +251,18 @@ export const api = {
   getFondoResponsables: (anio, mes) => request(`/fondo/detalle/responsables?anio=${anio}&mes=${mes}`),
 
   // Fondo Emprender — Catálogo de procesos (checklist)
-  getFondoProcesos: () => request('/fondo/procesos'),
+  getFondoProcesos: (incluirInactivos) => {
+    const qs = incluirInactivos ? '?incluirInactivos=true' : ''
+    return request(`/fondo/procesos${qs}`)
+  },
+  createFondoProceso: (data) => request('/fondo/procesos', { method: 'POST', body: JSON.stringify(data) }),
+  updateFondoProceso: (id, data) => request(`/fondo/procesos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Fondo Emprender — Grupos de procesos (agrupar columnas del checklist)
+  getFondoProcesoGrupos: () => request('/fondo/proceso-grupos'),
+  createFondoProcesoGrupo: (data) => request('/fondo/proceso-grupos', { method: 'POST', body: JSON.stringify(data) }),
+  updateFondoProcesoGrupo: (id, data) => request(`/fondo/proceso-grupos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteFondoProcesoGrupo: (id) => request(`/fondo/proceso-grupos/${id}`, { method: 'DELETE' }),
 
   // DIAN
   uploadDian: (formData) => {

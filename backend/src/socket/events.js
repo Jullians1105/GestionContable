@@ -24,6 +24,8 @@ const setupSocket = (io) => {
     socket.join(`user:${userId}`);
     onlineUsers.set(userId, { email, socketId: socket.id });
     io.emit('user:online', { userId, email });
+    // Enviar al cliente recién conectado la lista de quién ya está en línea
+    socket.emit('users:online:list', Array.from(onlineUsers.keys()));
 
     socket.on('join:task', (taskId) => socket.join(`task:${taskId}`));
     socket.on('leave:task', (taskId) => socket.leave(`task:${taskId}`));

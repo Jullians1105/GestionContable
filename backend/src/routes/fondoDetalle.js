@@ -47,8 +47,9 @@ router.get('/responsables', getResponsables);
  *     responses:
  *       200:
  *         description: >
- *           Array de 7 macroprocesos (mp1-mp7). mp5/Contabilidad es readonly y su campo
- *           confirmed se deriva de fondo_checklist_meses. Los demás reflejan fondo_detalle_macroprocesos.
+ *           Array de 7 macroprocesos (mp1-mp7). mp2/Nómina y mp5/Contabilidad son readonly y
+ *           sus campos confirmed/enviado se derivan de fondo_checklist_meses (columnas
+ *           _nomina/_contabilidad respectivamente). Los demás reflejan fondo_detalle_macroprocesos.
  */
 router.get('/:empresaId',
   ...validateUUIDParam('empresaId'),

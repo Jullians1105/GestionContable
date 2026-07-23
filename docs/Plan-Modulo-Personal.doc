@@ -1,0 +1,49 @@
+{\rtf1\ansi\ansicpg1252\deff0\deflang3082
+{\fonttbl{\f0 Calibri;}{\f1 Calibri Light;}}
+{\colortbl;\red0\green74\blue198;\red60\green60\blue60;}
+\f0\fs22
+\pard\sa240\sb0\f1\fs40\b\cf1 Modulo personal: Tareas pendientes y Notas\b0\cf0\par
+\pard\sa360\f0\fs18\i\cf2 TaskFlow Pro - Propuesta de desarrollo | 2026-07-20\i0\cf0\par
+\pard\sb360\sa160\f0\fs30\b\cf1 Contexto\b0\cf0\par
+\pard\sa160\f0\fs22 Se evalua agregar un espacio personal para cada trabajador dentro de la app, separado de las tareas asignadas por otros. Incluye dos partes: (1) una lista de pendientes propia tipo checklist con subtareas, y (2) un apartado de Notas de formato libre, al estilo Notion, con un menu de "/" para insertar bloques (titulos, listas, checkboxes, etc.).\par
+\pard\sa160\f0\fs22 El objetivo de este documento es dejar claras las fases de desarrollo, el alcance de cada una y las decisiones ya tomadas, antes de empezar a escribir codigo.\par
+\pard\sb360\sa160\f0\fs30\b\cf1 Decisiones ya tomadas\b0\cf0\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab El modulo de Notas usara la libreria BlockNote (sobre Tiptap/ProseMirror) para tener el menu "/" real, en vez de construir un editor de bloques desde cero.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab El desarrollo se hace por fases: primero Tareas personales (Fase 1), y una vez entregada y funcionando, se aborda Notas (Fase 2).\par
+\pard\sb360\sa160\f0\fs30\b\cf1 Fase 0 - Preparacion\b0\cf0\par
+\pard\sa160\f0\fs22 Alcance minimo, sin dependencias nuevas. Prepara el terreno para ambas fases.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Definir la ruta de navegacion nueva en el Sidebar (ej. "Mis pendientes"), visible para todos los roles (a diferencia de otras secciones, esto es personal y no requiere permisos especiales).\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Confirmar convenciones a reutilizar: patron de migraciones SQL (backend/migrations), patron de controlador + rutas (Express + PostgreSQL), patron de contexto/servicio en frontend (src/services/api.js).\par
+\pard\sb360\sa160\f0\fs30\b\cf1 Fase 1 - Tareas pendientes personales\b0\cf0\par
+\pard\sa160\f0\fs22 Checklist privado por usuario, con subtareas. Reutiliza el mismo patron que ya existe para las subtareas de tareas de equipo (tabla task_subtasks), pero sin asignacion a terceros, sin grupos y sin permisos: cada usuario solo ve y edita lo suyo.\par
+\pard\sb200\sa100\f0\fs24\b\cf2 Backend\b0\cf0\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Nueva migracion SQL: tabla personal_tasks (id, user_id, title, completed, position, due_date opcional, created_at, updated_at) y personal_task_items (id, personal_task_id, title, completed, position, created_at).\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Controlador nuevo (personalTaskController.js): listar, crear, actualizar, eliminar, reordenar tareas propias; agregar/actualizar/eliminar/marcar items.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Rutas nuevas montadas en /api/personal-tasks, protegidas solo con autenticacion (sin roles ni permisos adicionales); toda consulta se filtra siempre por user_id = usuario autenticado.\par
+\pard\sb200\sa100\f0\fs24\b\cf2 Frontend\b0\cf0\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Nueva pagina (PersonalTasksPage) y entrada en el Sidebar.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Reutilizar la logica visual del componente de subtareas existente (src/components/Subtasks) como base para la lista de items.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Llamadas a la API mediante el mismo patron de src/services/api.js (agregar metodos nuevos al objeto api).\par
+\pard\sb200\sa100\f0\fs24\b\cf2 Esfuerzo estimado\b0\cf0\par
+\pard\sa160\f0\fs22 Bajo. Es el mismo patron ya probado en el modulo de tareas, sin necesidad de tiempo real (Socket.io) porque es de un solo usuario. Entregable en pocos dias de trabajo.\par
+\pard\sb360\sa160\f0\fs30\b\cf1 Fase 2 - Notas tipo Notion\b0\cf0\par
+\pard\sa160\f0\fs22 Espacio de notas de formato libre por usuario, con edicion por bloques y menu "/" (texto, encabezados, listas, checkboxes, etc.), usando BlockNote.\par
+\pard\sb200\sa100\f0\fs24\b\cf2 Backend\b0\cf0\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Nueva migracion SQL: tabla notes (id, user_id, title, content JSONB, created_at, updated_at). El contenido de los bloques se guarda como JSON (formato nativo de BlockNote), no como HTML.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Controlador y rutas /api/notes: listar notas propias, crear, actualizar (autoguardado), eliminar. Igual que Fase 1, todo filtrado por user_id.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Autoguardado con debounce desde el frontend (no se guarda en cada tecla, sino cada cierto tiempo de inactividad) para no saturar la base de datos.\par
+\pard\sb200\sa100\f0\fs24\b\cf2 Frontend\b0\cf0\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Integrar BlockNote (nueva dependencia npm) dentro de una pagina o panel de Notas.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Adaptar estilos de BlockNote a la paleta de colores del proyecto (modo claro/oscuro ya definido en Tailwind).\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Guardar el JSON de bloques contra la API con debounce, y mostrar estado de guardado (ej. "Guardado" / "Guardando...").\par
+\pard\sb200\sa100\f0\fs24\b\cf2 Esfuerzo estimado\b0\cf0\par
+\pard\sa160\f0\fs22 Medio. La libreria resuelve la parte mas cara (el editor de bloques), pero integrarla, ajustar estilos al tema visual del proyecto y armar el autoguardado toma mas tiempo que la Fase 1.\par
+\pard\sb360\sa160\f0\fs30\b\cf1 Rendimiento y viabilidad\b0\cf0\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Impacto en base de datos: insignificante. Son 3-4 tablas nuevas, chicas, indexadas por user_id, sin relacion con las tablas grandes del sistema (tasks, fondo_*). No afecta el rendimiento de lo existente.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Sin necesidad de Socket.io en ninguna de las dos fases: al ser datos estrictamente personales (no se comparten entre usuarios), no hace falta sincronizacion en tiempo real entre distintos usuarios. Si en el futuro se quiere sincronizar entre varios dispositivos del mismo usuario, se puede sumar despues sin redise\'f1ar nada.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Costo real esta en el frontend de Notas (Fase 2) por la libreria de edicion de bloques, no en la base de datos ni en el backend.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab Conclusion: viable en ambas fases sin riesgo de rendimiento. Fase 1 es rapida de entregar; Fase 2 requiere mas tiempo por la integracion del editor, pero sigue siendo acotada.\par
+\pard\sb360\sa160\f0\fs30\b\cf1 Orden de entrega sugerido\b0\cf0\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab 1. Fase 0 (preparacion) + Fase 1 (Tareas personales) completas y probadas en la app.\par
+\pard\fi-240\li480\sa80\f0\fs22 \bullet\tab 2. Fase 2 (Notas con BlockNote) como entrega separada, una vez validada la Fase 1 con los usuarios.\par
+}

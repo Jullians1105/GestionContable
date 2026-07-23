@@ -1,4 +1,4 @@
-# TaskFlow Pro — GestionTareasOficina
+# Gestcon — GestionTareasOficina
 
 Gestor de tareas para equipos de oficina con backend real en PostgreSQL, autenticación JWT, WebSockets en tiempo real y soporte Docker.
 
@@ -57,7 +57,7 @@ npm run build              # Build de producción (verifica errores)
 npm run lint               # ESLint (falla con warnings)
 npm run backend:test       # Tests del backend
 docker compose down        # Parar contenedores
-./scripts/backup-db.sh    # Backup manual de la base de datos
+./scripts/backup.sh    # Backup manual de BD, .env, certs con rotación de 7 días
 ./scripts/reset-db.sh     # Resetear BD (destructivo)
 ```
 

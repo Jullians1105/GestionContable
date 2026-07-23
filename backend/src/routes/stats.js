@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { getStats, getAuditLog } = require('../controllers/statsController');
+const { getStats, getAuditLog, getWorkload } = require('../controllers/statsController');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 
 const router = Router();
@@ -32,5 +32,20 @@ router.get('/', getStats);
  *       - { name: table, in: query, schema: { type: string } }
  */
 router.get('/audit', roleMiddleware('admin', 'leader'), getAuditLog);
+
+/**
+ * @openapi
+ * /api/stats/workload:
+ *   get:
+ *     tags: [Stats]
+ *     summary: Carga de trabajo por persona (snapshot actual + histórico mensual, solo admin/leader)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: >
+ *           { current: [{ id, name, abiertas, vencidas }], monthly: [{ mes, name, creadas }] }
+ */
+router.get('/workload', roleMiddleware('admin', 'leader'), getWorkload);
 
 module.exports = router;

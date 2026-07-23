@@ -14,6 +14,65 @@ const MACRO_STATUS = {
   done:        { label: 'Completado',  icon: 'check_circle',           color: '#16a34a', bg: '#dcfce7' },
 }
 
+// Usado solo para el ícono/color del header de tarjetas con estado auto-derivado
+// (mp5, mp6) — 'na' no es un estado válido para el resto de macroprocesos.
+const AUTO_STATUS = {
+  ...MACRO_STATUS,
+  na: { label: 'N/A', icon: 'do_not_disturb_on', color: '#0ea5e9', bg: '#e0f2fe' },
+}
+
+// Estados de un ítem individual del checklist de impuestos (mp6). Independiente
+// del checklist mensual de Seguimiento Mensual — mismo lenguaje visual (grid de
+// botones, colores) pero dominio de datos separado.
+const IMPUESTO_ITEM_STATUS = {
+  pending:   { label: 'Pendiente',  color: MACRO_STATUS.pending.color, bg: MACRO_STATUS.pending.bg },
+  presented: { label: 'Presentado', color: MACRO_STATUS.done.color,    bg: MACRO_STATUS.done.bg },
+  na:        { label: 'N/A',        color: AUTO_STATUS.na.color,       bg: AUTO_STATUS.na.bg },
+}
+
+const IMPUESTOS_TEXTO = {
+  done:        'Todos los impuestos presentados',
+  in_progress: 'Impuestos en proceso',
+  pending:     'Impuestos pendientes',
+  na:          'Sin impuestos aplicables este mes',
+}
+
+// Texto para mp4 (Documentos contador - Pagos), keyed por el estado crudo de
+// fondo_pagos (no por el estado agregado de 3 valores) para poder distinguir
+// "enviado" de "aprobado" aunque ambos deriven a 'done' (mp4 rastrea que los
+// documentos se enviaron, no si la fiduciaria ya confirmó el pago).
+const PAGOS_TEXTO = {
+  aprobado:  'Documentos enviados',
+  enviado:   'Documentos enviados',
+  rechazado: 'Pago rechazado — requiere corrección',
+  pendiente: 'Pago pendiente',
+}
+
+// Texto para mp3 (Nómina electrónica), keyed por el estado crudo del ítem del
+// checklist (proc.checklistEstado) — no por el estado agregado de 3 valores,
+// para poder distinguir "Completado" de "Completado - No aplica" aunque
+// ambos deriven a 'done'.
+const NOMINA_ELECTRONICA_TEXTO = {
+  done:        'Completado',
+  na:          'Completado — No aplica',
+  in_progress: 'En proceso',
+  pending:     'Pendiente',
+}
+
+// Debe coincidir con deriveImpuestosEstado en
+// backend/src/controllers/fondoDetalleController.js — usado para reflejar el
+// estado de mp6 al instante tras editar un ítem, sin esperar un refetch.
+// Los 4 en 'na' cuentan como 'done' (ya se revisó, no había nada que
+// presentar) — el texto distinto para ese caso se resuelve aparte, ver
+// impuestosTexto más abajo.
+function deriveImpuestosEstado(items) {
+  const noNa = items.map(i => i.estado).filter(e => e !== 'na')
+  if (noNa.length === 0) return 'done'
+  if (noNa.every(e => e === 'presented')) return 'done'
+  if (noNa.some(e => e === 'presented')) return 'in_progress'
+  return 'pending'
+}
+
 const TASK_STATUS = {
   pending:    { icon: 'radio_button_unchecked', color: '#6b7280' },
   in_progress:{ icon: 'timelapse',              color: '#d97706' },
@@ -26,11 +85,35 @@ const PRIORITY_COLORS = { high: '#ef4444', medium: '#f59e0b', low: '#10b981' }
 const MACRO_RESPONSABLES = {
   1: [{ name: 'Diego Quintero' }],
   2: [{ name: 'Katerin Pineda' }],
-  3: [{ name: 'Diego Quintero' }, { name: 'Daniela Ruiz', note: 'temporal' }],
+  3: [{ name: 'Diego Quintero' }, { name: 'Dana', note: 'temporal' }],
   4: [{ name: 'Diego Quintero' }],
   5: [{ name: 'Katerin Pineda' }, { name: 'Ruben Parada' }],
   6: [{ name: 'Diana Gutierrez' }],
   7: [{ name: 'Diana Gutierrez', note: 'Producción' }, { name: 'Mauricio Gutierrez', note: 'Ventas' }],
+}
+
+function EstadoButtonGroup({ options, value, onChange, columns = 3 }) {
+  return (
+    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
+      {Object.entries(options).map(([key, cfg]) => {
+        const active = value === key
+        return (
+          <button
+            key={key}
+            onClick={() => onChange(key)}
+            className="py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:opacity-90 active:scale-95"
+            style={{
+              background: active ? cfg.bg : 'transparent',
+              color:      active ? cfg.color : '#9ca3af',
+              border:     `1.5px solid ${active ? cfg.color : '#e2e4ef'}`,
+            }}
+          >
+            {cfg.label}
+          </button>
+        )
+      })}
+    </div>
+  )
 }
 
 function ResponsableBadges({ macroId }) {
@@ -72,23 +155,29 @@ export default function FondoEmprenderEmpresaDetallePage() {
 
   const [company, setCompany]           = useState(null)
   const [macroprocesos, setMacros]      = useState([])
+  const [impuestosItems, setImpuestosItems] = useState([])
   const [loading, setLoading]           = useState(true)
   const [error, setError]               = useState(null)
   // notasDraft tracks in-progress edits; saves on blur to avoid per-keystroke API calls
   const [notasDraft, setNotasDraft]     = useState({})
+  // Qué ítem de impuesto tiene el textarea de nota desplegado (inline, no flotante)
+  const [notaAbiertaId, setNotaAbiertaId] = useState(null)
 
   const fetchDetalle = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-      const [empresaData, detalleData] = await Promise.all([
+      const [empresaData, detalleData, impuestosData] = await Promise.all([
         api.getFondoEmpresa(empresaId),
         api.getFondoDetalle(empresaId, anio, mes),
+        api.getFondoImpuestos(empresaId, anio, mes),
       ])
       setCompany(empresaData)
       setMacros(detalleData.macroprocesos)
+      setImpuestosItems(impuestosData.items)
       const drafts = {}
       detalleData.macroprocesos.forEach(m => { drafts[m.id] = m.nota ?? '' })
+      impuestosData.items.forEach(it => { drafts[it.id] = it.nota ?? '' })
       setNotasDraft(drafts)
     } catch (err) {
       setError(err.message || 'Error al cargar detalle')
@@ -131,19 +220,37 @@ export default function FondoEmprenderEmpresaDetallePage() {
         setNotasDraft(prev => ({ ...prev, [macroId]: actualizado.nota ?? '' }))
       }
     } catch (err) {
-      if (err.status === 403) {
-        alert('No tienes permiso para editar macroprocesos')
-      } else {
-        alert('Error: ' + err.message)
-      }
+      alert(err.status === 403 ? err.message : 'Error: ' + err.message)
     }
   }, [empresaId, anio, mes])
 
-  // Progress summary
-  const mp5        = macroprocesos.find(m => m.id === 5)
-  const contabDone = mp5?.confirmed ?? false
-  const manualDone = macroprocesos.filter(m => m.id !== 5 && m.estado === 'done').length
-  const totalDone  = manualDone + (contabDone ? 1 : 0)
+  const handleUpdateImpuesto = useCallback(async (item, updates) => {
+    const previous = impuestosItems
+    const optimistic = previous.map(it => it.id === item.id ? { ...it, ...updates } : it)
+    setImpuestosItems(optimistic)
+    setMacros(prev => prev.map(m => m.id !== 6 ? m : { ...m, estado: deriveImpuestosEstado(optimistic) }))
+    try {
+      const actualizado = await api.updateFondoImpuestoItem(empresaId, item.impuestoId, anio, mes, updates)
+      setImpuestosItems(prev => prev.map(it => it.id === item.id ? { ...it, ...actualizado } : it))
+      if ('nota' in updates) {
+        setNotasDraft(prev => ({ ...prev, [item.id]: actualizado.nota ?? '' }))
+      }
+    } catch (err) {
+      setImpuestosItems(previous)
+      setMacros(prev => prev.map(m => m.id !== 6 ? m : { ...m, estado: deriveImpuestosEstado(previous) }))
+      alert(err.status === 403 ? err.message : 'Error: ' + err.message)
+    }
+  }, [empresaId, anio, mes, impuestosItems])
+
+  // Progress summary — mp5/Contabilidad ya viene con su estado derivado del
+  // grupo CONTABILIDAD del checklist mensual (igual que mp2/mp3/mp4/mp6), no
+  // hace falta sumarlo aparte a partir de "confirmed".
+  const totalDone = macroprocesos.filter(m => m.estado === 'done').length
+
+  // Texto del badge de mp6 — independiente del estado agregado (que ahora es
+  // 'done' tanto si se presentó todo como si los 4 quedaron en N/A), para
+  // poder seguir diferenciando el mensaje sin afectar color/conteo.
+  const impuestosTodoNa = impuestosItems.length > 0 && impuestosItems.every(it => it.estado === 'na')
 
   // ── Loading / error ───────────────────────────────────────────────────────
   if (loading) return (
@@ -211,9 +318,16 @@ export default function FondoEmprenderEmpresaDetallePage() {
       {/* ── Macro process cards ───────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {macroprocesos.map(proc => {
-          const isContabilidad = proc.id === 5
-          const cfgStatus = isContabilidad
-            ? (proc.confirmed ? MACRO_STATUS.done : MACRO_STATUS.pending)
+          const isContabilidad       = proc.id === 5
+          const isImpuestos          = proc.id === 6
+          const isPagos              = proc.id === 4
+          const isNominaElectronica  = proc.id === 3
+          const isNomina             = proc.id === 2
+          const isProduccionVentas   = proc.id === 7
+          const produccionResponsable = MACRO_RESPONSABLES[7]?.find(r => r.note === 'Producción')
+          const ventasResponsable     = MACRO_RESPONSABLES[7]?.find(r => r.note === 'Ventas')
+          const cfgStatus = (isContabilidad || isImpuestos || isPagos || isNominaElectronica || isNomina || isProduccionVentas)
+            ? (AUTO_STATUS[proc.estado] ?? AUTO_STATUS.pending)
             : (MACRO_STATUS[proc.estado] ?? MACRO_STATUS.pending)
 
           return (
@@ -234,60 +348,247 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     {proc.nombre}
                   </h3>
                 </div>
-                {isContabilidad && (
+                {(isContabilidad || isImpuestos || isPagos || isNominaElectronica || isNomina || isProduccionVentas) && (
                   <span className="text-[9px] font-bold uppercase tracking-wide text-[#8890b5] bg-[#f3f4f6] dark:bg-[#252840] px-1.5 py-0.5 rounded flex-shrink-0">
                     Auto
                   </span>
                 )}
               </div>
 
-              {/* Status — readonly for mp5, buttons for the rest */}
+              {/* Status — readonly for mp5/mp6, buttons for the rest */}
               {isContabilidad ? (
                 <div className="rounded-lg p-2.5 text-xs leading-relaxed" style={{ background: cfgStatus.bg }}>
-                  {proc.confirmed ? (
-                    <p className="font-semibold" style={{ color: '#16a34a' }}>
-                      Confirmado
-                    </p>
-                  ) : (
-                    <p className="text-[#6b7280] dark:text-[#8890b5]">
-                      Sin confirmar ·{' '}
-                      <Link
-                        to="/fondo-emprender"
-                        className="underline underline-offset-2 font-medium"
-                        style={{ color: '#004ac6' }}
-                      >
-                        ir al checklist
-                      </Link>
+                  <p className="font-semibold" style={{ color: cfgStatus.color }}>
+                    {AUTO_STATUS[proc.estado]?.label ?? AUTO_STATUS.pending.label}
+                  </p>
+                  <p className="text-[#9ca3af] mt-1" style={{ fontSize: 10 }}>
+                    Estado calculado desde el checklist mensual ·{' '}
+                    <Link
+                      to="/fondo-emprender"
+                      className="underline underline-offset-2 font-medium"
+                      style={{ color: '#004ac6' }}
+                    >
+                      ir al checklist
+                    </Link>
+                  </p>
+                  {proc.confirmed && (
+                    <p className="mt-1.5 pt-1.5 font-semibold" style={{ borderTop: '1px solid rgba(0,0,0,0.08)', color: proc.enviado ? '#004ac6' : '#16a34a' }}>
+                      {proc.enviado ? 'Enviada' : 'Lista para enviar'}
                     </p>
                   )}
+                </div>
+              ) : isImpuestos ? (
+                <div className="rounded-lg p-2.5 text-xs leading-relaxed" style={{ background: cfgStatus.bg }}>
+                  <p className="font-semibold" style={{ color: cfgStatus.color }}>
+                    {impuestosTodoNa ? IMPUESTOS_TEXTO.na : (IMPUESTOS_TEXTO[proc.estado] ?? IMPUESTOS_TEXTO.pending)}
+                  </p>
                   <p className="text-[#9ca3af] mt-1" style={{ fontSize: 10 }}>
-                    Estado calculado desde el checklist mensual
+                    Estado calculado desde el checklist de impuestos
+                  </p>
+                </div>
+              ) : isPagos ? (
+                <div className="rounded-lg p-2.5 text-xs leading-relaxed" style={{ background: cfgStatus.bg }}>
+                  <p className="font-semibold" style={{ color: cfgStatus.color }}>
+                    {PAGOS_TEXTO[proc.pagoEstado] ?? PAGOS_TEXTO.pendiente}
+                  </p>
+                  <p className="text-[#9ca3af] mt-1" style={{ fontSize: 10 }}>
+                    Estado calculado desde el módulo de Pagos ·{' '}
+                    <Link
+                      to="/fondo-emprender/pagos"
+                      className="underline underline-offset-2 font-medium"
+                      style={{ color: '#004ac6' }}
+                    >
+                      ir a pagos
+                    </Link>
+                  </p>
+                </div>
+              ) : isNominaElectronica ? (
+                <div className="rounded-lg p-2.5 text-xs leading-relaxed" style={{ background: cfgStatus.bg }}>
+                  <p className="font-semibold" style={{ color: cfgStatus.color }}>
+                    {NOMINA_ELECTRONICA_TEXTO[proc.checklistEstado] ?? NOMINA_ELECTRONICA_TEXTO.pending}
+                  </p>
+                  <p className="text-[#9ca3af] mt-1" style={{ fontSize: 10 }}>
+                    Estado calculado desde el checklist mensual ·{' '}
+                    <Link
+                      to="/fondo-emprender"
+                      className="underline underline-offset-2 font-medium"
+                      style={{ color: '#004ac6' }}
+                    >
+                      ir al checklist
+                    </Link>
+                  </p>
+                </div>
+              ) : isNomina ? (
+                <div className="rounded-lg p-2.5 text-xs leading-relaxed" style={{ background: cfgStatus.bg }}>
+                  <p className="font-semibold" style={{ color: cfgStatus.color }}>
+                    {AUTO_STATUS[proc.estado]?.label ?? AUTO_STATUS.pending.label}
+                  </p>
+                  <p className="text-[#9ca3af] mt-1" style={{ fontSize: 10 }}>
+                    Estado calculado desde el checklist mensual ·{' '}
+                    <Link
+                      to="/fondo-emprender"
+                      className="underline underline-offset-2 font-medium"
+                      style={{ color: '#004ac6' }}
+                    >
+                      ir al checklist
+                    </Link>
+                  </p>
+                  {proc.confirmed && (
+                    <p className="mt-1.5 pt-1.5 font-semibold" style={{ borderTop: '1px solid rgba(0,0,0,0.08)', color: proc.enviado ? '#004ac6' : '#16a34a' }}>
+                      {proc.enviado ? 'Enviada' : 'Lista para enviar'}
+                    </p>
+                  )}
+                </div>
+              ) : isProduccionVentas ? (
+                <div className="flex flex-col gap-2">
+                  {[
+                    { key: 'produccion', label: 'Informe de producción', data: proc.produccion, responsable: produccionResponsable },
+                    { key: 'ventas',     label: 'Informe de Ventas',     data: proc.ventas,     responsable: ventasResponsable },
+                  ].map(({ key, label, data, responsable }) => {
+                    const itemCfg = AUTO_STATUS[data?.estado ?? 'pending'] ?? AUTO_STATUS.pending
+                    return (
+                      <div key={key} className="rounded-lg p-2.5" style={{ background: itemCfg.bg }}>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-semibold" style={{ color: itemCfg.color }}>{label}</p>
+                          <span className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0" style={{ color: itemCfg.color }}>
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{itemCfg.icon}</span>
+                            {itemCfg.label}
+                          </span>
+                        </div>
+                        {responsable && (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0 ${getAvatarColor(responsable.name)}`}>
+                              {getInitials(responsable.name)}
+                            </span>
+                            <span className="text-[10px] text-[#8890b5]">{responsable.name.split(' ')[0]}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <p className="text-[#9ca3af]" style={{ fontSize: 10 }}>
+                    Estado calculado desde el checklist mensual ·{' '}
+                    <Link
+                      to="/fondo-emprender"
+                      className="underline underline-offset-2 font-medium"
+                      style={{ color: '#004ac6' }}
+                    >
+                      ir al checklist
+                    </Link>
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-1">
-                  {Object.entries(MACRO_STATUS).map(([key, cfg]) => {
-                    const active = proc.estado === key
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => handleEditarMacro(proc.id, { estado: key })}
-                        className="py-1.5 rounded-lg text-[10px] font-semibold transition-all hover:opacity-90 active:scale-95"
-                        style={{
-                          background: active ? cfg.bg : 'transparent',
-                          color:      active ? cfg.color : '#9ca3af',
-                          border:     `1.5px solid ${active ? cfg.color : '#e2e4ef'}`,
-                        }}
-                      >
-                        {cfg.label}
-                      </button>
-                    )
-                  })}
+                <EstadoButtonGroup
+                  options={MACRO_STATUS}
+                  value={proc.estado}
+                  onChange={key => handleEditarMacro(proc.id, { estado: key })}
+                />
+              )}
+
+              {/* Desglose por proceso (mp2) — solo lectura, espejo del
+                  checklist de Seguimiento Mensual; se edita allá, no acá. */}
+              {isNomina && (
+                <div>
+                  <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1.5">
+                    Procesos
+                  </label>
+                  <div className="space-y-1">
+                    {(proc.checklistItems ?? []).map(item => {
+                      const itemCfg = AUTO_STATUS[item.estado] ?? AUTO_STATUS.pending
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-[#f8f9fc] dark:bg-[#252840]"
+                        >
+                          <span className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate">
+                            {item.nombre}
+                          </span>
+                          <span
+                            className="flex items-center gap-1 text-[10px] font-semibold flex-shrink-0"
+                            style={{ color: itemCfg.color }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{itemCfg.icon}</span>
+                            {itemCfg.label}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
 
-              {/* Responsables */}
-              <ResponsableBadges macroId={proc.id} />
+              {/* Checklist de impuestos (mp6) */}
+              {isImpuestos && (
+                <div>
+                  <label className="block text-[10px] font-semibold text-[#8890b5] uppercase tracking-wide mb-1.5">
+                    Impuestos
+                  </label>
+                  <div className="space-y-2">
+                    {impuestosItems.map(item => {
+                      const notaAbierta = notaAbiertaId === item.id
+                      const tieneNota   = !!item.nota?.trim()
+                      return (
+                        <div key={item.id} className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8]">
+                              {item.nombre}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setNotasDraft(prev => ({ ...prev, [item.id]: item.nota ?? '' }))
+                                setNotaAbiertaId(prev => prev === item.id ? null : item.id)
+                              }}
+                              title={tieneNota ? 'Editar nota' : 'Agregar nota'}
+                              className="flex-shrink-0 text-[#9ca3af] hover:text-[#6b7280] dark:hover:text-[#c4c8e8] transition"
+                            >
+                              <span className="material-symbols-outlined" style={{ fontSize: 13, lineHeight: 1 }}>edit</span>
+                            </button>
+                          </div>
+                          <EstadoButtonGroup
+                            options={IMPUESTO_ITEM_STATUS}
+                            value={item.estado}
+                            onChange={key => handleUpdateImpuesto(item, { estado: key })}
+                          />
+                          {tieneNota && !notaAbierta && (
+                            <div className="rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] px-2.5 py-1.5">
+                              <p className="text-[9px] font-semibold text-[#8890b5] uppercase tracking-wide mb-0.5">
+                                Nota
+                              </p>
+                              <p
+                                className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate"
+                                title={item.nota}
+                              >
+                                {item.nota}
+                              </p>
+                            </div>
+                          )}
+                          {notaAbierta && (
+                            <textarea
+                              autoFocus
+                              value={notasDraft[item.id] ?? ''}
+                              onChange={e => setNotasDraft(prev => ({ ...prev, [item.id]: e.target.value }))}
+                              onBlur={e => {
+                                const newNota = e.target.value
+                                if (newNota !== (item.nota ?? '')) {
+                                  handleUpdateImpuesto(item, { nota: newNota })
+                                }
+                                setNotaAbiertaId(null)
+                              }}
+                              placeholder="Notas adicionales..."
+                              rows={2}
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Responsables — para mp7 ya se muestran adentro de cada
+                  sub-sección (Producción/Ventas), no hace falta repetir acá */}
+              {!isProduccionVentas && <ResponsableBadges macroId={proc.id} />}
 
               {/* Tareas vinculadas desde el Gestor de Tareas */}
               {proc.tareasVinculadas?.length > 0 && (

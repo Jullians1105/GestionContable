@@ -1,11 +1,36 @@
-# Estado del Proyecto — GestionTareasOficina / TaskFlow Pro
+# Estado del Proyecto — GestionTareasOficina / Gestcon
 
-**Última actualización:** 2026-06-27 (sesión 9 — Tareas recurrentes, Web Push / iPhone PWA, recordatorios automáticos)  
-**Rama activa:** `main`  
+**Última actualización:** 2026-07-21 (sesión 17 — Módulo Personal completo: Fase 1 "Tareas
+pendientes" + Fase 2 "Notas" con BlockNote, checklist #61)  
+**Rama activa:** `feat/tareas-personales` (creada desde `main` en `79fc91f`, 0 commits de
+diferencia con `main` — son intercambiables, el working tree sin commitear viaja igual entre
+ambas). El usuario cambió el checkout activo a `main` y de vuelta a `feat/tareas-personales`
+más de una vez durante la sesión, por fuera de Claude Code; **no asumir cuál está activa sin
+correr `git branch --show-current`.** Working tree con 8 archivos nuevos + 7 modificados
+(módulo personal completo), **sin commitear todavía** — decisión del usuario, no hubo que
+resolver conflictos porque ambas ramas comparten el mismo commit base.  
+**Ojo si se retoma desde otra máquina:** `CLAUDE.md` (raíz) y toda la carpeta `.claude/`
+(incluida la memoria de sesión en `.claude/MEMORIA_SESION.md`) están en `.gitignore` — **no
+viajan con git push/pull/clone**. Si el trabajo continúa en otra máquina, ese Claude Code
+arranca sin este contexto salvo que alguien copie esos archivos manualmente (AirDrop/USB/etc.),
+no vía git.  
 **Versión:** 3.0.0  
 **Fases completadas:** FASE 1 ✅ · FASE 2 ✅ · FASE 3 ✅ · OWASP ✅ · Fondo Emprender ✅  
-**Ramas activas en remoto:** `main`  
-**Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)
+**Ramas activas en remoto:** `main` en `e9c5222` (verificar con `git fetch` antes de asumir
+vigencia). `feat/tareas-personales` es **local, todavía no pusheada** (sin upstream) — no
+confundir con el resto de ramas locales ya mergeadas y con remoto borrado en GitHub, candidatas
+a limpiar con `git branch -d`: `arregloMacFondo`, `feat/ajustesResponsiveArregloBugs11/07`,
+`feat/tareasArregloYResponsive`. **Pendiente sin resolver:** `rollback/d6b852d` tiene 1 commit
+que nunca se pusheó a ningún lado (sin upstream configurado) — ver checklist #60.  
+**Servidor de producción:** `https://gestcon.work` (Cloudflare Tunnel + HTTPS real) · `https://192.168.1.12` (acceso local directo)  
+**Nombre del proyecto:** desde la sesión 15 (2026-07-20), branding unificado a **Gestcon** en
+todo el repo (antes convivían "TaskFlow Pro", "Gestor de Tareas" y "Gestión Contable" según el
+archivo). Ver checklist #58 para el detalle completo y las excepciones intencionales
+(`backend/src/middleware/security.js` conserva los strings `taskflow-*` porque son una lista
+negra de secretos JWT conocidos, no branding; el contenedor `n8n` de producción no está en
+`docker-compose.yml` de este repo, así que su rename es un paso manual aparte — ver
+`docs/N8N_SETUP.md`). **Mergeado a `main` en la sesión 16** (checklist #60) — antes vivía sin
+commitear en `feat/tareasArregloYResponsive`.
 
 ---
 
@@ -17,7 +42,7 @@
 | Estilos | Tailwind CSS 3 (`darkMode: 'class'`) |
 | Estado | Context API + localStorage (fallback) |
 | Tiempo real | Socket.io-client ^4.8.3 |
-| UI extras | @dnd-kit (Kanban), Recharts 2, date-fns 3, jsPDF, xlsx |
+| UI extras | @dnd-kit (Kanban), Recharts 2, date-fns 3, jsPDF, xlsx, BlockNote (`@blocknote/core`+`react`+`ariakit`, editor de bloques de Notas, lazy-loaded) |
 | Backend | Node.js + Express 4 |
 | Base de datos | PostgreSQL 16 (pg + connection pooling) |
 | Auth | JWT (jsonwebtoken) + bcrypt + refresh tokens |
@@ -47,7 +72,7 @@ GestionTareasOficina/
 │   │   ├── ThemeContext.jsx    # dark/light mode
 │   │   └── ToastContext.jsx    # Notificaciones UI
 │   ├── components/             # Componentes reutilizables
-│   ├── pages/                  # 17 páginas
+│   ├── pages/                  # 18 páginas
 │   ├── services/api.js         # Cliente HTTP con interceptores
 │   ├── hooks/                  # useTasks.js, useTeam.js
 │   └── utils/
@@ -99,7 +124,6 @@ GestionTareasOficina/
 ├── scripts/
 │   ├── start-dev.sh            # Levanta Docker Compose para desarrollo
 │   ├── stop-dev.sh
-│   ├── backup-db.sh            # pg_dump manual (legacy, usar backup.sh)
 │   ├── backup.sh               # Backup completo: BD + .env + certs, comprimido, rotación 7 días
 │   ├── restore.sh              # Restaura desde backup_TIMESTAMP.tar.gz
 │   ├── setup-cron.sh           # Instala cron de backup diario a las 6 PM
@@ -118,10 +142,14 @@ GestionTareasOficina/
 
 ### Frontend
 
-**Páginas disponibles (17):**
+**Páginas disponibles (20):**
 - `LoginPage`, `RegisterPage`, `ForgotPasswordPage`, `ResetPasswordPage`
 - `DashboardPage` — estadísticas, tareas recientes
 - `TasksPage` — lista de tareas con filtros
+- `PersonalTasksPage` — Mis Pendientes (`/pendientes`): checklist 100% personal con subtareas,
+  sin restricción de rol, filtrado por `user_id`
+- `PersonalNotesPage` — Mis Notas (`/notas`): editor de bloques tipo Notion con BlockNote,
+  cargada con `React.lazy` (no engorda el bundle principal), menú "/" en español
 - `KanbanPage` — tablero drag-and-drop (@dnd-kit)
 - `CalendarPage` — vista de calendario + templates proyectados + barras de rango de fechas
 - `GroupsPage` — gestión de grupos
@@ -129,6 +157,9 @@ GestionTareasOficina/
 - `UsersPage` — administración de usuarios (admin)
 - `NotificationsPage`
 - `ReportsPage` — exportación PDF/Excel
+- `WorkloadPage` — Tablero de Carga de Trabajo (`/workload`, admin/leader): barras de tareas
+  abiertas por persona, detalle con vencidas, indicador de balance, recomendaciones de
+  rebalanceo **por grupo** (no cruza equipos) e histórico mensual de tareas creadas
 - `ProfilePage`, `SettingsPage`
 - `FondoEmprenderPage` + `FondoEmprenderEmpresasPage` + `FondoEmprenderEmpresaDetallePage` + `FondoEmprenderPagosPage` (módulo Fondo Emprender)
 - `RecurringTasksPage` — gestión de templates recurrentes (solo admin/leader, ruta `/tasks/recurrentes`)
@@ -148,6 +179,9 @@ GestionTareasOficina/
 | leader | ✅ | ✅ | ✅ | ✅ |
 | member | ❌ | ❌ | ✅ | ❌ |
 | viewer | ❌ | ❌ | ❌ | ❌ |
+
+Nota: member (y cualquiera que no sea viewer) puede *solicitar* la eliminación de una tarea con
+un motivo aunque no pueda borrarla directamente — ver checklist #56 (`task_delete_requests`).
 
 ### Backend API REST
 
@@ -190,6 +224,7 @@ PUT    /api/groups/:id
 DELETE /api/groups/:id                     → solo admin
 POST   /api/groups/:id/members
 DELETE /api/groups/:id/members/:userId
+PUT    /api/groups/:id/members/:userId/leader  → asignar/quitar liderazgo del grupo (solo admin)
 
 GET    /api/tags
 POST   /api/tags                           → cualquier usuario autenticado (sin restricción de rol)
@@ -201,6 +236,12 @@ POST   /api/fondo/empresas
 PUT    /api/fondo/empresas/:id
 DELETE /api/fondo/empresas/:id
 GET    /api/fondo/procesos
+POST   /api/fondo/procesos
+PUT    /api/fondo/procesos/:id
+GET    /api/fondo/proceso-grupos                → agrupar columnas del Seguimiento Mensual
+POST   /api/fondo/proceso-grupos                   (sesión 16 / PR #25, checklist #59)
+PUT    /api/fondo/proceso-grupos/:id
+DELETE /api/fondo/proceso-grupos/:id
 GET    /api/fondo/checklist/:empresaId
 PUT    /api/fondo/checklist/:empresaId
 GET    /api/fondo/detalle/:empresaId
@@ -215,6 +256,16 @@ GET    /api/tasks/:id/fondo-link
 POST   /api/tasks/:id/fondo-link
 DELETE /api/tasks/:id/fondo-link
 
+PATCH  /api/tasks/:id/assignees/me         → marca el status individual del usuario autenticado
+                                              como asignado; tasks.status se recalcula como
+                                              agregado (completed solo si todos completaron)
+
+POST   /api/tasks/:id/delete-request       → solicita eliminar una tarea con motivo (cualquiera
+                                              que no sea viewer); notifica a admins + líder(es)
+                                              del grupo de la tarea
+PATCH  /api/tasks/:id/delete-request/:requestId → aprueba/rechaza (admin o líder del grupo);
+                                              mismo criterio de autorización que DELETE /:id
+
 GET    /api/tasks/templates                  → lista templates recurrentes (admin/leader)
 
 GET    /api/notifications
@@ -227,6 +278,22 @@ DELETE /api/notifications/push-subscribe    → eliminar suscripción
 
 GET    /api/stats
 GET    /api/stats/audit                    → solo admin/leader
+GET    /api/stats/workload                 → solo admin/leader; carga por persona (total + por
+                                              grupo) y tareas creadas por mes (últimos 6 meses)
+
+GET    /api/personal-tasks                 → checklist personal — sin restricción de rol, cada
+POST   /api/personal-tasks                   quien ve/edita solo lo propio (filtrado por
+PUT    /api/personal-tasks/:id               user_id = req.user.userId en cada query)
+DELETE /api/personal-tasks/:id
+POST   /api/personal-tasks/:id/items
+PUT    /api/personal-tasks/:id/items/:itemId
+DELETE /api/personal-tasks/:id/items/:itemId
+
+GET    /api/personal-notes                 → listado liviano (sin `content`, solo título/fecha)
+GET    /api/personal-notes/:id             → detalle completo con `content` (JSONB, bloques)
+POST   /api/personal-notes
+PUT    /api/personal-notes/:id             → usado también para autoguardado con debounce
+DELETE /api/personal-notes/:id
 ```
 
 **Seguridad:**
@@ -242,6 +309,7 @@ GET    /api/stats/audit                    → solo admin/leader
 - Autenticación con JWT en handshake (no puede conectar sin token válido)
 - Rooms: `user:{userId}`, `group:{groupId}`, `task:{taskId}`
 - Eventos emitidos por el backend: `task:created`, `task:updated`, `task:deleted`, `user:online`, `user:offline`
+- `users:online:list` emitido al socket recién conectado con array de IDs ya online (fix PWA)
 - `mark:read` para marcar notificaciones desde el cliente
 - Evento `disconnect` limpia el mapa de usuarios online
 
@@ -258,6 +326,16 @@ GET    /api/stats/audit                    → solo admin/leader
 
 **Sistema de tracking:** `run.js` crea tabla `schema_migrations` (PRIMARY KEY `filename`). Saltar migraciones ya aplicadas. Opción `--reset` para limpiar y reaplicar todo. Todos los `CREATE INDEX` deben usar `IF NOT EXISTS` para ser idempotentes.
 
+**Números duplicados (007 y 018) — intencionalmente sin renombrar:** existen dos pares de
+archivos con el mismo prefijo numérico (`007_due_time.sql`/`007_fondo_empresas.sql` y
+`018_fondo_pagos_autorizado.sql`/`018_group_leaders.sql`). El tracking es por **nombre de
+archivo completo** (no por el número), así que no hay colisión real ni problema de
+dependencias entre ellos. **No renombrar estos archivos**: ya corrieron en producción
+(`gestcon.work`), y `run.js` solo reconoce una migración como "ya aplicada" si el nombre
+coincide exactamente con lo que hay en `schema_migrations`. Renombrar `007_fondo_empresas.sql`
+la haría re-ejecutarse en el próximo deploy y duplicaría el `INSERT` de las 30 empresas
+(no tiene protección `ON CONFLICT`).
+
 | Migración | Contenido |
 |---|---|
 | 007 | Columna `due_time TIME` en tasks |
@@ -266,9 +344,23 @@ GET    /api/stats/audit                    → solo admin/leader
 | 014 | Columna `start_time` (existe en BD, no usada en código — reverted) |
 | 015 | Tabla `push_subscriptions` (Web Push / iPhone PWA) |
 | 016 | Columna `reminder_sent_at TIMESTAMPTZ` en tasks |
+| 017 | Elimina etiquetas de muestra del seed (bug, feature, urgente, documentación) vía DELETE por UUID |
+| 018 | `group_members.is_leader BOOLEAN` — soporte multi-líder por grupo (índice parcial `WHERE is_leader = true`) |
+| 019 | Tabla `fondo_pagos_mes_actual` (singleton) — mes vencido habilitado para pagos, controlado manualmente por las jefas en vez de derivarse de la fecha del sistema |
+| 020 | Tabla `task_assignees` (task_id, user_id, status, completed_at) — estado individual por asignado; backfill desde `tasks.assigned_to`/`status` existentes |
+| 021 | Columnas `completed_by`/`completed_at` en `task_subtasks` — quién completó cada subtarea; backfill best-effort de `completed_at` desde `updated_at` |
+| 022 | Tabla `task_delete_requests` (task_id, requested_by, reason, status, resolved_by, resolved_at) — solicitudes de eliminación con motivo; índice único parcial evita duplicar solicitudes pendientes por tarea |
+| 023 | Tablas `fondo_impuestos` (catálogo fijo: autorretención, retención, IVA, consumo) y `fondo_impuestos_items` (registro por empresa × impuesto × mes) — checklist de la tarjeta "Información tributaria" (mp6), independiente del checklist mensual |
+| 024 | Tabla `fondo_proceso_grupos` (agrupar columnas del Seguimiento Mensual, ej. "Nómina"/"Impuestos") — aditiva, `grupo_id` nace `NULL` en todo proceso existente |
+| 025 | Columnas `vigente_desde_anio`/`vigente_desde_mes`/`vigente_hasta_anio`/`vigente_hasta_mes` en `fondo_procesos` — un proceso puede existir solo en un rango de meses; `NULL` en ambos extremos = sin restricción (comportamiento igual a antes) |
+| 026 | Columnas `enviado`/`enviado_at`/`confirmed_at` en `fondo_checklist_meses` — trackea el envío además de la confirmación; backfill de `confirmed_at` desde `updated_at` para filas ya confirmadas |
+| 027 | Columna `macroproceso_id` en `fondo_procesos` — vínculo estable (por id, no por nombre) entre un proceso y el macroproceso que deriva su estado; solo `nomina electronica` mapeado a `mp3` por ahora |
+| 028 | Columna `macroproceso_id` en `fondo_proceso_grupos` — mismo vínculo pero a nivel de grupo completo (ej. grupo NOMINA → `mp2`) |
+| 029 | Tablas `personal_tasks` + `personal_task_items` — checklist personal por usuario (Fase 1 del Módulo Personal), `ON DELETE CASCADE` desde `users` |
+| 030 | Tabla `personal_notes` (`content JSONB`, default `''` en `title` — no `'Sin título'` literal, eso es solo placeholder de UI) — Notas tipo Notion (Fase 2 del Módulo Personal) |
 
 **Tests:**
-- Cobertura actual: **~79% statements / ~71% functions** (umbral: 70%)
+- Cobertura actual: **~81% statements / ~74% functions** (umbral: 70%)
 - 8 archivos unitarios: authController, taskController, groupController, statsController, middleware, routes, helpers, validators
 - 2 archivos de integración: auth.test.js, tasks.test.js
 - Excluidos de cobertura: `pushService.js`, `recurringTaskService.js`, `reminderService.js` (servicios de infraestructura)
@@ -298,6 +390,13 @@ migrate:    Perfil "migrate" — corre run.js --seed y termina
 **PWA (iPhone):** `public/manifest.json` con `display: standalone`. Meta tags Apple en `index.html`. Instalar desde Safari → Compartir → "Agregar a pantalla de inicio". Push notifications se suscriben automáticamente al iniciar sesión si el usuario otorga permiso. VAPID keys en `backend/.env`.
 
 **Frontend build:** Se construye localmente con `--platform linux/amd64` si el servidor no tiene RAM suficiente para esbuild.
+
+**Memoria del build de Docker (`Dockerfile` raíz):** `NODE_OPTIONS="--max-old-space-size"` subido
+de 512 a **1024** en la sesión 17 — con 512 el build revienta con OOM desde que se sumó
+BlockNote/Tiptap/ProseMirror (Notas), aunque esa página esté lazy-loaded: Rollup igual necesita
+analizar/minificar todo en build time. Probado: 768 ya compila, se dejó margen en 1024. Si el
+servidor real no tiene esa RAM libre para el build, usar el fallback de siempre (compilar en Mac
+con `--platform linux/amd64` y llevar la imagen).
 
 ### Documentación y scripts
 
@@ -391,7 +490,7 @@ docker compose down
 # Scripts auxiliares
 chmod +x scripts/*.sh
 ./scripts/start-dev.sh
-./scripts/backup-db.sh
+./scripts/backup.sh
 ```
 
 ---
@@ -448,3 +547,25 @@ Variables críticas: `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_REF
 | 37 | Recordatorios automáticos de vencimiento: cron cada 30 min, sin due_time → hoy/mañana, con due_time → 2h antes | ✅ Implementado 2026-06-27 |
 | 38 | Logo Sidebar clickeable → navega al inicio (/) | ✅ Implementado 2026-06-27 |
 | 39 | Fix CI: ESLint override para sw.js (serviceworker env), mock pushService en tests, coveragePathIgnore nuevos servicios | ✅ Resuelto 2026-06-27 |
+| 40 | Responsable temporal Nómina electrónica: `Daniela Ruiz` → `Dana` en `MACRO_RESPONSABLES` (hardcoded en FondoEmprenderEmpresaDetallePage.jsx) | ✅ Resuelto 2026-07-02 |
+| 41 | Fix online en PWA: `socket/events.js` emite `users:online:list` al conectar; `SocketContext.jsx` lo escucha para poblar estado inicial | ✅ Resuelto 2026-07-02 |
+| 42 | Migración 017: elimina etiquetas de muestra del seed; `002_seed_data.sql` limpiado de tags y assignments | ✅ Resuelto 2026-07-02 |
+| 43 | Tablero de Carga de Trabajo (`/workload`): `GET /api/stats/workload` (solo lectura, sin migraciones), barras + detalle + balance + histórico mensual | ✅ Implementado 2026-07-08 |
+| 44 | Recomendaciones de rebalanceo **por grupo** (Tablero) y sugerencia de menor carga **por grupo** en el selector "Asignado a" de `TaskForm` — no cruzan equipos (Desarrollo/Fondo Emprender/Tributario/etc.) | ✅ Implementado 2026-07-08 |
+| 45 | n8n `fondo-pagos-alerta-mora`: fix login de servicio (password real), fix SMTP `Missing credentials for PLAIN` con Mailhog, migrado a Gmail SMTP para alertas reales | ✅ Resuelto 2026-07-08 |
+| 46 | Limpieza: carpeta duplicada de OneDrive del repo (causaba error de migración en Docker) eliminada | ✅ Resuelto 2026-07-08 |
+| 47 | Liderazgo por grupo: migración 018 (`group_members.is_leader`, multi-líder por grupo), permisos reales en backend (editar/eliminar grupo, agregar/quitar miembros, eliminar tarea — solo admin o líder del grupo específico; tareas sin grupo solo las borra admin), asignable desde Usuarios | ✅ Implementado 2026-07-08 |
+| 48 | Revisión de seguridad de BD antes de deploy de `feat/funcionesNuevas`: migración 018 es aditiva/idempotente (`ADD COLUMN IF NOT EXISTS` + `DEFAULT false`, `CREATE INDEX IF NOT EXISTS`), no toca datos existentes; `GET /api/stats/workload` es 100% de solo lectura; todas las columnas usadas en las queries nuevas ya existían salvo `is_leader` (la crea la propia 018). El orden migrar→arrancar backend ya está garantizado por `docker-compose.yml` (`backend` tiene `depends_on: migrate: condition: service_completed_successfully`), así que `docker compose up -d` solo es seguro sin pasos manuales extra — ver `docs/DEPLOY.md` §6 (actualizado con backup previo vía `scripts/backup.sh`) | ✅ Revisado 2026-07-11 |
+| 49 | Fix `CalendarPage`: al hacer clic en un día dentro del rango de vigencia (`recurrence.start_date`→`end_date`) de un template recurrente, el panel derecho ahora muestra el template como si fuera una tarea de ese día (antes solo aparecía en el día exacto proyectado `approx_day`, y el resto de días del rango sombreado mostraban "Sin tareas este día"). Verificado end-to-end con Playwright headless contra los contenedores `_dev` (usuario admin temporal creado y borrado en la BD para el test, no se usaron credenciales reales) | ✅ Implementado 2026-07-11 |
+| 50 | Corrección `docs/DEPLOY.md` §6: el paso de migración ya no depende de que la persona que despliega "revise si hay migraciones nuevas" — se descubrió que `docker-compose.yml` ya fuerza el orden correcto vía `backend: depends_on: migrate: condition: service_completed_successfully` (el `migrate` de ese archivo no tiene `profiles:`, a diferencia de lo que sugería la doc vieja con `--profile migrate`). Guía simplificada a 3 comandos (`git pull` → `build` → `up -d`) + backup previo recomendado con `./scripts/backup.sh` | ✅ Resuelto 2026-07-11 |
+| 51 | Progreso individual por asignado en tareas multi-persona: migración 019 (`task_assignees`, aditiva/idempotente, backfill desde `tasks.assigned_to`/`status`), fix del bug preexistente que descartaba todos los asignados salvo el primero al guardar, endpoint `PATCH /api/tasks/:id/assignees/me` (cada asignado marca su propio estado), `tasks.status` recalculado como agregado (completed solo si todos completaron), barra de progreso "X/Y completaron" en `TaskCard`/`TaskDetailModal` (mismo patrón visual que la barra de subtareas). Verificado end-to-end contra la API real de `gestcon_backend_dev` con usuarios temporales (creados y borrados en la BD para la prueba) | ✅ Implementado 2026-07-12 |
+| 52 | Quién completó cada subtarea: migración 020 (`task_subtasks.completed_by`/`completed_at`, aditiva), `updateSubtask` setea `completed_by` desde el usuario autenticado al marcar/desmarcar, texto "Completado por X" bajo cada subtarea tildada en `SubtaskList`. Alcance acotado a propósito (elegido por el usuario entre dos opciones): sin asignación previa de subtareas a personas específicas, cualquier responsable de la tarea puede tildar cualquier subtarea, solo se traza quién lo hizo. Verificado en la UI real (Playwright + usuario temporal) contra `gestcon_backend_dev`/`gestcon_frontend_dev` | ✅ Implementado 2026-07-13 |
+| 53 | Fix `TeamManager.jsx` (página `/team` "Equipo"): los botones "Editar" y "Remover del equipo" ahora solo se muestran si `isAdmin()` — antes se mostraban a cualquier rol autenticado (leader/member/viewer), aunque el backend (`PUT`/`DELETE /api/employees/:id`) ya exigía admin. "Agregar Miembro" queda fuera de este cambio (no se pidió). Verificado en la UI con dos usuarios temporales (admin ve 17/17 botones, member ve 0) | ✅ Implementado 2026-07-13 |
+| 54 | Filtro "Creadas por mí" en Mis Tareas (`TaskFilters.jsx`/`TaskList.jsx`): nuevo campo `createdBy` (= `tasks.user_id`) expuesto por `normalizeTask` (antes solo se exponía `createdByName`, sin el id, insuficiente para filtrar). Checkbox visible solo para admin/leader (mismo gate que el resto de `TaskFilters`, `canSeeAll`), ya que member/viewer no pueden crear tareas y de por sí solo ven las suyas asignadas. Sin migración (el dato ya existía en `tasks.user_id`). Verificado en la UI real: con el filtro activo pasó de 9 a 1 tarea (la creada por el usuario de prueba) | ✅ Implementado 2026-07-13 |
+| 55 | Botón "Nueva Tarea" siempre accesible desde `Header.jsx` (icono "+" azul, con label en `sm:` y superior), independiente de la barra lateral y disponible en cualquier página, no solo en `/tasks`. Antes la única forma de crear una tarea fuera de `/tasks` era el botón dentro de `Sidebar.jsx`, que en mobile exige primero abrir el drawer (hamburguesa) — ahora no hace falta. De paso se corrigió un overflow horizontal real en el header a 375px/360px (el avatar del usuario quedaba fuera de la pantalla, invisible/no clickeable): al formulario de búsqueda le faltaba `min-w-0`, por lo que no podía encoger más allá de su ancho mínimo de contenido y empujaba al resto de los íconos fuera del viewport (no se detectaba por `scrollWidth` porque es un elemento `fixed`, solo visible comparando screenshots). Verificado con Playwright en 4 anchos (360/375/768/1440px, sin overflow) y flujo completo de creación de tarea desde el Dashboard sin tocar el sidebar | ✅ Implementado 2026-07-13 |
+| 56 | Solicitud de eliminación de tareas: migración 021 (`task_delete_requests`, aditiva, índice único parcial evita solicitudes duplicadas pendientes), `POST /api/tasks/:id/delete-request` (motivo obligatorio, cualquiera que no sea viewer) y `PATCH /api/tasks/:id/delete-request/:requestId` (aprobar/rechazar — admin o líder del grupo de la tarea, mismo criterio que `DELETE /api/tasks/:id`). Notifica a todos los admins + líder(es) del grupo de la tarea (o solo admins si no tiene grupo); botones "Aprobar"/"Rechazar" inline en la notificación (`NotificationBell`/`NotificationsPage`) y banner con motivo + acciones en `TaskDetailModal` cuando hay una solicitud pendiente. Alcance elegido explícitamente por el usuario entre opciones: cualquiera con acceso a la tarea puede solicitar (no solo el asignado), notifica admin + líder del grupo (no solo admin), rechazo sin motivo adicional. 13 tests unitarios nuevos (`createDeleteRequest`/`respondDeleteRequest`), cobertura subió a 82%/75%. Bug encontrado y corregido durante la verificación: `resolveDeleteRequest` en `TaskContext.jsx` devolvía éxito falso si la tarea ya no estaba en el estado local (notificación vieja tras resolver dos veces) — la rama de backend real ahora llama a la API primero, sin depender del estado local; y como `notifications.task_id` queda `NULL` cuando se borra la tarea referenciada (`ON DELETE SET NULL`), se agregó un guard en el frontend para notificaciones con `taskId` nulo. Verificado end-to-end con Playwright (2 usuarios temporales, aprobación + rechazo + ambos casos de solicitud ya resuelta) | ✅ Implementado 2026-07-13 |
+| 57 | Fix bug reportado: tarea creada por un `member` no aparecía en producción (sí en dev/local) hasta recargar. Causa: en `src/context/TaskContext.jsx`, `addTask` solo agregaba la tarea al estado local cuando el socket **no** estaba conectado (`if (!connected) setTasks(...)`); si estaba conectado, dependía 100% de que el evento `task:created` volviera al mismo cliente que la creó — a diferencia de `updateTask`/`deleteTask`, que siempre actualizan optimista sin depender del socket. En producción (Cloudflare Tunnel, más latencia/reconexiones que Docker local) ese único broadcast podía no llegar, dejando la tarea invisible para su creador; un `member` que se autoasigna depende de esa sola tarea porque `TaskList.jsx` solo le muestra tareas donde figura en `assignedTo` (admin/leader no lo notaban porque ven todo). Fix: `addTask` ahora siempre agrega la tarea local tras la respuesta de la API, igual patrón que `updateTask`/`deleteTask`; seguro porque `onTaskCreated` (listener del socket) ya dedupea por `id`. Sin migración. Pendiente: rebuild + redeploy del frontend en el servidor para que tome efecto | ✅ Implementado 2026-07-20 |
+| 58 | Rebrand completo del proyecto: "TaskFlow Pro" / "Gestor de Tareas" / "Gestión Contable" (nombres que convivían inconsistentemente) → **Gestcon** en todo el repo (~36 archivos): branding visible (`index.html`, `public/manifest.json`, Login/Register/Forgot/Reset Password, `SettingsPage` "Sobre la aplicación", títulos/pie de página de PDF en `ReportsPage`), infraestructura (`docker-compose.yml`/`docker-compose.dev.yml`: contenedores `taskflow_*` → `gestcon_*`, `POSTGRES_DB` default), `backend/package.json` → `gestcon-backend` (+ `package-lock.json` regenerado con `npm install --package-lock-only`), defaults de `DB_NAME`/`DB_TEST_NAME`/`FROM_EMAIL` en `.env.example`, `backend/.env.example`, `env.js`, `run.js`, CI (`.github/workflows/ci.yml`), scripts (`backup.sh`, `restore.sh`, `reset-db.sh`, `deploy-n8n.sh`) y toda la documentación. Excepciones intencionales: `backend/src/middleware/security.js` conserva los strings `taskflow-dev-secret-key-change-in-production-2026`/`taskflow-refresh-secret-different-key-2026` (lista negra de secretos JWT conocidos, no branding — cambiarlos rompería la protección); `Sidebar.jsx`/`UsersManager.jsx` conservan "Gestor de Tareas" como nombre del **módulo** de tareas (no el nombre de la app, igual que "Fondo Emprender"). El `DB_NAME` real de producción no se toca (solo el valor por defecto — el `.env` del servidor ya tiene `DB_NAME=taskflow` explícito, así que la BD productiva sigue funcionando igual sin coordinar un rename real de la base). Los contenedores sí cambian de nombre; un `docker compose up -d` normal los recrea sin perder datos (volumen `postgres_data` es independiente del nombre del contenedor). Encontrados y corregidos 2 errores del reemplazo automático durante la revisión: `docs/ARQUITECTURA.md` (nota de historia de nombres quedó contradictoria) y `docs/CAMBIOS_SESION_2026-06-10.md` (había renombrado por error los mismos secretos JWT que se dejaron intactos en `security.js`). Hallazgo aparte, no relacionado al rename: el contenedor `n8n` de producción (y `n8n-db-init`) no está definido en el `docker-compose.yml` de este repo — se armó aparte en el servidor — así que el nombre `gestcon_n8n` puesto en `docs/N8N_SETUP.md` es solo referencia documental, no renombra el contenedor real (nota de advertencia agregada ahí). Verificado: `npm run lint` y `npm run build` (frontend) limpios, `node -c` sobre los archivos backend tocados, `docker compose config` válido en ambos compose files | ✅ Implementado 2026-07-20 |
+| 59 | **PR #25** `feature/fondo-seguimiento-mensual` (mergeado a `main` como `b4ad3da`): agrupar columnas del Seguimiento Mensual en "grupos de proceso" reordenables por drag & drop (migración 024, tabla `fondo_proceso_grupos`, endpoints `/api/fondo/proceso-grupos`); vigencia por mes de cada proceso — un proceso puede existir solo en un rango de meses, ej. una prima que solo aplicó en junio (migración 025); vínculo estable proceso↔macroproceso y grupo↔macroproceso por id, no por nombre, para que renombrar desde "Editar estructura" no rompa el enlace en silencio (migraciones 027-028); envío del mes trackeado aparte de la confirmación (migración 026, `enviado`/`enviado_at`); permisos: solo admin puede editar la estructura (grupos/vigencia); fixes de UX: la columna "Sin grupo" ya no rompía la altura del header de la tabla, la barra de progreso ya contaba "N/A" como completado, se quitó la opción de editar/borrar una empresa desde la vista de Seguimiento Mensual (queda solo en "Empresas"), se bloqueó la navegación a meses futuros en Seguimiento Mensual y Empresas. Esta rama no se trabajó en una sesión de Claude Code — se documenta acá porque llegó a `main` en paralelo con el trabajo de la sesión 16 (ver nota en el encabezado) y las migraciones 024-028 son las que causaron el fix del checklist #60 en el entorno local | ✅ Mergeado a `main` 2026-07-21 |
+| 60 | Sesión 16: (a) planificación de un módulo personal por trabajador (checklist propio con subtareas + Notas de formato libre tipo Notion con menú "/") — investigado el código existente, decidido con el usuario usar **BlockNote** para el editor de bloques en vez de construirlo a mano, y acordado el orden de fases (personal tasks primero, Notas después); documento `docs/Plan-Modulo-Personal.doc` generado, **nada implementado todavía**, solo planificación; (b) fix responsive real: en `/fondo-emprender/empresas` (`src/pages/FondoEmprenderEmpresasPage.jsx`), la barra de progreso fija de 96px + botones de editar/eliminar dejaban casi sin espacio al nombre de la empresa en mobile, truncándolo a una sola letra en un iPhone 15 (393px) — verificado con capturas de Cypress a `cy.viewport(393, 852)` (extensión de Chrome no disponible en esa sesión) recorriendo Dashboard/Tareas/Kanban/Calendario/Reportes/Equipo/Grupos/Carga de trabajo/Usuarios/Configuración/Fondo — solo esa lista estaba rota, el resto ya era responsive; fix: `hidden sm:block` en la barra + `gap`/`padding` reducidos en mobile, sin regresión verificada en desktop (1280px); (c) fix del entorno de desarrollo local: la base `taskflow` en Docker tenía las migraciones aplicadas solo hasta la 023, le faltaban la 024-028 (recién incorporadas a `main` vía PR #25, ver checklist #59) — todos los endpoints `/api/fondo/*` devolvían 500 (`relation "fondo_proceso_grupos" does not exist`); corridas las 5 migraciones pendientes (todas aditivas, sin riesgo para datos existentes) con `docker exec taskflow_backend_dev node migrations/run.js`, verificados los 4 endpoints principales de Fondo respondiendo 200; (d) auditoría de ramas: `rollback/d6b852d` tiene 1 commit sin pushear a ningún lado (sin upstream configurado, `f1cd74b`, mismo mensaje que `4dff776` en `rollback/f1a24ee` que sí está pusheado — parecen dos intentos del mismo fix, sin resolver cuál es el vigente); `arregloMacFondo`, `feat/ajustesResponsiveArregloBugs11/07` y `feat/tareasArregloYResponsive` quedaron completamente mergeadas a `main` (remoto ya borrado en GitHub), candidatas a `git branch -d` local, no borradas todavía. El commit/push/merge de todo el trabajo de esta sesión + el de la sesión 15 se hizo fuera de la conversación de Claude Code (el usuario, en otra terminal) — confirmado por el mensaje de commit `548699c` y el merge `e9c5222` (PR #26) | ✅ Implementado / mergeado 2026-07-21 |
+| 61 | **Módulo Personal completo** (rama `feat/tareas-personales`, sin commitear), Fase 1 + Fase 2 del plan de la sesión 16: **Fase 1 — Tareas pendientes** (migración 029 `personal_tasks`/`personal_task_items`, `personalTaskController.js`/`routes/personalTasks.js` en `/api/personal-tasks` sin restricción de rol, `PersonalTasksPage.jsx` en `/pendientes` reutilizando el patrón visual de `SubtaskList`). **Fase 2 — Notas tipo Notion** (migración 030 `personal_notes` con `content JSONB`, `personalNoteController.js`/`routes/personalNotes.js` en `/api/personal-notes` con listado liviano sin `content` + detalle completo aparte, `PersonalNotesPage.jsx` en `/notas` con editor de bloques **BlockNote** — se eligió `@blocknote/ariakit` en vez del Mantine por defecto para no meter un framework de UI ajeno al proyecto Tailwind-only, y en vez de `@blocknote/shadcn` porque exige Tailwind v4 y el proyecto está en v3; cargada con `React.lazy` para que sus ~273KB gzip no engorden el bundle principal; menú "/" en español vía `dictionary` con el diccionario `es` importado del subpath `@blocknote/core/locales`; autoguardado con debounce 800ms + indicador "Guardando…/Guardado"; popup propio (`ConfirmDeleteModal`, mismo patrón que `DeleteRequestModal.jsx`) en vez del `window.confirm()` nativo del navegador, a pedido explícito del usuario). Ambas fases con aislamiento por `user_id` verificado (un usuario no puede ver ni tocar los pendientes/notas de otro, ni adivinando IDs → 404). Bugs reales encontrados y corregidos durante la verificación en navegador (no del test, del código): título de nota nuevo se guardaba como el string literal `"Sin título"` en vez de `''`; el autoguardado con debounce compartía un solo timer entre título y contenido y el último en dispararse pisaba el payload del otro (fix: acumular cambios pendientes en un objeto y mandarlos juntos); el input de título estaba controlado por un round-trip hijo→padre→hijo en cada tecla y con tipeo rápido se comían caracteres (fix: estado local en el editor). **Bug de deploy encontrado y corregido:** el `Dockerfile` del frontend tiene `NODE_OPTIONS="--max-old-space-size=512"` (límite puesto por un SIGSEGV de esbuild documentado en el servidor real) — con BlockNote sumado el build de producción revienta con OOM aunque la página esté lazy-loaded (Rollup igual analiza/minifica todo en build time); confirmado reproduciendo el build real (`docker build`), subido a 1024MB (mínimo que compila: 768MB, se dejó margen). Verificación de deploy completa: imágenes Docker de producción reales reconstruidas (no solo dev), las 30 migraciones corridas desde cero en un Postgres aislado, backend en `NODE_ENV=production` contra esa base con `/api/health`+login+los 4 endpoints nuevos+`/api/fondo/empresas`+`/api/tasks` respondiendo 200. Hallazgo aparte (preexistente, no de esta sesión): los tests de integración del backend venían saltándose silenciosamente en el host por `node_modules` desactualizado (faltaba `nodemailer`) — sincronizado y creada la base `taskflow_test` con las 30 migraciones, ahora los 219 tests corren de verdad contra Postgres real. Todo el entorno de prueba (contenedores/red/imágenes Docker temporales) limpiado al terminar, sin tocar el stack de desarrollo | ✅ Implementado 2026-07-21, sin commitear |

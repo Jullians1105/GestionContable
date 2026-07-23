@@ -1,4 +1,4 @@
-# Cambios Sesión 2026-06-04 — TaskFlow Pro Fase 3
+# Cambios Sesión 2026-06-04 — Gestcon Fase 3
 
 Registro de todas las funcionalidades implementadas, correcciones y bugs resueltos durante esta sesión de desarrollo. Complementa `CAMBIOS_FASE_3.md` (arquitectura backend) y `BUGS_SESION_2026-06-04.md` (integración inicial).
 

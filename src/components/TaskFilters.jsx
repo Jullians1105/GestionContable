@@ -11,7 +11,7 @@ export default function TaskFilters({ filters, onChange, onClear }) {
 
   const handleChange = (field, value) => onChange({ ...filters, [field]: value })
 
-  const hasActive = filters.search || filters.status || filters.priority || filters.assignedTo || filters.groupId || filters.tagId
+  const hasActive = filters.search || filters.status || filters.priority || filters.assignedTo || filters.groupId || filters.tagId || filters.createdByMe
 
   const selectCls = 'h-10 border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-white dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition w-full'
 
@@ -92,6 +92,19 @@ export default function TaskFilters({ filters, onChange, onClear }) {
             <option value="">Todas</option>
             {tags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
+        </div>
+
+        <div className="flex flex-col gap-1 w-full sm:w-auto">
+          <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] px-1">&nbsp;</label>
+          <label className="h-10 flex items-center gap-2 px-3 border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-white dark:bg-[#252840] cursor-pointer select-none w-full sm:w-auto">
+            <input
+              type="checkbox"
+              checked={filters.createdByMe}
+              onChange={(e) => handleChange('createdByMe', e.target.checked)}
+              className="accent-[#004ac6] cursor-pointer"
+            />
+            Creadas por mí
+          </label>
         </div>
 
         <div className="flex-1" />

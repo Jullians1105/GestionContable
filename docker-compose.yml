@@ -1,12 +1,16 @@
+# Despliegue de producción — construye imágenes estáticas con `docker build`, sin hot-reload.
+# Para desarrollo local (Mac, Windows o Linux) usá docker-compose.dev.yml, no este archivo:
+# cambios en el código NO se reflejan acá hasta reconstruir manualmente las imágenes.
+
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: taskflow_postgres
+    container_name: gestcon_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-taskflow}
+      POSTGRES_DB: ${DB_NAME:-gestcon}
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
@@ -19,7 +23,7 @@ services:
 
   mailhog:
     image: mailhog/mailhog:latest
-    container_name: taskflow_mailhog
+    container_name: gestcon_mailhog
     restart: unless-stopped
     ports:
       - "1025:1025"
@@ -29,7 +33,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: taskflow_backend
+    container_name: gestcon_backend
     restart: unless-stopped
     depends_on:
       postgres:
@@ -53,7 +57,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: taskflow_frontend
+      # El build de Vite (esbuild) se cae con SIGSEGV usando el /dev/shm por
+      # defecto de Docker (64MB) — probado y confirmado en el servidor de
+      # producción: con 1g el mismo build que fallaba compila limpio. No es
+      # un tema de RAM total del host ni de paralelismo, es específicamente
+      # el tamaño de /dev/shm disponible durante el build.
+      shm_size: '1gb'
+    container_name: gestcon_frontend
     restart: unless-stopped
     depends_on:
       - backend

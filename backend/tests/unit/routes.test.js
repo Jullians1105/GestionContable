@@ -34,6 +34,14 @@ describe('Routes registration', () => {
   test('tag routes se cargan correctamente', () => {
     expect(() => require('../../src/routes/tags')).not.toThrow();
   });
+
+  test('personal task routes se cargan correctamente', () => {
+    expect(() => require('../../src/routes/personalTasks')).not.toThrow();
+  });
+
+  test('personal note routes se cargan correctamente', () => {
+    expect(() => require('../../src/routes/personalNotes')).not.toThrow();
+  });
 });
 
 describe('services/emailService', () => {
@@ -129,6 +137,7 @@ describe('socket/events', () => {
       user: { userId: 'u1', email: 'test@test.com' },
       join: jest.fn(),
       leave: jest.fn(),
+      emit: jest.fn(),
       on: jest.fn((event, fn) => { socketEvents[event] = fn; }),
       id: 'socket-1',
     };

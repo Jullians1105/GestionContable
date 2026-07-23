@@ -37,6 +37,7 @@ export function SocketProvider({ children }) {
       s.on('connect', () => { console.debug('[Socket] Connected:', s.id); setConnected(true) })
       s.on('disconnect', () => { console.debug('[Socket] Disconnected'); setConnected(false) })
       s.on('connect_error', (err) => { console.debug('[Socket] Error:', err.message); setConnected(false) })
+      s.on('users:online:list', (userIds) => setOnlineUserIds(new Set(userIds)))
       s.on('user:online',  ({ userId }) => setOnlineUserIds(prev => new Set([...prev, userId])))
       s.on('user:offline', ({ userId }) => setOnlineUserIds(prev => { const n = new Set(prev); n.delete(userId); return n }))
 

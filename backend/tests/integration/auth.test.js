@@ -1,7 +1,7 @@
 /**
  * Tests de integración para autenticación.
  * Requieren una base de datos PostgreSQL de prueba configurada.
- * Ejecutar con: DB_TEST_NAME=taskflow_test npm test
+ * Ejecutar con: DB_TEST_NAME=gestcon_test npm test
  *
  * Para correr sin BD: estos tests se saltan automáticamente si DB no está disponible.
  */

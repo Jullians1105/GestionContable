@@ -1,4 +1,4 @@
-# Guía de Deployment — TaskFlow Pro
+# Guía de Deployment — Gestcon
 
 **Servidor de producción:** `192.168.1.12`  
 **Puerto de acceso:** `5173`  
@@ -33,8 +33,8 @@ newgrp docker
 
 ```bash
 cd ~
-git clone <URL_DEL_REPO> taskflow
-cd taskflow
+git clone <URL_DEL_REPO> gestcon
+cd gestcon
 ```
 
 Si el repositorio es privado, configurar SSH key o usar HTTPS con token.
@@ -54,7 +54,7 @@ Valores mínimos que debes cambiar para producción:
 # Base de datos
 DB_USER=postgres
 DB_PASSWORD=CAMBIA_ESTO_POR_UNA_CONTRASEÑA_SEGURA
-DB_NAME=taskflow
+DB_NAME=gestcon
 
 # JWT — usar cadenas largas y aleatorias
 JWT_SECRET=genera-un-secreto-largo-y-aleatorio-aqui
@@ -90,10 +90,10 @@ docker compose ps
 Salida esperada:
 ```
 NAME                 STATUS          PORTS
-taskflow_postgres    running (healthy)   0.0.0.0:5432->5432/tcp
-taskflow_mailhog     running             0.0.0.0:1025->1025/tcp
-taskflow_backend     running (healthy)   0.0.0.0:3000->3000/tcp
-taskflow_frontend    running             0.0.0.0:5173->80/tcp
+gestcon_postgres    running (healthy)   0.0.0.0:5432->5432/tcp
+gestcon_mailhog     running             0.0.0.0:1025->1025/tcp
+gestcon_backend     running (healthy)   0.0.0.0:3000->3000/tcp
+gestcon_frontend    running             0.0.0.0:5173->80/tcp
 ```
 
 ---
@@ -144,18 +144,57 @@ docker compose down -v
 ## 6. Actualizar a una nueva versión
 
 ```bash
-# Traer cambios del repositorio
+# 0. Backup antes de tocar producción (por las dudas, no específico de esta versión)
+./scripts/backup.sh
+
+# 1. Traer cambios del repositorio
 git pull
 
-# Reconstruir imágenes con los cambios
+# 2. Reconstruir imágenes con los cambios
 docker compose build
 
-# Aplicar las nuevas imágenes con reinicio mínimo
+# 3. Levantar con las imágenes nuevas
 docker compose up -d
-
-# Si hay migraciones nuevas (verificar el CHANGELOG)
-docker compose --profile migrate up migrate
 ```
+
+No hace falta un paso manual aparte para migraciones ni verificar si "hay migraciones nuevas":
+en `docker-compose.yml`, el servicio `backend` tiene `depends_on: migrate: condition:
+service_completed_successfully`, así que `docker compose up -d` siempre corre `migrate` primero
+y espera a que termine OK antes de levantar `backend`. `migrations/run.js` es idempotente
+(tabla `schema_migrations` trackea qué archivos ya se aplicaron), así que correrlo en cada
+deploy —incluso sin migraciones nuevas— no tiene efecto ni riesgo, simplemente no hace nada.
+
+### Atajo: alias `deploy`
+
+En el servidor de producción existe un alias `deploy` en `~/.bashrc` (**no versionado en el
+repo** — si el servidor se reinstala hay que volver a crearlo, ver comando abajo) que hace
+exactamente los pasos de esta sección en un solo comando:
+
+```bash
+alias deploy='cd ~/GestionTareasOficina && ./scripts/backup.sh && git pull && docker compose build && docker compose up -d'
+```
+
+Escribir `deploy` en una terminal del servidor: hace backup, trae `main`, reconstruye todas las
+imágenes y levanta todo (lo que dispara `migrate` automáticamente, igual que el paso a paso
+manual).
+
+**Por qué el backup va primero, siempre:** si algo del deploy sale mal (migración que falla,
+imagen que no levanta), el backup ya está hecho *antes* de tocar nada — no depende de acordarse
+de correrlo aparte.
+
+**Historial — versión anterior de este alias (ya corregida):** hasta el 2026-07-21 el alias era
+`git pull && docker compose up -d --build backend && docker compose up -d --build frontend`, sin
+backup y limitando el `--build`/`up` a `backend` y `frontend` únicamente. Eso dejaba un hueco
+real: `migrate` es un contenedor "one-off" (`restart: "no"`) que Compose solo vuelve a correr si
+su condición `service_completed_successfully` no está ya satisfecha por un contenedor previo. Si
+`migrate` ya había corrido y salido con código 0 en un deploy anterior, un `deploy` posterior que
+solo apuntaba a `backend`/`frontend` **no volvía a ejecutar `migrate`** — y encima, como tampoco
+reconstruía la imagen de `migrate` (mismo Dockerfile/contexto que `backend`, pero el `--build` no
+la incluía), si por algún motivo sí llegaba a correr lo hacía con migraciones viejas. Esto es lo
+que obligaba a correr las migraciones a mano antes de cada deploy con cambios de esquema. La
+versión actual del alias evita el problema por completo: `docker compose build` reconstruye
+también la imagen de `migrate`, y `docker compose up -d` (sin restringir a servicios puntuales)
+sí re-evalúa y corre `migrate` como corresponde.
 
 ---
 
@@ -165,7 +204,7 @@ Configurar un backup diario de la base de datos a las 2:00 AM:
 
 ```bash
 # Dar permisos al script
-chmod +x scripts/backup-db.sh
+chmod +x scripts/backup.sh
 
 # Editar el crontab del usuario actual
 crontab -e
@@ -173,16 +212,17 @@ crontab -e
 
 Añadir esta línea al crontab:
 ```cron
-0 2 * * * /home/$USER/taskflow/scripts/backup-db.sh >> /home/$USER/taskflow/backups/backup.log 2>&1
+0 2 * * * /home/$USER/gestcon/scripts/backup.sh >> /home/$USER/gestcon/backups/backup.log 2>&1
 ```
 
-Los backups se guardan en `backups/taskflow_YYYYMMDD_HHMMSS.sql`.
+Los backups se guardan comprimidos en `backups/backup_YYYYMMDD_HHMMSS.tar.gz`. La rotación automática (mantener últimos 7 días) está integrada en el script, no requiere cron adicional.
 
-Limpiar backups antiguos (mantener solo los últimos 7 días):
-```bash
-# Añadir también al crontab
-0 3 * * * find /home/$USER/taskflow/backups -name "*.sql" -mtime +7 -delete
+**Cron real configurado en el servidor de producción actual** (`crontab -l` como
+`gestionc-server`, distinto del ejemplo genérico de arriba):
+```cron
+0 18 * * * cd /home/gestionc-server/GestionTareasOficina && ./scripts/backup.sh >> /var/log/backup-gestion.log 2>&1
 ```
+Corre todos los días a las 6:00 PM, log en `/var/log/backup-gestion.log` (no dentro del repo).
 
 ---
 
@@ -205,6 +245,63 @@ Docker Compose con `restart: unless-stopped` ya garantiza que los contenedores s
 sudo systemctl enable docker
 sudo systemctl status docker
 ```
+
+---
+
+## 10. Configuración manual del servidor — gestion-start / gestion-stop
+
+### Qué hace cada script
+
+**`gestion-start.sh`**: corre `docker compose up -d`, después sondea cada 5s (hasta 60s máximo)
+el estado de `docker compose ps --format json` esperando que `backend` y `postgres` (los únicos
+servicios con healthcheck propio — `frontend` y `mailhog` no tienen) queden `healthy`. Al final
+muestra `docker compose ps` completo. Si algún servicio no llegó a `healthy` en los 60s, lista
+cuáles y termina con código de error (sugiere revisar `docker compose logs <servicio>`).
+
+**`gestion-stop.sh`**: muestra una advertencia (apaga el servidor para toda la oficina y para
+quienes entran remoto por `gestcon.work`), pide escribir exactamente `si` para confirmar (se
+puede saltar con `-y`/`--yes`), corre `docker compose down` y termina con `sudo shutdown -h now`.
+Uso diario real: `gestion-start` al llegar, `gestion-stop` al terminar el día.
+
+Ambos resuelven su propia ruta con `readlink -f "$0"` para funcionar igual invocados por el path
+completo o por el symlink en `/usr/local/bin`.
+
+### Instalación
+
+Dependen de tres cambios hechos directamente en el sistema operativo del servidor — **no están
+versionados en el repo**. Si el servidor se reinstala o migra a otro equipo, hay que rehacerlos.
+
+**1. Sudo sin contraseña, solo para shutdown**
+
+Archivo `/etc/sudoers.d/gestion-stop`:
+```
+gestionc-server ALL=(ALL) NOPASSWD: /usr/sbin/shutdown
+```
+Verificar con `sudo -n shutdown --help` — no debe pedir contraseña.
+
+**2. Lid switch en ignore** (evita que cerrar la tapa suspenda el servidor por accidente)
+
+Archivo `/etc/systemd/logind.conf.d/99-gestion-lid.conf`:
+```ini
+[Login]
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+```
+Aplicar con:
+```bash
+sudo systemctl restart systemd-logind
+```
+
+**3. Symlinks de los scripts**
+
+```bash
+sudo ln -sf ~/GestionTareasOficina/scripts/gestion-start.sh /usr/local/bin/gestion-start
+sudo ln -sf ~/GestionTareasOficina/scripts/gestion-stop.sh  /usr/local/bin/gestion-stop
+```
+
+**Uso diario:** `gestion-start` al llegar, `gestion-stop` al terminar el día (pide confirmación
+escribiendo `si`, apaga físicamente el servidor). Solo funciona parado frente al servidor o
+conectado por SSH.
 
 ---
 

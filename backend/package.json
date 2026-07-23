@@ -1,5 +1,5 @@
 {
-  "name": "taskflow-backend",
+  "name": "gestcon-backend",
   "version": "3.0.0",
   "main": "src/index.js",
   "scripts": {

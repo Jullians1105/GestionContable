@@ -51,8 +51,15 @@ export default function SubtaskList({ task }) {
               onChange={() => toggleSubtask(task.id, s.id)}
               className="accent-[#004ac6] cursor-pointer"
             />
-            <span className={`text-sm flex-1 ${s.completed ? 'line-through text-[#888]' : 'text-[#191c1e] dark:text-[#e4e6f0]'}`}>
-              {s.title}
+            <span className="flex-1 min-w-0">
+              <span className={`block text-sm ${s.completed ? 'line-through text-[#888]' : 'text-[#191c1e] dark:text-[#e4e6f0]'}`}>
+                {s.title}
+              </span>
+              {s.completed && s.completedByName && (
+                <span className="block text-xs text-[#434655] dark:text-[#c4c8e8]">
+                  Completado por {s.completedByName}
+                </span>
+              )}
             </span>
             <button
               onClick={() => deleteSubtask(task.id, s.id)}

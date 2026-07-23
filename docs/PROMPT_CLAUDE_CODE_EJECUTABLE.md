@@ -5,7 +5,7 @@
 
 ## 📌 CONTEXTO DEL PROYECTO
 
-**Proyecto:** GestionTareasOficina / TaskFlow Pro  
+**Proyecto:** GestionTareasOficina / Gestcon  
 **Stack:** React 18 + Node.js + Express + PostgreSQL + Docker + Socket.io  
 **Estado:** FASE 3 completa (Backend, WebSockets, Tests ✅)  
 **Servidor actual:** 192.168.1.12:5173 (solo red local)  
@@ -22,7 +22,7 @@
 Permitir que **3 líderes accedan a la aplicación desde internet** (fuera de red local) y **reciban notificaciones en tiempo real** cuando sus miembros comenten o realicen acciones en tareas asignadas.
 
 ### Casos de uso:
-1. **Líder en café/casa:** Puede crear/editar tareas via `https://taskflow.duitama.cloudflareaccess.com`
+1. **Líder en café/casa:** Puede crear/editar tareas via `https://gestcon.duitama.cloudflareaccess.com`
 2. **Miembro en oficina:** Comenta en una tarea
 3. **Líder en otro lugar:** Recibe notificación en el navegador (incluso minimizado) sin lag
 
@@ -34,7 +34,7 @@ Permitir que **3 líderes accedan a la aplicación desde internet** (fuera de re
 
 **Decisión ya evaluada:** Opción recomendada es **Cloudflare Tunnel sin dominio**
 
-**URL final:** `https://taskflow.duitama.cloudflareaccess.com` ($0 costo)
+**URL final:** `https://gestcon.duitama.cloudflareaccess.com` ($0 costo)
 
 **Cambios necesarios:**
 
@@ -44,7 +44,7 @@ Permitir que **3 líderes accedan a la aplicación desde internet** (fuera de re
 
 cloudflared:
   image: cloudflare/cloudflared:latest
-  container_name: taskflow_cloudflared
+  container_name: gestcon_cloudflared
   restart: unless-stopped
   command: tunnel --no-autoupdate run
   environment:
@@ -53,12 +53,12 @@ cloudflared:
     - frontend
     - backend
   networks:
-    - taskflow_network
+    - gestcon_network
 ```
 
 #### B. .env - Agregar variable
 ```
-# Cloudflare Tunnel (obtener de: cloudflared tunnel create taskflow)
+# Cloudflare Tunnel (obtener de: cloudflared tunnel create gestcon)
 CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoixxxxxxxxxxxxxxxx...
 ```
 
@@ -66,7 +66,7 @@ CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoixxxxxxxxxxxxxxxx...
 ```
 # CLOUDFLARE TUNNEL (Opcional - para acceso remoto de líderes)
 # Obtener token: https://dash.cloudflare.com/
-# Crear tunnel: cloudflared tunnel create taskflow
+# Crear tunnel: cloudflared tunnel create gestcon
 # Token es sensible - NUNCA en git
 CLOUDFLARE_TUNNEL_TOKEN=tu_token_aqui
 ```
@@ -87,7 +87,7 @@ CLOUDFLARE_TUNNEL_TOKEN=tu_token_aqui
 **Validación:**
 - ✅ docker-compose.yml sintaxis correcta
 - ✅ cloudflared service levanta sin errores
-- ✅ Frontend accesible desde https://taskflow.duitama.cloudflareaccess.com
+- ✅ Frontend accesible desde https://gestcon.duitama.cloudflareaccess.com
 - ✅ WebSockets funcionan (Socket.io)
 - ✅ Backend API responde en /api/health
 
@@ -277,7 +277,7 @@ socket.emit('notification:new', {
 ```
 Usuario A (Líder) EN OTRO LUGAR
     ↓
-Accede: https://taskflow.duitama.cloudflareaccess.com
+Accede: https://gestcon.duitama.cloudflareaccess.com
     ↓ (Cloudflare Tunnel)
 Frontend en 192.168.1.12:5173
     ↓
@@ -307,10 +307,10 @@ Frontend A recibe en socket listener
 
 | Opción | URL | Costo | Seguridad | Profesional |
 |--------|-----|-------|-----------|---|
-| 1. Sin dominio | taskflow.duitama.cloudflareaccess.com | $0 | ✅ | ⭐⭐⭐ |
-| 2. Dominio gratis | taskflow.tk | $0 | ❌ | ⭐ |
-| 3. Subdominio existente | taskflow.tudominio.com | $0* | ✅ | ⭐⭐⭐⭐⭐ |
-| 4. Dominio pagado | taskflow.com | $12-15/año | ✅ | ⭐⭐⭐⭐⭐ |
+| 1. Sin dominio | gestcon.duitama.cloudflareaccess.com | $0 | ✅ | ⭐⭐⭐ |
+| 2. Dominio gratis | gestcon.tk | $0 | ❌ | ⭐ |
+| 3. Subdominio existente | gestcon.tudominio.com | $0* | ✅ | ⭐⭐⭐⭐⭐ |
+| 4. Dominio pagado | gestcon.com | $12-15/año | ✅ | ⭐⭐⭐⭐⭐ |
 
 **Recomendación para MVP:** Opción 1 (Sin dominio, $0)  
 **Recomendación cuando escale:** Opción 4 (Dominio .com, $12/año)

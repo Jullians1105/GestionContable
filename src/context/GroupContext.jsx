@@ -48,6 +48,7 @@ function normalizeGroup(g) {
     ...g,
     leaderId: g.leaderId ?? g.leader_id ?? null,
     memberIds: g.memberIds ?? (g.members || []).map((m) => m.id),
+    leaderIds: g.leaderIds ?? (g.members || []).filter((m) => m.isLeader).map((m) => m.id),
     taskIds: g.taskIds ?? [],
   }
 }
@@ -178,6 +179,23 @@ export function GroupProvider({ children }) {
     )
   }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const setGroupLeader = useCallback(async (groupId, userId, isLeader) => {
+    const applyLocal = (g) => {
+      if (g.id !== groupId) return g
+      const leaderIds = isLeader
+        ? [...new Set([...(g.leaderIds || []), userId])]
+        : (g.leaderIds || []).filter((id) => id !== userId)
+      const memberIds = g.memberIds.includes(userId) ? g.memberIds : [...g.memberIds, userId]
+      return { ...g, leaderIds, memberIds }
+    }
+    if (useRealBackend) {
+      await api.setGroupLeader(groupId, userId, isLeader)
+      setGroups((prev) => prev.map(applyLocal))
+      return
+    }
+    persist((prev) => prev.map((g) => (g.id === groupId ? { ...applyLocal(g), updatedAt: today() } : g)))
+  }, [useRealBackend]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const getGroupById = useCallback((id) => groups.find((g) => g.id === id), [groups])
 
   const getGroupsByMember = useCallback(
@@ -196,6 +214,7 @@ export function GroupProvider({ children }) {
         deleteGroup,
         addMemberToGroup,
         removeMemberFromGroup,
+        setGroupLeader,
         getGroupById,
         getGroupsByMember,
       }}
