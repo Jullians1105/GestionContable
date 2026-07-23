@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useTeam } from '../hooks/useTeam'
 import { useTags } from '../context/TagContext'
 import { useToast } from '../context/ToastContext'
-import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo, getTaskProgress } from '../utils/helpers'
+import { formatDate, formatReminder, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo, getTaskProgress } from '../utils/helpers'
 import SubtaskList from './Subtasks/SubtaskList'
 import CommentSection from './Comments/CommentSection'
 import DeleteRequestModal from './DeleteRequestModal'
@@ -239,6 +239,15 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
                 <span className="text-sm text-[#888] italic">Sin fecha</span>
               )}
             </div>
+            {liveTask.reminderAt && (
+              <div className="col-span-2 bg-[#f3f4f6] dark:bg-[#252840] rounded-xl p-3">
+                <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide mb-1">Recordatorio</p>
+                <span className="text-sm font-semibold text-[#b45309] flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">notifications_active</span>
+                  {formatReminder(liveTask.reminderAt)}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Cambiar estado */}

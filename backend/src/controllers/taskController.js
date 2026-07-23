@@ -237,16 +237,16 @@ const normalizeAssignedTo = (val) => {
 
 const createTask = async (req, res, next) => {
   try {
-    const { title, description, priority = 'medium', assignedTo: assignedToRaw, dueDate, dueTime, groupId, tagIds = [], isRecurring = false, recurrence = null } = req.body;
+    const { title, description, priority = 'medium', assignedTo: assignedToRaw, dueDate, dueTime, groupId, tagIds = [], isRecurring = false, recurrence = null, reminderAt } = req.body;
     const assignedToArr = normalizeAssignedTo(assignedToRaw);
     const assignedTo = assignedToArr[0] ?? null;
     const id = uuidv4();
 
     const result = await db.query(
-      `INSERT INTO tasks (id, user_id, group_id, title, description, status, priority, assigned_to, due_date, due_time, is_recurring, recurrence)
-       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11)
+      `INSERT INTO tasks (id, user_id, group_id, title, description, status, priority, assigned_to, due_date, due_time, is_recurring, recurrence, custom_reminder_at)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
-      [id, req.user.userId, groupId || null, title, description || null, priority, assignedTo, dueDate || null, dueTime || null, isRecurring, recurrence ? JSON.stringify(recurrence) : null]
+      [id, req.user.userId, groupId || null, title, description || null, priority, assignedTo, dueDate || null, dueTime || null, isRecurring, recurrence ? JSON.stringify(recurrence) : null, reminderAt || null]
     );
     const task = result.rows[0];
 
@@ -289,7 +289,7 @@ const createTask = async (req, res, next) => {
           [id]
         )).rows
       : [];
-    const full = { ...normalizeTask(task), subtasks: [], comments: [], tagIds, assignees };
+    const full = { ...normalizeTask(task), subtasks: [], comments: [], tagIds, assignees, assignedTo: assignedToArr };
     emitTaskEvent(req.io, 'task:created', full, groupId);
     logger.info({ taskId: id, userId: req.user.userId }, 'Task created');
     res.status(201).json(full);
@@ -305,7 +305,7 @@ const updateTask = async (req, res, next) => {
     if (!current.rows[0]) return res.status(404).json({ error: 'Tarea no encontrada' });
 
     const old = current.rows[0];
-    const { title, description, status, priority, assignedTo: assignedToRaw, dueDate, dueTime, groupId, tagIds } = req.body;
+    const { title, description, status, priority, assignedTo: assignedToRaw, dueDate, dueTime, groupId, tagIds, reminderAt } = req.body;
     const assignedToArr = assignedToRaw !== undefined ? normalizeAssignedTo(assignedToRaw) : null;
     const assignedTo = assignedToArr !== null ? (assignedToArr[0] ?? null) : undefined;
 
@@ -314,6 +314,11 @@ const updateTask = async (req, res, next) => {
     const dueTimeChanged = dueTime !== undefined && (dueTime || null) !== old.due_time;
     const assignedChanged = assignedToArr !== null && (assignedToArr[0] ?? null) !== old.assigned_to;
     const resetReminder = dueDateChanged || dueTimeChanged || assignedChanged;
+
+    // Recordatorio personalizado: mismo criterio, se resetea el flag de enviado solo si cambia
+    const oldReminderAt = old.custom_reminder_at ? old.custom_reminder_at.toISOString().slice(0, 16) : null;
+    const newReminderAt = reminderAt !== undefined ? (reminderAt || null) : old.custom_reminder_at;
+    const customReminderChanged = reminderAt !== undefined && (reminderAt || null) !== oldReminderAt;
 
     const result = await db.query(
       `UPDATE tasks SET
@@ -326,9 +331,11 @@ const updateTask = async (req, res, next) => {
         due_time = $7,
         group_id = $8,
         reminder_sent_at = CASE WHEN $10 THEN NULL ELSE reminder_sent_at END,
+        custom_reminder_at = $11,
+        custom_reminder_sent_at = CASE WHEN $12 THEN NULL ELSE custom_reminder_sent_at END,
         updated_at = NOW()
        WHERE id = $9 RETURNING *`,
-      [title, description, status, priority, assignedTo ?? old.assigned_to, dueDate ?? old.due_date, dueTime !== undefined ? (dueTime || null) : old.due_time, groupId ?? old.group_id, id, resetReminder]
+      [title, description, status, priority, assignedTo ?? old.assigned_to, dueDate ?? old.due_date, dueTime !== undefined ? (dueTime || null) : old.due_time, groupId ?? old.group_id, id, resetReminder, newReminderAt, customReminderChanged]
     );
     const task = result.rows[0];
 
@@ -645,7 +652,7 @@ function normalizeTask(t) {
     description: t.description || '',
     status: t.status,
     priority: t.priority,
-    assignedTo: t.assigned_to || null,
+    assignedTo: t.assignees?.length ? t.assignees.map(a => a.userId) : (t.assigned_to || null),
     assignedToName: t.assigned_to_name || null,
     assignees: t.assignees || [],
     pendingDeleteRequest: t.pending_delete_request
@@ -659,6 +666,7 @@ function normalizeTask(t) {
       : null,
     dueDate: t.due_date ? t.due_date.toISOString().slice(0, 10) : null,
     dueTime: t.due_time || null,
+    reminderAt: t.custom_reminder_at ? t.custom_reminder_at.toISOString().slice(0, 16) : null,
     groupId: t.group_id || null,
     groupName: t.group_name || null,
     subtasks: (t.subtasks || []).map(s => ({

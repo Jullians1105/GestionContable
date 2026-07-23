@@ -42,6 +42,15 @@ export const formatDate = (dateStr, timeStr = '') => {
 
 export const today = () => format(new Date(), 'yyyy-MM-dd')
 
+export const formatReminder = (reminderAt) => {
+  if (!reminderAt) return ''
+  try {
+    return format(parseISO(reminderAt), "dd/MM/yyyy, HH:mm", { locale: es })
+  } catch {
+    return reminderAt
+  }
+}
+
 const toDatetime = (dateStr, timeStr = '') => parseISO(`${dateStr}T${timeStr || '19:00'}`)
 
 export const isDueDateOverdue = (dateStr, timeStr = '') => {

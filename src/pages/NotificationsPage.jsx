@@ -11,6 +11,7 @@ const TYPE_ICONS = {
   task_completed:  { icon: 'check_circle',    color: '#10B981' },
   task_in_progress:{ icon: 'pending_actions', color: '#6366f1' },
   task_overdue:    { icon: 'warning',         color: '#EF4444' },
+  task_reminder:   { icon: 'notifications_active', color: '#FBBF24' },
   comment_added:   { icon: 'chat_bubble',     color: '#0891b2' },
   comment:         { icon: 'chat',            color: '#10B981' },
   subtask_done:    { icon: 'task_alt',        color: '#8b5cf6' },

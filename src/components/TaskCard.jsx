@@ -1,4 +1,4 @@
-import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo, getTaskProgress } from '../utils/helpers'
+import { formatDate, formatReminder, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS, STATUS_LABELS, normalizeAssignedTo, getTaskProgress } from '../utils/helpers'
 import { useTeam } from '../hooks/useTeam'
 import { useTags } from '../context/TagContext'
 import { useAuth } from '../context/AuthContext'
@@ -10,12 +10,15 @@ const STATUS_COLORS = { pending: '#888', in_progress: '#004ac6', completed: '#10
 export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onView }) {
   const { getMemberById } = useTeam()
   const { getTagById } = useTags()
-  const { hasPermission } = useAuth()
+  const { user, hasPermission } = useAuth()
   const { addToast } = useToast()
   const assignedIds = normalizeAssignedTo(task.assignedTo)
   const assignedMembers = assignedIds.map(id => getMemberById(id)).filter(Boolean)
   const overdue = isDueDateOverdue(task.dueDate, task.dueTime) && task.status !== 'completed'
   const soon = isDueDateSoon(task.dueDate, task.dueTime) && task.status !== 'completed'
+  const isCreator = task.createdBy === user?.id
+  const creatorAlsoAssigned = isCreator && assignedIds.includes(user?.id)
+  const creatorOnlyForOthers = isCreator && assignedIds.length > 0 && !assignedIds.includes(user?.id)
 
   const guard = (key, fn) => {
     if (hasPermission(key)) fn()
@@ -59,6 +62,33 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
           <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-0.5 bg-[#ede9fe] text-[#6d28d9]">
             <span className="material-symbols-outlined" style={{ fontSize: 10 }}>link</span>
             Fondo
+          </span>
+        )}
+        {creatorAlsoAssigned && (
+          <span
+            className="px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-0.5 bg-[#dbeafe] text-[#1e40af]"
+            title="Creaste esta tarea y también estás asignado"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 10 }}>how_to_reg</span>
+            También es tuya
+          </span>
+        )}
+        {creatorOnlyForOthers && (
+          <span
+            className="px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-0.5 bg-[#f3f4f6] dark:bg-[#252840] text-[#888]"
+            title="Creaste esta tarea para otra persona, no estás asignado"
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 10 }}>send</span>
+            La creaste para otro
+          </span>
+        )}
+        {task.reminderAt && (
+          <span
+            className="px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-0.5 bg-[#fef3c7] text-[#b45309]"
+            title={`Recordatorio: ${formatReminder(task.reminderAt)}`}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 10 }}>notifications_active</span>
+            Recordatorio
           </span>
         )}
         {task.templateId && !task.dueDate && (

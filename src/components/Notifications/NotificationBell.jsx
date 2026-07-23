@@ -11,6 +11,7 @@ const TYPE_ICONS = {
   task_completed:   'check_circle',
   task_in_progress: 'pending_actions',
   task_overdue:     'warning',
+  task_reminder:    'notifications_active',
   comment_added:    'chat_bubble',
   comment:          'chat',
   subtask_done:     'task_alt',
