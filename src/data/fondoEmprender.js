@@ -10,15 +10,19 @@
 // and must never accept a manual status change.
 
 // ── Mes habilitado para Seguimiento Mensual (checklist/macroprocesos/impuestos) ──
-// Mes vencido: el mes en curso todavía no ha "vencido", así que el mes
-// habilitado para editar es siempre el mes calendario anterior. Debe
-// coincidir con getMesVencidoHabilitado en backend/src/utils/mesVencido.js
-// (duplicado a propósito para no depender de una llamada de red solo para
-// esto — mismo criterio que deriveImpuestosEstado en
-// FondoEmprenderEmpresaDetallePage.jsx).
+// Mes vencido, pero el mes en curso se da por "vencido" anticipadamente desde
+// el día 23: del 1 al 22 el mes habilitado es el calendario anterior; del 23
+// en adelante el mes habilitado pasa a ser el mes en curso. Debe coincidir
+// con getMesVencidoHabilitado en backend/src/utils/mesVencido.js (duplicado a
+// propósito para no depender de una llamada de red solo para esto — mismo
+// criterio que deriveImpuestosEstado en FondoEmprenderEmpresaDetallePage.jsx).
+const DIA_CORTE = 23
+
 export function getMesVencidoHabilitado(now = new Date()) {
+  const diaActual  = now.getDate()
   const mesActual  = now.getMonth() + 1 // 1-12
   const anioActual = now.getFullYear()
+  if (diaActual >= DIA_CORTE) return { anio: anioActual, mes: mesActual }
   if (mesActual === 1) return { anio: anioActual - 1, mes: 12 }
   return { anio: anioActual, mes: mesActual - 1 }
 }

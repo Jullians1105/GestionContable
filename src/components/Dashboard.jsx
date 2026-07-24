@@ -29,7 +29,7 @@ export default function Dashboard() {
   const { getMemberById } = useTeam()
   const { user, isAdmin, isLeader } = useAuth()
   const { theme } = useTheme()
-  const visibleTasks = (isAdmin() || isLeader()) ? tasks : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id))
+  const visibleTasks = (isAdmin() || isLeader()) ? tasks : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id) || t.createdBy === user?.id)
   const isDark = theme === 'dark'
   const axisColor = isDark ? '#c4c8e8' : '#434655'
   const gridColor = isDark ? '#2e3148' : '#edeef0'

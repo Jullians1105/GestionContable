@@ -11,7 +11,7 @@ const TYPE_ICONS = {
   task_completed:  { icon: 'check_circle',    color: '#10B981' },
   task_in_progress:{ icon: 'pending_actions', color: '#6366f1' },
   task_overdue:    { icon: 'warning',         color: '#EF4444' },
-  task_reminder:   { icon: 'notifications_active', color: '#FBBF24' },
+  personal_task_reminder: { icon: 'notifications_active', color: '#FBBF24' },
   comment_added:   { icon: 'chat_bubble',     color: '#0891b2' },
   comment:         { icon: 'chat',            color: '#10B981' },
   subtask_done:    { icon: 'task_alt',        color: '#8b5cf6' },
@@ -85,6 +85,11 @@ export default function NotificationsPage() {
           notifications.map((n) => {
             const meta = TYPE_ICONS[n.type] || { icon: 'notifications', color: '#004ac6' }
             const handleRowClick = () => {
+              if (n.type === 'personal_task_reminder') {
+                markAsRead(n.id)
+                navigate('/pendientes')
+                return
+              }
               if (!n.taskId) return
               markAsRead(n.id)
               const params = new URLSearchParams({ openTask: n.taskId })
@@ -95,7 +100,7 @@ export default function NotificationsPage() {
               <div
                 key={n.id}
                 onClick={handleRowClick}
-                className={`flex items-start gap-4 px-5 py-4 border-b border-[#edeef0] dark:border-[#252840] last:border-0 ${!n.read ? 'bg-blue-50 dark:bg-[#1a2040]' : ''} ${n.taskId ? 'cursor-pointer hover:bg-[#f3f4f6] dark:hover:bg-[#252840]' : ''} transition`}
+                className={`flex items-start gap-4 px-5 py-4 border-b border-[#edeef0] dark:border-[#252840] last:border-0 ${!n.read ? 'bg-blue-50 dark:bg-[#1a2040]' : ''} ${(n.taskId || n.type === 'personal_task_reminder') ? 'cursor-pointer hover:bg-[#f3f4f6] dark:hover:bg-[#252840]' : ''} transition`}
               >
                 <div className="relative flex-shrink-0">
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: `${meta.color}22` }}>

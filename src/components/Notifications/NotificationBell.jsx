@@ -11,7 +11,7 @@ const TYPE_ICONS = {
   task_completed:   'check_circle',
   task_in_progress: 'pending_actions',
   task_overdue:     'warning',
-  task_reminder:    'notifications_active',
+  personal_task_reminder: 'notifications_active',
   comment_added:    'chat_bubble',
   comment:          'chat',
   subtask_done:     'task_alt',
@@ -39,7 +39,9 @@ export default function NotificationBell() {
   const handleClick = (n) => {
     markAsRead(n.id)
     setOpen(false)
-    if (n.taskId) {
+    if (n.type === 'personal_task_reminder') {
+      navigate('/pendientes')
+    } else if (n.taskId) {
       const params = new URLSearchParams({ openTask: n.taskId })
       if (n.extra?.commentId) params.set('comment', n.extra.commentId)
       navigate(`/tasks?${params}`)

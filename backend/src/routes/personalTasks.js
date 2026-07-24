@@ -1,11 +1,11 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
+const { validate } = require('../middleware/validation');
 const {
   getPersonalTasks, createPersonalTask, updatePersonalTask, deletePersonalTask,
   addItem, updateItem, deleteItem,
 } = require('../controllers/personalTaskController');
 const { authMiddleware } = require('../middleware/auth');
-const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 
 const router = Router();
@@ -30,11 +30,23 @@ router.get('/', getPersonalTasks);
 
 router.post(
   '/',
-  [body('title').trim().notEmpty().withMessage('El título es obligatorio'), validate],
+  [
+    body('title').trim().notEmpty().withMessage('El título es obligatorio'),
+    body('reminderAt').optional({ nullable: true }).isISO8601().withMessage('Fecha de recordatorio inválida'),
+    validate,
+  ],
   createPersonalTask
 );
 
-router.put('/:id', validateUUIDParam('id'), updatePersonalTask);
+router.put(
+  '/:id',
+  [
+    validateUUIDParam('id'),
+    body('reminderAt').optional({ nullable: true }).isISO8601().withMessage('Fecha de recordatorio inválida'),
+    validate,
+  ],
+  updatePersonalTask
+);
 router.delete('/:id', validateUUIDParam('id'), deletePersonalTask);
 
 router.post(

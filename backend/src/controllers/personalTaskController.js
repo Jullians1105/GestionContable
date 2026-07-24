@@ -16,6 +16,7 @@ function normalizePersonalTask(t) {
     completed: t.completed,
     position: t.position,
     dueDate: t.due_date ? t.due_date.toISOString().slice(0, 10) : null,
+    reminderAt: t.reminder_at ? t.reminder_at.toISOString().slice(0, 16) : null,
     items: (t.items || []).map(i => ({
       id: i.id,
       title: i.title,
@@ -45,13 +46,13 @@ const getPersonalTasks = async (req, res, next) => {
 
 const createPersonalTask = async (req, res, next) => {
   try {
-    const { title, dueDate } = req.body;
+    const { title, dueDate, reminderAt } = req.body;
     if (!title || !title.trim()) return res.status(400).json({ error: 'El título es obligatorio' });
 
     const id = uuidv4();
     await db.query(
-      'INSERT INTO personal_tasks (id, user_id, title, due_date) VALUES ($1, $2, $3, $4)',
-      [id, req.user.userId, title.trim(), dueDate || null]
+      'INSERT INTO personal_tasks (id, user_id, title, due_date, reminder_at) VALUES ($1, $2, $3, $4, $5)',
+      [id, req.user.userId, title.trim(), dueDate || null, reminderAt || null]
     );
 
     const result = await db.query(
@@ -67,7 +68,7 @@ const createPersonalTask = async (req, res, next) => {
 const updatePersonalTask = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { title, completed, dueDate, position } = req.body;
+    const { title, completed, dueDate, position, reminderAt } = req.body;
 
     const fields = [];
     const params = [];
@@ -76,6 +77,10 @@ const updatePersonalTask = async (req, res, next) => {
     if (completed !== undefined) { fields.push(`completed = $${i++}`); params.push(completed); }
     if (dueDate !== undefined) { fields.push(`due_date = $${i++}`); params.push(dueDate || null); }
     if (position !== undefined) { fields.push(`position = $${i++}`); params.push(position); }
+    if (reminderAt !== undefined) {
+      fields.push(`reminder_at = $${i++}`); params.push(reminderAt || null);
+      fields.push(`reminder_sent_at = NULL`);
+    }
     if (!fields.length) return res.status(400).json({ error: 'Nada que actualizar' });
 
     params.push(id, req.user.userId);
