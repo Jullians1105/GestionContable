@@ -141,6 +141,16 @@ const MOTIVOS_DOCUMENTOS_EXCLUIDOS = {
   [NOMINA_INDIVIDUAL]:    'Documento de nómina — no se contabiliza como compra (ver hoja NÓMINA)',
 };
 
+// Nombres de hoja que exportarBorrador agrega sobre el archivo original (ver esa función).
+// Si el archivo que se sube ya trae alguna de estas hojas, es porque es un .xlsx que esta
+// misma herramienta ya exportó antes (no un reporte crudo de la DIAN) — subirlo de nuevo
+// haría que exportarBorrador reviente más adelante con "Worksheet name already exists" al
+// intentar agregar una hoja con un nombre que ya existe. Se rechaza acá, con un mensaje
+// claro, en vez de dejar que falle de forma críptica al exportar.
+const HOJAS_RESERVADAS = new Set([
+  'RESUMEN', 'IMPUESTOS', 'RETENCIONES_POR_PROVEEDOR', 'DETALLE_COMPRAS', 'NOMINA', 'METADATOS', 'REPORTE_DIAN',
+]);
+
 const getSalaryConstants = (year) => {
   if (SALARY_CONSTANTS[year]) return SALARY_CONSTANTS[year];
   const fallbackYear = Math.max(...Object.keys(SALARY_CONSTANTS).map(Number));
@@ -172,6 +182,14 @@ const uploadDian = async (req, res, next) => {
     const worksheet = workbook.worksheets[0];
     if (!worksheet) {
       return res.status(400).json({ error: 'El archivo no contiene hojas de cálculo' });
+    }
+
+    const hojaReservada = workbook.worksheets.find((ws) => HOJAS_RESERVADAS.has(ws.name.toUpperCase()));
+    if (hojaReservada) {
+      return res.status(400).json({
+        error: `Este archivo ya parece ser un reporte exportado por esta herramienta (contiene la hoja "${hojaReservada.name}"). ` +
+          'Sube el reporte original tal como lo descargaste del portal de la DIAN.',
+      });
     }
 
     // Construir mapa nombre → número de columna a partir de la fila 1
