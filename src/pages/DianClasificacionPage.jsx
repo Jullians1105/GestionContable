@@ -162,6 +162,154 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
   )
 }
 
+// ── menú de filtro de Total: checklist de valores, angostable por texto y/o rango ──
+// Desde/Hasta funcionan igual que el buscador: solo acotan qué filas de la lista se ven
+// y se pueden tildar/destildar en masa — no son un modo aparte, se combinan con la
+// búsqueda de texto para que el usuario vea los precios reales mientras escribe el rango.
+function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align = 'left' }) {
+  const [busqueda, setBusqueda] = useState('')
+  const [desde, setDesde] = useState('')
+  const [hasta, setHasta] = useState('')
+  const [borrador, setBorrador] = useState(() => new Set(seleccion ?? valores.map((v) => v.value)))
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const onClickFuera = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) onCerrar()
+    }
+    document.addEventListener('mousedown', onClickFuera)
+    return () => document.removeEventListener('mousedown', onClickFuera)
+  }, [onCerrar])
+
+  const visibles = useMemo(() => {
+    const q = busqueda.trim().toLowerCase()
+    const desdeNum = desde.trim() === '' ? null : Number(desde)
+    const hastaNum = hasta.trim() === '' ? null : Number(hasta)
+    return valores.filter((v) => {
+      if (q && !v.label.toLowerCase().includes(q)) return false
+      if (desdeNum != null && v.value < desdeNum) return false
+      if (hastaNum != null && v.value > hastaNum) return false
+      return true
+    })
+  }, [valores, busqueda, desde, hasta])
+
+  const todasVisiblesMarcadas = visibles.length > 0 && visibles.every((v) => borrador.has(v.value))
+
+  const toggleTodasVisibles = () => {
+    setBorrador((prev) => {
+      const next = new Set(prev)
+      const marcarTodas = !visibles.every((v) => next.has(v.value))
+      for (const v of visibles) {
+        if (marcarTodas) next.add(v.value)
+        else next.delete(v.value)
+      }
+      return next
+    })
+  }
+
+  const toggleValor = (value) => {
+    setBorrador((prev) => {
+      const next = new Set(prev)
+      if (next.has(value)) next.delete(value)
+      else next.add(value)
+      return next
+    })
+  }
+
+  const style = {
+    position: 'fixed',
+    top: rect.bottom + 4,
+    ...(align === 'right' ? { right: window.innerWidth - rect.right } : { left: rect.left }),
+  }
+
+  const inputClase =
+    'w-full text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-2 py-1.5 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent'
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={style}
+      className="w-64 normal-case font-normal tracking-normal bg-white dark:bg-[#1e2030] border border-[#d1d5db] dark:border-[#3a3e5c] rounded-xl shadow-lg p-3 z-50"
+    >
+      <div className="relative mb-2">
+        <span className="material-symbols-outlined text-base text-[#8890b5] absolute left-2 top-1/2 -translate-y-1/2">search</span>
+        <input
+          type="text"
+          autoFocus
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar…"
+          className={`${inputClase} pl-8`}
+        />
+      </div>
+
+      <div className="flex items-center gap-2 mb-2">
+        <input
+          type="number"
+          value={desde}
+          onChange={(e) => setDesde(e.target.value)}
+          placeholder="Desde $"
+          className={inputClase}
+        />
+        <span className="text-xs text-[#8890b5]">—</span>
+        <input
+          type="number"
+          value={hasta}
+          onChange={(e) => setHasta(e.target.value)}
+          placeholder="Hasta $"
+          className={inputClase}
+        />
+      </div>
+
+      <label className="flex items-center gap-2 px-1 py-1.5 border-b border-[#f0f2f8] dark:border-[#2e3148] mb-1 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={todasVisiblesMarcadas}
+          onChange={toggleTodasVisibles}
+          className="w-4 h-4 rounded border-[#d1d5db] dark:border-[#3a3e5c] text-[#004ac6] focus:ring-[#004ac6] cursor-pointer"
+        />
+        <span className="text-sm font-medium text-[#191c1e] dark:text-[#e4e6f0]">(Seleccionar todo)</span>
+      </label>
+
+      <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5">
+        {visibles.length === 0 ? (
+          <p className="text-xs text-[#8890b5] px-1 py-2">Sin resultados</p>
+        ) : visibles.map((v) => (
+          <label
+            key={v.value}
+            className="flex items-center gap-2 px-1 py-1 rounded hover:bg-[#f8f9ff] dark:hover:bg-[#252840] cursor-pointer"
+          >
+            <input
+              type="checkbox"
+              checked={borrador.has(v.value)}
+              onChange={() => toggleValor(v.value)}
+              className="w-4 h-4 rounded border-[#d1d5db] dark:border-[#3a3e5c] text-[#004ac6] focus:ring-[#004ac6] cursor-pointer flex-shrink-0"
+            />
+            <span className="text-sm text-[#191c1e] dark:text-[#e4e6f0] truncate" title={v.label}>{v.label}</span>
+          </label>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-[#f0f2f8] dark:border-[#2e3148]">
+        <button
+          onClick={onCerrar}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f0f2f8] dark:hover:bg-[#252840]"
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={() => onAplicar(borrador.size === valores.length ? null : new Set(borrador))}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+          style={{ background: '#004ac6' }}
+        >
+          Aceptar
+        </button>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ── fila de la tabla ───────────────────────────────────────────────────────────
 function FilaClasificacion({ fila, borradorId, valorActual, onClasificado, isEven, seleccionada, onToggleSeleccion }) {
   const [guardadoEstado, setGuardadoEstado] = useState(
@@ -270,10 +418,11 @@ export default function DianClasificacionPage() {
   const state     = location.state ?? {}
   const { borradorId, filasParaClasificar = [] } = state
 
-  // Solo filas Recibido no-nómina
+  // Solo filas Recibido no-nómina y sin acuses técnicos ("Application response"
+  // es un acuse DIAN sin valor comercial — no se clasifica, no cuenta para nada).
   const filasRecibido = useMemo(() =>
     filasParaClasificar.filter(
-      (f) => f.grupo === 'Recibido' && f.tipoDocumento !== 'Nomina Individual'
+      (f) => f.grupo === 'Recibido' && f.tipoDocumento !== 'Nomina Individual' && f.tipoDocumento !== 'Application response'
     ),
     [filasParaClasificar]
   )
@@ -358,6 +507,42 @@ export default function DianClasificacionPage() {
     }),
     [filasRecibido, filtroFecha, filtroEmisor, filtroTotal]
   )
+
+  // ── orden por Fecha o Total (asc/desc) — independiente de los filtros ───────────
+  const [ordenColumna,   setOrdenColumna]   = useState(null)   // 'fecha' | 'total' | null
+  const [ordenDireccion, setOrdenDireccion] = useState('asc')  // 'asc' | 'desc'
+
+  const toggleOrden = useCallback((columna) => {
+    if (ordenColumna !== columna) {
+      setOrdenColumna(columna)
+      setOrdenDireccion('asc')
+    } else if (ordenDireccion === 'asc') {
+      setOrdenDireccion('desc')
+    } else {
+      setOrdenColumna(null)
+    }
+  }, [ordenColumna, ordenDireccion])
+
+  const filasOrdenadas = useMemo(() => {
+    if (!ordenColumna) return filasFiltradas
+    const campo  = ordenColumna === 'fecha' ? 'fechaEmision' : 'total'
+    const factor = ordenDireccion === 'asc' ? 1 : -1
+    return [...filasFiltradas].sort((a, b) => {
+      const av = a[campo]
+      const bv = b[campo]
+      if (av == null && bv == null) return 0
+      if (av == null) return 1
+      if (bv == null) return -1
+      if (av < bv) return -factor
+      if (av > bv) return factor
+      return 0
+    })
+  }, [filasFiltradas, ordenColumna, ordenDireccion])
+
+  const iconoOrden = (columna) => {
+    if (ordenColumna !== columna) return 'unfold_more'
+    return ordenDireccion === 'asc' ? 'arrow_upward' : 'arrow_downward'
+  }
 
   // Estado local: indice → opcion | null
   const [clasificaciones, setClasificaciones] = useState(() =>
@@ -700,6 +885,13 @@ export default function DianClasificacionPage() {
                     <div className="flex items-center gap-1">
                       <span>Fecha</span>
                       <button
+                        onClick={() => toggleOrden('fecha')}
+                        className={claseIconoFiltro(ordenColumna === 'fecha')}
+                        title="Ordenar por fecha"
+                      >
+                        {iconoOrden('fecha')}
+                      </button>
+                      <button
                         ref={btnFechaRef}
                         onClick={() => abrirFiltro('fecha', btnFechaRef)}
                         className={claseIconoFiltro(filtroFecha !== null)}
@@ -725,6 +917,13 @@ export default function DianClasificacionPage() {
                   <th className="px-4 py-3 text-right text-xs font-semibold text-[#8890b5] uppercase tracking-wide">
                     <div className="flex items-center justify-end gap-1">
                       <button
+                        onClick={() => toggleOrden('total')}
+                        className={claseIconoFiltro(ordenColumna === 'total')}
+                        title="Ordenar por total"
+                      >
+                        {iconoOrden('total')}
+                      </button>
+                      <button
                         ref={btnTotalRef}
                         onClick={() => abrirFiltro('total', btnTotalRef)}
                         className={claseIconoFiltro(filtroTotal !== null)}
@@ -739,13 +938,13 @@ export default function DianClasificacionPage() {
                 </tr>
               </thead>
               <tbody>
-                {filasFiltradas.length === 0 ? (
+                {filasOrdenadas.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-sm text-[#8890b5]">
                       Ningún resultado coincide con los filtros.
                     </td>
                   </tr>
-                ) : filasFiltradas.map((fila, i) => (
+                ) : filasOrdenadas.map((fila, i) => (
                   <FilaClasificacion
                     key={fila.indice}
                     fila={fila}
@@ -781,7 +980,7 @@ export default function DianClasificacionPage() {
             />
           )}
           {filtroPopover?.columna === 'total' && (
-            <ColumnFilterMenu
+            <TotalFilterMenu
               rect={filtroPopover.rect}
               valores={valoresTotal}
               seleccion={filtroTotal}

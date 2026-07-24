@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import SALARY_CONSTANTS from '../../shared/salaryConstants.json'
 import {
   calcularNomina, calcularCostoTotal,
-  TASA_PENSION, TASA_ARL, TASA_CAJA,
+  TASA_PENSION, TASA_SALUD,
   TASA_VACACIONES, TASA_PRIMA, TASA_CESANTIAS, TASA_INTERESES_CESANTIAS,
 } from '../../shared/calcularNomina.js'
 
@@ -26,15 +26,18 @@ const toFloat = (v) => {
 }
 
 // ── subcomponente: fila del preview (valor precomputado, o base*tasa si no se pasa) ────────────
-function PreviewRow({ label, tasa, base, valor: valorProp, isTotal }) {
+// tasaLabel: permite mostrar un % distinto al que realmente usa el cálculo (ej. Pensión
+// se muestra como "12%" informativo, pero se calcula con la tasa real del 4%).
+function PreviewRow({ label, tasa, tasaLabel, base, valor: valorProp, isTotal, isNeg }) {
   const valor = valorProp !== undefined ? valorProp : base * tasa
+  const pct = tasaLabel ?? (tasa ? `${(tasa * 100).toFixed(tasa * 100 % 1 === 0 ? 0 : 2)}%` : null)
   return (
     <div className={`flex items-center justify-between py-1.5 ${isTotal ? 'border-t border-[#e2e4ef] dark:border-[#2e3148] mt-1 pt-2.5 font-semibold' : ''}`}>
       <span className={`text-sm ${isTotal ? 'text-[#191c1e] dark:text-[#e4e6f0]' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
-        {label}{!isTotal && tasa ? <span className="text-[11px] ml-1 opacity-70">({(tasa * 100).toFixed(tasa * 100 % 1 === 0 ? 0 : 2)}%)</span> : ''}
+        {label}{!isTotal && pct ? <span className="text-[11px] ml-1 opacity-70">({pct})</span> : ''}
       </span>
-      <span className={`text-sm tabular-nums ${isTotal ? 'text-[#191c1e] dark:text-[#e4e6f0]' : 'text-[#434655] dark:text-[#c4c8e8]'}`}>
-        {fmt(valor)}
+      <span className={`text-sm tabular-nums ${isNeg ? 'text-red-600 dark:text-red-400' : isTotal ? 'text-[#191c1e] dark:text-[#e4e6f0]' : 'text-[#434655] dark:text-[#c4c8e8]'}`}>
+        {isNeg ? `(${fmt(Math.abs(valor))})` : fmt(valor)}
       </span>
     </div>
   )
@@ -196,30 +199,21 @@ export default function DianNominaPage() {
                 label={`Auxilio de transporte${calc.auxilioAplica ? '' : ' (no aplica: salario > 2 SMMLV)'}`}
                 valor={calc.auxilio}
               />
+              <PreviewRow label="Vacaciones (s/ salario)"                  tasa={TASA_VACACIONES}          valor={calc.devengadoDetalle.vacaciones} />
+              <PreviewRow label="Prima de Servicios (s/ salario+auxilio)"  tasa={TASA_PRIMA}               valor={calc.devengadoDetalle.prima} />
+              <PreviewRow label="Cesantías (s/ salario+auxilio)"           tasa={TASA_CESANTIAS}            valor={calc.devengadoDetalle.cesantias} />
+              <PreviewRow label="Intereses Cesantías (s/ cesantías)"       tasa={TASA_INTERESES_CESANTIAS}  valor={calc.devengadoDetalle.interesesCesantias} />
               <PreviewRow label="Total devengado" valor={calc.devengado} isTotal />
             </div>
 
-            {/* Aportes empresa */}
+            {/* Deducciones */}
             <div>
               <p className="text-[11px] font-bold text-[#8890b5] uppercase tracking-wide mb-2">
-                Aportes empresa (sobre salario)
+                Deducciones (sobre salario)
               </p>
-              <PreviewRow label="Pensión"              tasa={TASA_PENSION} base={salVal} />
-              <PreviewRow label="ARL Clase I"           tasa={TASA_ARL}     base={salVal} />
-              <PreviewRow label="Caja de Compensación"  tasa={TASA_CAJA}    base={salVal} />
-              <PreviewRow label="Total aportes" valor={calc.aportesEmpresa} isTotal />
-            </div>
-
-            {/* Provisiones */}
-            <div>
-              <p className="text-[11px] font-bold text-[#8890b5] uppercase tracking-wide mb-2">
-                Provisiones por mes
-              </p>
-              <PreviewRow label="Vacaciones (s/ salario)"          tasa={TASA_VACACIONES}          valor={calc.provisionesDetalle.vacaciones} />
-              <PreviewRow label="Prima de Servicios (s/ salario+auxilio)" tasa={TASA_PRIMA}         valor={calc.provisionesDetalle.prima} />
-              <PreviewRow label="Cesantías (s/ salario+auxilio)"   tasa={TASA_CESANTIAS}            valor={calc.provisionesDetalle.cesantias} />
-              <PreviewRow label="Intereses Cesantías (s/ cesantías)" tasa={TASA_INTERESES_CESANTIAS} valor={calc.provisionesDetalle.interesesCesantias} />
-              <PreviewRow label="Total provisiones" valor={calc.provisiones} isTotal />
+              <PreviewRow label="Pensión" tasaLabel="12%" base={salVal} tasa={TASA_PENSION} isNeg />
+              <PreviewRow label="Salud"   tasa={TASA_SALUD} base={salVal} isNeg />
+              <PreviewRow label="Total deducciones" valor={calc.deducciones} isTotal isNeg />
             </div>
 
             {/* Costo por empleado/mes */}

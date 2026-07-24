@@ -152,7 +152,7 @@ router.patch('/borradores/:id/aplicar-clasificacion-rapida',
  *       200:
  *         description: Anomalía marcada como revisada.
  *       400:
- *         description: "tipo" ausente.
+ *         description: '"tipo" ausente.'
  *       404:
  *         description: Borrador no encontrado o no pertenece al usuario.
  */

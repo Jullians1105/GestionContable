@@ -1,8 +1,106 @@
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
 const ExcelJS = require('exceljs');
+const JSZip = require('jszip');
 const { parse } = require('date-fns');
 const db = require('../config/database');
 const { SALARY_CONSTANTS } = require('../constants/salaryConstants');
+
+// El portal de la DIAN exporta el .xlsx con las etiquetas de estos dos namespaces
+// prefijadas (ej. <x:workbook>, <x:sheets>, <ap:Properties>) — válido según OOXML, pero el
+// parser SAX de exceljs compara nombres de etiqueta sin tener en cuenta el prefijo, así que
+// nunca reconoce nada y devuelve un modelo vacío (de ahí errores como "Cannot read
+// properties of undefined (reading 'sheets'/'company')"). Se quita el prefijo antes de
+// pasarlo a ExcelJS. En un .xlsx normal (guardado por Excel real) estos dos namespaces van
+// SIN prefijo (xmlns=), así que esto no les afecta — solo entra en juego con el export crudo
+// de la DIAN. NO tocar "r:" (relationships), "vt:" (docPropsVTypes) ni "cp:"/"dc:"/"dcterms:"
+// (docProps/core.xml) — esos SÍ los espera exceljs literalmente prefijados, incluso en
+// archivos normales (ver CoreXform: sus children están mapeados como 'cp:lastModifiedBy',
+// no 'lastModifiedBy' — desprefijar esa namespace rompía el core.xml de cualquier archivo
+// ya abierto/guardado en Excel real).
+const NAMESPACES_A_DESPREFIJAR = [
+  'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+  'http://schemas.openxmlformats.org/officeDocument/2006/extended-properties',
+];
+
+const stripKnownNamespacePrefixes = (xml) => {
+  let out = xml;
+  for (const ns of NAMESPACES_A_DESPREFIJAR) {
+    const nsMatch = out.match(new RegExp(`xmlns:(\\w+)="${ns.replace(/[/.]/g, '\\$&')}"`));
+    if (!nsMatch) continue;
+    const prefix = nsMatch[1];
+    out = out
+      .replace(new RegExp(`</${prefix}:`, 'g'), '</')
+      .replace(new RegExp(`<${prefix}:`, 'g'), '<');
+  }
+  return out;
+};
+
+// El mismo exportador escribe los Target de sus .rels como rutas absolutas del paquete
+// (ej. Target="/xl/tables/table1.xml") en vez de relativas al part que las contiene (lo que
+// Excel genera: "../tables/table1.xml"). exceljs ya tolera esto para workbook→hoja, pero no
+// para hoja→tabla — la búsqueda por Target falla en silencio y deja el modelo de tabla
+// undefined ("Cannot read properties of undefined (reading 'name')"). Se recalcula el
+// Target relativo a la carpeta del part dueño de cada .rels antes de pasarlo a ExcelJS.
+const normalizeRelsTargets = (relsPath, xml) => {
+  const ownerDir = path.posix.dirname(path.posix.dirname(relsPath));
+  return xml.replace(/Target="([^"]+)"/g, (match, target) => {
+    if (!target.startsWith('/')) return match;
+    const absolute = target.replace(/^\/+/, '');
+    const relative = path.posix.relative(ownerDir === '.' ? '' : ownerDir, absolute);
+    return `Target="${relative}"`;
+  });
+};
+
+// exceljs tiene un bug al releer y regrabar (round-trip) el objeto "Tabla" de Excel que
+// trae el reporte DIAN original: cuando el archivo fuente omite headerRowCount (implícito
+// =1 por el estándar OOXML) y usa totalsRowShown en vez de totalsRowCount, exceljs lo
+// parsea como headerRow=false/totalsRow=false y al regrabar escribe headerRowCount="0"
+// (contradice que la tabla sí tiene columnas con nombre) y totalsRowShown="1" (contradice
+// que el rango de la tabla no reserva fila de totales) — esa contradicción es justo lo que
+// dispara el aviso de Excel "hemos encontrado un problema con el contenido". Ninguna celda
+// ni dato se altera; solo se corrigen esos dos atributos de metadata de la tabla después de
+// generar el archivo final.
+const corregirTablaRoundtrip = async (buffer) => {
+  const zip = await JSZip.loadAsync(buffer);
+  let changed = false;
+  await Promise.all(
+    Object.keys(zip.files)
+      .filter((name) => /^xl\/tables\/table\d+\.xml$/.test(name))
+      .map(async (name) => {
+        const content = await zip.file(name).async('string');
+        const fixed = content
+          .replace(/headerRowCount="0"/, 'headerRowCount="1"')
+          .replace(/totalsRowShown="1"/, 'totalsRowShown="0"');
+        if (fixed !== content) {
+          zip.file(name, fixed);
+          changed = true;
+        }
+      })
+  );
+  return changed ? zip.generateAsync({ type: 'nodebuffer' }) : buffer;
+};
+
+const normalizeXlsxBuffer = async (buffer) => {
+  const zip = await JSZip.loadAsync(buffer);
+  let changed = false;
+  await Promise.all(
+    Object.keys(zip.files)
+      .filter((name) => !zip.files[name].dir && (name.endsWith('.xml') || name.endsWith('.rels')))
+      .map(async (name) => {
+        const content = await zip.file(name).async('string');
+        let normalized = stripKnownNamespacePrefixes(content);
+        if (name.endsWith('.rels')) {
+          normalized = normalizeRelsTargets(name, normalized);
+        }
+        if (normalized !== content) {
+          zip.file(name, normalized);
+          changed = true;
+        }
+      })
+  );
+  return changed ? zip.generateAsync({ type: 'nodebuffer' }) : buffer;
+};
 
 const REQUIRED_COLS = [
   'Tipo de documento', 'CUFE/CUDE', 'Fecha Emisión',
@@ -12,27 +110,35 @@ const REQUIRED_COLS = [
 const FACTURA                  = 'Factura electrónica';
 const NOTA_CREDITO             = 'Nota de crédito electrónica';
 const DOC_EQUIVALENTE          = 'Documento equivalente - Servicios públicos domiciliarios';
+const DOC_TRANSPORTE_AEREO     = 'Documento equivalente - Transporte aéreo de pasajeros';
 const DOC_SOPORTE_NO_OBLIGADOS = 'Documento soporte con no obligados';
 const APPLICATION_RESPONSE     = 'Application response';
+const NOMINA_INDIVIDUAL        = 'Nomina Individual';
 const RECIBIDO                 = 'Recibido';
 const EMITIDO                  = 'Emitido';
+
+// Tipos que se tratan exactamente igual que una Factura electrónica: cuentan como compra
+// si Grupo=Recibido y como venta si Grupo=Emitido. A diferencia de DOC_EQUIVALENTE
+// (servicios públicos), que solo se ve como compra, el tiquete de transporte aéreo puede
+// aparecer en cualquiera de los dos grupos según quién lo emita.
+const TIPOS_FACTURA_EQUIVALENTE = [FACTURA, DOC_TRANSPORTE_AEREO];
 
 // Tipos de documento "Recibido" que cuentan como costo deducible ante la DIAN bajo la
 // convención normal (Recibido = compra). DOC_SOPORTE_NO_OBLIGADOS NO va acá: su Grupo
 // funciona invertido (ver esDocSoporteCompra / calcularAnomalias más abajo).
-const TIPOS_COMPRA = [FACTURA, DOC_EQUIVALENTE];
+const TIPOS_COMPRA = [...TIPOS_FACTURA_EQUIVALENTE, DOC_EQUIVALENTE];
 
 // Tipos de documento que sí entran en algún cálculo (compras, ventas, notas crédito,
 // documento soporte). DOC_SOPORTE_NO_OBLIGADOS se contabiliza condicionalmente por Grupo
 // (ver exportarBorrador), por eso igual cuenta como "contabilizado" acá.
 const TIPOS_CONTABILIZADOS = new Set([
-  FACTURA, NOTA_CREDITO, DOC_EQUIVALENTE, DOC_SOPORTE_NO_OBLIGADOS,
+  FACTURA, NOTA_CREDITO, DOC_EQUIVALENTE, DOC_SOPORTE_NO_OBLIGADOS, DOC_TRANSPORTE_AEREO,
 ]);
 
 // Motivos conocidos para documentos que quedan fuera de los cálculos (sección de transparencia)
 const MOTIVOS_DOCUMENTOS_EXCLUIDOS = {
   [APPLICATION_RESPONSE]: 'Acuse técnico DIAN sin valor comercial',
-  'Nomina Individual':    'Documento de nómina — no se contabiliza como compra (ver hoja NÓMINA)',
+  [NOMINA_INDIVIDUAL]:    'Documento de nómina — no se contabiliza como compra (ver hoja NÓMINA)',
 };
 
 const getSalaryConstants = (year) => {
@@ -60,7 +166,8 @@ const uploadDian = async (req, res, next) => {
     }
 
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(req.file.buffer);
+    const bufferNormalizado = await normalizeXlsxBuffer(req.file.buffer);
+    await workbook.xlsx.load(bufferNormalizado);
 
     const worksheet = workbook.worksheets[0];
     if (!worksheet) {
@@ -163,15 +270,15 @@ const uploadDian = async (req, res, next) => {
     const sumField = (pred, field) =>
       filas.filter(pred).reduce((acc, r) => acc + (r[field] ?? 0), 0);
 
-    const esFacturaRecibida  = (r) => r.grupo === RECIBIDO && r.tipoDocumento === FACTURA;
-    // comprasBruto: Factura electrónica + Documento equivalente (servicios públicos) —
-    // costos deducibles ante la DIAN bajo la convención normal (Recibido = compra).
+    const esFacturaRecibida  = (r) => r.grupo === RECIBIDO && TIPOS_FACTURA_EQUIVALENTE.includes(r.tipoDocumento);
+    // comprasBruto: Factura electrónica + Documento equivalente (servicios públicos + transporte
+    // aéreo) — costos deducibles ante la DIAN bajo la convención normal (Recibido = compra).
     // "Documento soporte con no obligados" NO entra acá: su Grupo funciona invertido,
     // se resuelve aparte en exportarBorrador (ver esDocSoporteCompra).
     // "Application response" queda fuera a propósito: es un acuse técnico sin valor comercial.
     const esCompraRecibida   = (r) => r.grupo === RECIBIDO && TIPOS_COMPRA.includes(r.tipoDocumento);
     const esNotaRecibida     = (r) => r.grupo === RECIBIDO && r.tipoDocumento === NOTA_CREDITO;
-    const esFacturaEmitida   = (r) => r.grupo === EMITIDO  && r.tipoDocumento === FACTURA;
+    const esFacturaEmitida   = (r) => r.grupo === EMITIDO  && TIPOS_FACTURA_EQUIVALENTE.includes(r.tipoDocumento);
     const esNotaEmitida      = (r) => r.grupo === EMITIDO  && r.tipoDocumento === NOTA_CREDITO;
 
     const calculos = {
@@ -183,6 +290,10 @@ const uploadDian = async (req, res, next) => {
       ivaGenerado:           sumField(esFacturaEmitida,  'iva'),
       ivaDevolucionCompras:  sumField(esNotaRecibida,    'iva'),
       ivaDevolucionVentas:   sumField(esNotaEmitida,     'iva'),
+      // INC (Impuesto Nacional al Consumo) — igual que el IVA, no es ingreso real de la
+      // empresa (es un impuesto que se recauda y se paga a la DIAN), se resta de Ventas.
+      incGenerado:           sumField(esFacturaEmitida,  'inc'),
+      incDevolucionVentas:   sumField(esNotaEmitida,     'inc'),
     };
 
     // Proyección para la respuesta: campos de clasificación + solo columnas presentes en el archivo
@@ -206,12 +317,15 @@ const uploadDian = async (req, res, next) => {
       return out;
     });
 
-    // Persistir borrador con campos de clasificación incluidos (expira en 14 días)
+    // Persistir borrador con campos de clasificación incluidos (expira en 14 días).
+    // Se guarda también el archivo normalizado (solo prefijos XML corregidos, NINGÚN
+    // dato/formato tocado) para reutilizarlo tal cual al exportar como primera hoja —
+    // evita reconstruir la hoja original desde JSON, que podía perder formato/precisión.
     const id = uuidv4();
     await db.query(
-      `INSERT INTO calculo_borradores (id, nombre_archivo, creado_por, datos)
-       VALUES ($1, $2, $3, $4)`,
-      [id, req.file.originalname, req.user.userId, JSON.stringify({ filas, calculos })]
+      `INSERT INTO calculo_borradores (id, nombre_archivo, creado_por, datos, archivo_original)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, req.file.originalname, req.user.userId, JSON.stringify({ filas, calculos }), bufferNormalizado]
     );
 
     res.status(201).json({ id, calculos, totalFilas: filas.length, filasParaClasificar });
@@ -431,13 +545,9 @@ const freezeHeaderRowAt = (ws, ySplit = 1) => {
 };
 
 // ── Hoja RESUMEN ───────────────────────────────────────────────────────────────
-function buildResumen(ws, resumen, nomina, meta) {
-  ws.columns = [
-    { key: 'a', width: 46 },
-    { key: 'b', width: 20 },
-    { key: 'c', width: 35 }, // Notas
-  ];
-
+// Separado en Content (solo filas, reutilizable en otras hojas como TODO) + wrapper
+// (columnas propias de la hoja standalone RESUMEN).
+function buildResumenContent(ws, resumen, nomina, meta, { freeze = true } = {}) {
   const COP  = '"$ "#,##0';
   const COPN = '"$ ("#,##0")"';
 
@@ -523,14 +633,14 @@ function buildResumen(ws, resumen, nomina, meta) {
   blank();
 
   // Fila de encabezado a congelar en scroll: hasta acá (título + KPI + contador)
-  freezeHeaderRowAt(ws, docRow.number + 1);
+  if (freeze) freezeHeaderRowAt(ws, docRow.number + 1);
 
-  // INGRESOS/COSTOS — esta hoja muestra solo las BASES (montos sin IVA). El IVA
+  // INGRESOS/COSTOS — esta hoja muestra solo las BASES (montos sin IVA ni INC). El IVA
   // correspondiente a cada una de estas bases se cuadra aparte en la hoja IMPUESTOS.
   sectionRow('INGRESOS');
   valueRow('Ventas',                   resumen.ventasBrutoSinIva,      {
     indent: 2,
-    nota: 'Todos los valores de esta hoja son BASE (sin IVA). El IVA de cada línea está en la hoja IMPUESTOS.',
+    nota: 'Todos los valores de esta hoja son BASE (sin IVA ni INC). El IVA de cada línea está en la hoja IMPUESTOS.',
   });
   valueRow('(−) Devolución en ventas', resumen.devolucionVentasSinIva, { isNeg: true, indent: 2 });
   valueRow('Ventas Netas',             resumen.ventasNetas,            { subtotal: true });
@@ -574,6 +684,15 @@ function buildResumen(ws, resumen, nomina, meta) {
   valueRow('UTILIDAD FINAL', utilFinal, { total: true, isNeg: utilFinal < 0 });
 }
 
+function buildResumen(ws, resumen, nomina, meta) {
+  ws.columns = [
+    { key: 'a', width: 46 },
+    { key: 'b', width: 20 },
+    { key: 'c', width: 35 }, // Notas
+  ];
+  buildResumenContent(ws, resumen, nomina, meta);
+}
+
 // ── Hoja IMPUESTOS ─────────────────────────────────────────────────────────────
 // El IVA no es ingreso ni costo real de la empresa (es un pasivo que se recauda
 // y se paga a la DIAN), por eso vive en su propia hoja separada de RESUMEN en
@@ -582,15 +701,7 @@ function buildResumen(ws, resumen, nomina, meta) {
 // que RESUMEN); derecha = IVA, agrupado por efecto sobre el IVA a pagar y NO por
 // Emitido/Recibido — Devolución en compras sube el IVA a pagar (revierte crédito),
 // Devolución en ventas lo baja (revierte el generado). Ver nota en exportarBorrador.
-function buildImpuestos(ws, resumen) {
-  ws.columns = [
-    { key: 'labelL', width: 30 },
-    { key: 'valL',   width: 18 },
-    { key: 'gap',    width: 4  },
-    { key: 'labelR', width: 30 },
-    { key: 'valR',   width: 18 },
-  ];
-
+function buildImpuestosContent(ws, resumen, { freeze = true } = {}) {
   const COP = '"$ "#,##0';
 
   const titleRow = ws.addRow(['IMPUESTOS — IVA']);
@@ -600,7 +711,7 @@ function buildImpuestos(ws, resumen) {
   for (let c = 1; c <= 5; c++) titleRow.getCell(c).fill = sfill(XL_TITLE);
   ws.mergeCells(titleRow.number, 1, titleRow.number, 5);
   ws.addRow([]);
-  freezeHeaderRowAt(ws, titleRow.number + 2);
+  if (freeze) freezeHeaderRowAt(ws, titleRow.number + 2);
 
   const sectionHdr = ws.addRow(['INGRESOS Y COSTOS (base, sin IVA)', '', '', 'IVA', '']);
   for (let c = 1; c <= 5; c++) {
@@ -680,16 +791,19 @@ function buildImpuestos(ws, resumen) {
   }
 }
 
-// ── Hoja RETENCIONES_POR_PROVEEDOR ─────────────────────────────────────────────
-function buildRetenciones(ws, retencionesPorProveedor, totalRetenciones) {
+function buildImpuestos(ws, resumen) {
   ws.columns = [
-    { key: 'nit',      width: 16 },
-    { key: 'nombre',   width: 40 },
-    { key: 'concepto', width: 16 },
-    { key: 'tasa',     width: 12 },
-    { key: 'total',    width: 20 },
+    { key: 'labelL', width: 30 },
+    { key: 'valL',   width: 18 },
+    { key: 'gap',    width: 4  },
+    { key: 'labelR', width: 30 },
+    { key: 'valR',   width: 18 },
   ];
+  buildImpuestosContent(ws, resumen);
+}
 
+// ── Hoja RETENCIONES_POR_PROVEEDOR ─────────────────────────────────────────────
+function buildRetencionesContent(ws, retencionesPorProveedor, totalRetenciones, { freeze = true } = {}) {
   const hdr = ws.addRow(['NIT Emisor', 'Nombre Emisor', 'Concepto', 'Tasa (%)', 'Total Retenido']);
   applyHeaderRow(hdr, 5);
 
@@ -715,22 +829,22 @@ function buildRetenciones(ws, retencionesPorProveedor, totalRetenciones) {
   totalRow.getCell(5).alignment = { horizontal: 'right' };
   applyTotalRow(totalRow, 5);
 
-  freezeHeaderRowAt(ws, 1);
+  if (freeze) freezeHeaderRowAt(ws, 1);
+}
+
+function buildRetenciones(ws, retencionesPorProveedor, totalRetenciones) {
+  ws.columns = [
+    { key: 'nit',      width: 16 },
+    { key: 'nombre',   width: 40 },
+    { key: 'concepto', width: 16 },
+    { key: 'tasa',     width: 12 },
+    { key: 'total',    width: 20 },
+  ];
+  buildRetencionesContent(ws, retencionesPorProveedor, totalRetenciones);
 }
 
 // ── Hoja DETALLE_COMPRAS ───────────────────────────────────────────────────────
-function buildDetalleCompras(ws, filasRecibido) {
-  ws.columns = [
-    { key: 'fecha',     width: 14 },
-    { key: 'folio',     width: 10 },
-    { key: 'nombre',    width: 36 },
-    { key: 'nit',       width: 15 },
-    { key: 'total',     width: 18 },
-    { key: 'clasi',     width: 16 },
-    { key: 'tasa',      width: 12 },
-    { key: 'retencion', width: 18 },
-  ];
-
+function buildDetalleComprasContent(ws, filasRecibido, { freeze = true } = {}) {
   const hdr = ws.addRow([
     'Fecha Emisión', 'Folio', 'Nombre Emisor', 'NIT Emisor',
     'Total', 'Clasificación', 'Tasa (%)', 'Retención',
@@ -763,22 +877,36 @@ function buildDetalleCompras(ws, filasRecibido) {
     applyDataRow(row, 8, i % 2 === 1);
   });
 
-  freezeHeaderRowAt(ws, 1);
+  if (freeze) freezeHeaderRowAt(ws, 1);
+}
+
+function buildDetalleCompras(ws, filasRecibido) {
+  ws.columns = [
+    { key: 'fecha',     width: 14 },
+    { key: 'folio',     width: 10 },
+    { key: 'nombre',    width: 36 },
+    { key: 'nit',       width: 15 },
+    { key: 'total',     width: 18 },
+    { key: 'clasi',     width: 16 },
+    { key: 'tasa',      width: 12 },
+    { key: 'retencion', width: 18 },
+  ];
+  buildDetalleComprasContent(ws, filasRecibido);
 }
 
 // ── Hoja NOMINA ────────────────────────────────────────────────────────────────
-function buildNomina(ws, nomina, salario) {
-  ws.columns = [{ key: 'a', width: 52 }, { key: 'b', width: 22 }];
-  freezeHeaderRowAt(ws, 1);
-
+function buildNominaContent(ws, nomina, salario) {
   const COP   = '"$ "#,##0';
+  const COPN  = '"$ ("#,##0")"';
   const blank = () => ws.addRow([]);
 
   const sectionRow = (label) => sectionBand(ws, label, 2);
 
   // opts.count: cantidades enteras (empleados, meses) — sin formato de moneda
+  // opts.isNeg: se muestra en rojo entre paréntesis (deducciones, restan del total)
   const addRow = (label, val, opts = {}) => {
-    const row = ws.addRow([label, val]);
+    const displayVal = opts.isNeg && val !== null && val !== undefined ? Math.abs(val) : val;
+    const row = ws.addRow([label, displayVal]);
     const cA  = row.getCell(1);
     const cB  = row.getCell(2);
     cA.alignment = { horizontal: 'left', indent: opts.indent ?? 0 };
@@ -787,12 +915,15 @@ function buildNomina(ws, nomina, salario) {
     if (opts.count) {
       cB.numFmt = '0';
     } else if (val !== null && val !== undefined) {
-      cB.numFmt = COP;
+      cB.numFmt = opts.isNeg ? COPN : COP;
+    }
+    if (opts.isNeg) {
+      cB.font = { color: { argb: XL_RED }, bold: !!opts.subtotal };
     }
     if (opts.subtotal) {
       cA.fill = cB.fill = sfill(XL_BLUE_LT);
       cA.font = { bold: true };
-      cB.font = { bold: true };
+      if (!opts.isNeg) cB.font = { bold: true };
       row.height = 20;
     }
     if (opts.total) {
@@ -815,24 +946,21 @@ function buildNomina(ws, nomina, salario) {
   blank();
 
   sectionRow('DEVENGADO (por empleado/mes)');
-  addRow('Salario',               salario, { indent: 2 });
-  addRow('Auxilio de transporte', nomina.auxilioAplica ? nomina.auxilioTransporte : 0, { indent: 2 });
-  addRow('Total devengado',       nomina.devengado, { subtotal: true });
+  addRow('Salario',                                       salario, { indent: 2 });
+  addRow('Auxilio de transporte',                         nomina.auxilioAplica ? nomina.auxilioTransporte : 0, { indent: 2 });
+  addRow('Vacaciones (4,17% s/ salario)',                  round2(nomina.devengadoDetalle.vacaciones),          { indent: 2 });
+  addRow('Prima de Servicios (8,33% s/ salario+auxilio)',  round2(nomina.devengadoDetalle.prima),               { indent: 2 });
+  addRow('Cesantías (8,33% s/ salario+auxilio)',           round2(nomina.devengadoDetalle.cesantias),           { indent: 2 });
+  addRow('Intereses Cesantías (1% s/ cesantías)',          round2(nomina.devengadoDetalle.interesesCesantias),  { indent: 2 });
+  addRow('Total devengado',                                nomina.devengado, { subtotal: true });
   blank();
 
-  sectionRow('APORTES EMPRESA (por empleado/mes, sobre salario)');
-  addRow(`Pensión (${(nomina.tasaPension * 100).toFixed(0)}%)`,             round2(salario * nomina.tasaPension), { indent: 2 });
-  addRow(`ARL Clase I (${(nomina.tasaArl * 100).toFixed(2)}%)`,             round2(salario * nomina.tasaArl),     { indent: 2 });
-  addRow(`Caja de Compensación (${(nomina.tasaCaja * 100).toFixed(0)}%)`,   round2(salario * nomina.tasaCaja),    { indent: 2 });
-  addRow('Total aportes',                                                  round2(nomina.aportesEmpresa),        { subtotal: true });
-  blank();
-
-  sectionRow('PROVISIONES (por empleado/mes)');
-  addRow('Vacaciones (4,17% s/ salario)',                round2(nomina.provisionesDetalle.vacaciones),         { indent: 2 });
-  addRow('Prima de Servicios (8,33% s/ salario+auxilio)', round2(nomina.provisionesDetalle.prima),             { indent: 2 });
-  addRow('Cesantías (8,33% s/ salario+auxilio)',          round2(nomina.provisionesDetalle.cesantias),         { indent: 2 });
-  addRow('Intereses Cesantías (1% s/ cesantías)',         round2(nomina.provisionesDetalle.interesesCesantias),{ indent: 2 });
-  addRow('Total provisiones',                             round2(nomina.provisiones), { subtotal: true });
+  sectionRow('DEDUCCIONES (por empleado/mes, sobre salario)');
+  // La etiqueta "(12%)" es la tasa oficial que paga el empleador — puramente informativa,
+  // el cálculo real sigue usando nomina.tasaPension (4%), no este texto.
+  addRow('Pensión (12%)',                                   round2(salario * nomina.tasaPension), { indent: 2, isNeg: true });
+  addRow(`Salud (${(nomina.tasaSalud * 100).toFixed(0)}%)`, round2(salario * nomina.tasaSalud),   { indent: 2, isNeg: true });
+  addRow('Total deducciones',                               nomina.deducciones, { subtotal: true, isNeg: true });
   blank();
 
   // ── Tarjeta destacada del costo final — mismo tratamiento visual que UTILIDAD FINAL
@@ -853,21 +981,20 @@ function buildNomina(ws, nomina, salario) {
   blank();
 
   addRow(
-    `Costo por empleado / mes (Devengado + Aportes + Provisiones) — $${Math.round(nomina.costoMes).toLocaleString('es-CO')}/emp`,
+    `Costo por empleado / mes (Devengado − Deducciones) — $${Math.round(nomina.costoMes).toLocaleString('es-CO')}/emp`,
     nomina.costoMes,
     { total: true }
   );
 }
 
-// ── Hoja METADATOS ─────────────────────────────────────────────────────────────
-function buildMetadatos(ws, { totalFilas, periodoDesde, periodoHasta, procesadoEn }, userEmail, filas, documentosNoContabilizados = [], anomalias = []) {
-  ws.columns = [
-    { key: 'campo', width: 34 },
-    { key: 'valor', width: 36 },
-    { key: 'c',     width: 14 },
-    { key: 'd',     width: 50 },
-  ];
+function buildNomina(ws, nomina, salario) {
+  ws.columns = [{ key: 'a', width: 52 }, { key: 'b', width: 22 }];
+  freezeHeaderRowAt(ws, 1);
+  buildNominaContent(ws, nomina, salario);
+}
 
+// ── Hoja METADATOS ─────────────────────────────────────────────────────────────
+function buildMetadatosContent(ws, { totalFilas, periodoDesde, periodoHasta, procesadoEn }, userEmail, filas, documentosNoContabilizados = [], anomalias = [], { freeze = true } = {}) {
   const emitido  = filas.filter((f) => f.grupo === EMITIDO).length;
   const recibido = filas.filter((f) => f.grupo === RECIBIDO).length;
 
@@ -950,6 +1077,87 @@ function buildMetadatos(ws, { totalFilas, periodoDesde, periodoHasta, procesadoE
     });
   }
 
+  if (freeze) freezeHeaderRowAt(ws, 1);
+}
+
+function buildMetadatos(ws, meta, userEmail, filas, documentosNoContabilizados = [], anomalias = []) {
+  ws.columns = [
+    { key: 'campo', width: 34 },
+    { key: 'valor', width: 36 },
+    { key: 'c',     width: 14 },
+    { key: 'd',     width: 50 },
+  ];
+  buildMetadatosContent(ws, meta, userEmail, filas, documentosNoContabilizados, anomalias);
+}
+
+// ── Hoja REPORTE_DIAN ────────────────────────────────────────────────────────────
+// Reproduce el reporte DIAN tal cual se subió (mismas columnas, una fila por documento),
+// como referencia cruda junto a las hojas de cálculo. No es un resumen ni duplica las
+// otras hojas — es la fuente original, sin transformar.
+const COLUMNAS_REPORTE_DIAN = [
+  { header: 'Tipo de documento', field: 'tipoDocumento', width: 26 },
+  { header: 'CUFE/CUDE',         field: 'cufe',           width: 42 },
+  { header: 'Folio',             field: 'folio',          width: 10 },
+  { header: 'Prefijo',           field: 'prefijo',        width: 10 },
+  { header: 'Divisa',            field: 'divisa',         width: 10 },
+  { header: 'Forma de Pago',     field: 'formaPago',      width: 14 },
+  { header: 'Medio de Pago',     field: 'medioPago',      width: 14 },
+  { header: 'Fecha Emisión',     field: 'fechaEmision',   width: 14, isFecha: true },
+  { header: 'Fecha Recepción',   field: 'fechaRecepcion', width: 18, isFecha: true },
+  { header: 'NIT Emisor',        field: 'nitEmisor',      width: 14 },
+  { header: 'Nombre Emisor',     field: 'nombreEmisor',   width: 32 },
+  { header: 'NIT Receptor',      field: 'nitReceptor',    width: 14 },
+  { header: 'Nombre Receptor',   field: 'nombreReceptor', width: 32 },
+  { header: 'IVA',               field: 'iva',            width: 14, isNum: true },
+  { header: 'ICA',               field: 'ica',            width: 12, isNum: true },
+  { header: 'IC',                field: 'ic',             width: 12, isNum: true },
+  { header: 'INC',               field: 'inc',            width: 12, isNum: true },
+  { header: 'Timbre',            field: 'timbre',         width: 12, isNum: true },
+  { header: 'INC Bolsas',        field: 'incBolsas',      width: 12, isNum: true },
+  { header: 'IN Carbono',        field: 'inCarbono',      width: 12, isNum: true },
+  { header: 'IN Combustibles',   field: 'inCombustibles', width: 14, isNum: true },
+  { header: 'IC Datos',          field: 'icDatos',        width: 12, isNum: true },
+  { header: 'ICL',               field: 'icl',            width: 12, isNum: true },
+  { header: 'INPP',              field: 'inpp',           width: 12, isNum: true },
+  { header: 'IBUA',              field: 'ibua',           width: 12, isNum: true },
+  { header: 'ICUI',              field: 'icui',           width: 12, isNum: true },
+  { header: 'Rete IVA',          field: 'reteIva',        width: 12, isNum: true },
+  { header: 'Rete Renta',        field: 'reteRenta',      width: 12, isNum: true },
+  { header: 'Rete ICA',          field: 'reteIca',        width: 12, isNum: true },
+  { header: 'Total',             field: 'total',          width: 16, isNum: true },
+  { header: 'Estado',            field: 'estado',         width: 22 },
+  { header: 'Grupo',             field: 'grupo',          width: 12 },
+];
+
+// Convierte de vuelta a dd/mm/aaaa cuando el valor se pudo parsear a ISO (yyyy-MM-dd);
+// si vino con hora o no se pudo parsear, se deja tal cual llegó del archivo original.
+const fechaOriginal = (val) => (/^\d{4}-\d{2}-\d{2}$/.test(val ?? '') ? fechaES(val) : (val ?? ''));
+
+function buildReporteDian(ws, filas) {
+  const numCols = COLUMNAS_REPORTE_DIAN.length;
+  ws.columns = COLUMNAS_REPORTE_DIAN.map((c, i) => ({ key: `c${i}`, width: c.width }));
+
+  const hdr = ws.addRow(COLUMNAS_REPORTE_DIAN.map((c) => c.header));
+  applyHeaderRow(hdr, numCols);
+
+  filas.forEach((f, i) => {
+    const row = ws.addRow(COLUMNAS_REPORTE_DIAN.map((c) =>
+      c.isFecha ? fechaOriginal(f[c.field]) : (f[c.field] ?? '')
+    ));
+    COLUMNAS_REPORTE_DIAN.forEach((c, colIdx) => {
+      const cell = row.getCell(colIdx + 1);
+      if (c.isNum) {
+        cell.numFmt = '"$ "#,##0';
+        cell.alignment = { horizontal: 'right' };
+      } else if (c.isFecha) {
+        cell.alignment = { horizontal: 'center' };
+      } else {
+        cell.alignment = { horizontal: 'left' };
+      }
+    });
+    applyDataRow(row, numCols, i % 2 === 1);
+  });
+
   freezeHeaderRowAt(ws, 1);
 }
 
@@ -961,7 +1169,7 @@ const exportarBorrador = async (req, res, next) => {
 
     // ── 1. Leer borrador y verificar propiedad ─────────────────────────────
     const { rows } = await db.query(
-      `SELECT datos FROM calculo_borradores WHERE id = $1 AND creado_por = $2`,
+      `SELECT datos, archivo_original FROM calculo_borradores WHERE id = $1 AND creado_por = $2`,
       [id, req.user.userId]
     );
     if (rows.length === 0) {
@@ -969,10 +1177,14 @@ const exportarBorrador = async (req, res, next) => {
     }
 
     const { filas, calculos, anomaliasRevisadas = [] } = rows[0].datos;
+    const archivoOriginal = rows[0].archivo_original;
 
-    // ── 2. Filas Recibido no-nómina ─────────────────────────────────────────
+    // ── 2. Filas Recibido no-nómina, sin acuses técnicos ────────────────────
+    // "Application response" es un acuse técnico DIAN sin valor comercial (ver
+    // MOTIVOS_DOCUMENTOS_EXCLUIDOS) — no se le pide clasificación de retención ni
+    // entra a DETALLE_COMPRAS ni a los totales retenidos.
     const filasRecibido = filas.filter(
-      (f) => f.grupo === RECIBIDO && f.tipoDocumento !== 'Nomina Individual'
+      (f) => f.grupo === RECIBIDO && f.tipoDocumento !== NOMINA_INDIVIDUAL && f.tipoDocumento !== APPLICATION_RESPONSE
     );
 
     const sinClasificar = filasRecibido.filter((f) => f.clasificacionRetencion == null);
@@ -1018,14 +1230,17 @@ const exportarBorrador = async (req, res, next) => {
     const ivaPagar             = round2(totalIvaVentas - totalIvaCompras);
 
     // ── 5. Estado de resultados ────────────────────────────────────────────
-    // Ventas/Compras Netas (y por lo tanto Utilidad Bruta) se calculan SIN IVA:
-    // el "Total" del reporte DIAN incluye IVA, pero el IVA no es ingreso ni costo
-    // real de la empresa — es un pasivo que se cuadra aparte en IMPUESTOS. Se
-    // muestran ambas versiones (con/sin IVA) en el Excel para poder auditar.
+    // Ventas/Compras Netas (y por lo tanto Utilidad Bruta) se calculan SIN IVA ni INC:
+    // el "Total" del reporte DIAN incluye ambos impuestos, pero ninguno es ingreso ni
+    // costo real de la empresa — son pasivos que se recaudan y se pagan a la DIAN. Se
+    // muestran ambas versiones (con/sin impuestos) en el Excel para poder auditar.
+    const incGenerado          = calculos.incGenerado         ?? 0;
+    const incDevolucionVentas  = calculos.incDevolucionVentas ?? 0;
+
     const ventasBrutoConIva      = calculos.ventasBruto       ?? 0;
-    const ventasBrutoSinIva      = ventasBrutoConIva - ivaGenerado;
+    const ventasBrutoSinIva      = ventasBrutoConIva - ivaGenerado - incGenerado;
     const devolucionVentasConIva = calculos.devolucionVentas  ?? 0;
-    const devolucionVentasSinIva = devolucionVentasConIva - ivaDevolucionVentas;
+    const devolucionVentasSinIva = devolucionVentasConIva - ivaDevolucionVentas - incDevolucionVentas;
     const ventasNetas            = ventasBrutoSinIva - devolucionVentasSinIva;
 
     const comprasBrutoConIva      = calculos.comprasBruto      ?? 0;
@@ -1068,7 +1283,7 @@ const exportarBorrador = async (req, res, next) => {
     // ── 7. Nómina ──────────────────────────────────────────────────────────
     // Fórmula compartida con el preview de frontend (shared/calcularNomina.js) — evita que
     // backend y frontend vuelvan a desincronizarse, como pasó antes con el SMMLV hardcodeado.
-    const { calcularNomina, calcularCostoTotal, TASA_PENSION, TASA_ARL, TASA_CAJA } =
+    const { calcularNomina, calcularCostoTotal, TASA_PENSION, TASA_SALUD } =
       await import('../../../shared/calcularNomina.js');
 
     let nominaCalc = null;
@@ -1111,20 +1326,18 @@ const exportarBorrador = async (req, res, next) => {
     const nominaData = nominaCalc
       ? {
           empleados, meses,
-          year:               anioPeriodo,
-          salario:            round2(salario),
-          smmlv:              salaryConsts.smmlv,
-          auxilioTransporte:  salaryConsts.auxilioTransporte,
-          auxilioAplica:      nominaCalc.auxilioAplica,
-          devengado:          round2(nominaCalc.devengado),
-          aportesEmpresa:     nominaCalc.aportesEmpresa,
-          provisiones:        nominaCalc.provisiones,
-          provisionesDetalle: nominaCalc.provisionesDetalle,
-          costoMes:           round2(nominaCalc.costoMes),
-          costoTotal:         costoNominaTotal,
-          tasaPension:        TASA_PENSION,
-          tasaArl:            TASA_ARL,
-          tasaCaja:           TASA_CAJA,
+          year:              anioPeriodo,
+          salario:           round2(salario),
+          smmlv:             salaryConsts.smmlv,
+          auxilioTransporte: salaryConsts.auxilioTransporte,
+          auxilioAplica:     nominaCalc.auxilioAplica,
+          devengadoDetalle:  nominaCalc.devengadoDetalle,
+          devengado:         nominaCalc.devengado,
+          deducciones:       nominaCalc.deducciones,
+          costoMes:          nominaCalc.costoMes,
+          costoTotal:        costoNominaTotal,
+          tasaPension:       TASA_PENSION,
+          tasaSalud:         TASA_SALUD,
         }
       : null;
 
@@ -1133,7 +1346,18 @@ const exportarBorrador = async (req, res, next) => {
     const userEmail = userRow.rows[0]?.email ?? 'usuario';
 
     // ── 10. Generar workbook ───────────────────────────────────────────────
+    // Partimos del archivo original tal cual se subió (mismo buffer normalizado que se
+    // guardó en el upload — solo prefijos XML corregidos, ningún dato/formato tocado) y le
+    // agregamos las hojas de cálculo encima. La hoja original queda 100% intacta: cero
+    // riesgo de perder formato/precisión al reconstruirla desde JSON.
     const wb = new ExcelJS.Workbook();
+    if (archivoOriginal) {
+      await wb.xlsx.load(archivoOriginal);
+    } else {
+      // Borradores previos a esta migración no tienen el archivo guardado — se reconstruye
+      // la hoja desde los datos parseados como respaldo.
+      buildReporteDian(wb.addWorksheet('REPORTE_DIAN'), filas);
+    }
     wb.creator = userEmail;
     wb.created = new Date();
 
@@ -1147,7 +1371,7 @@ const exportarBorrador = async (req, res, next) => {
     buildMetadatos(wb.addWorksheet('METADATOS'), meta, userEmail, filas, documentosNoContabilizados, anomalias);
 
     // ── 9. Escribir buffer y enviar ────────────────────────────────────────
-    const buffer = await wb.xlsx.writeBuffer();
+    const buffer = await corregirTablaRoundtrip(await wb.xlsx.writeBuffer());
 
     const mesAnio       = periodoDesde ? periodoDesde.slice(0, 7) : new Date().toISOString().slice(0, 7);
     const nombreSan     = empresaNombre.replace(/[^A-Za-z0-9]/g, '_').replace(/_+/g, '_').replace(/_$/, '').slice(0, 20);
@@ -1184,7 +1408,11 @@ const aplicarClasificacionRapida = async (req, res, next) => {
     if (check.rows.length === 0) return res.status(404).json({ error: 'Borrador no encontrado' });
 
     const filas = check.rows[0].filas;
-    const sinClasificar = filas.filter((f) => f.clasificacionRetencion == null);
+    // Solo filas que realmente requieren clasificación de retención (Recibido, no-nómina,
+    // sin acuses técnicos) — "Application response" nunca se clasifica, no cuenta para nada.
+    const requiereClasificacion = (f) =>
+      f.grupo === RECIBIDO && f.tipoDocumento !== NOMINA_INDIVIDUAL && f.tipoDocumento !== APPLICATION_RESPONSE;
+    const sinClasificar = filas.filter((f) => requiereClasificacion(f) && f.clasificacionRetencion == null);
 
     if (sinClasificar.length === 0) {
       return res.json({ filasActualizadas: 0, filasRestanteSinClasificar: 0, mensaje: 'No hay filas sin clasificar' });
@@ -1192,7 +1420,7 @@ const aplicarClasificacionRapida = async (req, res, next) => {
 
     const nuevaTasa = clasificacionRetencion === 'N/A' ? null : (tasaRetencion ?? null);
     const nuevasFilas = filas.map((f) =>
-      f.clasificacionRetencion == null
+      requiereClasificacion(f) && f.clasificacionRetencion == null
         ? { ...f, clasificacionRetencion, tasaRetencion: nuevaTasa }
         : f
     );
