@@ -87,22 +87,40 @@ Las columnas opcionales (ICA, INC, Rete IVA, Rete Renta, etc.) se incluyen solo 
 Se separan las filas por `Grupo` (`Recibido` / `Emitido`) y `Tipo de documento`:
 
 ```
-comprasBruto       = Σ total  (Recibido + [Factura electrónica, Documento equivalente -
-                                Servicios públicos domiciliarios, Documento soporte con
-                                no obligados])
-devolucionCompras  = Σ total  (Recibido + Nota crédito electrónica)
-ventasBruto        = Σ total  (Emitido  + Factura electrónica)
-devolucionVentas   = Σ total  (Emitido  + Nota crédito electrónica)
-ivaDescontable     = Σ IVA    (Recibido + Factura electrónica)
-ivaGenerado        = Σ IVA    (Emitido  + Factura electrónica)
-ivaDevolucionCompras = Σ IVA  (Recibido + Nota crédito electrónica)
-ivaDevolucionVentas  = Σ IVA  (Emitido  + Nota crédito electrónica)
+comprasBruto       = Σ total  (Recibido + TIPOS_COMPRA)
+devolucionCompras  = Σ total  (Recibido + TIPOS_NOTA_CREDITO)
+ventasBruto        = Σ total  (Emitido  + TIPOS_FACTURA_EQUIVALENTE)
+devolucionVentas   = Σ total  (Emitido  + TIPOS_NOTA_CREDITO)
+ivaDescontable     = Σ IVA    (Recibido + TIPOS_FACTURA_EQUIVALENTE)
+ivaGenerado        = Σ IVA    (Emitido  + TIPOS_FACTURA_EQUIVALENTE)
+ivaDevolucionCompras = Σ IVA  (Recibido + TIPOS_NOTA_CREDITO)
+ivaDevolucionVentas  = Σ IVA  (Emitido  + TIPOS_NOTA_CREDITO)
 ```
 
-`comprasBruto` incluye tres tipos de documento porque los tres son costos deducibles ante
-la DIAN. `"Application response"` queda deliberadamente fuera: es un acuse técnico sin
-valor comercial (aparece en la sección DOCUMENTOS NO CONTABILIZADOS del Excel, junto con
+Los tres conjuntos de tipos están definidos al inicio de `dianController.js`:
+
+| Conjunto | Contiene | Criterio |
+|----------|----------|----------|
+| `TIPOS_FACTURA_EQUIVALENTE` | Factura electrónica, Documento equivalente - Transporte aéreo de pasajeros | Puede ser compra **o** venta según el `Grupo`; aporta IVA descontable/generado |
+| `TIPOS_COMPRA` | los anteriores + Servicios públicos domiciliarios, Transporte pasajeros terrestre | Costo deducible ante la DIAN. Los dos últimos solo aparecen como compra y están **excluidos de IVA** (Art. 476 ET), por eso no entran en el conjunto de arriba |
+| `TIPOS_NOTA_CREDITO` | Nota de crédito electrónica, Nota de ajuste crédito del documento equivalente | Revierten una operación ya contabilizada: restan del grupo al que pertenecen |
+
+La nota de ajuste crédito (código 94 del anexo DIAN) es la nota crédito del mundo
+"documento equivalente" — referencia un documento equivalente en vez de una factura, pero
+contablemente se comporta igual. Falta su contraparte **débito** (código 93), que sumaría
+en vez de restar: aún no ha aparecido en ningún reporte y el texto exacto que usa el portal
+está sin confirmar, así que no se agregó a ciegas.
+
+`"Application response"` queda deliberadamente fuera: es un acuse técnico sin valor
+comercial (aparece en la sección DOCUMENTOS NO CONTABILIZADOS del Excel, junto con
 cualquier otro tipo de documento no reconocido).
+
+> El catálogo completo de tipos de documento DIAN, con su código oficial, la página del
+> anexo de donde sale y su tratamiento contable, está en
+> [dian-tipos-documento.md](dian-tipos-documento.md). **Antes de agregar un tipo nuevo**,
+> verificar ahí el texto exacto que usa el portal: no coincide con el nombre oficial del
+> anexo, y una constante mal escrita falla en silencio (la fila cae en DOCUMENTOS NO
+> CONTABILIZADOS en vez de sumar).
 
 #### 3. Clasificación de retenciones
 
@@ -276,10 +294,16 @@ Nombre del archivo generado: `ContabilidadDIAN_<empresa>_<YYYY-MM>.xlsx`
 - Generación y descarga del Excel (6 hojas, IVA en hoja propia): implementado
 - Eliminación automática del borrador tras exportación: implementado
 
+- Catálogo de tipos de documento contra los anexos oficiales DIAN: documentado en
+  [dian-tipos-documento.md](dian-tipos-documento.md)
+
 **Pendiente / ideas futuras:**
 - **UI de frontend para "revisar anomalía"** — el endpoint (`PATCH .../revisar-anomalia`)
   y el reflejo en el Excel ya existen; falta decidir dónde vive el botón (¿nueva sección
   en `DianClasificacionPage`? ¿página propia?) y conectarlo.
+- **Nota de ajuste débito del documento equivalente** (código 93) — contraparte de la de
+  crédito, sumaría en vez de restar. Falta confirmar el texto exacto del portal en un
+  reporte real antes de agregarla.
 - Cron job para limpiar borradores sin exportar después de 14 días
 - Historial de reportes exportados (sin guardar los datos, solo metadatos)
 - Soporte para múltiples empresas en el mismo reporte

@@ -109,13 +109,27 @@ const REQUIRED_COLS = [
 
 const FACTURA                  = 'Factura electrónica';
 const NOTA_CREDITO             = 'Nota de crédito electrónica';
+const NOTA_AJUSTE_CREDITO_DE   = 'Nota de ajuste crédito del documento equivalente';
 const DOC_EQUIVALENTE          = 'Documento equivalente - Servicios públicos domiciliarios';
 const DOC_TRANSPORTE_AEREO     = 'Documento equivalente - Transporte aéreo de pasajeros';
+const DOC_TRANSPORTE_TERRESTRE = 'Documento equivalente - Transporte pasajeros terrestre';
 const DOC_SOPORTE_NO_OBLIGADOS = 'Documento soporte con no obligados';
 const APPLICATION_RESPONSE     = 'Application response';
 const NOMINA_INDIVIDUAL        = 'Nomina Individual';
 const RECIBIDO                 = 'Recibido';
 const EMITIDO                  = 'Emitido';
+
+// Notas que revierten una operación ya contabilizada: restan del total del grupo al que
+// pertenecen (Recibido → devolución en compras, Emitido → devolución en ventas).
+// NOTA_AJUSTE_CREDITO_DE es la nota crédito del mundo "documento equivalente" (código 94
+// del anexo DIAN); se comporta igual que la nota crédito de factura, solo que referencia
+// un documento equivalente en vez de una factura electrónica.
+// Falta la nota de ajuste DÉBITO (código 93), que sumaría en vez de restar: todavía no ha
+// aparecido en ningún reporte y el texto exacto que usa el portal está sin confirmar, así
+// que no se agrega a ciegas — si llega, cae en DOCUMENTOS NO CONTABILIZADOS (visible en la
+// hoja METADATOS) en vez de sumar con el signo equivocado.
+// Ver docs/dian-tipos-documento.md para el catálogo completo y sus fuentes oficiales.
+const TIPOS_NOTA_CREDITO = [NOTA_CREDITO, NOTA_AJUSTE_CREDITO_DE];
 
 // Tipos que se tratan exactamente igual que una Factura electrónica: cuentan como compra
 // si Grupo=Recibido y como venta si Grupo=Emitido. A diferencia de DOC_EQUIVALENTE
@@ -126,13 +140,19 @@ const TIPOS_FACTURA_EQUIVALENTE = [FACTURA, DOC_TRANSPORTE_AEREO];
 // Tipos de documento "Recibido" que cuentan como costo deducible ante la DIAN bajo la
 // convención normal (Recibido = compra). DOC_SOPORTE_NO_OBLIGADOS NO va acá: su Grupo
 // funciona invertido (ver esDocSoporteCompra / calcularAnomalias más abajo).
-const TIPOS_COMPRA = [...TIPOS_FACTURA_EQUIVALENTE, DOC_EQUIVALENTE];
+// DOC_TRANSPORTE_TERRESTRE va acá y no en TIPOS_FACTURA_EQUIVALENTE (donde sí está el
+// aéreo) porque el transporte terrestre de pasajeros solo aparece como compra: se lo
+// compramos a una empresa transportadora. Además está EXCLUIDO de IVA (Art. 476 ET), así
+// que sus filas llegan con IVA=0 y no aportan IVA descontable — igual que los servicios
+// públicos domiciliarios, que tampoco están en TIPOS_FACTURA_EQUIVALENTE.
+const TIPOS_COMPRA = [...TIPOS_FACTURA_EQUIVALENTE, DOC_EQUIVALENTE, DOC_TRANSPORTE_TERRESTRE];
 
 // Tipos de documento que sí entran en algún cálculo (compras, ventas, notas crédito,
 // documento soporte). DOC_SOPORTE_NO_OBLIGADOS se contabiliza condicionalmente por Grupo
 // (ver exportarBorrador), por eso igual cuenta como "contabilizado" acá.
 const TIPOS_CONTABILIZADOS = new Set([
-  FACTURA, NOTA_CREDITO, DOC_EQUIVALENTE, DOC_SOPORTE_NO_OBLIGADOS, DOC_TRANSPORTE_AEREO,
+  FACTURA, ...TIPOS_NOTA_CREDITO, DOC_EQUIVALENTE, DOC_SOPORTE_NO_OBLIGADOS,
+  DOC_TRANSPORTE_AEREO, DOC_TRANSPORTE_TERRESTRE,
 ]);
 
 // Motivos conocidos para documentos que quedan fuera de los cálculos (sección de transparencia)
@@ -289,15 +309,15 @@ const uploadDian = async (req, res, next) => {
       filas.filter(pred).reduce((acc, r) => acc + (r[field] ?? 0), 0);
 
     const esFacturaRecibida  = (r) => r.grupo === RECIBIDO && TIPOS_FACTURA_EQUIVALENTE.includes(r.tipoDocumento);
-    // comprasBruto: Factura electrónica + Documento equivalente (servicios públicos + transporte
-    // aéreo) — costos deducibles ante la DIAN bajo la convención normal (Recibido = compra).
+    // comprasBruto: todos los TIPOS_COMPRA — costos deducibles ante la DIAN bajo la
+    // convención normal (Recibido = compra). Ver la definición del conjunto más arriba.
     // "Documento soporte con no obligados" NO entra acá: su Grupo funciona invertido,
     // se resuelve aparte en exportarBorrador (ver esDocSoporteCompra).
     // "Application response" queda fuera a propósito: es un acuse técnico sin valor comercial.
     const esCompraRecibida   = (r) => r.grupo === RECIBIDO && TIPOS_COMPRA.includes(r.tipoDocumento);
-    const esNotaRecibida     = (r) => r.grupo === RECIBIDO && r.tipoDocumento === NOTA_CREDITO;
+    const esNotaRecibida     = (r) => r.grupo === RECIBIDO && TIPOS_NOTA_CREDITO.includes(r.tipoDocumento);
     const esFacturaEmitida   = (r) => r.grupo === EMITIDO  && TIPOS_FACTURA_EQUIVALENTE.includes(r.tipoDocumento);
-    const esNotaEmitida      = (r) => r.grupo === EMITIDO  && r.tipoDocumento === NOTA_CREDITO;
+    const esNotaEmitida      = (r) => r.grupo === EMITIDO  && TIPOS_NOTA_CREDITO.includes(r.tipoDocumento);
 
     const calculos = {
       comprasBruto:          sumField(esCompraRecibida,  'total'),
@@ -458,11 +478,14 @@ const calcularAnomalias = (filas, anomaliasRevisadas = []) => {
     });
   }
 
-  const totalNegativoInesperado = filas.filter((f) => (f.total ?? 0) < 0 && f.tipoDocumento !== NOTA_CREDITO);
+  const totalNegativoInesperado = filas.filter(
+    (f) => (f.total ?? 0) < 0 && !TIPOS_NOTA_CREDITO.includes(f.tipoDocumento)
+  );
   if (totalNegativoInesperado.length > 0) {
     anomalias.push({
       tipo: 'Total negativo inesperado',
-      detalle: `${totalNegativoInesperado.length} fila(s) con Total negativo que no son "${NOTA_CREDITO}"`,
+      detalle: `${totalNegativoInesperado.length} fila(s) con Total negativo que no son nota crédito ` +
+        `(${TIPOS_NOTA_CREDITO.map((t) => `"${t}"`).join(', ')})`,
     });
   }
 
@@ -1487,4 +1510,9 @@ const marcarAnomaliaRevisada = async (req, res, next) => {
   }
 };
 
-module.exports = { uploadDian, patchBorrador, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada };
+module.exports = {
+  uploadDian, patchBorrador, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada,
+  // Funciones puras (no tocan DB ni request). Se exportan para poder testear directamente
+  // las reglas contables sin montar un borrador completo — ver tests/unit/dianController.test.js
+  calcularAnomalias, calcularDocumentosNoContabilizados,
+};
