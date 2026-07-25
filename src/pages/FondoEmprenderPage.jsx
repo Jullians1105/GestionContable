@@ -427,6 +427,13 @@ export default function FondoEmprenderPage() {
   const [year, setYear]             = useState(mesInicial.year)
   const [processes, setProcesses]   = useState([])
   const [companies, setCompanies]   = useState([])
+  const companiesRef = useRef(companies) // lets fetchGrid read the latest local state without re-subscribing
+  companiesRef.current = companies
+  // Keys "companyId:procId" with a status PUT in flight — fetchGrid keeps
+  // the local value for these instead of the server snapshot, otherwise a
+  // refetch (window focus, or the socket echo of this same edit) racing
+  // ahead of the PUT's commit silently reverts the cell the user just set.
+  const pendingCellWritesRef = useRef(new Set())
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
   const [migrationReport, setMigrationReport] = useState(() => getMigrationReport())
@@ -516,7 +523,13 @@ export default function FondoEmprenderPage() {
           confirmedContabilidad: false, confirmedContabilidadAt: null, enviadoContabilidad: false, enviadoContabilidadAt: null,
         }
         const cells = {}
-        chk.items.forEach(it => { cells[it.id] = { status: it.estado, note: it.nota ?? '' } })
+        const prevCells = companiesRef.current.find(c => c.id === e.id)?.cells
+        chk.items.forEach(it => {
+          const key = `${e.id}:${it.id}`
+          cells[it.id] = pendingCellWritesRef.current.has(key) && prevCells?.[it.id]
+            ? prevCells[it.id]
+            : { status: it.estado, note: it.nota ?? '' }
+        })
         return {
           id: e.id,
           name: e.name,
@@ -747,11 +760,15 @@ export default function FondoEmprenderPage() {
 
   async function handleStatusChange(companyId, procId, status) {
     updateCellLocal(companyId, procId, { status })
+    const key = `${companyId}:${procId}`
+    pendingCellWritesRef.current.add(key)
     try {
       await api.updateFondoChecklistItem(companyId, procId, year, month + 1, { estado: status })
     } catch (err) {
       console.error('Error al guardar estado:', err.message)
       fetchGrid()
+    } finally {
+      pendingCellWritesRef.current.delete(key)
     }
   }
 
