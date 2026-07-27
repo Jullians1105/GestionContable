@@ -242,6 +242,8 @@ Programa de acompañamiento contable a ~30 empresas, con tres vistas relacionada
 
 Checklist de 23 procesos (`fondo_procesos`) × cada empresa, agrupado por mes (`fondo_checklist_meses` + `fondo_checklist_items`). El campo `fondo_checklist_meses.confirmed` de este módulo es la fuente de verdad que alimenta **mp5/Contabilidad** en la ficha de empresa (macroproceso derivado, no editable ahí).
 
+**Código Siigo** (`fondo_empresas.codigo_siigo`, migración 037): primera columna de la grilla (header "Cod Siigo"), a la izquierda de Empresa (ambas *sticky*). Es dato maestro de la empresa, no del mes — lo mismo para todos los meses. Lo ve todo el mundo pero **solo el admin con "Editar estructura" activo lo edita** (`canEditStructure`, mismo modo que los grupos y procesos: es catálogo, no dato mensual); clic en la celda → input. El guardián vive en `fondoEmpresasController` y no en un middleware, porque `PUT /api/fondo/empresas/:id` es la misma ruta con la que un usuario con `fondoEmprender.canEditar` edita nombre/categoría/mensualidad. `codigo_siigo` es el único campo de esa ruta que no usa `COALESCE`: borrarlo es una edición válida, así que el `UPDATE` distingue "no vino en el body" de "vino en `null`" con un flag, igual que `grupoId` en `fondoProcesosController`. La búsqueda de la grilla también entra por este código.
+
 ### 2. Ficha de empresa (`/fondo-emprender/empresas/:empresaId`)
 
 7 macroprocesos por empresa/mes (`mp1`-`mp7`, sin `mp5` propio en la tabla — es derivado):

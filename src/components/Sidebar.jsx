@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -86,6 +86,32 @@ export default function Sidebar({ open, onClose }) {
     []
 
   const hasNav = navForModule.length > 0
+
+  // Sin scrollbar visible (ver scrollbar-hide en index.css) el único indicio
+  // de que el nav tiene más ítems ocultos es un degradado arriba/abajo, como
+  // el "scroll shadow" de apps nativas — visible solo si de verdad hay algo
+  // que scrollear en esa dirección, no un adorno fijo. Solo importa en la
+  // práctica para el admin, que ve bastantes más ítems que un usuario normal.
+  const navRef = useRef(null)
+  const [scrollShadow, setScrollShadow] = useState({ top: false, bottom: false })
+
+  const updateScrollShadow = useCallback(() => {
+    const el = navRef.current
+    if (!el) { setScrollShadow({ top: false, bottom: false }); return }
+    setScrollShadow({
+      top: el.scrollTop > 1,
+      bottom: el.scrollTop + el.clientHeight < el.scrollHeight - 1,
+    })
+  }, [])
+
+  // Recalcula al cambiar de módulo (la cantidad de ítems cambia) y al
+  // redimensionar la ventana o cambiar el zoom (cambia clientHeight) — el
+  // mismo tipo de ajuste de zoom que causaba el scroll horizontal.
+  useEffect(() => {
+    updateScrollShadow()
+    window.addEventListener('resize', updateScrollShadow)
+    return () => window.removeEventListener('resize', updateScrollShadow)
+  }, [activeModule, hasNav, updateScrollShadow])
 
   // Shared label class: hidden when collapsed, revealed on hover or when pinned
   const labelCls = pinned
@@ -180,40 +206,80 @@ export default function Sidebar({ open, onClose }) {
           {/* Nav links */}
           {hasNav ? (
             <>
-              <nav className="flex-1 flex flex-col gap-0.5 overflow-y-auto py-2 px-2">
-                {navForModule.map(({ to, label, icon, end }) => (
-                  <NavLink
-                    key={to}
-                    to={to}
-                    end={end}
-                    onClick={onClose}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                        isActive
-                          ? 'bg-[#d6e0f3] dark:bg-[#1a2040] text-[#004ac6] dark:text-[#7ba8f0]'
-                          : 'text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840]'
-                      }`
-                    }
-                  >
-                    <span className="relative w-8 flex items-center justify-center flex-shrink-0">
-                      <span className="material-symbols-outlined text-xl">{icon}</span>
-                      {to === '/notifications' && unreadCount > 0 && (
-                        <span
-                          className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white"
-                          style={{ background: '#EF4444' }}
-                        >
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      className={`whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${labelCls}`}
+              {/* overflow-x-hidden explícito: si solo se fija overflow-y-auto,
+                  la spec de CSS obliga a que el otro eje (que por default
+                  queda en `visible`) también pase a `auto` — cualquier
+                  desborde de subpíxel (típico en flex + gap + los max-width
+                  que transicionan con el hover) dispara entonces una barra
+                  horizontal aunque no haya contenido real que la justifique.
+                  Pasa siempre que el navegador tenga scrollbars clásicos (no
+                  overlay), independiente del nivel de zoom — no es un tema de
+                  zoom, es este eje quedando en auto por accidente.
+
+                  scrollbar-hide (ver index.css): el scroll vertical solo
+                  aparece con muchos ítems de menú (el caso del admin, que ve
+                  bastantes más que un usuario normal) y el scrollbar clásico
+                  de Windows con flechitas se ve mal en una columna angosta.
+                  Se oculta la barra pero el scroll sigue andando con la rueda
+                  del mouse/trackpad, colapsado o expandido. En su lugar, un
+                  degradado arriba/abajo (ver scrollShadow) avisa cuando hay
+                  más ítems ocultos para scrollear.
+
+                  min-h-0 en el wrapper: sin esto un hijo flex con contenido
+                  que desborda puede terminar más alto que el contenedor,
+                  ignorando el overflow-y-auto de adentro — el bug clásico de
+                  flexbox + scroll. */}
+              <div className="relative flex-1 min-h-0">
+                <nav
+                  ref={navRef}
+                  onScroll={updateScrollShadow}
+                  className="h-full flex flex-col gap-0.5 overflow-y-auto overflow-x-hidden scrollbar-hide py-2 px-2"
+                >
+                  {navForModule.map(({ to, label, icon, end }) => (
+                    <NavLink
+                      key={to}
+                      to={to}
+                      end={end}
+                      onClick={onClose}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                          isActive
+                            ? 'bg-[#d6e0f3] dark:bg-[#1a2040] text-[#004ac6] dark:text-[#7ba8f0]'
+                            : 'text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840]'
+                        }`
+                      }
                     >
-                      {label}
-                    </span>
-                  </NavLink>
-                ))}
-              </nav>
+                      <span className="relative w-8 flex items-center justify-center flex-shrink-0">
+                        <span className="material-symbols-outlined text-xl">{icon}</span>
+                        {to === '/notifications' && unreadCount > 0 && (
+                          <span
+                            className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white"
+                            style={{ background: '#EF4444' }}
+                          >
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                          </span>
+                        )}
+                      </span>
+                      <span
+                        className={`whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${labelCls}`}
+                      >
+                        {label}
+                      </span>
+                    </NavLink>
+                  ))}
+                </nav>
+
+                {/* pointer-events-none: son puramente decorativos, un clic
+                    ahí debe llegar al nav de abajo (para poder seguir
+                    scrolleando arrastrando, o para no bloquear el último
+                    ítem visible bajo el degradado inferior). */}
+                {scrollShadow.top && (
+                  <div className="pointer-events-none absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-white dark:from-[#1e2030] to-transparent" />
+                )}
+                {scrollShadow.bottom && (
+                  <div className="pointer-events-none absolute bottom-0 inset-x-0 h-4 bg-gradient-to-t from-white dark:from-[#1e2030] to-transparent" />
+                )}
+              </div>
 
               {activeModule === 'tasks' && (
                 <div className="px-2 pb-4 flex-shrink-0">
@@ -222,10 +288,19 @@ export default function Sidebar({ open, onClose }) {
                       if (hasPermission('canCreateTask')) setShowModal(true)
                       else addToast('No tienes permiso para crear tareas', 'error')
                     }}
-                    className="w-full h-10 rounded-lg text-xs font-semibold text-white flex items-center justify-center gap-2 hover:opacity-90 transition active:scale-[0.97] overflow-hidden"
+                    className="w-full h-10 rounded-lg text-xs font-semibold text-white flex items-center gap-3 hover:opacity-90 transition active:scale-[0.97] overflow-hidden"
                     style={{ background: '#004ac6' }}
                   >
-                    <span className="material-symbols-outlined text-lg flex-shrink-0">add</span>
+                    {/* Mismo slot w-8 que el ícono de los NavLink de arriba (línea
+                        ~205) en vez de centrar todo el contenido con
+                        justify-center: con justify-center el "+" se corría al
+                        pasar el mouse, porque el centro del bloque ícono+texto
+                        se mueve cuando el texto pasa de 0 a "Nueva Tarea" — con
+                        un slot fijo el ícono queda anclado en la misma posición
+                        colapsado y expandido. */}
+                    <span className="w-8 flex items-center justify-center flex-shrink-0">
+                      <span className="material-symbols-outlined text-lg">add</span>
+                    </span>
                     <span
                       className={`whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${labelCls}`}
                     >

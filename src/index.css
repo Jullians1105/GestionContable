@@ -63,3 +63,57 @@
     @apply bg-white dark:bg-[#1e2030] rounded-xl shadow-sm border border-[#c3c6d7] dark:border-[#2e3148] p-6;
   }
 }
+
+@layer utilities {
+  /* Oculta la barra de scroll sin desactivar el scroll en sí (rueda del
+     mouse, trackpad, flechas del teclado siguen funcionando) — pensada para
+     el nav del sidebar, donde el scrollbar clásico de Windows (con flechitas
+     arriba/abajo) se ve mal en una columna tan angosta. */
+  .scrollbar-hide {
+    scrollbar-width: none;      /* Firefox */
+    -ms-overflow-style: none;   /* IE/Edge viejo */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;              /* Chrome, Edge, Safari */
+  }
+
+  /* Barra de scroll delgada y redondeada en la paleta de la app, en vez de
+     la barra gris cuadrada por defecto del navegador — usada en cajas donde
+     sí conviene ver una barra real (da una idea de cuánto queda por
+     scrollear), a diferencia de scrollbar-hide de arriba. */
+  .scrollbar-styled {
+    scrollbar-width: thin;                    /* Firefox */
+    scrollbar-color: #c3c6d7 transparent;     /* Firefox: thumb, track */
+  }
+  .scrollbar-styled::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .scrollbar-styled::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-styled::-webkit-scrollbar-thumb {
+    background-color: #c3c6d7;
+    border-radius: 9999px;
+    /* border transparente + background-clip: el "grosor" real del thumb
+       queda un poco más angosto que el track, dejando un margen parejo
+       alrededor en vez de pegarlo borde a borde — se ve más pulido. */
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  .scrollbar-styled::-webkit-scrollbar-thumb:hover {
+    background-color: #8890b5;
+  }
+  .scrollbar-styled::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  .dark .scrollbar-styled {
+    scrollbar-color: #3e4260 transparent;
+  }
+  .dark .scrollbar-styled::-webkit-scrollbar-thumb {
+    background-color: #3e4260;
+  }
+  .dark .scrollbar-styled::-webkit-scrollbar-thumb:hover {
+    background-color: #5a5f7a;
+  }
+}

@@ -65,18 +65,22 @@ router.get('/:id', validateUUIDParam('id'), getEmpresa);
  *             type: object
  *             required: [name]
  *             properties:
- *               name:       { type: string, maxLength: 255 }
- *               categoria:  { type: string, enum: [contable, tributario] }
- *               monthlyFee: { type: number, minimum: 0 }
+ *               name:        { type: string, maxLength: 255 }
+ *               categoria:   { type: string, enum: [contable, tributario] }
+ *               monthlyFee:  { type: number, minimum: 0 }
+ *               codigoSiigo: { type: string, maxLength: 20, nullable: true, description: Solo admin }
  *     responses:
  *       201:
  *         description: Empresa creada
+ *       403:
+ *         description: Sin permiso de edición, o codigoSiigo enviado por un no-admin
  */
 router.post('/',
   requireFondoAccess,
   body('name').trim().notEmpty().withMessage('El nombre es obligatorio').isLength({ max: 255 }),
   body('categoria').optional().isIn(['contable', 'tributario']),
   body('monthlyFee').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('monthlyFee debe ser un número >= 0'),
+  body('codigoSiigo').optional({ nullable: true }).trim().isLength({ max: 20 }).withMessage('El código Siigo no puede superar 20 caracteres'),
   validate,
   createEmpresa
 );
@@ -97,12 +101,15 @@ router.post('/',
  *           schema:
  *             type: object
  *             properties:
- *               name:       { type: string, maxLength: 255 }
- *               categoria:  { type: string, enum: [contable, tributario] }
- *               monthlyFee: { type: number, minimum: 0 }
+ *               name:        { type: string, maxLength: 255 }
+ *               categoria:   { type: string, enum: [contable, tributario] }
+ *               monthlyFee:  { type: number, minimum: 0 }
+ *               codigoSiigo: { type: string, maxLength: 20, nullable: true, description: Solo admin; null lo borra }
  *     responses:
  *       200:
  *         description: Empresa actualizada
+ *       403:
+ *         description: Sin permiso de edición, o codigoSiigo enviado por un no-admin
  *       404:
  *         description: Empresa no encontrada
  */
@@ -112,6 +119,7 @@ router.put('/:id',
   body('name').optional().trim().notEmpty().isLength({ max: 255 }),
   body('categoria').optional().isIn(['contable', 'tributario']),
   body('monthlyFee').optional({ nullable: true }).isFloat({ min: 0 }),
+  body('codigoSiigo').optional({ nullable: true }).trim().isLength({ max: 20 }).withMessage('El código Siigo no puede superar 20 caracteres'),
   validate,
   updateEmpresa
 );
