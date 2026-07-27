@@ -6,6 +6,9 @@ const {
   uploadDian,
   calcularAnomalias,
   calcularDocumentosNoContabilizados,
+  exportarBorrador,
+  aplicarClasificacionRapida,
+  marcarAnomaliaRevisada,
 } = require('../../src/controllers/dianController');
 
 // Textos EXACTOS como los exporta el portal de la DIAN. No son los nombres oficiales del
@@ -309,5 +312,142 @@ describe('calcularAnomalias', () => {
     ]);
 
     expect(anomalias).toEqual([]);
+  });
+});
+
+// exportarBorrador arma el .xlsx completo (RESUMEN, IMPUESTOS, RETENCIONES_POR_PROVEEDOR,
+// DETALLE_COMPRAS, NOMINA, METADATOS), pero en el camino feliz hace
+// `await import('../../../shared/calcularNomina.js')` — ese archivo es ESM real (lo
+// consume también el frontend), y Jest no puede interceptar un import() nativo sin
+// --experimental-vm-modules (falla con "A dynamic import callback was invoked without
+// --experimental-vm-modules", no es un error de este test). Por eso no se puede unit-testear
+// el camino feliz acá sin tocar la configuración global de Jest — ver la exclusión de
+// dianController.js en jest.config.js, mismo criterio que ya se usa para fondo*/servicios de
+// infraestructura. Sí se puede testear todo lo que retorna ANTES de llegar a esa línea.
+describe('exportarBorrador — validaciones que retornan antes del import ESM', () => {
+  function mockRes() {
+    return { setHeader: jest.fn(), send: jest.fn(), status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+  }
+
+  test('rechaza si hay filas Recibido sin clasificar', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [{
+        datos: {
+          filas: [{ tipoDocumento: FACTURA, grupo: 'Recibido', total: 119000, iva: 19000, clasificacionRetencion: null }],
+          calculos: {},
+          anomaliasRevisadas: [],
+        },
+        archivo_original: null,
+      }],
+    });
+    const req = { params: { id: 'borrador-1' }, user: { userId: 'usuario-de-prueba' }, body: {} };
+    const res = mockRes();
+
+    await exportarBorrador(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.stringContaining('sin clasificar') }));
+  });
+
+  test('borrador inexistente devuelve 404', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+    const res = mockRes();
+
+    await exportarBorrador({ params: { id: 'x' }, user: { userId: 'u' }, body: {} }, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+describe('aplicarClasificacionRapida', () => {
+  test('clasifica en bloque todas las filas Recibido sin clasificar', async () => {
+    const filas = [
+      { tipoDocumento: FACTURA, grupo: 'Recibido', total: 119000, clasificacionRetencion: null },
+      { tipoDocumento: FACTURA, grupo: 'Recibido', total: 50000, clasificacionRetencion: null },
+      { tipoDocumento: FACTURA, grupo: 'Emitido', total: 200000 }, // no aplica, no es Recibido
+    ];
+    db.query
+      .mockResolvedValueOnce({ rows: [{ filas }] }) // SELECT
+      .mockResolvedValueOnce({ rows: [] });         // UPDATE
+
+    const req = { params: { id: 'b1' }, user: { userId: 'u1' }, body: { clasificacionRetencion: 'Servicios', tasaRetencion: 4 } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await aplicarClasificacionRapida(req, res, jest.fn());
+
+    expect(res.json).toHaveBeenCalledWith({ filasActualizadas: 2, filasRestanteSinClasificar: 0 });
+    const nuevasFilas = JSON.parse(db.query.mock.calls[1][1][0]);
+    expect(nuevasFilas.filter((f) => f.grupo === 'Recibido').every((f) => f.clasificacionRetencion === 'Servicios')).toBe(true);
+  });
+
+  test('clasificación "N/A" no guarda tasa de retención', async () => {
+    const filas = [{ tipoDocumento: FACTURA, grupo: 'Recibido', total: 119000, clasificacionRetencion: null }];
+    db.query.mockResolvedValueOnce({ rows: [{ filas }] }).mockResolvedValueOnce({ rows: [] });
+
+    const req = { params: { id: 'b1' }, user: { userId: 'u1' }, body: { clasificacionRetencion: 'N/A', tasaRetencion: 4 } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await aplicarClasificacionRapida(req, res, jest.fn());
+
+    const nuevasFilas = JSON.parse(db.query.mock.calls[1][1][0]);
+    expect(nuevasFilas[0].tasaRetencion).toBeNull();
+  });
+
+  test('rechaza una clasificación fuera del catálogo permitido', async () => {
+    const req = { params: { id: 'b1' }, user: { userId: 'u1' }, body: { clasificacionRetencion: 'Lo que sea' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await aplicarClasificacionRapida(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('borrador inexistente devuelve 404', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+    const req = { params: { id: 'x' }, user: { userId: 'u1' }, body: { clasificacionRetencion: 'Compras' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await aplicarClasificacionRapida(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+describe('marcarAnomaliaRevisada', () => {
+  test('agrega el tipo a anomaliasRevisadas sin duplicar ni tocar cálculos', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ datos: { anomaliasRevisadas: ['Total negativo inesperado'] } }] }) // SELECT
+      .mockResolvedValueOnce({ rows: [] }); // UPDATE
+
+    const req = { params: { id: 'b1' }, user: { userId: 'u1' }, body: { tipo: 'CUFE/CUDE duplicado' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await marcarAnomaliaRevisada(req, res, jest.fn());
+
+    expect(res.json).toHaveBeenCalledWith({
+      success: true,
+      anomaliasRevisadas: expect.arrayContaining(['Total negativo inesperado', 'CUFE/CUDE duplicado']),
+    });
+  });
+
+  test('rechaza sin "tipo" en el body', async () => {
+    const req = { params: { id: 'b1' }, user: { userId: 'u1' }, body: {} };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await marcarAnomaliaRevisada(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('borrador inexistente devuelve 404', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+    const req = { params: { id: 'x' }, user: { userId: 'u1' }, body: { tipo: 'algo' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await marcarAnomaliaRevisada(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 });
