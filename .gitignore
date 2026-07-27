@@ -34,4 +34,9 @@ n8n/workflows/*.json
 *.dump
 *.tar.gz
 env_backup*.txt
-docs/SISTEMA CONTABILIDAD EXCEL.xlsx
+# Reportes y anexos DIAN en docs/: los .xlsx traen datos financieros reales de la empresa
+# (NITs, proveedores, montos) y los anexos técnicos PDF pesan decenas de MB. Ninguno debe
+# entrar al repo — una vez commiteados quedan en el historial para siempre.
+# El catálogo con lo que importa de los anexos está en docs/dian-tipos-documento.md.
+docs/*.xlsx
+docs/*.pdf
