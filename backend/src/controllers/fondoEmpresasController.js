@@ -6,6 +6,7 @@ const normalizeEmpresa = (row) => ({
   id:               row.id,
   name:             row.name,
   categoria:        row.categoria,
+  codigoSiigo:      row.codigo_siigo ?? null,
   monthlyFee:       row.monthly_fee !== null && row.monthly_fee !== undefined
                       ? parseFloat(row.monthly_fee)
                       : null,
@@ -257,17 +258,36 @@ const getEmpresa = async (req, res, next) => {
   }
 };
 
+// El código Siigo es dato maestro de la empresa: lo mantiene solo el admin
+// (misma regla que la estructura de columnas del Seguimiento Mensual, ver
+// requireFondoAdmin), aunque el resto de campos de la empresa sí los pueda
+// editar quien tenga fondoEmprender.canEditar. Por eso se valida acá adentro
+// y no con un middleware: la misma ruta acepta ambos tipos de cambio.
+const puedeEditarCodigoSiigo = (req) => req.user?.role === 'admin';
+
+// '' desde un input vacío significa "sin código" — se guarda NULL, no ''.
+const normalizeCodigoSiigo = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = String(value).trim().toUpperCase();
+  return trimmed === '' ? null : trimmed;
+};
+
 const createEmpresa = async (req, res, next) => {
   try {
     const { name, categoria = 'contable', monthlyFee = null } = req.body;
+    const codigoSiigo = normalizeCodigoSiigo(req.body.codigoSiigo);
+    if (codigoSiigo !== undefined && !puedeEditarCodigoSiigo(req)) {
+      return res.status(403).json({ error: 'Solo un administrador puede asignar el código Siigo' });
+    }
     const id = uuidv4();
     const result = await db.query(
-      `INSERT INTO fondo_empresas (id, name, categoria, monthly_fee)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO fondo_empresas (id, name, categoria, monthly_fee, codigo_siigo)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [id, name.trim().toUpperCase(), categoria, monthlyFee]
+      [id, name.trim().toUpperCase(), categoria, monthlyFee, codigoSiigo ?? null]
     );
-    await auditLog(req.user.userId, 'CREATE', 'fondo_empresas', id, { name, categoria, monthlyFee });
+    await auditLog(req.user.userId, 'CREATE', 'fondo_empresas', id, { name, categoria, monthlyFee, codigoSiigo });
     req.io.emit('empresa:updated', { empresaId: id, tipo: 'empresa' });
     res.status(201).json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
@@ -282,21 +302,32 @@ const updateEmpresa = async (req, res, next) => {
     if (!existing.rows[0]) return res.status(404).json({ error: 'Empresa no encontrada' });
 
     const { name, categoria, monthlyFee } = req.body;
+    const codigoSiigo = normalizeCodigoSiigo(req.body.codigoSiigo);
+    if (codigoSiigo !== undefined && !puedeEditarCodigoSiigo(req)) {
+      return res.status(403).json({ error: 'Solo un administrador puede editar el código Siigo' });
+    }
+    // codigo_siigo no puede usar COALESCE como los demás: borrarlo (dejar la
+    // celda vacía) es una edición válida, y con COALESCE un NULL explícito se
+    // leería como "no lo toques". El flag $4 distingue "no vino en el body"
+    // de "vino en null".
     const result = await db.query(
       `UPDATE fondo_empresas SET
-        name        = COALESCE($1, name),
-        categoria   = COALESCE($2, categoria),
-        monthly_fee = COALESCE($3, monthly_fee)
-       WHERE id = $4
+        name         = COALESCE($1, name),
+        categoria    = COALESCE($2, categoria),
+        monthly_fee  = COALESCE($3, monthly_fee),
+        codigo_siigo = CASE WHEN $4 THEN $5 ELSE codigo_siigo END
+       WHERE id = $6
        RETURNING *`,
       [
         name !== undefined ? name.trim().toUpperCase() : null,
         categoria ?? null,
         monthlyFee !== undefined ? monthlyFee : null,
+        codigoSiigo !== undefined,
+        codigoSiigo ?? null,
         id,
       ]
     );
-    await auditLog(req.user.userId, 'UPDATE', 'fondo_empresas', id, { name, categoria, monthlyFee });
+    await auditLog(req.user.userId, 'UPDATE', 'fondo_empresas', id, { name, categoria, monthlyFee, codigoSiigo });
     req.io.emit('empresa:updated', { empresaId: id, tipo: 'empresa' });
     res.json(normalizeEmpresa(result.rows[0]));
   } catch (err) {

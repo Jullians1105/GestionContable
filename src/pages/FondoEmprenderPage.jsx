@@ -41,6 +41,17 @@ const BORDER_COL = '1px solid #d5d9ea' // separador vertical entre columnas — 
 
 const COL_WIDTH = 48
 
+// Las dos columnas fijas de la izquierda (Siigo + Empresa). Todo lo que ocupen
+// se le resta al ancho visible de las columnas de proceso, que es lo escaso
+// acá: la grilla ya pide scroll horizontal para llegar a Contabilidad. Por eso
+// el código va lo más angosto posible (los códigos son de 2-4 dígitos, y el
+// header dice "Cod Siigo" partido en dos líneas) y Empresa se recortó de 220 a
+// 176 — entre las dos suman apenas ~4px más que la columna de Empresa sola de
+// antes, así que se sigue viendo tanto de Nómina y Contabilidad como antes de
+// que existiera el código.
+const CODIGO_COL_WIDTH  = 48
+const EMPRESA_COL_WIDTH = 176
+
 // Nómina y Contabilidad tienen cada una su propia columna de confirmar/enviar
 // (antes era una sola, compartida). Angosta y con texto rotado, igual que
 // las columnas de proceso, para no sumar ancho horizontal innecesario.
@@ -472,6 +483,17 @@ export default function FondoEmprenderPage() {
   const tooltipKeyRef   = useRef(null)        // key of the cell whose size is active
   tooltipSizeRef.current = tooltipSize        // kept in sync on every render
 
+  // edición inline del código Siigo (primera columna) — { companyId }; el
+  // input es no controlado (defaultValue), así un refetch de la grilla en
+  // mitad de la edición no le pisa lo que el admin está escribiendo. Se abre
+  // solo con canEditStructure (admin + "Editar estructura"): es dato maestro
+  // de la empresa, no del mes, igual que los grupos y procesos.
+  const [editingCodigo, setEditingCodigo] = useState(null)
+  // Escape cancela: marca acá que el blur que viene es un descarte, no un
+  // guardado (el input se cierra con .blur() para no depender de si el
+  // navegador dispara blur al desmontar el nodo enfocado).
+  const codigoCancelRef = useRef(false)
+
   // add / edit process — un solo modal para ambos casos (ver procesoModal
   // más abajo), en vez de inputs sueltos por header. mode: 'create' | 'edit',
   // hastaMode: 'siempre' | 'esteMes' | 'porMeses'.
@@ -534,6 +556,7 @@ export default function FondoEmprenderPage() {
           id: e.id,
           name: e.name,
           categoria: e.categoria,
+          codigoSiigo: e.codigoSiigo ?? null,
           cells,
           confirmedNomina: chk.confirmedNomina
             ? { date: (chk.confirmedNominaAt ?? new Date().toISOString()).slice(0, 10) }
@@ -769,6 +792,26 @@ export default function FondoEmprenderPage() {
       fetchGrid()
     } finally {
       pendingCellWritesRef.current.delete(key)
+    }
+  }
+
+  // Código Siigo de una empresa. Optimista igual que las celdas de estado: se
+  // pinta el valor nuevo y, si el PUT falla, se recarga la grilla del servidor.
+  async function saveCodigoSiigo(companyId, rawValue) {
+    setEditingCodigo(null)
+    const trimmed = rawValue.trim().toUpperCase()
+    const nuevo   = trimmed === '' ? null : trimmed
+    const actual  = companiesRef.current.find(c => c.id === companyId)?.codigoSiigo ?? null
+    if (nuevo === actual) return
+
+    setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, codigoSiigo: nuevo } : c))
+    try {
+      await api.updateFondoEmpresa(companyId, { codigoSiigo: nuevo })
+    } catch (err) {
+      alert(err.status === 403
+        ? 'Solo un administrador puede editar el código Siigo'
+        : 'Error al guardar el código Siigo: ' + err.message)
+      fetchGrid()
     }
   }
 
@@ -1218,7 +1261,11 @@ export default function FondoEmprenderPage() {
 
   const q = search.toLowerCase()
   const filteredCompanies = companies.filter(c => {
-    const matchSearch = !q || c.name.toLowerCase().includes(q)
+    // La búsqueda también entra por código Siigo: es el identificador con el
+    // que llega media consulta desde el software contable.
+    const matchSearch = !q
+      || c.name.toLowerCase().includes(q)
+      || (c.codigoSiigo ?? '').toLowerCase().includes(q)
     const matchCat    = activeTab === 'todas' || (c.categoria ?? 'contable') === activeTab
     const matchColumnFilters = Object.entries(columnFilters).every(([procId, allowed]) => {
       const status = c.cells[procId]?.status ?? 'pending'
@@ -1253,7 +1300,8 @@ export default function FondoEmprenderPage() {
   // Contabilidad, el ancho extra de su columna "Confirmar ..." pegada justo
   // después — por eso ya no hay un ancho fijo aparte al final para eso.
   const columnWidths = [
-    220, // Empresa
+    CODIGO_COL_WIDTH,  // Código Siigo
+    EMPRESA_COL_WIDTH, // Empresa
     ...sortedGrupos.flatMap(g => {
       const children = visibleProcesses.filter(p => p.grupoId === g.id)
       const collapsedOrEmpty = collapsedGroupIds.has(g.id) || children.length === 0
@@ -1265,6 +1313,70 @@ export default function FondoEmprenderPage() {
   ]
   const totalLeafColumns = columnWidths.length
   const gridWidth = columnWidths.reduce((a, b) => a + b, 0)
+
+  // Celda del código Siigo. Solo lectura salvo para el admin con "Editar
+  // estructura" activo (canEditStructure), que la edita en línea (clic →
+  // input) — el código es catálogo de la empresa, del mismo orden que los
+  // grupos y procesos, así que se toca desde el mismo modo y no suelto.
+  // Mismo truco de box-shadow que la celda de Empresa: es sticky y un
+  // `border` de verdad se rompe al scrollear.
+  function renderCodigoCell(company, rowBg) {
+    // El && canEditStructure cierra el input si el admin apaga el modo edición
+    // con una celda abierta (el valor ya se guardó: hacer clic en el botón de
+    // "Editar estructura" dispara antes el blur del input).
+    const editando = canEditStructure && editingCodigo?.companyId === company.id
+    const codigo   = company.codigoSiigo
+    return (
+      <td
+        className="sticky left-0 z-10"
+        style={{
+          width: CODIGO_COL_WIDTH, minWidth: CODIGO_COL_WIDTH, maxWidth: CODIGO_COL_WIDTH,
+          background: rowBg, height: 36, padding: 0,
+          boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, left: BORDER, right: BORDER_COL }),
+        }}
+      >
+        {editando ? (
+          <div className="w-full h-full px-0.5 flex items-center">
+            <input
+              autoFocus
+              defaultValue={codigo ?? ''}
+              maxLength={20}
+              onFocus={e => e.target.select()}
+              onBlur={e => {
+                if (codigoCancelRef.current) {
+                  codigoCancelRef.current = false
+                  setEditingCodigo(null)
+                  return
+                }
+                saveCodigoSiigo(company.id, e.target.value)
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter')  e.target.blur()
+                if (e.key === 'Escape') { codigoCancelRef.current = true; e.target.blur() }
+              }}
+              className="w-full h-7 px-1 rounded border border-[#004ac6] bg-white dark:bg-[#1e2030] text-xs font-semibold text-center text-[#191c1e] dark:text-[#e4e6f0] outline-none"
+            />
+          </div>
+        ) : canEditStructure ? (
+          <button
+            onClick={() => setEditingCodigo({ companyId: company.id })}
+            title={codigo ? `Código Siigo: ${codigo} — clic para editar` : 'Asignar código Siigo'}
+            className="w-full h-full px-1 flex items-center justify-center transition hover:bg-[#eef2ff] dark:hover:bg-[#252840]"
+          >
+            <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">
+              {codigo ?? <span className="text-[#c3c8dd] dark:text-[#5a5f7a]">—</span>}
+            </span>
+          </button>
+        ) : (
+          <div className="w-full h-full px-1 flex items-center justify-center" title={codigo ? `Código Siigo: ${codigo}` : undefined}>
+            <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">
+              {codigo ?? <span className="text-[#c3c8dd] dark:text-[#5a5f7a]">—</span>}
+            </span>
+          </div>
+        )}
+      </td>
+    )
+  }
 
   // Línea divisoria entre el bloque de columnas agrupadas y lo que sigue
   // (reemplaza a la vieja columna angosta "Sin grupo") — solo tiene sentido
@@ -1613,9 +1725,33 @@ export default function FondoEmprenderPage() {
       </div>
 
       {/* ── Table ────────────────────────────────────────────────────────── */}
+      {/* maxHeight generoso (bastante más que el original calc(100vh-13rem)):
+          es lo que le da al header pegajoso de más abajo (sticky top-0) una
+          referencia de scroll real y estable donde anclarse — sin un
+          contenedor con overflow-auto y alto propio, el sticky termina
+          referenciado contra un contenedor que nunca scrollea de verdad (por
+          ejemplo, si este div solo creciera con su contenido) y Chrome
+          renderiza mal el <thead> (filas tapadas, huecos) — se probó y no
+          sirve. Con esto el "menú" de columnas (Nómina/Contabilidad + cada
+          proceso) queda fijo igual que congelar una fila en Excel, tanto al
+          bajar como al moverse hacia los lados (Código Siigo/Empresa siguen
+          sticky left). Si hace falta más alto todavía, subir el número acá
+          (menos rem restados = caja más alta; el límite es que en pantallas
+          bajas empieza a pedir un pequeño scroll de página para llegar a ver
+          la leyenda de abajo del todo).
+
+          scrollbar-styled (ver index.css): barra de scroll delgada y
+          redondeada en la paleta de la app en vez de la gris cuadrada por
+          defecto del navegador — a diferencia de scrollbar-hide (el truco
+          del nav del sidebar), acá sí se ve una barra real, para tener una
+          idea de cuánto queda por scrollear en una tabla tan larga. Se probó
+          además sumarle un degradado de refuerzo en los bordes, pero con
+          tantos elementos sticky adentro (header, columnas fijas) terminaba
+          tapado/parpadeando — no vale la pena la complejidad si ya está la
+          barra real. */}
       <div
-        className="overflow-auto rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm"
-        style={{ maxHeight: 'calc(100vh - 13rem)' }}
+        className="overflow-auto rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm scrollbar-styled"
+        style={{ maxHeight: 'calc(100vh - 6rem)' }}
       >
         <DndContext sensors={sensors} collisionDetection={collisionDetectionStrategy} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           {/* table-layout: fixed + <colgroup> explícito: sin esto, el colSpan de
@@ -1636,17 +1772,45 @@ export default function FondoEmprenderPage() {
                 GPU y ahí los box-shadow se rasterizaban borrosos; el fix real
                 del bug de scroll es que los bordes ya no son `border` (que es
                 lo que rompía con `border-collapse` + sticky), así que
-                will-change ya no hacía falta. */}
+                will-change ya no hacía falta.
+
+                top-0: se referencia contra el div de la línea de arriba
+                (overflow-auto con su propio alto vía maxHeight), no contra
+                la página — probado contra la página directamente (sin ese
+                contenedor) y rompía el layout, ver comentario del div de
+                arriba. */}
             <thead className="sticky top-0 z-20">
 
               <tr>
+                {/* Código Siigo — primera columna, pegada a la izquierda junto
+                    con Empresa (las dos sticky, una al lado de la otra: esta en
+                    left 0 y Empresa en left CODIGO_COL_WIDTH). El header dice
+                    "Cod Siigo" en dos líneas para que la columna pueda ser bien
+                    angosta sin que el texto la ensanche. */}
+                <th
+                  rowSpan={2}
+                  className="sticky left-0 top-0 z-30 bg-[#f8f9fc] dark:bg-[#1a1d2e] text-center text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
+                  style={{
+                    width: CODIGO_COL_WIDTH, minWidth: CODIGO_COL_WIDTH, verticalAlign: 'bottom', padding: '6px 4px 8px',
+                    boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, left: BORDER, right: BORDER_COL }),
+                  }}
+                  title="Código de la empresa en Siigo"
+                >
+                  {/* Dos líneas explícitas ("COD" arriba de "SIIGO") en vez de
+                      dejar que el navegador decida dónde parte: a 48px de ancho
+                      el salto es inevitable y así queda siempre igual. */}
+                  <span className="block leading-tight">Cod</span>
+                  <span className="block leading-tight">Siigo</span>
+                </th>
+
                 {/* Company column header */}
                 <th
                   rowSpan={2}
-                  className="sticky left-0 top-0 z-30 bg-[#f8f9fc] dark:bg-[#1a1d2e] text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
+                  className="sticky top-0 z-30 bg-[#f8f9fc] dark:bg-[#1a1d2e] text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
                   style={{
-                    width: 220, minWidth: 220, verticalAlign: 'bottom', padding: '6px 12px 8px',
-                    boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, left: BORDER, right: BORDER_COL }),
+                    left: CODIGO_COL_WIDTH,
+                    width: EMPRESA_COL_WIDTH, minWidth: EMPRESA_COL_WIDTH, verticalAlign: 'bottom', padding: '6px 8px 8px',
+                    boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, right: BORDER_COL }),
                   }}
                 >
                   Empresa
@@ -1745,18 +1909,23 @@ export default function FondoEmprenderPage() {
                 return (
                   <tr key={company.id} style={{ background: rowBg }}>
 
+                    {renderCodigoCell(company, rowBg)}
+
                     {/* Company name cell — editar/eliminar empresa se hace desde Empresas, no acá.
-                        box-shadow en vez de border: esta celda es sticky (left-0), y un
-                        border de verdad ahí es justo el bug de Chrome que ya evita el
-                        header (ver comentario de sideShadow/headerBoxShadow más arriba) —
-                        se ve bien sin scrollear pero el borde derecho desaparece al
-                        scrollear horizontalmente. Mismos anchos que el <th> de "Empresa"
-                        para que la línea quede continua entre header y body. */}
+                        box-shadow en vez de border: esta celda es sticky (pegada a la
+                        derecha de la de Código Siigo), y un border de verdad ahí es justo
+                        el bug de Chrome que ya evita el header (ver comentario de
+                        sideShadow/headerBoxShadow más arriba) — se ve bien sin scrollear
+                        pero el borde derecho desaparece al scrollear horizontalmente.
+                        Mismos anchos y mismo `left` que el <th> de "Empresa" para que la
+                        línea quede continua entre header y body. */}
                     <td
-                      className="sticky left-0 z-10"
+                      className="sticky z-10"
                       style={{
-                        width: 220, minWidth: 220, maxWidth: 220, background: rowBg, height: 36, padding: 0,
-                        boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, left: BORDER, right: BORDER_COL }),
+                        left: CODIGO_COL_WIDTH,
+                        width: EMPRESA_COL_WIDTH, minWidth: EMPRESA_COL_WIDTH, maxWidth: EMPRESA_COL_WIDTH,
+                        background: rowBg, height: 36, padding: 0,
+                        boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, right: BORDER_COL }),
                       }}
                     >
                       <div className="flex items-center h-full px-2">
