@@ -52,6 +52,14 @@ services:
       - "${PORT:-3000}:3000"
     volumes:
       - ./backend/migrations:/app/migrations:ro
+      # dianController.js hace require('../../../shared/salaryConstants.json') y
+      # await import('.../shared/calcularNomina.js') — código compartido con el
+      # frontend que vive en la raíz del repo, fuera del build context del backend
+      # (./backend), así que la imagen nunca lo tuvo copiado adentro. La resolución
+      # relativa desde /app/src/constants/ sube 3 niveles y cae en /shared (no
+      # /app/shared) — de ahí el punto de montaje. Volumen en vez de agregarlo al
+      # Dockerfile: no exige reconstruir la imagen, solo recrear el contenedor.
+      - ./shared:/shared:ro
 
   frontend:
     build:
