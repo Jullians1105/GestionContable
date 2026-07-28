@@ -108,6 +108,9 @@ const REQUIRED_COLS = [
 ];
 
 const FACTURA                  = 'Factura electrónica';
+const FACTURA_CONTINGENCIA     = 'Factura electrónica de contingencia';
+const DOC_EQUIVALENTE_POS      = 'Documento equivalente POS';
+const CONTINGENCIA_DOC_EQUIV   = 'Contingencia Documentos Equivalentes';
 const NOTA_CREDITO             = 'Nota de crédito electrónica';
 const NOTA_AJUSTE_CREDITO_DE   = 'Nota de ajuste crédito del documento equivalente';
 const DOC_EQUIVALENTE          = 'Documento equivalente - Servicios públicos domiciliarios';
@@ -128,6 +131,14 @@ const EMITIDO                  = 'Emitido';
 // aparecido en ningún reporte y el texto exacto que usa el portal está sin confirmar, así
 // que no se agrega a ciegas — si llega, cae en DOCUMENTOS NO CONTABILIZADOS (visible en la
 // hoja METADATOS) en vez de sumar con el signo equivocado.
+//
+// Mismo motivo por el que NO está acá 'Nota de ajuste del documento soporte' (anexo
+// Resolución 000167, familia del documento soporte): el anexo confirma que existen tanto
+// CreditNote como DebitNote para este ajuste, pero el portal usa un único texto genérico
+// (sin la palabra "crédito" ni "débito", a diferencia de la familia de arriba) — con un
+// solo caso visto en un reporte real no alcanza para confirmar si ese texto es siempre
+// crédito o si el signo depende de algo que no está en las columnas del reporte. Si
+// aparece, cae en DOCUMENTOS NO CONTABILIZADOS hasta confirmar el patrón con más casos.
 // Ver docs/dian-tipos-documento.md para el catálogo completo y sus fuentes oficiales.
 const TIPOS_NOTA_CREDITO = [NOTA_CREDITO, NOTA_AJUSTE_CREDITO_DE];
 
@@ -135,7 +146,16 @@ const TIPOS_NOTA_CREDITO = [NOTA_CREDITO, NOTA_AJUSTE_CREDITO_DE];
 // si Grupo=Recibido y como venta si Grupo=Emitido. A diferencia de DOC_EQUIVALENTE
 // (servicios públicos), que solo se ve como compra, el tiquete de transporte aéreo puede
 // aparecer en cualquiera de los dos grupos según quién lo emita.
-const TIPOS_FACTURA_EQUIVALENTE = [FACTURA, DOC_TRANSPORTE_AEREO];
+// FACTURA_CONTINGENCIA: misma factura electrónica, emitida por el mecanismo de
+// contingencia (cuando el sistema del emisor estaba caído) — no cambia su naturaleza.
+// DOC_EQUIVALENTE_POS (código 20 del anexo Documento Equivalente, tiquete de caja
+// registradora) y CONTINGENCIA_DOC_EQUIV (códigos 07/08, contingencia del emisor/DIAN
+// sobre un documento equivalente) van acá y no en TIPOS_COMPRA porque sí pueden aparecer
+// en cualquiera de los dos grupos y sí traen IVA — a diferencia de DOC_EQUIVALENTE
+// (servicios públicos) y DOC_TRANSPORTE_TERRESTRE, que solo se ven como compra sin IVA.
+const TIPOS_FACTURA_EQUIVALENTE = [
+  FACTURA, FACTURA_CONTINGENCIA, DOC_TRANSPORTE_AEREO, DOC_EQUIVALENTE_POS, CONTINGENCIA_DOC_EQUIV,
+];
 
 // Tipos de documento "Recibido" que cuentan como costo deducible ante la DIAN bajo la
 // convención normal (Recibido = compra). DOC_SOPORTE_NO_OBLIGADOS NO va acá: su Grupo
@@ -151,8 +171,8 @@ const TIPOS_COMPRA = [...TIPOS_FACTURA_EQUIVALENTE, DOC_EQUIVALENTE, DOC_TRANSPO
 // documento soporte). DOC_SOPORTE_NO_OBLIGADOS se contabiliza condicionalmente por Grupo
 // (ver exportarBorrador), por eso igual cuenta como "contabilizado" acá.
 const TIPOS_CONTABILIZADOS = new Set([
-  FACTURA, ...TIPOS_NOTA_CREDITO, DOC_EQUIVALENTE, DOC_SOPORTE_NO_OBLIGADOS,
-  DOC_TRANSPORTE_AEREO, DOC_TRANSPORTE_TERRESTRE,
+  ...TIPOS_FACTURA_EQUIVALENTE, ...TIPOS_NOTA_CREDITO, DOC_EQUIVALENTE, DOC_SOPORTE_NO_OBLIGADOS,
+  DOC_TRANSPORTE_TERRESTRE,
 ]);
 
 // Motivos conocidos para documentos que quedan fuera de los cálculos (sección de transparencia)
@@ -168,7 +188,7 @@ const MOTIVOS_DOCUMENTOS_EXCLUIDOS = {
 // intentar agregar una hoja con un nombre que ya existe. Se rechaza acá, con un mensaje
 // claro, en vez de dejar que falle de forma críptica al exportar.
 const HOJAS_RESERVADAS = new Set([
-  'RESUMEN', 'IMPUESTOS', 'RETENCIONES_POR_PROVEEDOR', 'DETALLE_COMPRAS', 'NOMINA', 'METADATOS', 'REPORTE_DIAN',
+  'RESUMEN', 'RESUMEN_MENSUAL', 'IMPUESTOS', 'RETENCIONES_POR_PROVEEDOR', 'DETALLE_COMPRAS', 'NOMINA', 'METADATOS', 'REPORTE_DIAN',
 ]);
 
 const getSalaryConstants = (year) => {
@@ -1202,6 +1222,154 @@ function buildReporteDian(ws, filas) {
   freezeHeaderRowAt(ws, 1);
 }
 
+// Calcula el resumen contable completo (Estado de Resultados + IVA + Retenciones) para un
+// subconjunto de filas — misma fórmula que antes vivía inline en exportarBorrador, ahora
+// factorizada para poder llamarla una vez sobre TODAS las filas del borrador (Resumen
+// general, comportamiento sin cambios) y una vez POR MES (Resumen mensual, ver
+// agruparPorMes/buildResumenMensual) cuando el período cubre más de un mes calendario.
+// Retenciones acá es solo el total: el desglose por proveedor sigue siendo exclusivo de la
+// hoja RETENCIONES_POR_PROVEEDOR del período completo, no se repite por mes.
+function calcularResumenPeriodo(filasPeriodo) {
+  const sumField = (pred, field) =>
+    filasPeriodo.filter(pred).reduce((acc, r) => acc + (r[field] ?? 0), 0);
+
+  const esFacturaRecibida = (r) => r.grupo === RECIBIDO && TIPOS_FACTURA_EQUIVALENTE.includes(r.tipoDocumento);
+  const esCompraRecibida  = (r) => r.grupo === RECIBIDO && TIPOS_COMPRA.includes(r.tipoDocumento);
+  const esNotaRecibida    = (r) => r.grupo === RECIBIDO && TIPOS_NOTA_CREDITO.includes(r.tipoDocumento);
+  const esFacturaEmitida  = (r) => r.grupo === EMITIDO  && TIPOS_FACTURA_EQUIVALENTE.includes(r.tipoDocumento);
+  const esNotaEmitida     = (r) => r.grupo === EMITIDO  && TIPOS_NOTA_CREDITO.includes(r.tipoDocumento);
+
+  const comprasBruto         = sumField(esCompraRecibida,  'total');
+  const devolucionCompras    = sumField(esNotaRecibida,    'total');
+  const ventasBruto          = sumField(esFacturaEmitida,  'total');
+  const devolucionVentas     = sumField(esNotaEmitida,     'total');
+  const ivaDescontable       = sumField(esFacturaRecibida, 'iva');
+  const ivaGenerado          = sumField(esFacturaEmitida,  'iva');
+  const ivaDevolucionCompras = sumField(esNotaRecibida,    'iva');
+  const ivaDevolucionVentas  = sumField(esNotaEmitida,     'iva');
+  const incGenerado          = sumField(esFacturaEmitida,  'inc');
+  const incDevolucionVentas  = sumField(esNotaEmitida,     'inc');
+
+  const totalIvaVentas  = ivaGenerado    + ivaDevolucionCompras;
+  const totalIvaCompras = ivaDescontable + ivaDevolucionVentas;
+  const ivaPagar        = round2(totalIvaVentas - totalIvaCompras);
+
+  const ventasBrutoSinIva      = ventasBruto - ivaGenerado - incGenerado;
+  const devolucionVentasSinIva = devolucionVentas - ivaDevolucionVentas - incDevolucionVentas;
+  const ventasNetas            = ventasBrutoSinIva - devolucionVentasSinIva;
+
+  const comprasBrutoSinIva      = comprasBruto - ivaDescontable;
+  const devolucionComprasSinIva = devolucionCompras - ivaDevolucionCompras;
+
+  const esDocSoporteCompra = (f) => f.tipoDocumento === DOC_SOPORTE_NO_OBLIGADOS && f.grupo === EMITIDO;
+  const documentoSoporteComprasFilas  = filasPeriodo.filter(esDocSoporteCompra);
+  const documentoSoporteCompras       = documentoSoporteComprasFilas.reduce((s, f) => s + (f.total ?? 0), 0);
+  const ivaDocumentoSoporteCompras    = documentoSoporteComprasFilas.reduce((s, f) => s + (f.iva ?? 0), 0);
+  const documentoSoporteComprasSinIva = documentoSoporteCompras - ivaDocumentoSoporteCompras;
+
+  const comprasNetas  = comprasBrutoSinIva - devolucionComprasSinIva + documentoSoporteComprasSinIva;
+  const costosTotales = comprasNetas;
+  const utilidadBruta = ventasNetas - costosTotales;
+
+  const filasRecibido = filasPeriodo.filter(
+    (f) => f.grupo === RECIBIDO && f.tipoDocumento !== NOMINA_INDIVIDUAL && f.tipoDocumento !== APPLICATION_RESPONSE
+  );
+  let totalRetenciones = 0;
+  for (const fila of filasRecibido) {
+    totalRetenciones += (fila.total ?? 0) * ((fila.tasaRetencion ?? 0) / 100);
+  }
+  totalRetenciones = round2(totalRetenciones);
+
+  const utilidadNeta = round2(utilidadBruta - totalRetenciones);
+
+  return {
+    ventasBrutoSinIva:            round2(ventasBrutoSinIva),
+    devolucionVentasSinIva:       round2(devolucionVentasSinIva),
+    ventasNetas:                  round2(ventasNetas),
+    comprasBrutoSinIva:           round2(comprasBrutoSinIva),
+    devolucionComprasSinIva:      round2(devolucionComprasSinIva),
+    comprasNetas:                 round2(comprasNetas),
+    documentoSoporteCompras:      round2(documentoSoporteCompras),
+    documentoSoporteComprasSinIva: round2(documentoSoporteComprasSinIva),
+    costosTotales:                round2(costosTotales),
+    utilidadBruta:                round2(utilidadBruta),
+    ivaGenerado:                  round2(ivaGenerado),
+    ivaDescontable:               round2(ivaDescontable),
+    ivaDevolucionCompras:         round2(ivaDevolucionCompras),
+    ivaDevolucionVentas:          round2(ivaDevolucionVentas),
+    totalIvaVentas:               round2(totalIvaVentas),
+    totalIvaCompras:              round2(totalIvaCompras),
+    ivaPagar,
+    totalRetenciones,
+    utilidadNeta,
+  };
+}
+
+// Agrupa filas por mes calendario (YYYY-MM de fechaEmision) — filas sin fecha quedan afuera
+// (ya se excluyen también de periodoDesde/periodoHasta en exportarBorrador). Devuelve los
+// meses en orden cronológico, listos para pasarle cada bucket a calcularResumenPeriodo.
+function agruparPorMes(filas) {
+  const buckets = new Map();
+  for (const f of filas) {
+    if (!f.fechaEmision) continue;
+    const ym = f.fechaEmision.slice(0, 7); // 'YYYY-MM'
+    if (!buckets.has(ym)) buckets.set(ym, []);
+    buckets.get(ym).push(f);
+  }
+  return [...buckets.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
+const MESES_ES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+];
+
+// ── Hoja RESUMEN_MENSUAL ─────────────────────────────────────────────────────────
+// Solo se agrega cuando el borrador cubre más de un mes calendario (ver exportarBorrador) —
+// mismo espíritu que la tabla "Ingresos por Mes" del Excel manual que se usaba antes: una
+// fila por mes con los mismos indicadores del Resumen general, más una fila de total al
+// final que debe coincidir con la hoja RESUMEN (mismo cálculo, agrupado distinto).
+function buildResumenMensual(ws, resumenPorMes, resumenTotal) {
+  const COP = '"$ "#,##0';
+  const cols = [
+    { header: 'Mes',              width: 16 },
+    { header: 'Ventas Netas',     width: 16, num: true },
+    { header: 'Compras Netas',    width: 16, num: true },
+    { header: 'Utilidad Bruta',   width: 16, num: true },
+    { header: 'IVA Generado',     width: 16, num: true },
+    { header: 'IVA Descontable',  width: 16, num: true },
+    { header: 'IVA a Pagar',      width: 16, num: true },
+    { header: 'Retenciones',      width: 16, num: true },
+    { header: 'Utilidad Neta',    width: 16, num: true },
+  ];
+  ws.columns = cols.map((c) => ({ width: c.width }));
+
+  const hdr = ws.addRow(cols.map((c) => c.header));
+  applyHeaderRow(hdr, cols.length);
+
+  const addFila = (label, r, bold = false) => {
+    const row = ws.addRow([
+      label, r.ventasNetas, r.comprasNetas, r.utilidadBruta,
+      r.ivaGenerado, r.ivaDescontable, r.ivaPagar, r.totalRetenciones, r.utilidadNeta,
+    ]);
+    cols.forEach((c, i) => {
+      const cell = row.getCell(i + 1);
+      cell.border = xlBorder;
+      if (c.num) { cell.numFmt = COP; cell.alignment = { horizontal: 'right' }; }
+      if (bold)  cell.font = { bold: true };
+    });
+    return row;
+  };
+
+  resumenPorMes.forEach(([ym, resumen]) => {
+    const [anio, mes] = ym.split('-');
+    addFila(`${MESES_ES[parseInt(mes, 10) - 1]} ${anio}`, resumen);
+  });
+  addFila('TOTAL', resumenTotal, true);
+
+  freezeHeaderRowAt(ws, 1);
+}
+
 const exportarBorrador = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1217,7 +1385,10 @@ const exportarBorrador = async (req, res, next) => {
       return res.status(404).json({ error: 'Borrador no encontrado' });
     }
 
-    const { filas, calculos, anomaliasRevisadas = [] } = rows[0].datos;
+    // calculos (guardado en el upload) ya no hace falta acá: calcularResumenPeriodo
+    // recalcula todo desde filas, que refleja cualquier clasificación editada después
+    // del upload (calculos nunca se actualizaba con esos cambios).
+    const { filas, anomaliasRevisadas = [] } = rows[0].datos;
     const archivoOriginal = rows[0].archivo_original;
 
     // ── 2. Filas Recibido no-nómina, sin acuses técnicos ────────────────────
@@ -1235,13 +1406,14 @@ const exportarBorrador = async (req, res, next) => {
       });
     }
 
-    // ── 3. Retenciones agrupadas ───────────────────────────────────────────
+    // ── 3. Retenciones por proveedor (para la hoja RETENCIONES_POR_PROVEEDOR) ──
+    // El total de retenciones para el Resumen sale de calcularResumenPeriodo (paso 4-5,
+    // misma fórmula) — este bloque solo arma el desglose por proveedor, que es exclusivo
+    // de esta hoja y no se repite en el resumen mensual.
     const retencionesPorProveedor = {};
-    let totalRetenciones = 0;
     for (const fila of filasRecibido) {
       const { nitEmisor, nombreEmisor, total, clasificacionRetencion, tasaRetencion } = fila;
       const retencion = total * ((tasaRetencion ?? 0) / 100);
-      totalRetenciones += retencion;
       const key = nitEmisor ?? 'SIN_NIT';
       if (!retencionesPorProveedor[key]) {
         retencionesPorProveedor[key] = { nombreEmisor: nombreEmisor ?? '', retenciones: {}, totalProveedorRetenido: 0 };
@@ -1253,57 +1425,20 @@ const exportarBorrador = async (req, res, next) => {
       prv.retenciones[clasificacionRetencion].totalRetenido = round2(prv.retenciones[clasificacionRetencion].totalRetenido + retencion);
       prv.totalProveedorRetenido = round2(prv.totalProveedorRetenido + retencion);
     }
-    totalRetenciones = round2(totalRetenciones);
 
-    // ── 4. IVA ─────────────────────────────────────────────────────────────
-    // Agrupado por efecto sobre el IVA a pagar, no por Emitido/Recibido:
-    // - Devolución en COMPRAS revierte crédito de IVA descontable → sube el IVA
-    //   a pagar, igual que IVA Generado (grupo "IVA Ventas").
-    // - Devolución en VENTAS revierte el IVA generado en esa venta → baja el IVA
-    //   a pagar, igual que IVA Descontable (grupo "IVA Compras").
-    // Total IVA = (IVA Generado + IVA devolución compras) − (IVA Descontable + IVA devolución ventas)
-    const ivaGenerado          = calculos.ivaGenerado          ?? 0;
-    const ivaDescontable       = calculos.ivaDescontable       ?? 0;
-    const ivaDevolucionCompras = calculos.ivaDevolucionCompras ?? 0;
-    const ivaDevolucionVentas  = calculos.ivaDevolucionVentas  ?? 0;
-    const totalIvaVentas       = ivaGenerado    + ivaDevolucionCompras;
-    const totalIvaCompras      = ivaDescontable + ivaDevolucionVentas;
-    const ivaPagar             = round2(totalIvaVentas - totalIvaCompras);
-
-    // ── 5. Estado de resultados ────────────────────────────────────────────
+    // ── 4-5. IVA + Estado de resultados ─────────────────────────────────────
     // Ventas/Compras Netas (y por lo tanto Utilidad Bruta) se calculan SIN IVA ni INC:
     // el "Total" del reporte DIAN incluye ambos impuestos, pero ninguno es ingreso ni
     // costo real de la empresa — son pasivos que se recaudan y se pagan a la DIAN. Se
     // muestran ambas versiones (con/sin impuestos) en el Excel para poder auditar.
-    const incGenerado          = calculos.incGenerado         ?? 0;
-    const incDevolucionVentas  = calculos.incDevolucionVentas ?? 0;
-
-    const ventasBrutoConIva      = calculos.ventasBruto       ?? 0;
-    const ventasBrutoSinIva      = ventasBrutoConIva - ivaGenerado - incGenerado;
-    const devolucionVentasConIva = calculos.devolucionVentas  ?? 0;
-    const devolucionVentasSinIva = devolucionVentasConIva - ivaDevolucionVentas - incDevolucionVentas;
-    const ventasNetas            = ventasBrutoSinIva - devolucionVentasSinIva;
-
-    const comprasBrutoConIva      = calculos.comprasBruto      ?? 0;
-    const comprasBrutoSinIva      = comprasBrutoConIva - ivaDescontable;
-    const devolucionComprasConIva = calculos.devolucionCompras ?? 0;
-    const devolucionComprasSinIva = devolucionComprasConIva - ivaDevolucionCompras;
-
     // "Documento soporte con no obligados" tiene el Grupo invertido respecto a la
     // convención normal: Grupo="Emitido" es una COMPRA nuestra (se lo emitimos a alguien
     // no obligado a facturar que nos vendió). Se suma directo a Compras Netas, no a
     // Costos Totales por separado — Grupo="Recibido" no tiene contrapartida normal acá
     // y se reporta como anomalía (ver calcularAnomalias), sin sumar a ningún total.
-    const esDocSoporteCompra = (f) => f.tipoDocumento === DOC_SOPORTE_NO_OBLIGADOS && f.grupo === EMITIDO;
-    const documentoSoporteComprasFilas = filas.filter(esDocSoporteCompra);
-    const documentoSoporteCompras    = documentoSoporteComprasFilas.reduce((s, f) => s + (f.total ?? 0), 0);
-    const ivaDocumentoSoporteCompras = documentoSoporteComprasFilas.reduce((s, f) => s + (f.iva ?? 0), 0);
-    const documentoSoporteComprasSinIva = documentoSoporteCompras - ivaDocumentoSoporteCompras;
-
-    const comprasNetas   = comprasBrutoSinIva - devolucionComprasSinIva + documentoSoporteComprasSinIva;
-    const costosTotales  = comprasNetas;
-    const utilidadBruta  = ventasNetas - costosTotales;
-    const utilidadNeta   = round2(utilidadBruta - totalRetenciones);
+    // calcularResumenPeriodo reemplaza el cálculo que antes vivía inline acá — misma
+    // fórmula exacta, factorizada para poder reutilizarla por mes (ver resumenPorMes).
+    const resumen = calcularResumenPeriodo(filas);
 
     // ── 6. Período (se calcula antes de nómina para saber qué año de SMMLV usar) ──
     const fechas       = filas.map((f) => f.fechaEmision).filter(Boolean).sort();
@@ -1342,27 +1477,15 @@ const exportarBorrador = async (req, res, next) => {
     const documentosNoContabilizados = calcularDocumentosNoContabilizados(filas);
     const anomalias                  = calcularAnomalias(filas, anomaliasRevisadas);
 
-    const resumen = {
-      ventasBrutoSinIva:            round2(ventasBrutoSinIva),
-      devolucionVentasSinIva:       round2(devolucionVentasSinIva),
-      ventasNetas:                  round2(ventasNetas),
-      comprasBrutoSinIva:           round2(comprasBrutoSinIva),
-      devolucionComprasSinIva:      round2(devolucionComprasSinIva),
-      comprasNetas:                 round2(comprasNetas),
-      documentoSoporteCompras:      round2(documentoSoporteCompras),
-      documentoSoporteComprasSinIva: round2(documentoSoporteComprasSinIva),
-      costosTotales:                round2(costosTotales),
-      utilidadBruta:                round2(utilidadBruta),
-      ivaGenerado:                  round2(ivaGenerado),
-      ivaDescontable:               round2(ivaDescontable),
-      ivaDevolucionCompras:         round2(ivaDevolucionCompras),
-      ivaDevolucionVentas:          round2(ivaDevolucionVentas),
-      totalIvaVentas:               round2(totalIvaVentas),
-      totalIvaCompras:              round2(totalIvaCompras),
-      ivaPagar,
-      totalRetenciones,
-      utilidadNeta,
-    };
+    // ── 8b. Resumen mensual — solo si el período cubre más de un mes calendario ──
+    // Mismo espíritu que la tabla "Ingresos por Mes" del Excel manual que se usaba antes
+    // de este módulo: un archivo que trae varios meses (ej. el año completo) ya no da
+    // solo un total combinado — también se ve el desglose mes a mes. Con un solo mes no
+    // aporta nada (sería una fila igual al total), así que no se agrega la hoja.
+    const mesesConDatos = agruparPorMes(filas);
+    const resumenPorMes = mesesConDatos.length > 1
+      ? mesesConDatos.map(([ym, filasDelMes]) => [ym, calcularResumenPeriodo(filasDelMes)])
+      : null;
 
     const nominaData = nominaCalc
       ? {
@@ -1405,8 +1528,9 @@ const exportarBorrador = async (req, res, next) => {
     const meta = { totalFilas, periodoDesde, periodoHasta, procesadoEn, empresaNombre };
 
     buildResumen(wb.addWorksheet('RESUMEN'), resumen, nominaData, meta);
+    if (resumenPorMes) buildResumenMensual(wb.addWorksheet('RESUMEN_MENSUAL'), resumenPorMes, resumen);
     buildImpuestos(wb.addWorksheet('IMPUESTOS'), resumen);
-    buildRetenciones(wb.addWorksheet('RETENCIONES_POR_PROVEEDOR'), retencionesPorProveedor, totalRetenciones);
+    buildRetenciones(wb.addWorksheet('RETENCIONES_POR_PROVEEDOR'), retencionesPorProveedor, resumen.totalRetenciones);
     buildDetalleCompras(wb.addWorksheet('DETALLE_COMPRAS'), filasRecibido);
     if (nominaData) buildNomina(wb.addWorksheet('NOMINA'), nominaData, nominaData.salario);
     buildMetadatos(wb.addWorksheet('METADATOS'), meta, userEmail, filas, documentosNoContabilizados, anomalias);
@@ -1515,4 +1639,5 @@ module.exports = {
   // Funciones puras (no tocan DB ni request). Se exportan para poder testear directamente
   // las reglas contables sin montar un borrador completo — ver tests/unit/dianController.test.js
   calcularAnomalias, calcularDocumentosNoContabilizados,
+  calcularResumenPeriodo, agruparPorMes,
 };

@@ -9,6 +9,8 @@ const {
   exportarBorrador,
   aplicarClasificacionRapida,
   marcarAnomaliaRevisada,
+  calcularResumenPeriodo,
+  agruparPorMes,
 } = require('../../src/controllers/dianController');
 
 // Textos EXACTOS como los exporta el portal de la DIAN. No son los nombres oficiales del
@@ -17,8 +19,12 @@ const {
 // desincronizan del controller, la fila cae en DOCUMENTOS NO CONTABILIZADOS sin avisar.
 // Catálogo completo y códigos DIAN en docs/dian-tipos-documento.md
 const FACTURA              = 'Factura electrónica';
+const FACTURA_CONTINGENCIA = 'Factura electrónica de contingencia';
+const DOC_EQUIVALENTE_POS  = 'Documento equivalente POS';
+const CONTINGENCIA_DOC_EQ  = 'Contingencia Documentos Equivalentes';
 const NOTA_CREDITO         = 'Nota de crédito electrónica';
 const NOTA_AJUSTE_CREDITO  = 'Nota de ajuste crédito del documento equivalente';
+const NOTA_AJUSTE_DOC_SOP  = 'Nota de ajuste del documento soporte'; // a propósito SIN parametrizar, ver el test más abajo
 const SERVICIOS_PUBLICOS   = 'Documento equivalente - Servicios públicos domiciliarios';
 const TRANSPORTE_AEREO     = 'Documento equivalente - Transporte aéreo de pasajeros';
 const TRANSPORTE_TERRESTRE = 'Documento equivalente - Transporte pasajeros terrestre';
@@ -141,6 +147,41 @@ describe('uploadDian — qué cuenta como compra', () => {
   });
 });
 
+// Los tres primeros salieron de un reporte real de 10.349 filas (año completo) que antes
+// caían en DOCUMENTOS NO CONTABILIZADOS — se tratan igual que una Factura electrónica
+// normal (compra o venta según Grupo, con su IVA), confirmado con el usuario para
+// CONTINGENCIA_DOC_EQ en vez de asumirlo por el patrón de un solo emisor en esos datos.
+describe('uploadDian — tipos de contingencia y POS (igual que Factura electrónica)', () => {
+  test('factura electrónica de contingencia cuenta como compra o venta según Grupo, con su IVA', async () => {
+    const calculos = await calcular([
+      { tipo: FACTURA_CONTINGENCIA, grupo: 'Recibido', total: 166300, iva: 9532 },
+    ]);
+
+    expect(calculos.comprasBruto).toBe(166300);
+    expect(calculos.ivaDescontable).toBe(9532);
+  });
+
+  test('documento equivalente POS cuenta como compra o venta según Grupo, con su IVA', async () => {
+    const calculos = await calcular([
+      { tipo: DOC_EQUIVALENTE_POS, grupo: 'Emitido', total: 98000, iva: 15647 },
+    ]);
+
+    expect(calculos.ventasBruto).toBe(98000);
+    expect(calculos.ivaGenerado).toBe(15647);
+  });
+
+  test('contingencia documentos equivalentes cuenta como compra o venta según Grupo, no solo como servicios públicos', async () => {
+    // A diferencia de servicios públicos (siempre compra, sin IVA), este SÍ puede ser venta
+    // y SÍ trae IVA — es la corrección que pidió el usuario sobre mi propuesta inicial.
+    const calculos = await calcular([
+      { tipo: CONTINGENCIA_DOC_EQ, grupo: 'Emitido', total: 238000, iva: 38000 },
+    ]);
+
+    expect(calculos.ventasBruto).toBe(238000);
+    expect(calculos.ivaGenerado).toBe(38000);
+  });
+});
+
 describe('uploadDian — devoluciones', () => {
   test('la nota crédito recibida resta como devolución en compras', async () => {
     const calculos = await calcular([
@@ -252,9 +293,27 @@ describe('calcularDocumentosNoContabilizados', () => {
       { tipoDocumento: FACTURA,              grupo: 'Recibido', total: 119000 },
       { tipoDocumento: TRANSPORTE_TERRESTRE, grupo: 'Recibido', total: 47000 },
       { tipoDocumento: NOTA_AJUSTE_CREDITO,  grupo: 'Recibido', total: 111840 },
+      { tipoDocumento: FACTURA_CONTINGENCIA, grupo: 'Recibido', total: 166300 },
+      { tipoDocumento: DOC_EQUIVALENTE_POS,  grupo: 'Emitido',  total: 98000 },
+      { tipoDocumento: CONTINGENCIA_DOC_EQ,  grupo: 'Recibido', total: 5300274 },
     ]);
 
     expect(resultado).toEqual([]);
+  });
+
+  // Ver el comentario junto a TIPOS_NOTA_CREDITO en dianController.js: el anexo de la DIAN
+  // confirma que existen ajustes crédito Y débito para el documento soporte, pero el portal
+  // usa un único texto genérico sin distinguirlos — con un solo caso visto en un reporte
+  // real no alcanza para confirmar el signo, así que se deja sin parametrizar a propósito
+  // (no es un tipo olvidado, es una decisión deliberada hasta ver más casos).
+  test('nota de ajuste del documento soporte queda sin parametrizar a propósito (signo sin confirmar)', () => {
+    const resultado = calcularDocumentosNoContabilizados([
+      { tipoDocumento: NOTA_AJUSTE_DOC_SOP, grupo: 'Recibido', total: 379000 },
+    ]);
+
+    expect(resultado).toEqual([
+      expect.objectContaining({ tipo: NOTA_AJUSTE_DOC_SOP, cantidad: 1, total: 379000, esConocido: false }),
+    ]);
   });
 });
 
@@ -449,5 +508,82 @@ describe('marcarAnomaliaRevisada', () => {
     await marcarAnomaliaRevisada(req, res, jest.fn());
 
     expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+// calcularResumenPeriodo es la función que exportarBorrador usa tanto para el Estado de
+// Resultados general (sobre todas las filas) como para el desglose de RESUMEN_MENSUAL
+// (una vez por mes) — se factorizó a propósito para que ambos casos compartan la misma
+// fórmula. A diferencia de exportarBorrador (bloqueado por el import ESM, ver arriba),
+// esta función es pura y sí se puede testear directo.
+describe('calcularResumenPeriodo', () => {
+  test('ventas/compras netas quedan sin IVA ni INC, retención se resta de la utilidad', () => {
+    const resumen = calcularResumenPeriodo([
+      { tipoDocumento: FACTURA, grupo: 'Emitido', total: 119000, iva: 19000 },
+      {
+        tipoDocumento: FACTURA, grupo: 'Recibido', total: 59500, iva: 9500,
+        clasificacionRetencion: 'Compras', tasaRetencion: 2.5,
+      },
+    ]);
+
+    expect(resumen.ventasNetas).toBe(100000);
+    expect(resumen.comprasNetas).toBe(50000);
+    expect(resumen.utilidadBruta).toBe(50000);
+    expect(resumen.ivaPagar).toBe(9500); // 19000 generado − 9500 descontable
+    expect(resumen.totalRetenciones).toBe(1487.5); // 59500 × 2.5%
+    expect(resumen.utilidadNeta).toBe(48512.5); // 50000 − 1487.5
+  });
+
+  test('sin filas, todo da cero (no revienta con listas vacías)', () => {
+    const resumen = calcularResumenPeriodo([]);
+
+    expect(resumen.ventasNetas).toBe(0);
+    expect(resumen.utilidadNeta).toBe(0);
+    expect(resumen.totalRetenciones).toBe(0);
+  });
+
+  test('documento soporte con no obligados (Grupo invertido) suma a Compras Netas', () => {
+    const resumen = calcularResumenPeriodo([
+      { tipoDocumento: DOC_SOPORTE, grupo: 'Emitido', total: 12821, iva: 0 },
+    ]);
+
+    expect(resumen.documentoSoporteCompras).toBe(12821);
+    expect(resumen.comprasNetas).toBe(12821);
+  });
+});
+
+// agruparPorMes alimenta el desglose de RESUMEN_MENSUAL en exportarBorrador — un solo mes
+// no agrega la hoja (ver exportarBorrador: "mesesConDatos.length > 1"), así que lo que
+// importa acá es que agrupe bien por YYYY-MM y en orden cronológico.
+describe('agruparPorMes', () => {
+  test('agrupa por año-mes y devuelve los grupos en orden cronológico', () => {
+    const grupos = agruparPorMes([
+      { fechaEmision: '2026-03-05', total: 1 },
+      { fechaEmision: '2026-01-10', total: 2 },
+      { fechaEmision: '2026-01-20', total: 3 },
+      { fechaEmision: '2026-02-01', total: 4 },
+    ]);
+
+    expect(grupos.map(([ym]) => ym)).toEqual(['2026-01', '2026-02', '2026-03']);
+    expect(grupos.find(([ym]) => ym === '2026-01')[1]).toHaveLength(2);
+  });
+
+  test('un solo mes en los datos da un solo grupo', () => {
+    const grupos = agruparPorMes([
+      { fechaEmision: '2026-05-01' },
+      { fechaEmision: '2026-05-31' },
+    ]);
+
+    expect(grupos).toHaveLength(1);
+  });
+
+  test('filas sin fechaEmision quedan afuera de los grupos', () => {
+    const grupos = agruparPorMes([
+      { fechaEmision: '2026-01-10' },
+      { fechaEmision: null },
+    ]);
+
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0][1]).toHaveLength(1);
   });
 });

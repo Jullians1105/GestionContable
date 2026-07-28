@@ -133,20 +133,25 @@ Es un **acuse técnico sin valor comercial**. Nunca entra en ningún total.
 
 ## 3. Mapeo al reporte real y estado de parametrización
 
-Valores observados en `docs/REPORTE.xlsx` (419 filas, período 2026-07), contrastados con
-`TIPOS_CONTABILIZADOS` en `backend/src/controllers/dianController.js:134`.
+Valores observados en dos reportes reales: `docs/REPORTE.xlsx` (419 filas, período
+2026-07) y un segundo archivo de un año completo, 2025 (10.349 filas — no versionado en el
+repo, mismo motivo que el resto de reportes: datos financieros reales de la empresa),
+contrastados con `TIPOS_CONTABILIZADOS` en `backend/src/controllers/dianController.js`.
 
 | `Tipo de documento` (texto exacto del portal) | Filas | Cód. | Fuente | Estado |
 |---|---:|---:|---|---|
-| `Factura electrónica` | 374 | 01 | FE 1.9 | Parametrizado |
-| `Nota de crédito electrónica` | 14 | 91 | FE 1.9 | Parametrizado |
-| `Documento equivalente - Transporte pasajeros terrestre` | 9 | 35 | DocEquiv 16.3 | **PENDIENTE** |
-| `Nomina Individual` | 8 | 102 | Res. 000013 | Excluido a propósito |
-| `Documento equivalente - Servicios públicos domiciliarios` | 6 | 60 | DocEquiv 16.3 | Parametrizado |
-| `Nota de crédito electrónica` (Recibido) | 5 | 91 | FE 1.9 | Parametrizado |
-| `Application response` | 4 | — | DocEquiv 8.13 | Excluido a propósito |
-| `Documento soporte con no obligados` | 2 | 05 | DSNO 16.1.3 | Parametrizado (Grupo invertido) |
-| `Nota de ajuste crédito del documento equivalente` | 1 | 94 | DocEquiv 16.3 | **PENDIENTE** |
+| `Factura electrónica` | 5959 | 01 | FE 1.9 | Parametrizado |
+| `Application response` | 3839 | — | DocEquiv 8.13 | Excluido a propósito |
+| `Nomina Individual` | 193 | 102 | Res. 000013 | Excluido a propósito |
+| `Nota de crédito electrónica` | 179 | 91 | FE 1.9 | Parametrizado |
+| `Documento equivalente - Servicios públicos domiciliarios` | 79 | 60 | DocEquiv 16.3 | Parametrizado |
+| `Documento equivalente - Transporte pasajeros terrestre` | 33 | 35 | DocEquiv 16.3 | Parametrizado |
+| `Nota de ajuste crédito del documento equivalente` | 26 | 94 | DocEquiv 16.3 | Parametrizado |
+| `Contingencia Documentos Equivalentes` | 24 | 07/08 | DocEquiv 16.3 | Parametrizado |
+| `Documento soporte con no obligados` | 12 | 05 | DSNO 16.1.3 | Parametrizado (Grupo invertido) |
+| `Factura electrónica de contingencia` | 2 | 01 | FE 1.9 | Parametrizado |
+| `Documento equivalente POS` | 2 | 20 | DocEquiv 16.3 | Parametrizado |
+| `Nota de ajuste del documento soporte` | 1 | 95 | DSNO | **PENDIENTE** (signo sin confirmar) |
 | `Documento equivalente - Transporte aéreo de pasajeros` | 0 | 50 | DocEquiv 16.3 | Parametrizado |
 
 El texto exacto que usa el portal **no coincide** con el nombre oficial del anexo. El
@@ -155,7 +160,7 @@ portal usa el patrón `Documento equivalente - <descripción>`, mientras el anex
 en ningún reporte, el nombre exacto del portal **está sin confirmar** — hay que verlo en un
 reporte real antes de agregarlo como constante.
 
-### 3.1 Los dos pendientes
+### 3.1 Los dos primeros pendientes (ya resueltos)
 
 **`Documento equivalente - Transporte pasajeros terrestre` (cód. 35)**
 
@@ -180,9 +185,55 @@ reporte real antes de agregarlo como constante.
   Todavía no ha aparecido en ningún reporte, pero conviene contemplarla al mismo tiempo
   para no repetir este mismo hueco.
 
-**Impacto neto hoy no contabilizado:** `+423.000 − 111.840 = 311.160`. Ambos tipos caen
-actualmente en la sección DOCUMENTOS NO CONTABILIZADOS de la hoja METADATOS, así que el
-Excel exportado sí los muestra — pero no entran en ningún total.
+**Impacto que tenían mientras estuvieron sin contabilizar:** `+423.000 − 111.840 = 311.160`.
+Resuelto en el commit `fix(dian): contabiliza transporte terrestre y nota de ajuste crédito
+del documento equivalente` — los dos quedaron parametrizados, ya no caen en DOCUMENTOS NO
+CONTABILIZADOS.
+
+### 3.2 Cuatro tipos más, vistos en un reporte de un año completo (10.349 filas)
+
+**`Documento equivalente POS` (cód. 20) y `Factura electrónica de contingencia` (cód. 01)**
+
+- 2 filas cada uno, ambos con `Grupo = Recibido` e IVA > 0 en la muestra vista.
+- El anexo (secc. 2.1, cód. 20) dice que la "naturaleza habitual" del POS es venta, pero
+  aclara en la misma sección que **quien decide es la columna `Grupo`** del reporte, no el
+  código — igual que ya pasa con `DOC_TRANSPORTE_AEREO`. La factura de contingencia es,
+  contablemente, la misma factura electrónica de siempre; el mecanismo de contingencia solo
+  cambia cómo se emitió (el sistema del emisor estaba caído), no su naturaleza.
+- Tratamiento: **igual que `FACTURA`** — compra o venta según `Grupo`, con su IVA. Ambos se
+  agregan a `TIPOS_FACTURA_EQUIVALENTE`.
+
+**`Contingencia Documentos Equivalentes` (cód. 07/08)**
+
+- 24 filas, **$5.300.274**, todas con `Grupo = Recibido`, `IVA = 0`, **siempre** el mismo
+  emisor ("Empresa de Energía de Boyacá SA ESP" — la misma empresa que emite
+  `DOC_EQUIVALENTE` en este reporte).
+- Primera hipótesis (antes de confirmar con el usuario): tratarlo igual que
+  `DOC_EQUIVALENTE` (servicios públicos, solo compra, sin IVA), inferido del patrón de un
+  solo emisor en esta muestra. **El usuario corrigió esto**: pidió tratarlo como una factura
+  normal, que puede ser compra o venta según `Grupo` — el patrón de un solo emisor es
+  circunstancial a esta empresa/período, no una regla del tipo de documento en sí.
+- Tratamiento: **igual que `FACTURA`** — se agrega a `TIPOS_FACTURA_EQUIVALENTE`, no a
+  `TIPOS_COMPRA`.
+
+**`Nota de ajuste del documento soporte` (cód. 95) — sigue pendiente**
+
+- 1 sola fila, **$379.000**, `IVA = 0`, `Grupo = Recibido`, emisor "INNOVARK INVERSIONES
+  S.A.S".
+- El [anexo de la Resolución 000167](https://cijuf.org.co/sites/cijuf.org.co/files/activos/otros/ANEXO%20RESOLUCION%20000167%20DE%20-30-12-2021.pdf)
+  confirma que el formato contempla **dos tipos de XML distintos** para este ajuste —
+  `CreditNote` y `DebitNote` — igual que la familia del documento equivalente (cód. 93/94).
+  Pero a diferencia de esa familia (que sí tiene dos textos distintos en el portal, uno con
+  la palabra "crédito"), acá el portal usa un **único texto genérico**, sin "crédito" ni
+  "débito" en ningún lado.
+- Con un solo caso real no alcanza para confirmar si ese texto siempre significa crédito, o
+  si el portal usa el mismo texto para ambos casos y el signo depende de algo que no está en
+  ninguna de las columnas del reporte (`Tipo de documento`, `IVA`, `Total`, `Grupo`, etc.).
+- **Se deja sin parametrizar a propósito** — no es un descuido, es la misma decisión que ya
+  se tomó con la nota de ajuste débito del documento equivalente (cód. 93): mejor que caiga
+  en DOCUMENTOS NO CONTABILIZADOS (visible, sin sumar) a que se le adivine el signo y quede
+  mal sin que nadie lo note. Si aparece un segundo caso, revisar si el usuario puede
+  confirmar el signo contra su propio registro de esa transacción antes de agregarlo.
 
 ---
 
