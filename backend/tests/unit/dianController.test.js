@@ -517,7 +517,7 @@ describe('marcarAnomaliaRevisada', () => {
 // fórmula. A diferencia de exportarBorrador (bloqueado por el import ESM, ver arriba),
 // esta función es pura y sí se puede testear directo.
 describe('calcularResumenPeriodo', () => {
-  test('ventas/compras netas quedan sin IVA ni INC, retención se resta de la utilidad', () => {
+  test('ventas/compras netas quedan sin IVA ni INC; retención no se resta de la utilidad', () => {
     const resumen = calcularResumenPeriodo([
       { tipoDocumento: FACTURA, grupo: 'Emitido', total: 119000, iva: 19000 },
       {
@@ -530,8 +530,8 @@ describe('calcularResumenPeriodo', () => {
     expect(resumen.comprasNetas).toBe(50000);
     expect(resumen.utilidadBruta).toBe(50000);
     expect(resumen.ivaPagar).toBe(9500); // 19000 generado − 9500 descontable
-    expect(resumen.totalRetenciones).toBe(1487.5); // 59500 × 2.5%
-    expect(resumen.utilidadNeta).toBe(48512.5); // 50000 − 1487.5
+    expect(resumen.totalRetenciones).toBe(1250); // (59500 − 9500) × 2.5% — retención sobre subtotal sin IVA
+    expect(resumen.utilidadNeta).toBe(50000); // la retención no es un costo de la empresa, no se resta
   });
 
   test('sin filas, todo da cero (no revienta con listas vacías)', () => {

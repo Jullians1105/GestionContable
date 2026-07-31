@@ -724,9 +724,6 @@ function buildResumenContent(ws, resumen, nomina, meta, { freeze = true } = {}) 
   valueRow('UTILIDAD BRUTA', resumen.utilidadBruta, { total: true, isNeg: resumen.utilidadBruta < 0 });
   blank();
 
-  valueRow('(−) Total retenciones', resumen.totalRetenciones, { isNeg: true, bold: true });
-  blank();
-
   valueRow('UTILIDAD NETA (antes nómina)', resumen.utilidadNeta, { total: true, isNeg: resumen.utilidadNeta < 0 });
   blank();
 
@@ -913,7 +910,8 @@ function buildDetalleComprasContent(ws, filasRecibido, { freeze = true } = {}) {
   applyHeaderRow(hdr, 8);
 
   filasRecibido.forEach((fila, i) => {
-    const retencion = round2(fila.total * ((fila.tasaRetencion ?? 0) / 100));
+    const subtotal = (fila.total ?? 0) - (fila.iva ?? 0);
+    const retencion = round2(subtotal * ((fila.tasaRetencion ?? 0) / 100));
     const row = ws.addRow([
       fechaES(fila.fechaEmision),
       fila.folio   ?? '',
@@ -1276,11 +1274,15 @@ function calcularResumenPeriodo(filasPeriodo) {
   );
   let totalRetenciones = 0;
   for (const fila of filasRecibido) {
-    totalRetenciones += (fila.total ?? 0) * ((fila.tasaRetencion ?? 0) / 100);
+    const subtotal = (fila.total ?? 0) - (fila.iva ?? 0);
+    totalRetenciones += subtotal * ((fila.tasaRetencion ?? 0) / 100);
   }
   totalRetenciones = round2(totalRetenciones);
 
-  const utilidadNeta = round2(utilidadBruta - totalRetenciones);
+  // Las retenciones son un anticipo de impuesto que se le practica al proveedor, no un
+  // costo de la empresa — no se restan de la utilidad. totalRetenciones se sigue
+  // calculando para la hoja RETENCIONES_POR_PROVEEDOR.
+  const utilidadNeta = round2(utilidadBruta);
 
   return {
     ventasBrutoSinIva:            round2(ventasBrutoSinIva),
@@ -1412,8 +1414,9 @@ const exportarBorrador = async (req, res, next) => {
     // de esta hoja y no se repite en el resumen mensual.
     const retencionesPorProveedor = {};
     for (const fila of filasRecibido) {
-      const { nitEmisor, nombreEmisor, total, clasificacionRetencion, tasaRetencion } = fila;
-      const retencion = total * ((tasaRetencion ?? 0) / 100);
+      const { nitEmisor, nombreEmisor, total, iva, clasificacionRetencion, tasaRetencion } = fila;
+      const subtotal = (total ?? 0) - (iva ?? 0);
+      const retencion = subtotal * ((tasaRetencion ?? 0) / 100);
       const key = nitEmisor ?? 'SIN_NIT';
       if (!retencionesPorProveedor[key]) {
         retencionesPorProveedor[key] = { nombreEmisor: nombreEmisor ?? '', retenciones: {}, totalProveedorRetenido: 0 };
