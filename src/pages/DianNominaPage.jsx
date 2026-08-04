@@ -25,6 +25,33 @@ const toFloat = (v) => {
   return isNaN(n) || n < 0 ? 0 : n
 }
 
+// Tarifas de autorretención en la renta — mismo criterio que la "clasificación rápida" de
+// retenciones (dropdown con opciones fijas), pero acá es UNA sola tarifa para todo el
+// período, no por fila. 'N/A' es una respuesta válida (empresa exenta pese a tener
+// nómina+ventas), por eso el placeholder inicial queda vacío en vez de defaultear a algo.
+const OPCIONES_AUTORRETENCION = [
+  { label: '0,55%', value: '0.55' },
+  { label: '1,10%', value: '1.10' },
+  { label: '1,20%', value: '1.20' },
+  { label: '1,70%', value: '1.70' },
+  { label: '2,20%', value: '2.20' },
+  { label: '2,70%', value: '2.70' },
+  { label: '2,80%', value: '2.80' },
+  { label: '3,50%', value: '3.50' },
+  { label: '4,50%', value: '4.50' },
+  { label: 'N/A (no aplica)', value: 'N/A' },
+]
+
+// Base de la autorretención: ventas emitidas antes de IVA, con notas crédito descontadas —
+// misma fórmula que resumen.ventasNetas en el backend (calcularResumenPeriodo), calculada acá
+// a partir de "calculos" (ya viene del upload, no cambia con la clasificación de retenciones).
+function calcularVentasNetas(calculos) {
+  if (!calculos) return 0
+  const ventasBrutoSinIva      = (calculos.ventasBruto ?? 0) - (calculos.ivaGenerado ?? 0) - (calculos.incGenerado ?? 0)
+  const devolucionVentasSinIva = (calculos.devolucionVentas ?? 0) - (calculos.ivaDevolucionVentas ?? 0) - (calculos.incDevolucionVentas ?? 0)
+  return ventasBrutoSinIva - devolucionVentasSinIva
+}
+
 // ── subcomponente: fila del preview (valor precomputado, o base*tasa si no se pasa) ────────────
 // tasaLabel: permite mostrar un % distinto al que realmente usa el cálculo (ej. Pensión
 // se muestra como "12%" informativo, pero se calcula con la tasa real del 4%).
@@ -52,15 +79,24 @@ export default function DianNominaPage() {
   const [empleados, setEmpleados] = useState('')
   const [meses,     setMeses]     = useState('')
   const [salario,   setSalario]   = useState(String(SMMLV_ACTUAL))
+  const [tasaAutorretencion, setTasaAutorretencion] = useState('')
 
   const empVal = toInt(empleados)
   const mesVal = toInt(meses)
   const salVal = toFloat(salario) || SMMLV_ACTUAL
 
+  const ventasNetas = useMemo(() => calcularVentasNetas(state.calculos), [state.calculos])
+  const tieneNomina = empVal > 0 && mesVal > 0
+  const mostrarAutorretencion = tieneNomina && ventasNetas > 0
+  const valorAutorretencion = tasaAutorretencion && tasaAutorretencion !== 'N/A'
+    ? ventasNetas * (parseFloat(tasaAutorretencion) / 100)
+    : 0
+
   // Validación cruzada
   const error =
     empVal > 0 && mesVal === 0 ? 'Especifica el número de meses' :
     empVal === 0 && mesVal > 0 ? 'Especifica el número de empleados' :
+    mostrarAutorretencion && !tasaAutorretencion ? 'Selecciona la tarifa de autorretención' :
     null
 
   // ── cálculos preview — misma fórmula que usa el backend al exportar (shared/calcularNomina.js) ──
@@ -81,6 +117,9 @@ export default function DianNominaPage() {
         meses:            mesVal,
         salario:          salVal,
         costoNominaTotal: calc.costoTotal,
+        tasaAutorretencion:  mostrarAutorretencion ? tasaAutorretencion : null,
+        baseAutorretencion:  mostrarAutorretencion ? ventasNetas : 0,
+        valorAutorretencion: mostrarAutorretencion ? valorAutorretencion : 0,
       },
     })
   }
@@ -238,6 +277,55 @@ export default function DianNominaPage() {
           </div>
         )}
       </div>
+
+      {/* ── Autorretención en la renta — solo si hay nómina Y hay ventas ────────── */}
+      {mostrarAutorretencion && (
+        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-6 mb-6">
+          <h2 className="text-sm font-bold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide mb-4">
+            Autorretención en la renta
+          </h2>
+
+          <div className="flex items-end gap-4 mb-4">
+            {/* Base — ventas netas (emitidas antes de IVA, notas crédito descontadas) */}
+            <div className="flex-1">
+              <label className="block text-xs font-semibold text-[#8890b5] uppercase tracking-wide mb-1.5">
+                Base (Ventas Netas)
+              </label>
+              <div className="px-3.5 py-2.5 rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9ff] dark:bg-[#181a2e] text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">
+                {fmt(ventasNetas)}
+              </div>
+            </div>
+
+            {/* Tarifa — dropdown, una sola clasificación general para el período */}
+            <div className="w-40">
+              <label className="block text-xs font-semibold text-[#8890b5] uppercase tracking-wide mb-1.5">
+                Tarifa
+              </label>
+              <select
+                value={tasaAutorretencion}
+                onChange={(e) => setTasaAutorretencion(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] text-sm focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent"
+              >
+                <option value="">Selecciona…</option>
+                {OPCIONES_AUTORRETENCION.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {tasaAutorretencion && (
+            <div className="rounded-xl bg-[#f3f6ff] dark:bg-[#1a2040] border border-[#d6e0f3] dark:border-[#2a3560] p-4 flex items-center justify-between">
+              <span className="text-sm font-semibold text-[#434655] dark:text-[#c4c8e8]">
+                Valor Autorretención
+              </span>
+              <span className="text-base font-bold text-[#004ac6] dark:text-[#7ba8f0] tabular-nums">
+                {fmt(valorAutorretencion)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Navegación ───────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">

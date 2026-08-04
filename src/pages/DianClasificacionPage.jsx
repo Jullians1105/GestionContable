@@ -32,6 +32,11 @@ const formatCOP = (n) =>
 const truncate = (s, n) =>
   s && s.length > n ? s.slice(0, n) + '…' : (s || '—')
 
+// Base = Total − IVA — es sobre lo que realmente se calcula la retención (ver
+// backend, exportarBorrador: subtotal = fila.total - fila.iva), así que la columna
+// muestra/filtra/ordena por este valor en vez del Total con IVA incluido.
+const getBase = (f) => (f.total ?? 0) - (f.iva ?? 0)
+
 // ── indicador de autoguardado ──────────────────────────────────────────────────
 function SaveIndicator({ estado }) {
   if (!estado) return null
@@ -95,6 +100,17 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
     ...(align === 'right' ? { right: window.innerWidth - rect.right } : { left: rect.left }),
   }
 
+  // Al aceptar, solo cuentan los valores que siguen visibles bajo la búsqueda actual —
+  // si el usuario buscó "Acme" y no tocó ningún checkbox, "borrador" todavía trae TODOS
+  // los valores marcados por default (incluidos los que la búsqueda ocultó), y aplicar
+  // el filtro tal cual equivalía a "mostrar todo" (el bug reportado: buscar + Aceptar no
+  // hacía nada). Intersectar con "visibles" hace que buscar + Aceptar filtre a lo buscado.
+  const aplicar = () => {
+    const visibleValues = new Set(visibles.map((v) => v.value))
+    const seleccionFinal = new Set([...borrador].filter((v) => visibleValues.has(v)))
+    onAplicar(seleccionFinal.size === valores.length ? null : seleccionFinal)
+  }
+
   return createPortal(
     <div
       ref={ref}
@@ -150,7 +166,7 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
           Cancelar
         </button>
         <button
-          onClick={() => onAplicar(borrador.size === valores.length ? null : new Set(borrador))}
+          onClick={aplicar}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
           style={{ background: '#004ac6' }}
         >
@@ -225,6 +241,14 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
   const inputClase =
     'w-full text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-2 py-1.5 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent'
 
+  // Mismo fix que ColumnFilterMenu: intersectar con "visibles" para que buscar/acotar por
+  // rango + Aceptar sin tocar checkboxes filtre a lo que quedó visible, no a "todo".
+  const aplicar = () => {
+    const visibleValues = new Set(visibles.map((v) => v.value))
+    const seleccionFinal = new Set([...borrador].filter((v) => visibleValues.has(v)))
+    onAplicar(seleccionFinal.size === valores.length ? null : seleccionFinal)
+  }
+
   return createPortal(
     <div
       ref={ref}
@@ -298,7 +322,7 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
           Cancelar
         </button>
         <button
-          onClick={() => onAplicar(borrador.size === valores.length ? null : new Set(borrador))}
+          onClick={aplicar}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
           style={{ background: '#004ac6' }}
         >
@@ -379,7 +403,7 @@ function FilaClasificacion({ fila, borradorId, valorActual, onClasificado, isEve
         <div className="text-[11px] text-[#8890b5] mt-0.5">{fila.nitEmisor}</div>
       </td>
       <td className="px-4 py-3 text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] text-right tabular-nums whitespace-nowrap">
-        {formatCOP(fila.total)}
+        {formatCOP(getBase(fila))}
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-0">
@@ -494,7 +518,7 @@ export default function DianClasificacionPage() {
   }, [filasRecibido])
 
   const valoresTotal = useMemo(() => {
-    const unicos = Array.from(new Set(filasRecibido.map((f) => f.total).filter((t) => t != null))).sort((a, b) => a - b)
+    const unicos = Array.from(new Set(filasRecibido.filter((f) => f.total != null).map(getBase))).sort((a, b) => a - b)
     return unicos.map((t) => ({ value: t, label: formatCOP(t) }))
   }, [filasRecibido])
 
@@ -502,13 +526,13 @@ export default function DianClasificacionPage() {
     filasRecibido.filter((f) => {
       if (filtroFecha  !== null && !filtroFecha.has(f.fechaEmision)) return false
       if (filtroEmisor !== null && !filtroEmisor.has(f.nombreEmisor)) return false
-      if (filtroTotal  !== null && !filtroTotal.has(f.total)) return false
+      if (filtroTotal  !== null && !filtroTotal.has(getBase(f))) return false
       return true
     }),
     [filasRecibido, filtroFecha, filtroEmisor, filtroTotal]
   )
 
-  // ── orden por Fecha o Total (asc/desc) — independiente de los filtros ───────────
+  // ── orden por Fecha o Base (asc/desc) — independiente de los filtros ───────────
   const [ordenColumna,   setOrdenColumna]   = useState(null)   // 'fecha' | 'total' | null
   const [ordenDireccion, setOrdenDireccion] = useState('asc')  // 'asc' | 'desc'
 
@@ -525,11 +549,10 @@ export default function DianClasificacionPage() {
 
   const filasOrdenadas = useMemo(() => {
     if (!ordenColumna) return filasFiltradas
-    const campo  = ordenColumna === 'fecha' ? 'fechaEmision' : 'total'
     const factor = ordenDireccion === 'asc' ? 1 : -1
     return [...filasFiltradas].sort((a, b) => {
-      const av = a[campo]
-      const bv = b[campo]
+      const av = ordenColumna === 'fecha' ? a.fechaEmision : getBase(a)
+      const bv = ordenColumna === 'fecha' ? b.fechaEmision : getBase(b)
       if (av == null && bv == null) return 0
       if (av == null) return 1
       if (bv == null) return -1
@@ -919,7 +942,7 @@ export default function DianClasificacionPage() {
                       <button
                         onClick={() => toggleOrden('total')}
                         className={claseIconoFiltro(ordenColumna === 'total')}
-                        title="Ordenar por total"
+                        title="Ordenar por base"
                       >
                         {iconoOrden('total')}
                       </button>
@@ -927,11 +950,11 @@ export default function DianClasificacionPage() {
                         ref={btnTotalRef}
                         onClick={() => abrirFiltro('total', btnTotalRef)}
                         className={claseIconoFiltro(filtroTotal !== null)}
-                        title="Filtrar por total"
+                        title="Filtrar por base"
                       >
                         filter_alt
                       </button>
-                      <span>Total</span>
+                      <span title="Total − IVA — base sobre la que se calcula la retención">Base</span>
                     </div>
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[#8890b5] uppercase tracking-wide">Clasificación</th>

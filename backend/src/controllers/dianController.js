@@ -188,8 +188,15 @@ const MOTIVOS_DOCUMENTOS_EXCLUIDOS = {
 // intentar agregar una hoja con un nombre que ya existe. Se rechaza acá, con un mensaje
 // claro, en vez de dejar que falle de forma críptica al exportar.
 const HOJAS_RESERVADAS = new Set([
-  'RESUMEN', 'RESUMEN_MENSUAL', 'IMPUESTOS', 'RETENCIONES_POR_PROVEEDOR', 'DETALLE_COMPRAS', 'NOMINA', 'METADATOS', 'REPORTE_DIAN',
+  'RESUMEN', 'RESUMEN_MENSUAL', 'IVA', 'INC', 'RETENCIONES_POR_PROVEEDOR', 'DETALLE_COMPRAS', 'NOMINA', 'AUTORRETENCION', 'METADATOS', 'REPORTE_DIAN',
 ]);
+
+// Tarifas de autorretención en la renta (guía interna, % sobre la base = ventas netas sin
+// IVA). Solo aplica cuando hay nómina Y hay ventas en el período — el usuario elige UNA
+// tarifa general para todo el período (no se clasifica fila a fila, a diferencia de la
+// retención de compras). 'N/A' es una respuesta válida (empresa exenta pese a tener
+// nómina+ventas), no un placeholder vacío.
+const TASAS_AUTORRETENCION = ['0.55', '1.10', '1.20', '1.70', '2.20', '2.70', '2.80', '3.50', '4.50', 'N/A'];
 
 const getSalaryConstants = (year) => {
   if (SALARY_CONSTANTS[year]) return SALARY_CONSTANTS[year];
@@ -697,11 +704,11 @@ function buildResumenContent(ws, resumen, nomina, meta, { freeze = true } = {}) 
   if (freeze) freezeHeaderRowAt(ws, docRow.number + 1);
 
   // INGRESOS/COSTOS — esta hoja muestra solo las BASES (montos sin IVA ni INC). El IVA
-  // correspondiente a cada una de estas bases se cuadra aparte en la hoja IMPUESTOS.
+  // correspondiente a cada una de estas bases se cuadra aparte en la hoja IVA.
   sectionRow('INGRESOS');
   valueRow('Ventas',                   resumen.ventasBrutoSinIva,      {
     indent: 2,
-    nota: 'Todos los valores de esta hoja son BASE (sin IVA ni INC). El IVA de cada línea está en la hoja IMPUESTOS.',
+    nota: 'Todos los valores de esta hoja son BASE (sin IVA ni INC). El IVA de cada línea está en la hoja IVA.',
   });
   valueRow('(−) Devolución en ventas', resumen.devolucionVentasSinIva, { isNeg: true, indent: 2 });
   valueRow('Ventas Netas',             resumen.ventasNetas,            { subtotal: true });
@@ -751,7 +758,7 @@ function buildResumen(ws, resumen, nomina, meta) {
   buildResumenContent(ws, resumen, nomina, meta);
 }
 
-// ── Hoja IMPUESTOS ─────────────────────────────────────────────────────────────
+// ── Hoja IVA ───────────────────────────────────────────────────────────────────
 // El IVA no es ingreso ni costo real de la empresa (es un pasivo que se recauda
 // y se paga a la DIAN), por eso vive en su propia hoja separada de RESUMEN en
 // vez de mezclarse con el Estado de Resultados.
@@ -762,7 +769,7 @@ function buildResumen(ws, resumen, nomina, meta) {
 function buildImpuestosContent(ws, resumen, { freeze = true } = {}) {
   const COP = '"$ "#,##0';
 
-  const titleRow = ws.addRow(['IMPUESTOS — IVA']);
+  const titleRow = ws.addRow(['IVA']);
   titleRow.getCell(1).font = { bold: true, size: 14, color: { argb: XL_WHITE } };
   titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
   titleRow.height = 26;
@@ -858,6 +865,100 @@ function buildImpuestos(ws, resumen) {
     { key: 'valR',   width: 18 },
   ];
   buildImpuestosContent(ws, resumen);
+}
+
+// ── Hoja INC ───────────────────────────────────────────────────────────────────
+// Solo se agrega cuando el período tiene INC (ver exportarBorrador) — a diferencia del
+// IVA, el INC en este sistema solo aparece en ventas (Emitido), nunca en compras, así
+// que no hay bloque "Compras" a la izquierda ni bloque "INC descontable" a la derecha:
+// es la misma estructura visual de la hoja IVA, pero con un solo bloque por lado.
+function buildIncContent(ws, resumen, { freeze = true } = {}) {
+  const COP = '"$ "#,##0';
+
+  const titleRow = ws.addRow(['INC — IMPUESTO NACIONAL AL CONSUMO']);
+  titleRow.getCell(1).font = { bold: true, size: 14, color: { argb: XL_WHITE } };
+  titleRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+  titleRow.height = 26;
+  for (let c = 1; c <= 5; c++) titleRow.getCell(c).fill = sfill(XL_TITLE);
+  ws.mergeCells(titleRow.number, 1, titleRow.number, 5);
+  ws.addRow([]);
+  if (freeze) freezeHeaderRowAt(ws, titleRow.number + 2);
+
+  const sectionHdr = ws.addRow(['INGRESOS (base, sin INC)', '', '', 'INC', '']);
+  for (let c = 1; c <= 5; c++) {
+    const cell = sectionHdr.getCell(c);
+    cell.font      = { bold: true, color: { argb: XL_WHITE }, size: 10 };
+    cell.fill      = sfill(XL_BLUE);
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border    = xlBorder;
+  }
+  sectionHdr.height = 22;
+  ws.mergeCells(sectionHdr.number, 1, sectionHdr.number, 2);
+  ws.mergeCells(sectionHdr.number, 4, sectionHdr.number, 5);
+
+  const writeCell = (row, col, label, val, opts = {}) => {
+    const cA = row.getCell(col);
+    const cB = row.getCell(col + 1);
+    cA.value = label;
+    cB.value = val !== null && val !== undefined ? Math.abs(val) : null;
+    cA.alignment = { horizontal: 'left', indent: opts.indent ?? 1 };
+    cB.alignment = { horizontal: 'right' };
+    cB.numFmt = COP;
+    cA.border = cB.border = xlBorder;
+    if (opts.isNeg) {
+      cA.font = { color: { argb: XL_RED } };
+      cB.font = { color: { argb: XL_RED } };
+    }
+    if (opts.subtotal) {
+      cA.fill = cB.fill = sfill(XL_BLUE_LT);
+      cA.font = { bold: true, ...(opts.isNeg ? { color: { argb: XL_RED } } : {}) };
+      cB.font = { bold: true, ...(opts.isNeg ? { color: { argb: XL_RED } } : {}) };
+      row.height = 20;
+    }
+    if (opts.total) {
+      cA.fill = cB.fill = sfill(XL_GRAY);
+      cA.font = { bold: true, size: 11, ...(opts.isNeg ? { color: { argb: XL_RED } } : {}) };
+      cB.font = { bold: true, size: 11, ...(opts.isNeg ? { color: { argb: XL_RED } } : {}) };
+      row.height = 20;
+    }
+  };
+
+  const totalIngresoSinInc = resumen.ventasBrutoSinIva - resumen.devolucionVentasSinIva;
+  const incNeg = resumen.totalIncVentas < 0;
+
+  const left = [
+    { label: 'Ingreso (base antes de INC)',    val: resumen.ventasBrutoSinIva },
+    { label: '(−) Dev ventas (notas crédito)', val: resumen.devolucionVentasSinIva, isNeg: true },
+    { label: 'Total ingreso (sin INC)',        val: totalIngresoSinInc, subtotal: true },
+  ];
+
+  const right = [
+    { label: 'INC (Ventas)',                   val: resumen.incGenerado },
+    { label: '(−) INC devolución en ventas',   val: resumen.incDevolucionVentas, isNeg: true },
+    { label: 'Total INC Ventas',               val: resumen.totalIncVentas, subtotal: true },
+    null,
+    { label: incNeg ? 'TOTAL INC (saldo a favor)' : 'TOTAL INC', val: resumen.totalIncVentas, total: true, isNeg: incNeg },
+  ];
+
+  const maxLen = Math.max(left.length, right.length);
+  for (let i = 0; i < maxLen; i++) {
+    const row = ws.addRow([]);
+    const l = left[i];
+    const r = right[i];
+    if (l) writeCell(row, 1, l.label, l.val, l);
+    if (r) writeCell(row, 4, r.label, r.val, r);
+  }
+}
+
+function buildInc(ws, resumen) {
+  ws.columns = [
+    { key: 'labelL', width: 30 },
+    { key: 'valL',   width: 18 },
+    { key: 'gap',    width: 4  },
+    { key: 'labelR', width: 30 },
+    { key: 'valR',   width: 18 },
+  ];
+  buildIncContent(ws, resumen);
 }
 
 // ── Hoja RETENCIONES_POR_PROVEEDOR ─────────────────────────────────────────────
@@ -1050,6 +1151,56 @@ function buildNomina(ws, nomina, salario) {
   ws.columns = [{ key: 'a', width: 52 }, { key: 'b', width: 22 }];
   freezeHeaderRowAt(ws, 1);
   buildNominaContent(ws, nomina, salario);
+}
+
+// ── Hoja AUTORRETENCION ──────────────────────────────────────────────────────────
+// Solo se agrega cuando hay nómina Y hay ventas (ver exportarBorrador) — la tarifa la
+// elige el usuario una sola vez para todo el período, la base es resumen.ventasNetas
+// (mismo número que "Ventas Netas" en RESUMEN).
+function buildAutorretencion(ws, { base, tasa, valor }) {
+  const COP = '"$ "#,##0';
+  ws.columns = [{ key: 'a', width: 46 }, { key: 'b', width: 22 }];
+  freezeHeaderRowAt(ws, 1);
+
+  const addRow = (label, val, opts = {}) => {
+    const row = ws.addRow([label, val]);
+    const cA  = row.getCell(1);
+    const cB  = row.getCell(2);
+    cA.alignment = { horizontal: 'left', indent: opts.indent ?? 0 };
+    cB.alignment = { horizontal: 'right' };
+    cA.border = cB.border = xlBorder;
+    if (opts.pct) {
+      cB.numFmt = '0.00"%"';
+    } else if (opts.text) {
+      // 'N/A' — sin formato numérico
+    } else {
+      cB.numFmt = COP;
+    }
+    if (opts.subtotal) {
+      cA.fill = cB.fill = sfill(XL_BLUE_LT);
+      cA.font = { bold: true };
+      cB.font = { bold: true };
+      row.height = 20;
+    }
+  };
+
+  sectionBand(ws, 'AUTORRETENCIÓN EN LA RENTA', 2);
+  addRow('Base (Ventas Netas, sin IVA)', base, { indent: 2, subtotal: true });
+  if (tasa === 'N/A') {
+    addRow('Tarifa', 'N/A (no aplica)', { indent: 2, text: true });
+  } else {
+    addRow('Tarifa', parseFloat(tasa), { indent: 2, pct: true });
+  }
+
+  const kpiRow = ws.addRow(['Valor Autorretención', valor]);
+  kpiRow.getCell(1).font = { bold: true, size: 12, color: { argb: XL_WHITE } };
+  kpiRow.getCell(2).font = { bold: true, size: 16, color: { argb: XL_WHITE } };
+  kpiRow.getCell(2).numFmt = COP;
+  kpiRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle', indent: 1 };
+  kpiRow.getCell(2).alignment = { horizontal: 'right', vertical: 'middle', indent: 1 };
+  kpiRow.height = 32;
+  kpiRow.getCell(1).fill = sfill(XL_TITLE);
+  kpiRow.getCell(2).fill = sfill(XL_TITLE);
 }
 
 // ── Hoja METADATOS ─────────────────────────────────────────────────────────────
@@ -1252,6 +1403,12 @@ function calcularResumenPeriodo(filasPeriodo) {
   const totalIvaCompras = ivaDescontable + ivaDevolucionVentas;
   const ivaPagar        = round2(totalIvaVentas - totalIvaCompras);
 
+  // INC (Impuesto Nacional al Consumo) — a diferencia del IVA, no es descontable: en este
+  // sistema solo aparece en ventas (Emitido), nunca en compras. Por eso no hay un
+  // "incDescontable"/"totalIncCompras" equivalente — solo se neta contra sus propias
+  // devoluciones (notas crédito emitidas).
+  const totalIncVentas = round2(incGenerado - incDevolucionVentas);
+
   const ventasBrutoSinIva      = ventasBruto - ivaGenerado - incGenerado;
   const devolucionVentasSinIva = devolucionVentas - ivaDevolucionVentas - incDevolucionVentas;
   const ventasNetas            = ventasBrutoSinIva - devolucionVentasSinIva;
@@ -1302,6 +1459,9 @@ function calcularResumenPeriodo(filasPeriodo) {
     totalIvaVentas:               round2(totalIvaVentas),
     totalIvaCompras:              round2(totalIvaCompras),
     ivaPagar,
+    incGenerado:                  round2(incGenerado),
+    incDevolucionVentas:          round2(incDevolucionVentas),
+    totalIncVentas,
     totalRetenciones,
     utilidadNeta,
   };
@@ -1377,6 +1537,7 @@ const exportarBorrador = async (req, res, next) => {
     const { id } = req.params;
     const empleados = parseInt(req.body.empleados ?? 0, 10) || 0;
     const meses     = parseInt(req.body.meses     ?? 0, 10) || 0;
+    const tasaAutorretencion = req.body.tasaAutorretencion ?? null;
 
     // ── 1. Leer borrador y verificar propiedad ─────────────────────────────
     const { rows } = await db.query(
@@ -1442,6 +1603,21 @@ const exportarBorrador = async (req, res, next) => {
     // calcularResumenPeriodo reemplaza el cálculo que antes vivía inline acá — misma
     // fórmula exacta, factorizada para poder reutilizarla por mes (ver resumenPorMes).
     const resumen = calcularResumenPeriodo(filas);
+
+    // ── 5b. Autorretención en la renta — solo si hay nómina Y hay ventas en el período.
+    // El usuario elige UNA tarifa general (no por fila); si el módulo estaba visible en el
+    // frontend, la tarifa es obligatoria para exportar (mismo criterio que sinClasificar).
+    const tieneAutorretencion = empleados > 0 && meses > 0 && resumen.ventasNetas > 0;
+    if (tieneAutorretencion) {
+      if (!tasaAutorretencion || !TASAS_AUTORRETENCION.includes(tasaAutorretencion)) {
+        return res.status(400).json({
+          error: 'Selecciona la tarifa de autorretención antes de exportar.',
+        });
+      }
+    }
+    const valorAutorretencion = tieneAutorretencion && tasaAutorretencion !== 'N/A'
+      ? round2(resumen.ventasNetas * parseFloat(tasaAutorretencion) / 100)
+      : 0;
 
     // ── 6. Período (se calcula antes de nómina para saber qué año de SMMLV usar) ──
     const fechas       = filas.map((f) => f.fechaEmision).filter(Boolean).sort();
@@ -1532,10 +1708,20 @@ const exportarBorrador = async (req, res, next) => {
 
     buildResumen(wb.addWorksheet('RESUMEN'), resumen, nominaData, meta);
     if (resumenPorMes) buildResumenMensual(wb.addWorksheet('RESUMEN_MENSUAL'), resumenPorMes, resumen);
-    buildImpuestos(wb.addWorksheet('IMPUESTOS'), resumen);
+    buildImpuestos(wb.addWorksheet('IVA'), resumen);
+    if (resumen.incGenerado !== 0 || resumen.incDevolucionVentas !== 0) {
+      buildInc(wb.addWorksheet('INC'), resumen);
+    }
     buildRetenciones(wb.addWorksheet('RETENCIONES_POR_PROVEEDOR'), retencionesPorProveedor, resumen.totalRetenciones);
     buildDetalleCompras(wb.addWorksheet('DETALLE_COMPRAS'), filasRecibido);
     if (nominaData) buildNomina(wb.addWorksheet('NOMINA'), nominaData, nominaData.salario);
+    if (tieneAutorretencion) {
+      buildAutorretencion(wb.addWorksheet('AUTORRETENCION'), {
+        base: resumen.ventasNetas,
+        tasa: tasaAutorretencion,
+        valor: valorAutorretencion,
+      });
+    }
     buildMetadatos(wb.addWorksheet('METADATOS'), meta, userEmail, filas, documentosNoContabilizados, anomalias);
 
     // ── 9. Escribir buffer y enviar ────────────────────────────────────────
@@ -1643,4 +1829,5 @@ module.exports = {
   // las reglas contables sin montar un borrador completo — ver tests/unit/dianController.test.js
   calcularAnomalias, calcularDocumentosNoContabilizados,
   calcularResumenPeriodo, agruparPorMes,
+  TASAS_AUTORRETENCION,
 };

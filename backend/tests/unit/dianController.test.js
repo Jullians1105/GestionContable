@@ -374,7 +374,7 @@ describe('calcularAnomalias', () => {
   });
 });
 
-// exportarBorrador arma el .xlsx completo (RESUMEN, IMPUESTOS, RETENCIONES_POR_PROVEEDOR,
+// exportarBorrador arma el .xlsx completo (RESUMEN, IVA, RETENCIONES_POR_PROVEEDOR,
 // DETALLE_COMPRAS, NOMINA, METADATOS), pero en el camino feliz hace
 // `await import('../../../shared/calcularNomina.js')` — ese archivo es ESM real (lo
 // consume también el frontend), y Jest no puede interceptar un import() nativo sin

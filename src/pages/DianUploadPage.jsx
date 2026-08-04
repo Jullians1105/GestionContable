@@ -47,6 +47,7 @@ export default function DianUploadPage() {
           state: {
             borradorId:          respuesta.id,
             filasParaClasificar: respuesta.filasParaClasificar,
+            calculos:            respuesta.calculos,
           },
         })
       }, 1000)
