@@ -37,6 +37,9 @@ export default function DianExportacionPage() {
     meses            = 0,
     salario          = SMMLV_ACTUAL,
     costoNominaTotal = 0,
+    tasaAutorretencion  = null,
+    baseAutorretencion  = 0,
+    valorAutorretencion = 0,
   } = state
 
   const [status,   setStatus]   = useState('idle')   // idle | loading | done | error
@@ -49,7 +52,7 @@ export default function DianExportacionPage() {
     setStatus('loading')
     setErrorMsg('')
     try {
-      const { blob, filename: fname } = await api.exportarDian(borradorId, { empleados, meses, salario })
+      const { blob, filename: fname } = await api.exportarDian(borradorId, { empleados, meses, salario, tasaAutorretencion })
 
       // Trigger de descarga en el navegador
       const url = window.URL.createObjectURL(blob)
@@ -85,6 +88,7 @@ export default function DianExportacionPage() {
   }
 
   const tieneNomina = empleados > 0 && meses > 0
+  const tieneAutorretencion = !!tasaAutorretencion
 
   return (
     <div className="max-w-[600px] mx-auto">
@@ -114,6 +118,9 @@ export default function DianExportacionPage() {
             tieneNomina
               ? `Nómina: ${empleados} empleado${empleados !== 1 ? 's' : ''} × ${meses} mes${meses !== 1 ? 'es' : ''}`
               : 'Nómina: no aplica',
+            tieneAutorretencion
+              ? `Autorretención: tarifa ${tasaAutorretencion === 'N/A' ? 'N/A' : `${tasaAutorretencion}%`}`
+              : 'Autorretención: no aplica',
             'Listo para generar Excel',
           ].map((paso) => (
             <div key={paso} className="flex items-center gap-2.5">
@@ -136,7 +143,17 @@ export default function DianExportacionPage() {
           {tieneNomina && (
             <CifraRow label="Costo nómina total" value={costoNominaTotal} isNeg />
           )}
-          {!tieneNomina && (
+          {tieneAutorretencion && (
+            <>
+              <CifraRow label="Base autorretención (Ventas Netas)" value={baseAutorretencion} />
+              <CifraRow
+                label={`Valor autorretención (${tasaAutorretencion === 'N/A' ? 'N/A' : `${tasaAutorretencion}%`})`}
+                value={valorAutorretencion}
+                isNeg
+              />
+            </>
+          )}
+          {!tieneNomina && !tieneAutorretencion && (
             <div className="py-2 text-sm text-[#9ca3af] dark:text-[#6b7280] italic">
               Sin nómina para este período
             </div>
@@ -147,7 +164,7 @@ export default function DianExportacionPage() {
           <p className="text-xs text-[#9ca3af] dark:text-[#6b7280]">
             El Excel incluye <span className="font-semibold text-[#434655] dark:text-[#c4c8e8]">5 hojas</span>:
             Resumen · Retenciones por Proveedor · Detalle Compras
-            {tieneNomina ? ' · Nómina' : ''} · Metadatos
+            {tieneNomina ? ' · Nómina' : ''}{tieneAutorretencion ? ' · Autorretención' : ''} · Metadatos
           </p>
         </div>
       </div>

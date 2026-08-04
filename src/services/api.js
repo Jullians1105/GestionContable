@@ -290,7 +290,7 @@ export const api = {
       body: JSON.stringify({ clasificacionRetencion, tasaRetencion }),
     }),
 
-  exportarDian: (borradorId, { empleados, meses, salario }) => {
+  exportarDian: (borradorId, { empleados, meses, salario, tasaAutorretencion }) => {
     const token = getToken()
     return fetch(`${BASE}/dian/borradores/${borradorId}/exportar`, {
       method: 'POST',
@@ -298,7 +298,7 @@ export const api = {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ empleados, meses, salario }),
+      body: JSON.stringify({ empleados, meses, salario, tasaAutorretencion }),
     }).then((res) => {
       if (!res.ok) return res.json().then((e) => { throw new Error(e.error || `Error ${res.status}`) })
       // Extraer nombre sugerido del header Content-Disposition

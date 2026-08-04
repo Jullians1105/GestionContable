@@ -143,7 +143,7 @@ paga a la DIAN aparte. Por eso la hoja RESUMEN muestra **solo bases** (montos si
 a cada monto "bruto" del reporte (campo `Total`, que sí incluye IVA) se le resta su
 componente de IVA antes de usarlo en Ventas Netas / Compras Netas / UTILIDAD BRUTA. El
 IVA correspondiente a cada una de esas bases se cuadra aparte en su propia hoja
-`IMPUESTOS` (ver más abajo) — no se mezcla con el Estado de Resultados.
+`IVA` (ver más abajo) — no se mezcla con el Estado de Resultados.
 
 ```
 INGRESOS
@@ -170,7 +170,7 @@ NÓMINA (opcional)
 UTILIDAD FINAL = UTILIDAD NETA − Costo laboral   (el costo laboral es un GASTO, resta)
 ```
 
-La hoja `IMPUESTOS` (separada de RESUMEN) tiene dos bloques lado a lado:
+La hoja `IVA` (separada de RESUMEN) tiene dos bloques lado a lado:
 
 **Izquierda — bases (sin IVA)**, duplicando el mismo desglose de INGRESOS/COSTOS de
 RESUMEN (sin el ajuste de Documento Soporte, que solo vive en RESUMEN):
@@ -262,7 +262,7 @@ fijos, y una columna de Notas (col. C en RESUMEN) para explicaciones puntuales.
 | Hoja | Contenido |
 |------|-----------|
 | `RESUMEN` | Título con banda propia (empresa + período), tarjeta UTILIDAD FINAL (verde si es positiva, roja si es negativa — mismo criterio `isNeg` que el resto de la hoja), y el Estado de Resultados detallado línea por línea (con desglose con/sin IVA de ventas y compras) para auditar cómo se llegó a ese número. Ya no incluye el cuadre de IVA — eso vive en su propia hoja |
-| `IMPUESTOS` | Cuadre de IVA como pasivo (Generado, Descontable, devoluciones, IVA a pagar), separado de RESUMEN porque el IVA no es ingreso ni costo real de la empresa |
+| `IVA` | Cuadre de IVA como pasivo (Generado, Descontable, devoluciones, IVA a pagar), separado de RESUMEN porque el IVA no es ingreso ni costo real de la empresa |
 | `RETENCIONES_POR_PROVEEDOR` | Retenciones agrupadas por NIT emisor y concepto |
 | `DETALLE_COMPRAS` | Todas las facturas recibidas con su clasificación, tasa y valor retenido |
 | `NOMINA` | Desglose de devengado, aportes y provisiones, con tarjeta destacada del costo total (solo si se ingresó nómina) |

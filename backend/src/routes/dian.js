@@ -3,7 +3,7 @@ const multer = require('multer');
 const { body } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
-const { uploadDian, patchBorrador, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada } = require('../controllers/dianController');
+const { uploadDian, patchBorrador, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada, TASAS_AUTORRETENCION } = require('../controllers/dianController');
 
 const router = Router();
 
@@ -166,6 +166,7 @@ router.post('/borradores/:id/exportar',
   body('empleados').optional({ nullable: true }).isInt({ min: 0 }).toInt(),
   body('meses').optional({ nullable: true }).isInt({ min: 0 }).toInt(),
   body('salario').optional({ nullable: true }).isFloat({ min: 0 }).toFloat(),
+  body('tasaAutorretencion').optional({ nullable: true }).isIn(TASAS_AUTORRETENCION),
   validate,
   exportarBorrador
 );
