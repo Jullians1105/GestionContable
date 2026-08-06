@@ -442,12 +442,11 @@ export default function DianClasificacionPage() {
   const state     = location.state ?? {}
   const { borradorId, filasParaClasificar = [] } = state
 
-  // Solo filas Recibido no-nómina y sin acuses técnicos ("Application response"
-  // es un acuse DIAN sin valor comercial — no se clasifica, no cuenta para nada).
+  // Solo las compras reales piden clasificación de retención (ver requiereClasificacion
+  // en el backend) — no toda fila "Recibido". Notas de crédito, "Documento soporte con no
+  // obligados" y notas de ajuste no cuentan como compra y no deben bloquear esta pantalla.
   const filasRecibido = useMemo(() =>
-    filasParaClasificar.filter(
-      (f) => f.grupo === 'Recibido' && f.tipoDocumento !== 'Nomina Individual' && f.tipoDocumento !== 'Application response'
-    ),
+    filasParaClasificar.filter((f) => f.requiereClasificacion),
     [filasParaClasificar]
   )
 
