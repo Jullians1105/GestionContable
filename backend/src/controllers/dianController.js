@@ -167,6 +167,13 @@ const TIPOS_FACTURA_EQUIVALENTE = [
 // públicos domiciliarios, que tampoco están en TIPOS_FACTURA_EQUIVALENTE.
 const TIPOS_COMPRA = [...TIPOS_FACTURA_EQUIVALENTE, DOC_EQUIVALENTE, DOC_TRANSPORTE_TERRESTRE];
 
+// Solo las compras reales (TIPOS_COMPRA) piden clasificación de retención — no toda fila
+// "Recibido". Antes el filtro era "Recibido y no Nómina/Application response", que colaba
+// notas de crédito, "Documento soporte con no obligados" (acá con Grupo invertido, ni
+// siquiera cuenta como compra — ver esDocSoporteCompra) y notas de ajuste: filas que nunca
+// aportan a comprasBruto pero igual bloqueaban el export hasta clasificarlas a mano.
+const requiereClasificacion = (f) => f.grupo === RECIBIDO && TIPOS_COMPRA.includes(f.tipoDocumento);
+
 // Tipos de documento que sí entran en algún cálculo (compras, ventas, notas crédito,
 // documento soporte). DOC_SOPORTE_NO_OBLIGADOS se contabiliza condicionalmente por Grupo
 // (ver exportarBorrador), por eso igual cuenta como "contabilizado" acá.
@@ -376,6 +383,7 @@ const uploadDian = async (req, res, next) => {
         estado:                 f.estado,
         clasificacionRetencion: null,
         tasaRetencion:          null,
+        requiereClasificacion:  requiereClasificacion(f),
       };
       if (colMap['Folio'])   out.folio   = f.folio;
       if (colMap['Prefijo']) out.prefijo = f.prefijo;
@@ -1452,9 +1460,7 @@ function calcularResumenPeriodo(filasPeriodo) {
   const costosTotales = comprasNetas;
   const utilidadBruta = ventasNetas - costosTotales;
 
-  const filasRecibido = filasPeriodo.filter(
-    (f) => f.grupo === RECIBIDO && f.tipoDocumento !== NOMINA_INDIVIDUAL && f.tipoDocumento !== APPLICATION_RESPONSE
-  );
+  const filasRecibido = filasPeriodo.filter(requiereClasificacion);
   let totalRetenciones = 0;
   for (const fila of filasRecibido) {
     const subtotal = (fila.total ?? 0) - (fila.iva ?? 0);
@@ -1585,13 +1591,10 @@ const exportarBorrador = async (req, res, next) => {
     const { filas, anomaliasRevisadas = [] } = rows[0].datos;
     const archivoOriginal = rows[0].archivo_original;
 
-    // ── 2. Filas Recibido no-nómina, sin acuses técnicos ────────────────────
-    // "Application response" es un acuse técnico DIAN sin valor comercial (ver
-    // MOTIVOS_DOCUMENTOS_EXCLUIDOS) — no se le pide clasificación de retención ni
-    // entra a DETALLE_COMPRAS ni a los totales retenidos.
-    const filasRecibido = filas.filter(
-      (f) => f.grupo === RECIBIDO && f.tipoDocumento !== NOMINA_INDIVIDUAL && f.tipoDocumento !== APPLICATION_RESPONSE
-    );
+    // ── 2. Solo compras reales (TIPOS_COMPRA, ver requiereClasificacion) ────
+    // Notas de crédito, "Documento soporte con no obligados" y notas de ajuste no piden
+    // clasificación de retención ni entran a DETALLE_COMPRAS ni a los totales retenidos.
+    const filasRecibido = filas.filter(requiereClasificacion);
 
     const sinClasificar = filasRecibido.filter((f) => f.clasificacionRetencion == null);
     if (sinClasificar.length > 0) {
@@ -1804,10 +1807,6 @@ const aplicarClasificacionRapida = async (req, res, next) => {
     if (check.rows.length === 0) return res.status(404).json({ error: 'Borrador no encontrado' });
 
     const filas = check.rows[0].filas;
-    // Solo filas que realmente requieren clasificación de retención (Recibido, no-nómina,
-    // sin acuses técnicos) — "Application response" nunca se clasifica, no cuenta para nada.
-    const requiereClasificacion = (f) =>
-      f.grupo === RECIBIDO && f.tipoDocumento !== NOMINA_INDIVIDUAL && f.tipoDocumento !== APPLICATION_RESPONSE;
     const sinClasificar = filas.filter((f) => requiereClasificacion(f) && f.clasificacionRetencion == null);
 
     if (sinClasificar.length === 0) {
