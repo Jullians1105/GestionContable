@@ -3,9 +3,15 @@
 // ESM real: el frontend lo importa de forma estática; el backend (CommonJS) lo consume
 // vía `await import(...)` dentro de sus handlers async — no requiere plugins de bundling.
 
-export const TASA_PENSION = 0.04;
-export const TASA_SALUD   = 0.04;
-export const TASA_APORTES = TASA_PENSION + TASA_SALUD; // 8 %
+// Seguridad Social y Parafiscales — a cargo del empleador, se SUMAN al costo (no se
+// descuentan del devengado como sí ocurre con los aportes que se le retienen al trabajador).
+export const TASA_PENSION            = 0.12;
+export const TASA_CAJA_COMPENSACION  = 0.04;
+
+// Tarifas ARL por clase de riesgo (Decreto 1607 de 2002) — varía por trabajador según su
+// labor, así que a diferencia de pensión/caja no hay una sola tarifa: quien genera el Excel
+// tiene que elegir la clase antes de poder calcular el costo total.
+export const TARIFAS_ARL = [0.522, 1.044, 2.436, 4.350, 6.960];
 
 // Fracciones exactas (no redondeadas) — 15 días de vacaciones sobre 360 días/año = 1/24;
 // prima y cesantías se causan sobre el año completo = 1/12 por mes. Con los porcentajes
@@ -20,13 +26,19 @@ export const TASA_INTERESES_CESANTIAS = 0.01;
 
 export const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-// Costo de nómina por empleado/mes — replica el "Documento Soporte de Pago de Nómina
-// Electrónica" real: Total = Devengados − Deducciones.
+// Costo de nómina por empleado/mes = Devengado + Seguridad Social y Parafiscales.
 // - Devengados: salario + auxilio de transporte (solo si salario <= 2 SMMLV) + vacaciones +
 //   prima + cesantías + intereses de cesantías (todo lo que efectivamente se le paga/liquida
 //   al trabajador ese período, no una provisión aparte).
-// - Deducciones: pensión + salud, sobre salario (lo que se le retiene al trabajador).
-export function calcularNomina({ salario, smmlv, auxilioTransporte }) {
+// - Seguridad Social y Parafiscales: pensión + ARL + caja de compensación, sobre salario —
+//   a cargo del empleador, así que se SUMAN al costo (a diferencia de lo que se le retiene
+//   al trabajador, que no es costo adicional para la empresa, solo redirige parte del
+//   devengado).
+export function calcularNomina({ salario, smmlv, auxilioTransporte, tarifaArl }) {
+  if (!TARIFAS_ARL.includes(tarifaArl)) {
+    throw new Error(`tarifaArl inválida: debe ser una de ${TARIFAS_ARL.join(', ')}`);
+  }
+
   const auxilioAplica = salario <= 2 * smmlv;
   const auxilio = auxilioAplica ? auxilioTransporte : 0;
   const baseCesantiasPrima = salario + auxilio;
@@ -36,16 +48,22 @@ export function calcularNomina({ salario, smmlv, auxilioTransporte }) {
   const cesantias            = baseCesantiasPrima * TASA_CESANTIAS;
   const interesesCesantias  = cesantias * TASA_INTERESES_CESANTIAS;
 
-  const devengado    = round2(salario + auxilio + vacaciones + prima + cesantias + interesesCesantias);
-  const deducciones  = round2(salario * TASA_APORTES);
-  const costoMes     = round2(devengado - deducciones);
+  const devengado = round2(salario + auxilio + vacaciones + prima + cesantias + interesesCesantias);
+
+  const pension          = salario * TASA_PENSION;
+  const arl              = salario * (tarifaArl / 100);
+  const cajaCompensacion = salario * TASA_CAJA_COMPENSACION;
+
+  const aportesPatronales = round2(pension + arl + cajaCompensacion);
+  const costoMes          = round2(devengado + aportesPatronales);
 
   return {
     auxilioAplica,
     auxilio,
     devengadoDetalle: { vacaciones, prima, cesantias, interesesCesantias },
     devengado,
-    deducciones,
+    aportesDetalle: { pension, arl, cajaCompensacion },
+    aportesPatronales,
     costoMes,
   };
 }
