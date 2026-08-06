@@ -72,3 +72,15 @@ export function calcularNomina({ salario, smmlv, auxilioTransporte, tarifaArl })
 export function calcularCostoTotal({ empleados, meses, costoMes }) {
   return round2(empleados * meses * costoMes);
 }
+
+// Ventas Netas = Ventas Brutas (sin IVA/INC) − Devoluciones (sin IVA/INC). Es la base de la
+// autorretención en la renta — misma fórmula que usa el backend en calcularResumenPeriodo,
+// factorizada acá para que el preview de Nómina y la pantalla de Exportación no la
+// reimplementen cada una por su lado (evita que diverjan, como ya pasó una vez con el SMMLV
+// hardcodeado por separado — ver comentario arriba).
+export function calcularVentasNetas(calculos) {
+  if (!calculos) return 0;
+  const ventasBrutoSinIva      = (calculos.ventasBruto ?? 0) - (calculos.ivaGenerado ?? 0) - (calculos.incGenerado ?? 0);
+  const devolucionVentasSinIva = (calculos.devolucionVentas ?? 0) - (calculos.ivaDevolucionVentas ?? 0) - (calculos.incDevolucionVentas ?? 0);
+  return ventasBrutoSinIva - devolucionVentasSinIva;
+}

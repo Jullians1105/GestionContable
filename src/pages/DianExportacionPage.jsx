@@ -1,11 +1,13 @@
-import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../services/api'
 import SALARY_CONSTANTS from '../../shared/salaryConstants.json'
+import { calcularNomina, calcularCostoTotal, calcularVentasNetas, TARIFAS_ARL } from '../../shared/calcularNomina.js'
 
 // Año más reciente configurado — mismo criterio de fallback que usa el backend (getSalaryConstants)
 const LATEST_YEAR = Math.max(...Object.keys(SALARY_CONSTANTS).map(Number))
-const SMMLV_ACTUAL = SALARY_CONSTANTS[LATEST_YEAR].smmlv
+const SMMLV_ACTUAL   = SALARY_CONSTANTS[LATEST_YEAR].smmlv
+const AUXILIO_ACTUAL = SALARY_CONSTANTS[LATEST_YEAR].auxilioTransporte
 
 const fmt = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n ?? 0)
@@ -27,25 +29,84 @@ function CifraRow({ label, value, isNeg, isBold, isTotal }) {
 }
 
 export default function DianExportacionPage() {
-  const location = useLocation()
-  const navigate  = useNavigate()
-  const state     = location.state ?? {}
+  const { borradorId } = useParams()
+  const navigate = useNavigate()
 
-  const {
-    borradorId,
-    empleados        = 0,
-    meses            = 0,
-    salario          = SMMLV_ACTUAL,
-    tarifaArl        = null,
-    costoNominaTotal = 0,
-    tasaAutorretencion  = null,
-    baseAutorretencion  = 0,
-    valorAutorretencion = 0,
-  } = state
+  const [cargando,   setCargando]   = useState(true)
+  const [errorCarga, setErrorCarga] = useState('')
+  const [calculos,   setCalculos]   = useState(null)
+  const [nomina,     setNomina]     = useState(null) // { empleados, meses, salario, tarifaArl, tasaAutorretencion } | null
 
   const [status,   setStatus]   = useState('idle')   // idle | loading | done | error
   const [filename, setFilename] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+  // Blob del Excel ya generado, guardado en memoria para poder re-disparar la descarga
+  // (p.ej. si el explorador de archivos del sistema se cierra o falla) sin volver a pedirle
+  // el archivo al backend — el borrador se borra del servidor apenas se genera con éxito,
+  // así que una segunda llamada a exportarDian ya no encontraría nada que exportar.
+  const [blobDescargado, setBlobDescargado] = useState(null)
+
+  // Carga calculos + nómina persistida desde el backend — igual que en Clasificación y
+  // Nómina, para que "volver" o un F5 accidental recuperen lo ya guardado. Se ejecuta una
+  // sola vez al montar (no cuando cambia "status"): tras exportar con éxito el borrador se
+  // borra del servidor, así que no debe re-consultarse después de la descarga.
+  useEffect(() => {
+    let cancelado = false
+    setCargando(true)
+    setErrorCarga('')
+    api.getDianBorrador(borradorId)
+      .then((data) => {
+        if (cancelado) return
+        setCalculos(data.calculos ?? null)
+        setNomina(data.nomina ?? null)
+      })
+      .catch((err) => {
+        if (cancelado) return
+        setErrorCarga(err.message || 'No se pudo cargar el borrador')
+      })
+      .finally(() => {
+        if (!cancelado) setCargando(false)
+      })
+    return () => { cancelado = true }
+  }, [borradorId])
+
+  // Vista previa de nómina — misma fórmula que usa Nómina y el backend al exportar
+  // (shared/calcularNomina.js), recalculada acá a partir de lo persistido en vez de recibirla
+  // ya calculada por navegación (esa era la parte que se perdía al recargar o volver).
+  const calcNomina = useMemo(() => {
+    const empVal = nomina?.empleados ?? 0
+    const mesVal = nomina?.meses ?? 0
+    const salVal = nomina?.salario ?? SMMLV_ACTUAL
+    const tarifaArlVal = nomina?.tarifaArl ?? null
+    const tieneNomina = empVal > 0 && mesVal > 0
+    if (!tieneNomina || tarifaArlVal == null || !TARIFAS_ARL.includes(tarifaArlVal)) {
+      return { tieneNomina, empleados: empVal, meses: mesVal, tarifaArl: tarifaArlVal, costoNominaTotal: 0 }
+    }
+    const n = calcularNomina({ salario: salVal, smmlv: SMMLV_ACTUAL, auxilioTransporte: AUXILIO_ACTUAL, tarifaArl: tarifaArlVal })
+    const costoNominaTotal = calcularCostoTotal({ empleados: empVal, meses: mesVal, costoMes: n.costoMes })
+    return { tieneNomina, empleados: empVal, meses: mesVal, tarifaArl: tarifaArlVal, costoNominaTotal }
+  }, [nomina])
+
+  const ventasNetas = useMemo(() => calcularVentasNetas(calculos), [calculos])
+
+  const tasaAutorretencion  = nomina?.tasaAutorretencion ?? null
+  const tieneAutorretencion = !!tasaAutorretencion
+  const baseAutorretencion  = tieneAutorretencion ? ventasNetas : 0
+  const valorAutorretencion = tieneAutorretencion && tasaAutorretencion !== 'N/A'
+    ? ventasNetas * (parseFloat(tasaAutorretencion) / 100)
+    : 0
+
+  // Dispara la descarga en el navegador a partir de un blob ya en memoria.
+  const dispararDescarga = (blob, fname) => {
+    const url = window.URL.createObjectURL(blob)
+    const a   = document.createElement('a')
+    a.href     = url
+    a.download = fname
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  }
 
   // ── Descarga ─────────────────────────────────────────────────────────────────
   const handleDescargar = async () => {
@@ -53,18 +114,15 @@ export default function DianExportacionPage() {
     setStatus('loading')
     setErrorMsg('')
     try {
-      const { blob, filename: fname } = await api.exportarDian(borradorId, { empleados, meses, salario, tarifaArl, tasaAutorretencion })
-
-      // Trigger de descarga en el navegador
-      const url = window.URL.createObjectURL(blob)
-      const a   = document.createElement('a')
-      a.href     = url
-      a.download = fname
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
-
+      const { blob, filename: fname } = await api.exportarDian(borradorId, {
+        empleados: nomina?.empleados ?? 0,
+        meses: nomina?.meses ?? 0,
+        salario: nomina?.salario ?? SMMLV_ACTUAL,
+        tarifaArl: nomina?.tarifaArl ?? null,
+        tasaAutorretencion: nomina?.tasaAutorretencion ?? null,
+      })
+      dispararDescarga(blob, fname)
+      setBlobDescargado(blob)
       setFilename(fname)
       setStatus('done')
     } catch (err) {
@@ -73,23 +131,37 @@ export default function DianExportacionPage() {
     }
   }
 
-  // Sin datos de sesión
-  if (!borradorId) {
+  // Re-descarga sin volver a pedirle el archivo al servidor (el borrador ya no existe ahí).
+  const handleDescargarDeNuevo = () => {
+    if (!blobDescargado) return
+    dispararDescarga(blobDescargado, filename)
+  }
+
+  if (cargando) {
     return (
       <div className="max-w-lg mx-auto mt-20 text-center">
-        <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">error_outline</span>
-        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">
-          No hay datos de exportación. Inicia el flujo desde{' '}
-          <button onClick={() => navigate('/dian/upload')} className="text-[#004ac6] underline">
-            Subir reporte
-          </button>.
-        </p>
+        <svg className="animate-spin h-10 w-10 text-[#004ac6] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">Cargando borrador…</p>
       </div>
     )
   }
 
-  const tieneNomina = empleados > 0 && meses > 0
-  const tieneAutorretencion = !!tasaAutorretencion
+  if (errorCarga) {
+    return (
+      <div className="max-w-lg mx-auto mt-20 text-center">
+        <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">error_outline</span>
+        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">{errorCarga}</p>
+        <button onClick={() => navigate('/dian/upload')} className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]" style={{ background: '#004ac6' }}>
+          Subir otro reporte
+        </button>
+      </div>
+    )
+  }
+
+  const tieneNomina = calcNomina.tieneNomina
 
   return (
     <div className="max-w-[600px] mx-auto">
@@ -117,7 +189,7 @@ export default function DianExportacionPage() {
             'Reporte DIAN subido y procesado',
             'Clasificación de retenciones completa',
             tieneNomina
-              ? `Nómina: ${empleados} empleado${empleados !== 1 ? 's' : ''} × ${meses} mes${meses !== 1 ? 'es' : ''} (ARL ${tarifaArl}%)`
+              ? `Nómina: ${calcNomina.empleados} empleado${calcNomina.empleados !== 1 ? 's' : ''} × ${calcNomina.meses} mes${calcNomina.meses !== 1 ? 'es' : ''} (ARL ${calcNomina.tarifaArl}%)`
               : 'Nómina: no aplica',
             tieneAutorretencion
               ? `Autorretención: tarifa ${tasaAutorretencion === 'N/A' ? 'N/A' : `${tasaAutorretencion}%`}`
@@ -138,11 +210,12 @@ export default function DianExportacionPage() {
           Cifras a exportar
         </h2>
 
-        {/* Nota: los valores exactos los calculó el backend al exportar.
-            Aquí mostramos los disponibles en state (nómina). */}
+        {/* Nota: los valores exactos los calcula el backend al exportar. Aquí mostramos un
+            preview calculado con la misma fórmula (shared/calcularNomina.js) a partir de lo
+            guardado en el borrador. */}
         <div className="divide-y divide-[#f0f2f8] dark:divide-[#2a2e45]">
           {tieneNomina && (
-            <CifraRow label="Costo nómina total" value={costoNominaTotal} isNeg />
+            <CifraRow label="Costo nómina total" value={calcNomina.costoNominaTotal} isNeg />
           )}
           {tieneAutorretencion && (
             <>
@@ -228,19 +301,28 @@ export default function DianExportacionPage() {
                 Proceso completado
               </h2>
               <p className="text-sm text-green-700 dark:text-green-400 mt-1">
-                El archivo <span className="font-semibold">{filename}</span> ha sido descargado exitosamente.
+                El archivo <span className="font-semibold">{filename}</span> se envió a descargar.
               </p>
               <p className="text-xs text-green-600 dark:text-green-500 mt-1.5">
-                El borrador ha sido eliminado del servidor.
+                Si el explorador de archivos se cerró o hubo un error al guardar, usa
+                &quot;Descargar de nuevo&quot; abajo — el borrador ya se eliminó del servidor,
+                pero el archivo generado se queda disponible en esta pantalla mientras no la cierres.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 mt-5 pt-4 border-t border-green-200 dark:border-green-700">
+          <div className="flex items-center gap-3 mt-5 pt-4 border-t border-green-200 dark:border-green-700 flex-wrap">
             <button
-              onClick={() => navigate('/dian/upload')}
+              onClick={handleDescargarDeNuevo}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
               style={{ background: '#004ac6' }}
+            >
+              <span className="material-symbols-outlined text-base">download</span>
+              Descargar de nuevo
+            </button>
+            <button
+              onClick={() => navigate('/dian/upload')}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] dark:border-[#3a3e5c] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition active:scale-[0.97]"
             >
               <span className="material-symbols-outlined text-base">upload_file</span>
               Procesar otro reporte
@@ -259,7 +341,7 @@ export default function DianExportacionPage() {
       {/* ── Volver ──────────────────────────────────────────────────────── */}
       {status !== 'done' && (
         <button
-          onClick={() => navigate('/dian/nomina', { state })}
+          onClick={() => navigate(`/dian/nomina/${borradorId}`)}
           className="flex items-center gap-2 text-sm text-[#6b7280] dark:text-[#8890b5] hover:text-[#434655] dark:hover:text-[#c4c8e8] transition"
         >
           <span className="material-symbols-outlined text-base">arrow_back</span>

@@ -43,13 +43,7 @@ export default function DianUploadPage() {
       const respuesta = await api.uploadDian(formData)
       setEstado('success')
       setTimeout(() => {
-        navigate('/dian/clasificacion', {
-          state: {
-            borradorId:          respuesta.id,
-            filasParaClasificar: respuesta.filasParaClasificar,
-            calculos:            respuesta.calculos,
-          },
-        })
+        navigate(`/dian/clasificacion/${respuesta.id}`)
       }, 1000)
     } catch (err) {
       setEstado('error')

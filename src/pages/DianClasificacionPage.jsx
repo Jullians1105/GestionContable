@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../services/api'
 
 // ── opciones de clasificación (incluyendo N/A) ─────────────────────────────────
@@ -437,10 +437,36 @@ function FilaClasificacion({ fila, borradorId, valorActual, onClasificado, isEve
 
 // ── página principal ───────────────────────────────────────────────────────────
 export default function DianClasificacionPage() {
-  const location  = useLocation()
-  const navigate  = useNavigate()
-  const state     = location.state ?? {}
-  const { borradorId, filasParaClasificar = [] } = state
+  const { borradorId } = useParams()
+  const navigate = useNavigate()
+
+  // La página carga su estado SIEMPRE desde el backend (no desde el state de navegación de
+  // React Router): así, "volver" desde Nómina, un F5 accidental, o abrir el enlace de nuevo
+  // muestran lo que de verdad está guardado, en vez de una foto vieja del momento en que se
+  // salió de esta pantalla. Cada fila ya se autoguarda individualmente al clasificarla (ver
+  // FilaClasificacion) — lo único que faltaba era releerlas al volver a entrar.
+  const [cargando, setCargando]           = useState(true)
+  const [errorCarga, setErrorCarga]       = useState('')
+  const [filasParaClasificar, setFilasParaClasificar] = useState([])
+
+  useEffect(() => {
+    let cancelado = false
+    setCargando(true)
+    setErrorCarga('')
+    api.getDianBorrador(borradorId)
+      .then((data) => {
+        if (cancelado) return
+        setFilasParaClasificar(data.filasParaClasificar ?? [])
+      })
+      .catch((err) => {
+        if (cancelado) return
+        setErrorCarga(err.message || 'No se pudo cargar el borrador')
+      })
+      .finally(() => {
+        if (!cancelado) setCargando(false)
+      })
+    return () => { cancelado = true }
+  }, [borradorId])
 
   // Solo las compras reales piden clasificación de retención (ver requiereClasificacion
   // en el backend) — no toda fila "Recibido". Notas de crédito, "Documento soporte con no
@@ -566,20 +592,26 @@ export default function DianClasificacionPage() {
     return ordenDireccion === 'asc' ? 'arrow_upward' : 'arrow_downward'
   }
 
-  // Estado local: indice → opcion | null
-  const [clasificaciones, setClasificaciones] = useState(() =>
-    Object.fromEntries(
-      filasRecibido.map((f) => {
-        if (f.clasificacionRetencion) {
-          const opcion = OPCIONES.find(
-            (o) => o.clasificacion === f.clasificacionRetencion && o.tasa === (f.tasaRetencion ?? null)
-          ) ?? null
-          return [f.indice, opcion]
-        }
-        return [f.indice, null]
-      })
+  // Estado local: indice → opcion | null. Se recalcula cada vez que llega un fetch nuevo de
+  // filasRecibido (carga inicial o cambio de borradorId) — no en cada render, para no pisar
+  // ediciones locales que el usuario todavía no ha visto confirmadas por el autoguardado.
+  const [clasificaciones, setClasificaciones] = useState({})
+
+  useEffect(() => {
+    setClasificaciones(
+      Object.fromEntries(
+        filasRecibido.map((f) => {
+          if (f.clasificacionRetencion) {
+            const opcion = OPCIONES.find(
+              (o) => o.clasificacion === f.clasificacionRetencion && o.tasa === (f.tasaRetencion ?? null)
+            ) ?? null
+            return [f.indice, opcion]
+          }
+          return [f.indice, null]
+        })
+      )
     )
-  )
+  }, [filasRecibido])
 
   // ── clasificación rápida ───────────────────────────────────────────────────
   const [clasificacionRapida, setClasificacionRapida] = useState('')
@@ -715,11 +747,30 @@ export default function DianClasificacionPage() {
     pieRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [])
 
-  if (!borradorId) {
+  if (cargando) {
+    return (
+      <div className="max-w-lg mx-auto mt-20 text-center">
+        <svg className="animate-spin h-10 w-10 text-[#004ac6] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">Cargando borrador…</p>
+      </div>
+    )
+  }
+
+  if (errorCarga) {
     return (
       <div className="max-w-lg mx-auto mt-20 text-center">
         <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">error_outline</span>
-        <p className="mt-4 text-[#6b7280]">No hay datos de borrador. Sube primero un reporte DIAN.</p>
+        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">{errorCarga}</p>
+        <button
+          onClick={() => navigate('/dian/upload')}
+          className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
+          style={{ background: '#004ac6' }}
+        >
+          Subir otro reporte
+        </button>
       </div>
     )
   }
@@ -744,7 +795,7 @@ export default function DianClasificacionPage() {
             No hay compras que clasificar en este reporte.
           </p>
           <button
-            onClick={() => navigate('/dian/nomina', { state })}
+            onClick={() => navigate(`/dian/nomina/${borradorId}`)}
             className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
             style={{ background: '#004ac6' }}
           >
@@ -1016,7 +1067,7 @@ export default function DianClasificacionPage() {
           <div ref={pieRef} className="mt-6 flex justify-end">
             <button
               disabled={!todasClasificadas}
-              onClick={() => navigate('/dian/nomina', { state: { ...state, clasificaciones } })}
+              onClick={() => navigate(`/dian/nomina/${borradorId}`)}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: '#004ac6' }}
               title={!todasClasificadas ? 'Clasifica todas las compras antes de continuar' : ''}
