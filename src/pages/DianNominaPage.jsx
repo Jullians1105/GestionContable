@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useState, useMemo, useEffect } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { api } from '../services/api'
 import SALARY_CONSTANTS from '../../shared/salaryConstants.json'
 import {
-  calcularNomina, calcularCostoTotal,
+  calcularNomina, calcularCostoTotal, calcularVentasNetas,
   TASA_PENSION, TASA_CAJA_COMPENSACION, TARIFAS_ARL,
   TASA_VACACIONES, TASA_PRIMA, TASA_CESANTIAS, TASA_INTERESES_CESANTIAS,
 } from '../../shared/calcularNomina.js'
@@ -50,16 +51,6 @@ const OPCIONES_ARL = TARIFAS_ARL.map((tarifa, i) => ({
   value: String(tarifa),
 }))
 
-// Base de la autorretención: ventas emitidas antes de IVA, con notas crédito descontadas —
-// misma fórmula que resumen.ventasNetas en el backend (calcularResumenPeriodo), calculada acá
-// a partir de "calculos" (ya viene del upload, no cambia con la clasificación de retenciones).
-function calcularVentasNetas(calculos) {
-  if (!calculos) return 0
-  const ventasBrutoSinIva      = (calculos.ventasBruto ?? 0) - (calculos.ivaGenerado ?? 0) - (calculos.incGenerado ?? 0)
-  const devolucionVentasSinIva = (calculos.devolucionVentas ?? 0) - (calculos.ivaDevolucionVentas ?? 0) - (calculos.incDevolucionVentas ?? 0)
-  return ventasBrutoSinIva - devolucionVentasSinIva
-}
-
 // ── subcomponente: fila del preview (valor precomputado, o base*tasa si no se pasa) ────────────
 // tasaLabel: permite mostrar un % distinto al que realmente usa el cálculo (ej. Pensión
 // se muestra como "12%" informativo, pero se calcula con la tasa real del 4%).
@@ -80,9 +71,12 @@ function PreviewRow({ label, tasa, tasaLabel, base, valor: valorProp, isTotal, i
 
 // ── página ────────────────────────────────────────────────────────────────────
 export default function DianNominaPage() {
-  const location = useLocation()
+  const { borradorId } = useParams()
   const navigate = useNavigate()
-  const state    = location.state ?? {}
+
+  const [cargando,   setCargando]   = useState(true)
+  const [errorCarga, setErrorCarga] = useState('')
+  const [calculos,   setCalculos]   = useState(null)
 
   const [empleados, setEmpleados] = useState('')
   const [meses,     setMeses]     = useState('')
@@ -90,11 +84,56 @@ export default function DianNominaPage() {
   const [tasaAutorretencion, setTasaAutorretencion] = useState('')
   const [tarifaArl, setTarifaArl] = useState('')
 
+  // Carga el borrador desde el backend al montar — igual que en Clasificación, para que
+  // "volver" desde Exportación o un F5 accidental recuperen lo ya guardado en vez de un
+  // formulario en blanco.
+  useEffect(() => {
+    let cancelado = false
+    setCargando(true)
+    setErrorCarga('')
+    api.getDianBorrador(borradorId)
+      .then((data) => {
+        if (cancelado) return
+        setCalculos(data.calculos ?? null)
+        const n = data.nomina
+        if (n?.empleados != null)          setEmpleados(String(n.empleados))
+        if (n?.meses != null)              setMeses(String(n.meses))
+        if (n?.salario != null)            setSalario(String(n.salario))
+        if (n?.tarifaArl != null)          setTarifaArl(String(n.tarifaArl))
+        if (n?.tasaAutorretencion != null) setTasaAutorretencion(n.tasaAutorretencion)
+      })
+      .catch((err) => {
+        if (cancelado) return
+        setErrorCarga(err.message || 'No se pudo cargar el borrador')
+      })
+      .finally(() => {
+        if (!cancelado) setCargando(false)
+      })
+    return () => { cancelado = true }
+  }, [borradorId])
+
+  // Autoguardado de los campos de nómina (mismo patrón que la clasificación de retención)
+  // para que no se pierdan al volver o recargar. Se salta mientras carga el borrador, para
+  // no pisar lo persistido con los valores en blanco del formulario recién montado.
+  useEffect(() => {
+    if (cargando) return
+    const timer = setTimeout(() => {
+      api.patchDianNomina(borradorId, {
+        empleados:           empleados.trim() === '' ? null : toInt(empleados),
+        meses:                meses.trim() === '' ? null : toInt(meses),
+        salario:              salario.trim() === '' ? null : toFloat(salario),
+        tarifaArl:            tarifaArl === '' ? null : parseFloat(tarifaArl),
+        tasaAutorretencion:   tasaAutorretencion === '' ? null : tasaAutorretencion,
+      }).catch(() => {})
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [cargando, borradorId, empleados, meses, salario, tarifaArl, tasaAutorretencion])
+
   const empVal = toInt(empleados)
   const mesVal = toInt(meses)
   const salVal = toFloat(salario) || SMMLV_ACTUAL
 
-  const ventasNetas = useMemo(() => calcularVentasNetas(state.calculos), [state.calculos])
+  const ventasNetas = useMemo(() => calcularVentasNetas(calculos), [calculos])
   const tieneNomina = empVal > 0 && mesVal > 0
   const mostrarAutorretencion = tieneNomina && ventasNetas > 0
   const valorAutorretencion = tasaAutorretencion && tasaAutorretencion !== 'N/A'
@@ -126,26 +165,42 @@ export default function DianNominaPage() {
 
   const handleContinuar = () => {
     if (error) return
-    navigate('/dian/exportacion', {
-      state: {
-        ...state,
-        empleados:        empVal,
-        meses:            mesVal,
-        salario:          salVal,
-        tarifaArl:        tarifaArl,
-        costoNominaTotal: calc.costoTotal,
-        tasaAutorretencion:  mostrarAutorretencion ? tasaAutorretencion : null,
-        baseAutorretencion:  mostrarAutorretencion ? ventasNetas : 0,
-        valorAutorretencion: mostrarAutorretencion ? valorAutorretencion : 0,
-      },
-    })
+    navigate(`/dian/exportacion/${borradorId}`)
   }
 
   const handleVolver = () => {
-    navigate('/dian/clasificacion', { state })
+    navigate(`/dian/clasificacion/${borradorId}`)
   }
 
   // ── render ─────────────────────────────────────────────────────────────────
+  if (cargando) {
+    return (
+      <div className="max-w-lg mx-auto mt-20 text-center">
+        <svg className="animate-spin h-10 w-10 text-[#004ac6] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">Cargando borrador…</p>
+      </div>
+    )
+  }
+
+  if (errorCarga) {
+    return (
+      <div className="max-w-lg mx-auto mt-20 text-center">
+        <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">error_outline</span>
+        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">{errorCarga}</p>
+        <button
+          onClick={() => navigate('/dian/upload')}
+          className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
+          style={{ background: '#004ac6' }}
+        >
+          Subir otro reporte
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-[520px] mx-auto">
 

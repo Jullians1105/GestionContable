@@ -174,6 +174,29 @@ const TIPOS_COMPRA = [...TIPOS_FACTURA_EQUIVALENTE, DOC_EQUIVALENTE, DOC_TRANSPO
 // aportan a comprasBruto pero igual bloqueaban el export hasta clasificarlas a mano.
 const requiereClasificacion = (f) => f.grupo === RECIBIDO && TIPOS_COMPRA.includes(f.tipoDocumento);
 
+// Proyección de una fila para el frontend (pantalla de clasificación): solo lo que la UI
+// necesita, más el flag requiereClasificacion — así el frontend nunca reimplementa esta
+// regla por su cuenta (eso fue exactamente lo que causó el bug de "toma 458 en vez de 425").
+// Se usa tanto en el upload inicial como en getBorrador (recarga desde el backend al volver
+// a entrar a la pantalla), para que ambas respuestas tengan siempre la misma forma.
+const proyectarFilaParaClasificar = (f) => ({
+  indice:                 f.indice,
+  cufe:                   f.cufe,
+  tipoDocumento:          f.tipoDocumento,
+  fechaEmision:           f.fechaEmision,
+  nombreEmisor:           f.nombreEmisor,
+  nitEmisor:              f.nitEmisor,
+  total:                  f.total,
+  iva:                    f.iva,
+  grupo:                  f.grupo,
+  estado:                 f.estado,
+  folio:                  f.folio ?? null,
+  prefijo:                f.prefijo ?? null,
+  clasificacionRetencion: f.clasificacionRetencion ?? null,
+  tasaRetencion:          f.tasaRetencion ?? null,
+  requiereClasificacion:  requiereClasificacion(f),
+});
+
 // Tipos de documento que sí entran en algún cálculo (compras, ventas, notas crédito,
 // documento soporte). DOC_SOPORTE_NO_OBLIGADOS se contabiliza condicionalmente por Grupo
 // (ver exportarBorrador), por eso igual cuenta como "contabilizado" acá.
@@ -368,27 +391,8 @@ const uploadDian = async (req, res, next) => {
       incDevolucionVentas:   sumField(esNotaEmitida,     'inc'),
     };
 
-    // Proyección para la respuesta: campos de clasificación + solo columnas presentes en el archivo
-    const filasParaClasificar = filas.map((f) => {
-      const out = {
-        indice:                 f.indice,
-        cufe:                   f.cufe,
-        tipoDocumento:          f.tipoDocumento,
-        fechaEmision:           f.fechaEmision,
-        nombreEmisor:           f.nombreEmisor,
-        nitEmisor:              f.nitEmisor,
-        total:                  f.total,
-        iva:                    f.iva,
-        grupo:                  f.grupo,
-        estado:                 f.estado,
-        clasificacionRetencion: null,
-        tasaRetencion:          null,
-        requiereClasificacion:  requiereClasificacion(f),
-      };
-      if (colMap['Folio'])   out.folio   = f.folio;
-      if (colMap['Prefijo']) out.prefijo = f.prefijo;
-      return out;
-    });
+    // Proyección para la respuesta: campos de clasificación + flag requiereClasificacion
+    const filasParaClasificar = filas.map(proyectarFilaParaClasificar);
 
     // Persistir borrador con campos de clasificación incluidos (expira en 14 días).
     // Se guarda también el archivo normalizado (solo prefijos XML corregidos, NINGÚN
@@ -449,6 +453,79 @@ const patchBorrador = async (req, res, next) => {
        )
        WHERE id = $1`,
       [id, indice, clasificacionRetencion ?? null, tasaRetencion ?? null]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /borradores/:id — recarga el estado completo del borrador desde la base de datos.
+// Es la fuente de verdad que usan las 3 páginas del wizard (Clasificación, Nómina,
+// Exportación) al montar, en vez del state de navegación de React Router: ese state es una
+// foto del momento en que se salió de la pantalla, así que un "volver", un F5 accidental, o
+// cerrar y reabrir la pestaña lo perdían aunque el dato siguiera guardado en la base. Como
+// cada borrador ya está aislado por creado_por, esto es seguro para varios usuarios
+// trabajando al mismo tiempo — nunca comparten ni pisan el borrador de otro.
+const getBorrador = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await db.query(
+      `SELECT nombre_archivo, datos FROM calculo_borradores WHERE id = $1 AND creado_por = $2`,
+      [id, req.user.userId]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Borrador no encontrado. Puede haber expirado, haberse exportado ya, o pertenecer a otro usuario.' });
+    }
+
+    const { filas, calculos, nomina = null } = rows[0].datos;
+    const filasParaClasificar = filas.map(proyectarFilaParaClasificar);
+
+    res.json({
+      id,
+      nombreArchivo: rows[0].nombre_archivo,
+      totalFilas: filas.length,
+      calculos,
+      filasParaClasificar,
+      nomina,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// PATCH /borradores/:id/nomina — autoguardado de los inputs del formulario de Nómina
+// (empleados, meses, salario, tarifa ARL, tasa de autorretención). Antes solo viajaban en
+// el state de navegación hacia Exportación, así que un "volver" a Clasificación o un F5 los
+// borraba de verdad, a diferencia de clasificacionRetencion que ya se autoguarda por fila.
+// Se pisa completo en cada llamada (no hay noción de "parcial" acá, a diferencia del PATCH
+// por fila de arriba).
+const patchNomina = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { empleados, meses, salario, tarifaArl, tasaAutorretencion } = req.body;
+
+    const check = await db.query(
+      `SELECT 1 FROM calculo_borradores WHERE id = $1 AND creado_por = $2`,
+      [id, req.user.userId]
+    );
+    if (check.rows.length === 0) {
+      return res.status(404).json({ error: 'Borrador no encontrado' });
+    }
+
+    await db.query(
+      `UPDATE calculo_borradores SET datos = jsonb_set(datos, '{nomina}', $1::jsonb) WHERE id = $2`,
+      [
+        JSON.stringify({
+          empleados:          empleados ?? null,
+          meses:              meses ?? null,
+          salario:            salario ?? null,
+          tarifaArl:          tarifaArl ?? null,
+          tasaAutorretencion: tasaAutorretencion ?? null,
+        }),
+        id,
+      ]
     );
 
     res.json({ success: true });
@@ -1865,7 +1942,7 @@ const marcarAnomaliaRevisada = async (req, res, next) => {
 };
 
 module.exports = {
-  uploadDian, patchBorrador, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada,
+  uploadDian, patchBorrador, getBorrador, patchNomina, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada,
   // Funciones puras (no tocan DB ni request). Se exportan para poder testear directamente
   // las reglas contables sin montar un borrador completo — ver tests/unit/dianController.test.js
   calcularAnomalias, calcularDocumentosNoContabilizados,
