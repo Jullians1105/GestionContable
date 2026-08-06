@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import SALARY_CONSTANTS from '../../shared/salaryConstants.json'
 import {
   calcularNomina, calcularCostoTotal,
-  TASA_PENSION, TASA_SALUD,
+  TASA_PENSION, TASA_CAJA_COMPENSACION, TARIFAS_ARL,
   TASA_VACACIONES, TASA_PRIMA, TASA_CESANTIAS, TASA_INTERESES_CESANTIAS,
 } from '../../shared/calcularNomina.js'
 
@@ -41,6 +41,14 @@ const OPCIONES_AUTORRETENCION = [
   { label: '4,50%', value: '4.50' },
   { label: 'N/A (no aplica)', value: 'N/A' },
 ]
+
+// Tarifas ARL por clase de riesgo (Decreto 1607 de 2002) — a diferencia de pensión/caja de
+// compensación, varía según la labor del trabajador, así que hay que elegirla (no se puede
+// calcular directo con una sola tarifa fija).
+const OPCIONES_ARL = TARIFAS_ARL.map((tarifa, i) => ({
+  label: `Clase ${['I', 'II', 'III', 'IV', 'V'][i]} (${tarifa.toString().replace('.', ',')}%)`,
+  value: String(tarifa),
+}))
 
 // Base de la autorretención: ventas emitidas antes de IVA, con notas crédito descontadas —
 // misma fórmula que resumen.ventasNetas en el backend (calcularResumenPeriodo), calculada acá
@@ -80,6 +88,7 @@ export default function DianNominaPage() {
   const [meses,     setMeses]     = useState('')
   const [salario,   setSalario]   = useState(String(SMMLV_ACTUAL))
   const [tasaAutorretencion, setTasaAutorretencion] = useState('')
+  const [tarifaArl, setTarifaArl] = useState('')
 
   const empVal = toInt(empleados)
   const mesVal = toInt(meses)
@@ -96,17 +105,24 @@ export default function DianNominaPage() {
   const error =
     empVal > 0 && mesVal === 0 ? 'Especifica el número de meses' :
     empVal === 0 && mesVal > 0 ? 'Especifica el número de empleados' :
+    tieneNomina && !tarifaArl ? 'Selecciona la tarifa ARL' :
     mostrarAutorretencion && !tasaAutorretencion ? 'Selecciona la tarifa de autorretención' :
     null
 
   // ── cálculos preview — misma fórmula que usa el backend al exportar (shared/calcularNomina.js) ──
   const calc = useMemo(() => {
-    const n = calcularNomina({ salario: salVal, smmlv: SMMLV_ACTUAL, auxilioTransporte: AUXILIO_ACTUAL })
+    const arlValida = tarifaArl !== '' && TARIFAS_ARL.includes(parseFloat(tarifaArl))
+    const n = calcularNomina({
+      salario: salVal,
+      smmlv: SMMLV_ACTUAL,
+      auxilioTransporte: AUXILIO_ACTUAL,
+      tarifaArl: arlValida ? parseFloat(tarifaArl) : TARIFAS_ARL[0],
+    })
     const tieneNomina = empVal > 0 && mesVal > 0
-    const costoTotal  = tieneNomina ? calcularCostoTotal({ empleados: empVal, meses: mesVal, costoMes: n.costoMes }) : 0
+    const costoTotal  = tieneNomina && arlValida ? calcularCostoTotal({ empleados: empVal, meses: mesVal, costoMes: n.costoMes }) : 0
 
-    return { ...n, costoTotal, tieneNomina }
-  }, [salVal, empVal, mesVal])
+    return { ...n, costoTotal, tieneNomina, arlValida }
+  }, [salVal, empVal, mesVal, tarifaArl])
 
   const handleContinuar = () => {
     if (error) return
@@ -116,6 +132,7 @@ export default function DianNominaPage() {
         empleados:        empVal,
         meses:            mesVal,
         salario:          salVal,
+        tarifaArl:        tarifaArl,
         costoNominaTotal: calc.costoTotal,
         tasaAutorretencion:  mostrarAutorretencion ? tasaAutorretencion : null,
         baseAutorretencion:  mostrarAutorretencion ? ventasNetas : 0,
@@ -207,6 +224,28 @@ export default function DianNominaPage() {
           </p>
         </div>
 
+        {/* Tarifa ARL — varía por clase de riesgo, no se puede calcular directo como pensión/caja */}
+        {tieneNomina && (
+          <div className="mb-2 mt-5">
+            <label className="block text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">
+              Tarifa ARL
+            </label>
+            <select
+              value={tarifaArl}
+              onChange={(e) => setTarifaArl(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] text-sm focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent"
+            >
+              <option value="">Selecciona…</option>
+              {OPCIONES_ARL.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-[#9ca3af] dark:text-[#6b7280]">
+              Depende de la clase de riesgo de la labor del trabajador
+            </p>
+          </div>
+        )}
+
         {/* Error de validación cruzada */}
         {error && (
           <div className="mt-4 flex items-center gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
@@ -245,14 +284,23 @@ export default function DianNominaPage() {
               <PreviewRow label="Total devengado" valor={calc.devengado} isTotal />
             </div>
 
-            {/* Deducciones */}
+            {/* Seguridad Social y Parafiscales */}
             <div>
               <p className="text-[11px] font-bold text-[#8890b5] uppercase tracking-wide mb-2">
-                Deducciones (sobre salario)
+                Seguridad Social y Parafiscales (sobre salario, a cargo del empleador)
               </p>
-              <PreviewRow label="Pensión" tasaLabel="12%" base={salVal} tasa={TASA_PENSION} isNeg />
-              <PreviewRow label="Salud"   tasa={TASA_SALUD} base={salVal} isNeg />
-              <PreviewRow label="Total deducciones" valor={calc.deducciones} isTotal isNeg />
+              {calc.arlValida ? (
+                <>
+                  <PreviewRow label="Pensión"              tasa={TASA_PENSION}           base={salVal} />
+                  <PreviewRow label="ARL" tasaLabel={`${tarifaArl}%`} valor={calc.aportesDetalle.arl} />
+                  <PreviewRow label="Caja de Compensación" tasa={TASA_CAJA_COMPENSACION} base={salVal} />
+                  <PreviewRow label="Total seguridad social y parafiscales" valor={calc.aportesPatronales} isTotal />
+                </>
+              ) : (
+                <p className="text-sm text-[#9ca3af] dark:text-[#6b7280] py-2">
+                  Selecciona la tarifa ARL para ver el detalle
+                </p>
+              )}
             </div>
 
             {/* Costo por empleado/mes */}
@@ -262,7 +310,7 @@ export default function DianNominaPage() {
                   Costo por empleado / mes
                 </span>
                 <span className="text-sm font-bold text-[#004ac6] dark:text-[#7ba8f0] tabular-nums">
-                  {fmt(calc.costoMes)}
+                  {calc.arlValida ? fmt(calc.costoMes) : '—'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -270,7 +318,7 @@ export default function DianNominaPage() {
                   {empVal} empleado{empVal !== 1 ? 's' : ''} × {mesVal} mes{mesVal !== 1 ? 'es' : ''}
                 </span>
                 <span className="text-base font-bold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">
-                  {fmt(calc.costoTotal)}
+                  {calc.arlValida ? fmt(calc.costoTotal) : '—'}
                 </span>
               </div>
             </div>

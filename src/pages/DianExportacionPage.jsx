@@ -36,6 +36,7 @@ export default function DianExportacionPage() {
     empleados        = 0,
     meses            = 0,
     salario          = SMMLV_ACTUAL,
+    tarifaArl        = null,
     costoNominaTotal = 0,
     tasaAutorretencion  = null,
     baseAutorretencion  = 0,
@@ -52,7 +53,7 @@ export default function DianExportacionPage() {
     setStatus('loading')
     setErrorMsg('')
     try {
-      const { blob, filename: fname } = await api.exportarDian(borradorId, { empleados, meses, salario, tasaAutorretencion })
+      const { blob, filename: fname } = await api.exportarDian(borradorId, { empleados, meses, salario, tarifaArl, tasaAutorretencion })
 
       // Trigger de descarga en el navegador
       const url = window.URL.createObjectURL(blob)
@@ -116,7 +117,7 @@ export default function DianExportacionPage() {
             'Reporte DIAN subido y procesado',
             'Clasificación de retenciones completa',
             tieneNomina
-              ? `Nómina: ${empleados} empleado${empleados !== 1 ? 's' : ''} × ${meses} mes${meses !== 1 ? 'es' : ''}`
+              ? `Nómina: ${empleados} empleado${empleados !== 1 ? 's' : ''} × ${meses} mes${meses !== 1 ? 'es' : ''} (ARL ${tarifaArl}%)`
               : 'Nómina: no aplica',
             tieneAutorretencion
               ? `Autorretención: tarifa ${tasaAutorretencion === 'N/A' ? 'N/A' : `${tasaAutorretencion}%`}`

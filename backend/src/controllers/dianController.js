@@ -824,12 +824,22 @@ function buildImpuestosContent(ws, resumen, { freeze = true } = {}) {
 
   const ivaNeg = resumen.ivaPagar < 0;
 
+  // Si las compras también traen INC (poco común, ej. un proveedor que factura un servicio
+  // gravado con INC) se muestra el desglose: cuánto INC hay y la base ya neta de IVA e INC.
+  // No es descontable, así que es solo informativo acá — no toca comprasNetas/costeo real
+  // (ver comprasBrutoSinIvaNiInc en calcularResumenPeriodo).
+  const tieneIncCompras = resumen.incCompras !== 0;
+
   const left = [
     { label: 'Ingreso (base antes de IVA)',    val: resumen.ventasBrutoSinIva },
     { label: '(−) Dev ventas (notas crédito)', val: resumen.devolucionVentasSinIva, isNeg: true },
     { label: 'Total ingreso (sin IVA)',        val: totalIngresoSinIva, subtotal: true },
     null,
     { label: 'Compras (base antes de IVA)',     val: resumen.comprasBrutoSinIva },
+    ...(tieneIncCompras ? [
+      { label: 'INC en compras (no descontable)',  val: resumen.incCompras, isNeg: true },
+      { label: 'Compras (base neta de IVA e INC)', val: resumen.comprasBrutoSinIvaNiInc, subtotal: true },
+    ] : []),
     { label: '(−) Dev compras (notas crédito)', val: resumen.devolucionComprasSinIva, isNeg: true },
     { label: 'Total compras (sin IVA)',         val: totalComprasSinIva, subtotal: true },
   ];
@@ -840,6 +850,7 @@ function buildImpuestosContent(ws, resumen, { freeze = true } = {}) {
     { label: 'Total IVA Ventas',            val: resumen.totalIvaVentas, subtotal: true },
     null,
     { label: 'IVA descontable (compras)',   val: resumen.ivaDescontable },
+    ...(tieneIncCompras ? [null, null] : []),
     { label: 'IVA devolución ventas',       val: resumen.ivaDevolucionVentas },
     { label: 'Total IVA Compras',           val: resumen.totalIvaCompras, subtotal: true },
     null,
@@ -1112,6 +1123,7 @@ function buildNominaContent(ws, nomina, salario) {
     nomina.auxilioAplica ? nomina.auxilioTransporte : 0,
     { indent: 2 }
   );
+  addRow(`Tarifa ARL (${nomina.tarifaArl}%)`, null, { indent: 2 });
   blank();
 
   sectionRow('DEVENGADO (por empleado/mes)');
@@ -1124,12 +1136,11 @@ function buildNominaContent(ws, nomina, salario) {
   addRow('Total devengado',                                nomina.devengado, { subtotal: true });
   blank();
 
-  sectionRow('DEDUCCIONES (por empleado/mes, sobre salario)');
-  // La etiqueta "(12%)" es la tasa oficial que paga el empleador — puramente informativa,
-  // el cálculo real sigue usando nomina.tasaPension (4%), no este texto.
-  addRow('Pensión (12%)',                                   round2(salario * nomina.tasaPension), { indent: 2, isNeg: true });
-  addRow(`Salud (${(nomina.tasaSalud * 100).toFixed(0)}%)`, round2(salario * nomina.tasaSalud),   { indent: 2, isNeg: true });
-  addRow('Total deducciones',                               nomina.deducciones, { subtotal: true, isNeg: true });
+  sectionRow('SEGURIDAD SOCIAL Y PARAFISCALES (por empleado/mes, sobre salario — a cargo del empleador)');
+  addRow(`Pensión (${(nomina.tasaPension * 100).toFixed(0)}%)`,                round2(nomina.aportesDetalle.pension),          { indent: 2 });
+  addRow(`ARL (${nomina.tarifaArl}%)`,                                         round2(nomina.aportesDetalle.arl),              { indent: 2 });
+  addRow(`Caja de Compensación (${(nomina.tasaCajaCompensacion * 100).toFixed(0)}%)`, round2(nomina.aportesDetalle.cajaCompensacion), { indent: 2 });
+  addRow('Total seguridad social y parafiscales',                             nomina.aportesPatronales, { subtotal: true });
   blank();
 
   // ── Tarjeta destacada del costo final — mismo tratamiento visual que UTILIDAD FINAL
@@ -1150,7 +1161,7 @@ function buildNominaContent(ws, nomina, salario) {
   blank();
 
   addRow(
-    `Costo por empleado / mes (Devengado − Deducciones) — $${Math.round(nomina.costoMes).toLocaleString('es-CO')}/emp`,
+    `Costo por empleado / mes (Devengado + Seguridad Social y Parafiscales) — $${Math.round(nomina.costoMes).toLocaleString('es-CO')}/emp`,
     nomina.costoMes,
     { total: true }
   );
@@ -1407,15 +1418,18 @@ function calcularResumenPeriodo(filasPeriodo) {
   const ivaDevolucionVentas  = sumField(esNotaEmitida,     'iva');
   const incGenerado          = sumField(esFacturaEmitida,  'inc');
   const incDevolucionVentas  = sumField(esNotaEmitida,     'inc');
+  // INC en compras (ej. proveedor que factura un servicio gravado con INC) — a diferencia
+  // del IVA, el INC pagado en una compra NO es descontable, así que NO participa en
+  // Compras Netas/Costos Totales/Utilidad Bruta (sigue siendo un costo real). Se calcula
+  // aparte solo para mostrar, en la hoja IVA, la base de compras ya neta de ambos impuestos.
+  const incCompras           = sumField(esFacturaRecibida, 'inc');
 
   const totalIvaVentas  = ivaGenerado    + ivaDevolucionCompras;
   const totalIvaCompras = ivaDescontable + ivaDevolucionVentas;
   const ivaPagar        = round2(totalIvaVentas - totalIvaCompras);
 
-  // INC (Impuesto Nacional al Consumo) — a diferencia del IVA, no es descontable: en este
-  // sistema solo aparece en ventas (Emitido), nunca en compras. Por eso no hay un
-  // "incDescontable"/"totalIncCompras" equivalente — solo se neta contra sus propias
-  // devoluciones (notas crédito emitidas).
+  // INC (Impuesto Nacional al Consumo) en ventas se neta contra sus propias devoluciones
+  // (notas crédito emitidas) — no tiene "IVA a pagar" equivalente, es solo informativo.
   const totalIncVentas = round2(incGenerado - incDevolucionVentas);
 
   const ventasBrutoSinIva      = ventasBruto - ivaGenerado - incGenerado;
@@ -1423,6 +1437,9 @@ function calcularResumenPeriodo(filasPeriodo) {
   const ventasNetas            = ventasBrutoSinIva - devolucionVentasSinIva;
 
   const comprasBrutoSinIva      = comprasBruto - ivaDescontable;
+  // Solo informativa (hoja IVA) — el INC en compras no es descontable, así que NO se usa
+  // en comprasBrutoSinIva/comprasNetas/costosTotales, que siguen siendo el costo real.
+  const comprasBrutoSinIvaNiInc = comprasBrutoSinIva - incCompras;
   const devolucionComprasSinIva = devolucionCompras - ivaDevolucionCompras;
 
   const esDocSoporteCompra = (f) => f.tipoDocumento === DOC_SOPORTE_NO_OBLIGADOS && f.grupo === EMITIDO;
@@ -1455,6 +1472,8 @@ function calcularResumenPeriodo(filasPeriodo) {
     devolucionVentasSinIva:       round2(devolucionVentasSinIva),
     ventasNetas:                  round2(ventasNetas),
     comprasBrutoSinIva:           round2(comprasBrutoSinIva),
+    incCompras:                   round2(incCompras),
+    comprasBrutoSinIvaNiInc:      round2(comprasBrutoSinIvaNiInc),
     devolucionComprasSinIva:      round2(devolucionComprasSinIva),
     comprasNetas:                 round2(comprasNetas),
     documentoSoporteCompras:      round2(documentoSoporteCompras),
@@ -1547,6 +1566,9 @@ const exportarBorrador = async (req, res, next) => {
     const empleados = parseInt(req.body.empleados ?? 0, 10) || 0;
     const meses     = parseInt(req.body.meses     ?? 0, 10) || 0;
     const tasaAutorretencion = req.body.tasaAutorretencion ?? null;
+    const tarifaArl = req.body.tarifaArl !== undefined && req.body.tarifaArl !== null
+      ? parseFloat(req.body.tarifaArl)
+      : null;
 
     // ── 1. Leer borrador y verificar propiedad ─────────────────────────────
     const { rows } = await db.query(
@@ -1647,8 +1669,16 @@ const exportarBorrador = async (req, res, next) => {
     // ── 7. Nómina ──────────────────────────────────────────────────────────
     // Fórmula compartida con el preview de frontend (shared/calcularNomina.js) — evita que
     // backend y frontend vuelvan a desincronizarse, como pasó antes con el SMMLV hardcodeado.
-    const { calcularNomina, calcularCostoTotal, TASA_PENSION, TASA_SALUD } =
+    const { calcularNomina, calcularCostoTotal, TASA_PENSION, TASA_CAJA_COMPENSACION, TARIFAS_ARL } =
       await import('../../../shared/calcularNomina.js');
+
+    // La tarifa ARL varía por trabajador (clase de riesgo) — a diferencia de pensión/caja de
+    // compensación, no hay un único valor a calcular directo: es obligatoria si hay nómina.
+    if (empleados > 0 && meses > 0 && !TARIFAS_ARL.includes(tarifaArl)) {
+      return res.status(400).json({
+        error: 'Selecciona la tarifa ARL antes de exportar.',
+      });
+    }
 
     let nominaCalc = null;
     let costoNominaTotal = 0;
@@ -1657,6 +1687,7 @@ const exportarBorrador = async (req, res, next) => {
         salario,
         smmlv: salaryConsts.smmlv,
         auxilioTransporte: salaryConsts.auxilioTransporte,
+        tarifaArl,
       });
       costoNominaTotal = calcularCostoTotal({ empleados, meses, costoMes: nominaCalc.costoMes });
     }
@@ -1685,11 +1716,13 @@ const exportarBorrador = async (req, res, next) => {
           auxilioAplica:     nominaCalc.auxilioAplica,
           devengadoDetalle:  nominaCalc.devengadoDetalle,
           devengado:         nominaCalc.devengado,
-          deducciones:       nominaCalc.deducciones,
+          aportesDetalle:    nominaCalc.aportesDetalle,
+          aportesPatronales: nominaCalc.aportesPatronales,
           costoMes:          nominaCalc.costoMes,
           costoTotal:        costoNominaTotal,
-          tasaPension:       TASA_PENSION,
-          tasaSalud:         TASA_SALUD,
+          tasaPension:          TASA_PENSION,
+          tasaCajaCompensacion: TASA_CAJA_COMPENSACION,
+          tarifaArl,
         }
       : null;
 
