@@ -264,7 +264,7 @@ fijos, y una columna de Notas (col. C en RESUMEN) para explicaciones puntuales.
 | `RESUMEN` | Título con banda propia (empresa + período), tarjeta UTILIDAD FINAL (verde si es positiva, roja si es negativa — mismo criterio `isNeg` que el resto de la hoja), y el Estado de Resultados detallado línea por línea (con desglose con/sin IVA de ventas y compras) para auditar cómo se llegó a ese número. Ya no incluye el cuadre de IVA — eso vive en su propia hoja |
 | `IVA` | Cuadre de IVA como pasivo (Generado, Descontable, devoluciones, IVA a pagar), separado de RESUMEN porque el IVA no es ingreso ni costo real de la empresa |
 | `RETENCIONES_POR_PROVEEDOR` | Retenciones agrupadas por NIT emisor y concepto |
-| `DETALLE_COMPRAS` | Todas las facturas recibidas con su clasificación, tasa y valor retenido |
+| `DETALLE_COMPRAS` | Todas las facturas recibidas con Total, Subtotal (base sin IVA sobre la que se calcula la retención), IVA, clasificación, tasa y valor retenido |
 | `NOMINA` | Desglose de devengado, aportes y provisiones, con tarjeta destacada del costo total (solo si se ingresó nómina) |
 | `METADATOS` | Usuario, fecha de procesamiento, período, totales de documentos, y dos secciones de transparencia con banda ámbar (advertencia — no rojo, ese color ya significa "negativo" en el resto del Excel): **DOCUMENTOS NO CONTABILIZADOS** (tipos de documento fuera de todos los cálculos, ej. "Application response") y **ANOMALÍAS DETECTADAS** (CUFE/CUDE duplicado, IVA mayor que el Total, Total negativo fuera de Nota Crédito, Grupo con valor distinto de "Emitido"/"Recibido", Documento soporte con Grupo "Recibido" inesperado) |
 

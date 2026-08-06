@@ -1006,12 +1006,13 @@ function buildRetenciones(ws, retencionesPorProveedor, totalRetenciones) {
 function buildDetalleComprasContent(ws, filasRecibido, { freeze = true } = {}) {
   const hdr = ws.addRow([
     'Fecha Emisión', 'Folio', 'Nombre Emisor', 'NIT Emisor',
-    'Total', 'Clasificación', 'Tasa (%)', 'Retención',
+    'Total', 'Subtotal', 'IVA', 'Clasificación', 'Tasa (%)', 'Retención',
   ]);
-  applyHeaderRow(hdr, 8);
+  applyHeaderRow(hdr, 10);
 
   filasRecibido.forEach((fila, i) => {
-    const subtotal = (fila.total ?? 0) - (fila.iva ?? 0);
+    const iva = fila.iva ?? 0;
+    const subtotal = (fila.total ?? 0) - iva;
     const retencion = round2(subtotal * ((fila.tasaRetencion ?? 0) / 100));
     const row = ws.addRow([
       fechaES(fila.fechaEmision),
@@ -1019,22 +1020,28 @@ function buildDetalleComprasContent(ws, filasRecibido, { freeze = true } = {}) {
       fila.nombreEmisor ?? '',
       fila.nitEmisor    ?? '',
       fila.total   ?? 0,
+      subtotal,
+      iva,
       fila.clasificacionRetencion ?? '',
       fila.tasaRetencion ?? 0,
       retencion,
     ]);
-    row.getCell(1).alignment = { horizontal: 'center' };
-    row.getCell(2).alignment = { horizontal: 'center' };
-    row.getCell(3).alignment = { horizontal: 'left' };
-    row.getCell(4).alignment = { horizontal: 'right' };
-    row.getCell(5).numFmt    = '"$ "#,##0';
-    row.getCell(5).alignment = { horizontal: 'right' };
-    row.getCell(6).alignment = { horizontal: 'center' };
-    row.getCell(7).numFmt    = '0.00';
-    row.getCell(7).alignment = { horizontal: 'center' };
-    row.getCell(8).numFmt    = '"$ "#,##0';
-    row.getCell(8).alignment = { horizontal: 'right' };
-    applyDataRow(row, 8, i % 2 === 1);
+    row.getCell(1).alignment  = { horizontal: 'center' };
+    row.getCell(2).alignment  = { horizontal: 'center' };
+    row.getCell(3).alignment  = { horizontal: 'left' };
+    row.getCell(4).alignment  = { horizontal: 'right' };
+    row.getCell(5).numFmt     = '"$ "#,##0';
+    row.getCell(5).alignment  = { horizontal: 'right' };
+    row.getCell(6).numFmt     = '"$ "#,##0';
+    row.getCell(6).alignment  = { horizontal: 'right' };
+    row.getCell(7).numFmt     = '"$ "#,##0';
+    row.getCell(7).alignment  = { horizontal: 'right' };
+    row.getCell(8).alignment  = { horizontal: 'center' };
+    row.getCell(9).numFmt     = '0.00';
+    row.getCell(9).alignment  = { horizontal: 'center' };
+    row.getCell(10).numFmt    = '"$ "#,##0';
+    row.getCell(10).alignment = { horizontal: 'right' };
+    applyDataRow(row, 10, i % 2 === 1);
   });
 
   if (freeze) freezeHeaderRowAt(ws, 1);
@@ -1047,6 +1054,8 @@ function buildDetalleCompras(ws, filasRecibido) {
     { key: 'nombre',    width: 36 },
     { key: 'nit',       width: 15 },
     { key: 'total',     width: 18 },
+    { key: 'subtotal',  width: 18 },
+    { key: 'iva',       width: 16 },
     { key: 'clasi',     width: 16 },
     { key: 'tasa',      width: 12 },
     { key: 'retencion', width: 18 },
