@@ -61,6 +61,7 @@ router.get('/:id', ...validateUUIDParam('id'), getEmpresa);
  *             properties:
  *               name:          { type: string, maxLength: 255 }
  *               responsableId: { type: string, format: uuid, nullable: true }
+ *               contador:      { type: string, maxLength: 255, nullable: true }
  *     responses:
  *       201:
  *         description: Empresa creada
@@ -71,6 +72,7 @@ router.post('/',
   requireExternasAdmin,
   body('name').trim().notEmpty().withMessage('El nombre es obligatorio').isLength({ max: 255 }),
   body('responsableId').optional({ nullable: true }).isUUID().withMessage('responsableId debe ser un UUID válido'),
+  body('contador').optional({ nullable: true }).trim().isLength({ max: 255 }).withMessage('contador debe tener máximo 255 caracteres'),
   validate,
   createEmpresa
 );
@@ -94,6 +96,7 @@ router.post('/',
  *               name:          { type: string, maxLength: 255 }
  *               activa:        { type: boolean }
  *               responsableId: { type: string, format: uuid, nullable: true, description: null desasigna el responsable }
+ *               contador:      { type: string, maxLength: 255, nullable: true, description: null desasigna el contador }
  *     responses:
  *       200:
  *         description: Empresa actualizada
@@ -108,6 +111,7 @@ router.put('/:id',
   body('name').optional().trim().notEmpty().isLength({ max: 255 }),
   body('activa').optional().isBoolean().withMessage('activa debe ser boolean'),
   body('responsableId').optional({ nullable: true }).isUUID().withMessage('responsableId debe ser un UUID válido'),
+  body('contador').optional({ nullable: true }).trim().isLength({ max: 255 }).withMessage('contador debe tener máximo 255 caracteres'),
   validate,
   updateEmpresa
 );

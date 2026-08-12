@@ -17,3 +17,10 @@ export const MONTHS = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
   'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre',
 ]
+
+// Primer nombre de un nombre completo — usado para mostrar solo el nombre
+// (sin apellido) del responsable en la grilla, que es angosta.
+export function firstName(fullName) {
+  if (!fullName) return ''
+  return fullName.trim().split(/\s+/)[0]
+}
