@@ -41,6 +41,10 @@ const DIAN_NAV = [
   { to: '/dian/upload', label: 'Subir reporte', icon: 'upload_file', end: true },
 ]
 
+const EXTERNAS_NAV = [
+  { to: '/empresas-externas', label: 'Seguimiento mensual', icon: 'table_chart', end: true },
+]
+
 const FONDO_NAV = [
   { to: '/fondo-emprender',          label: 'Seguimiento mensual', icon: 'table_chart',    end: true },
   { to: '/fondo-emprender/empresas', label: 'Empresas',            icon: 'corporate_fare' },
@@ -87,9 +91,10 @@ export default function Sidebar({ open, onClose }) {
   const activeModuleMeta = modules.find(m => m.id === activeModule)
 
   const navForModule =
-    activeModule === 'tasks'   ? visible    :
-    activeModule === 'fondo'   ? FONDO_NAV  :
-    activeModule === 'dian'    ? DIAN_NAV   :
+    activeModule === 'tasks'    ? visible       :
+    activeModule === 'fondo'    ? FONDO_NAV     :
+    activeModule === 'dian'     ? DIAN_NAV      :
+    activeModule === 'empresas' ? EXTERNAS_NAV  :
     []
 
   const hasNav = navForModule.length > 0

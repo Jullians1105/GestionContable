@@ -12,6 +12,7 @@ const normalizeEmpresa = (row) => ({
                       : null,
   macrosDone:       row.macros_done       ?? 0,
   macrosInProgress: row.macros_in_progress ?? 0,
+  macroEstados:     row.macro_estados     ?? {},
   confirmed:        row.confirmed         ?? false,
   createdAt:        row.created_at,
   updatedAt:        row.updated_at,
@@ -233,7 +234,118 @@ const getEmpresas = async (req, res, next) => {
                   AND m.anio = $1
                   AND m.mes  = $2
                 LIMIT 1
-              ), false) AS confirmed
+              ), false) AS confirmed,
+              -- Estado individual por macroproceso (mp1..mp7), para el filtro
+              -- "¿qué empresas ya tienen X macroproceso en tal estado?" de la
+              -- lista. Independiente de macros_done/macros_in_progress de
+              -- arriba (que no se tocan, para no alterar el semáforo/contador
+              -- ya en producción) — replica la misma lógica de
+              -- deriveGrupoEstado / deriveNominaElectronicaEstado /
+              -- derivePagoMacroEstado / deriveImpuestosEstado de
+              -- fondoDetalleController.js, esta vez para todas las empresas
+              -- en una sola pasada en vez de una petición por empresa.
+              jsonb_build_object(
+                'mp1', COALESCE((
+                  SELECT estado FROM fondo_detalle_macroprocesos
+                  WHERE empresa_id = e.id AND macroproceso_id = 'mp1'
+                    AND anio = $1 AND mes = $2
+                  LIMIT 1
+                ), 'pending'),
+                'mp2', CASE
+                  WHEN NOT EXISTS (
+                    SELECT 1 FROM fondo_procesos p
+                    JOIN fondo_proceso_grupos g ON g.id = p.grupo_id AND g.macroproceso_id = 'mp2'
+                    LEFT JOIN fondo_checklist_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+                    LEFT JOIN fondo_checklist_items i ON i.mes_id = m.id AND i.proceso_id = p.id
+                    WHERE p.activo = true AND COALESCE(i.estado, 'pending') NOT IN ('done', 'na')
+                  ) THEN 'done'
+                  WHEN EXISTS (
+                    SELECT 1 FROM fondo_procesos p
+                    JOIN fondo_proceso_grupos g ON g.id = p.grupo_id AND g.macroproceso_id = 'mp2'
+                    LEFT JOIN fondo_checklist_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+                    LEFT JOIN fondo_checklist_items i ON i.mes_id = m.id AND i.proceso_id = p.id
+                    WHERE p.activo = true AND COALESCE(i.estado, 'pending') IN ('done', 'in_progress')
+                  ) THEN 'in_progress'
+                  ELSE 'pending'
+                END,
+                'mp3', CASE (
+                    SELECT COALESCE(i.estado, 'pending') FROM fondo_procesos p
+                    LEFT JOIN fondo_checklist_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+                    LEFT JOIN fondo_checklist_items i ON i.mes_id = m.id AND i.proceso_id = p.id
+                    WHERE p.macroproceso_id = 'mp3' LIMIT 1
+                  )
+                  WHEN 'na' THEN 'done'
+                  WHEN 'done' THEN 'done'
+                  WHEN 'in_progress' THEN 'in_progress'
+                  ELSE 'pending'
+                END,
+                'mp4', CASE (
+                    SELECT estado FROM fondo_pagos
+                    WHERE empresa_id = e.id AND anio = $1 AND mes = $2
+                    LIMIT 1
+                  )
+                  WHEN 'enviado'   THEN 'done'
+                  WHEN 'aprobado'  THEN 'done'
+                  WHEN 'rechazado' THEN 'in_progress'
+                  ELSE 'pending'
+                END,
+                'mp5', CASE
+                  WHEN NOT EXISTS (
+                    SELECT 1 FROM fondo_procesos p
+                    JOIN fondo_proceso_grupos g ON g.id = p.grupo_id AND g.macroproceso_id = 'mp5'
+                    LEFT JOIN fondo_checklist_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+                    LEFT JOIN fondo_checklist_items i ON i.mes_id = m.id AND i.proceso_id = p.id
+                    WHERE p.activo = true AND COALESCE(i.estado, 'pending') NOT IN ('done', 'na')
+                  ) THEN 'done'
+                  WHEN EXISTS (
+                    SELECT 1 FROM fondo_procesos p
+                    JOIN fondo_proceso_grupos g ON g.id = p.grupo_id AND g.macroproceso_id = 'mp5'
+                    LEFT JOIN fondo_checklist_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+                    LEFT JOIN fondo_checklist_items i ON i.mes_id = m.id AND i.proceso_id = p.id
+                    WHERE p.activo = true AND COALESCE(i.estado, 'pending') IN ('done', 'in_progress')
+                  ) THEN 'in_progress'
+                  ELSE 'pending'
+                END,
+                'mp6', (
+                  SELECT CASE
+                    WHEN COUNT(*) FILTER (WHERE COALESCE(fi.estado, 'pending') <> 'na') = 0 THEN 'done'
+                    WHEN COUNT(*) FILTER (WHERE COALESCE(fi.estado, 'pending') NOT IN ('na', 'presented')) = 0 THEN 'done'
+                    WHEN COUNT(*) FILTER (WHERE COALESCE(fi.estado, 'pending') = 'presented') > 0 THEN 'in_progress'
+                    ELSE 'pending'
+                  END
+                  FROM fondo_impuestos i
+                  LEFT JOIN fondo_impuestos_items fi
+                         ON fi.impuesto_id = i.id
+                        AND fi.empresa_id  = e.id
+                        AND fi.anio        = $1
+                        AND fi.mes         = $2
+                ),
+                'mp7', CASE
+                  WHEN (
+                    (SELECT COALESCE(i.estado, 'pending') FROM fondo_procesos p
+                     LEFT JOIN fondo_checklist_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+                     LEFT JOIN fondo_checklist_items i ON i.mes_id = m.id AND i.proceso_id = p.id
+                     WHERE p.macroproceso_id = 'mp7p' LIMIT 1) IN ('done', 'na')
+                    AND
+                    (SELECT COALESCE(i.estado, 'pending') FROM fondo_procesos p
+                     LEFT JOIN fondo_checklist_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+                     LEFT JOIN fondo_checklist_items i ON i.mes_id = m.id AND i.proceso_id = p.id
+                     WHERE p.macroproceso_id = 'mp7v' LIMIT 1) IN ('done', 'na')
+                  ) THEN 'done'
+                  WHEN (
+                    (SELECT COALESCE(i.estado, 'pending') FROM fondo_procesos p
+                     LEFT JOIN fondo_checklist_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+                     LEFT JOIN fondo_checklist_items i ON i.mes_id = m.id AND i.proceso_id = p.id
+                     WHERE p.macroproceso_id = 'mp7p' LIMIT 1) IN ('done', 'in_progress')
+                    OR
+                    (SELECT COALESCE(i.estado, 'pending') FROM fondo_procesos p
+                     LEFT JOIN fondo_checklist_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+                     LEFT JOIN fondo_checklist_items i ON i.mes_id = m.id AND i.proceso_id = p.id
+                     WHERE p.macroproceso_id = 'mp7v' LIMIT 1) IN ('done', 'in_progress')
+                  ) THEN 'in_progress'
+                  ELSE 'pending'
+                END
+              ) AS macro_estados
        FROM fondo_empresas e
        ${where}
        ORDER BY e.name ASC`,

@@ -42,6 +42,7 @@ import DianUploadPage from './pages/DianUploadPage'
 import DianNominaPage from './pages/DianNominaPage'
 import DianExportacionPage from './pages/DianExportacionPage'
 import RecurringTasksPage from './pages/RecurringTasksPage'
+import EmpresasExternasPage from './pages/EmpresasExternasPage'
 
 function Layout() {
   const { isAuthenticated } = useAuth()
@@ -110,6 +111,7 @@ function Layout() {
             <Route path="/fondo-emprender/empresas" element={<FondoEmprenderEmpresasPage />} />
             <Route path="/fondo-emprender/empresas/:empresaId" element={<FondoEmprenderEmpresaDetallePage />} />
             <Route path="/fondo-emprender/pagos" element={<FondoEmprenderPagosPage />} />
+            <Route path="/empresas-externas" element={<EmpresasExternasPage />} />
             <Route path="/dian/upload"                       element={<DianUploadPage />} />
             <Route path="/dian/clasificacion/:borradorId"    element={<DianClasificacionPage />} />
             <Route path="/dian/nomina/:borradorId"           element={<DianNominaPage />} />

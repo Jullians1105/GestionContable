@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import StatsCard from '../components/StatsCard'
-import { getMacroStats, getMesVencidoHabilitado, resolveMesInicial } from '../data/fondoEmprender'
+import { getMacroStats, getMesVencidoHabilitado, resolveMesInicial, MACRO_PROCESSES } from '../data/fondoEmprender'
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
 
@@ -10,6 +10,12 @@ const SEM_COLOR = {
   yellow: '#d97706',
   red:    '#ef4444',
 }
+
+const ESTADO_OPTIONS = [
+  { key: 'done',        label: 'Completado',  color: '#16a34a' },
+  { key: 'in_progress', label: 'En progreso', color: '#d97706' },
+  { key: 'pending',     label: 'Pendiente',   color: '#6b7280' },
+]
 
 const MONTHS = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -65,6 +71,55 @@ export default function FondoEmprenderEmpresasPage() {
   // ── filter state ─────────────────────────────────────────────────────────
   const [search, setSearch]       = useState('')
   const [activeTab, setActiveTab] = useState('todas')
+
+  // ── macroproceso + estado filter ─────────────────────────────────────────
+  // Aplica solo al presionar "Buscar" (no en vivo como el input de texto de
+  // arriba): el borrador (draft) vive en el panel, y solo pasa a `applied`
+  // —el que de verdad filtra `filtered`— al confirmar la búsqueda.
+  const [macroPanelOpen, setMacroPanelOpen]       = useState(false)
+  const [macroDraft, setMacroDraft]               = useState([])
+  const [estadoDraft, setEstadoDraft]             = useState('done')
+  const [appliedMacroFilter, setAppliedMacroFilter] = useState(null) // { macros: string[], estado: string } | null
+  const macroPanelRef = useRef(null)
+
+  // Cierra el panel al hacer clic afuera (mismo patrón que los dropdowns de
+  // FondoEmprenderPage.jsx). Si se cierra sin haber dado "Buscar", el
+  // borrador vuelve a reflejar el último filtro aplicado (o se vacía si
+  // nunca se aplicó ninguno) — así no queda "sucio" para la próxima vez que
+  // se abra.
+  useEffect(() => {
+    if (!macroPanelOpen) return
+    const handleClickOutside = (e) => {
+      if (macroPanelRef.current && !macroPanelRef.current.contains(e.target)) {
+        setMacroPanelOpen(false)
+        setMacroDraft(appliedMacroFilter?.macros ?? [])
+        setEstadoDraft(appliedMacroFilter?.estado ?? 'done')
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [macroPanelOpen, appliedMacroFilter])
+
+  function toggleMacroPanel() {
+    if (!macroPanelOpen) {
+      setMacroDraft(appliedMacroFilter?.macros ?? [])
+      setEstadoDraft(appliedMacroFilter?.estado ?? 'done')
+    }
+    setMacroPanelOpen(v => !v)
+  }
+  function toggleMacroDraft(id) {
+    setMacroDraft(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id])
+  }
+  function aplicarMacroFilter() {
+    if (macroDraft.length === 0) { setAppliedMacroFilter(null); setMacroPanelOpen(false); return }
+    setAppliedMacroFilter({ macros: macroDraft, estado: estadoDraft })
+    setMacroPanelOpen(false)
+  }
+  function limpiarMacroFilter() {
+    setMacroDraft([])
+    setEstadoDraft('done')
+    setAppliedMacroFilter(null)
+  }
 
   // ── add-company form state ────────────────────────────────────────────────
   const [adding, setAdding]        = useState(false)
@@ -203,9 +258,12 @@ export default function FondoEmprenderEmpresasPage() {
     return empresas.filter(c => {
       const matchSearch = !q || c.name.toLowerCase().includes(q)
       const matchCat    = activeTab === 'todas' || (c.categoria ?? 'contable') === activeTab
-      return matchSearch && matchCat
+      const matchMacros = !appliedMacroFilter || appliedMacroFilter.macros.every(
+        mpId => (c.macroEstados?.[mpId] ?? 'pending') === appliedMacroFilter.estado
+      )
+      return matchSearch && matchCat && matchMacros
     })
-  }, [empresas, search, activeTab])
+  }, [empresas, search, activeTab, appliedMacroFilter])
 
   // ── loading / error states ────────────────────────────────────────────────
   if (loading) return (
@@ -448,7 +506,145 @@ export default function FondoEmprenderEmpresasPage() {
             className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
           />
         </div>
+
       </div>
+
+      {/* ── Verificar macroprocesos — botón angosto alineado a la derecha,
+           justo arriba de la tabla. Al desplegar: columna de macroprocesos
+           a la izquierda, columna de estado a la derecha. Mismo lenguaje
+           visual que el resto de la página (punto de color como el estado
+           de la ficha de detalle). ────────────────────────────────────── */}
+      <div className="flex flex-col gap-2">
+        <div className="flex justify-end">
+          <div className="relative" ref={macroPanelRef}>
+            <button
+              onClick={toggleMacroPanel}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
+                appliedMacroFilter
+                  ? 'border-[#004ac6] text-[#004ac6] bg-[#f0f4ff] dark:bg-[#252840]'
+                  : 'border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]'
+              }`}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>fact_check</span>
+              {appliedMacroFilter
+                ? `${appliedMacroFilter.macros.length} macroproceso${appliedMacroFilter.macros.length > 1 ? 's' : ''} · ${ESTADO_OPTIONS.find(o => o.key === appliedMacroFilter.estado)?.label}`
+                : 'Verificar macroprocesos'}
+              {appliedMacroFilter && (
+                <span
+                  role="button"
+                  onClick={e => { e.stopPropagation(); limpiarMacroFilter() }}
+                  className="material-symbols-outlined hover:text-[#ef4444] dark:hover:text-[#ef4444]"
+                  style={{ fontSize: 15 }}
+                  title="Limpiar filtro"
+                >
+                  close
+                </span>
+              )}
+              <span
+                className="material-symbols-outlined transition-transform duration-150"
+                style={{ fontSize: 16, transform: macroPanelOpen ? 'rotate(180deg)' : 'none' }}
+              >
+                expand_more
+              </span>
+            </button>
+
+            {macroPanelOpen && (
+              <div className="absolute z-20 top-full mt-2 right-0 w-[340px] bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-lg p-4 flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Macroprocesos — columna izquierda */}
+                  <div className="flex flex-col gap-1.5 min-w-0">
+                    <label className="text-[10px] font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
+                      Macroprocesos
+                    </label>
+                    <div className="flex flex-col gap-0.5">
+                      {MACRO_PROCESSES.map(({ id, name }) => {
+                        const active = macroDraft.includes(id)
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => toggleMacroDraft(id)}
+                            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-semibold text-left transition-all duration-150 ${
+                              active ? 'text-white' : 'text-[#6b7280] dark:text-[#8890b5]'
+                            }`}
+                            style={{ background: active ? '#004ac6' : 'transparent' }}
+                          >
+                            <span className="material-symbols-outlined flex-shrink-0" style={{ fontSize: 15 }}>
+                              {active ? 'check_box' : 'check_box_outline_blank'}
+                            </span>
+                            <span className="truncate">{name}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Estado — columna derecha */}
+                  <div className="flex flex-col gap-1.5 min-w-0">
+                    <label className="text-[10px] font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
+                      Estado
+                    </label>
+                    <div className="flex flex-col gap-0.5">
+                      {ESTADO_OPTIONS.map(({ key, label, color }) => {
+                        const active = estadoDraft === key
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setEstadoDraft(key)}
+                            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-semibold text-left transition-all duration-150 ${
+                              active ? 'bg-[#f0f2f8] dark:bg-[#252840]' : ''
+                            }`}
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ background: active ? color : '#c3c6d7' }}
+                            />
+                            <span
+                              className={active ? '' : 'text-[#6b7280] dark:text-[#8890b5]'}
+                              style={active ? { color } : undefined}
+                            >
+                              {label}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#f0f2f8] dark:border-[#2e3148]">
+                  <button
+                    onClick={limpiarMacroFilter}
+                    className="px-2 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+                  >
+                    Limpiar
+                  </button>
+                  <button
+                    onClick={aplicarMacroFilter}
+                    disabled={macroDraft.length === 0}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40 transition active:scale-[0.97]"
+                    style={{ background: '#004ac6' }}
+                  >
+                    <span className="material-symbols-outlined" style={{ fontSize: 15 }}>search</span>
+                    Buscar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {appliedMacroFilter && (
+          <div className="flex items-center gap-1.5 text-xs text-[#434655] dark:text-[#c4c8e8] justify-end">
+            <span className="material-symbols-outlined flex-shrink-0" style={{ fontSize: 14, color: '#004ac6' }}>info</span>
+            Mostrando <span className="font-bold text-[#191c1e] dark:text-[#e4e6f0]">{filtered.length}</span> empresa{filtered.length !== 1 ? 's' : ''} con{' '}
+            <span className="font-semibold">{appliedMacroFilter.macros.map(id => MACRO_PROCESSES.find(m => m.id === id)?.name).join(', ')}</span> en estado{' '}
+            <span className="font-semibold" style={{ color: ESTADO_OPTIONS.find(o => o.key === appliedMacroFilter.estado)?.color }}>
+              {ESTADO_OPTIONS.find(o => o.key === appliedMacroFilter.estado)?.label}
+            </span>
+          </div>
+        )}
 
       {/* ── Compact table ────────────────────────────────────────────────── */}
       {filtered.length > 0 ? (
@@ -635,11 +831,12 @@ export default function FondoEmprenderEmpresasPage() {
         </div>
       ) : (
         <div className="text-center py-16 text-[#8890b5] dark:text-[#5a5f7a] text-sm">
-          {search || activeTab !== 'todas'
+          {search || activeTab !== 'todas' || appliedMacroFilter
             ? 'No hay empresas que coincidan con el filtro'
             : 'No se encontraron empresas'}
         </div>
       )}
+      </div>
     </div>
   )
 }

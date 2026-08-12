@@ -7,6 +7,12 @@ module.exports = {
     '!src/controllers/fondo*.js',
     '!src/routes/fondo*.js',
     '!src/middleware/fondoAccess.js',
+    // Mismo criterio que fondo* arriba: controllers/rutas pesados en SQL con
+    // sus propios tests dedicados (ver tests/unit/ext*.test.js), pero no
+    // cuentan para el umbral global de cobertura.
+    '!src/controllers/ext*.js',
+    '!src/routes/ext*.js',
+    '!src/middleware/externasAccess.js',
     '!src/services/pushService.js',
     '!src/services/recurringTaskService.js',
     '!src/services/reminderService.js',
