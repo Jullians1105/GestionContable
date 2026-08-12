@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { STATUS, MONTHS, getMesVencidoHabilitado, resolveMesInicial } from '../data/empresasExternas'
+import { STATUS, MONTHS, getMesVencidoHabilitado, resolveMesInicial, firstName } from '../data/empresasExternas'
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
 import { useAuth } from '../context/AuthContext'
@@ -15,15 +15,70 @@ import { useTeam } from '../context/TeamContext'
 const BORDER     = '1px solid #e2e4ef'
 const BORDER_COL = '1px solid #d5d9ea'
 
+// Franjas de color arriba y abajo de todo el header (mismo azul de acento
+// que el resto de la app), con el propio fondo del header teñido del mismo
+// tono muy tenue (bg-[#f0f4ff], el mismo hex que usa el grupo 0 de
+// FondoEmprenderPage.jsx) en vez de gris neutro — así las franjas se leen
+// como el borde de un bloque de ese color, no como dos líneas sueltas
+// flotando sobre un fondo que no tiene nada que ver con ellas. No hay grupos
+// acá, así que es una sola franja continua para toda la fila de headers
+// (no una por macroproceso como en Fondo Emprender).
+const HEADER_ACCENT = '#004ac6'
+const HEADER_ACCENT_BORDER = `3px solid ${HEADER_ACCENT}`
+
 // A diferencia de Fondo Emprender (23+ procesos, columnas angostas de 48px
 // con texto rotado para que todos quepan), acá son solo 11 — hay espacio de
 // sobra para texto horizontal normal, más legible y sin la franja vertical
 // vacía que dejaba el texto rotado dentro de un header pensado para nombres
-// mucho más largos. Ancho ajustado para que las 11 quepan sin scroll
-// horizontal en una pantalla de escritorio normal.
-const COL_WIDTH = 100
-const EMPRESA_COL_WIDTH = 170
-const RESPONSABLE_COL_WIDTH = 110
+// mucho más largos.
+//
+// Empresa/Responsable/Contador quedan en ancho fijo (son columnas sticky —
+// necesitan un `left` fijo en px para congelarse durante el scroll). Empresa
+// se llevó el espacio que se les recortó a las columnas de Proceso más
+// cortas (ver PROC_MIN_WEIGHT) para que los nombres de empresa se alcancen a
+// leer más completos. Responsable/Contador están medidos para que su propio
+// título en mayúsculas ("RESPONSABLE" es el más largo) entre en una sola
+// línea sin cortarse — el dato (nombres cortos como "Natalia") nunca es el
+// que manda el ancho acá, el título sí.
+//
+// Las 11 de Proceso NO tienen un ancho parejo entre sí: cada una pesa según
+// el largo de su propio nombre (ver procWeight más abajo) — "Caja" o
+// "Ventas" no necesitan el mismo espacio que "Pago seguridad social", forzar
+// el mismo ancho para todas desperdicia sitio en las cortas y aprieta a las
+// largas. calc() reparte el ancho sobrante de la tabla (100% del
+// contenedor, ya descontadas las 3 columnas fijas) proporcional a ese peso,
+// así la grilla llena la pantalla sin franja vacía ni scroll horizontal en
+// el caso normal — MIN_COL_WIDTH es el piso (min-width) para cuando la
+// ventana es angosta de verdad y ni así entra.
+const MIN_COL_WIDTH = 72
+const PROC_MIN_WEIGHT = 6 // = largo de "Ventas"/"Nómina" — piso para que "Caja" (4) no quede ridículamente angosta, sin inflar a las demás cortas
+const EMPRESA_COL_WIDTH = 210
+const RESPONSABLE_COL_WIDTH = 100
+const CONTADOR_COL_WIDTH = 80
+
+// Claves sintéticas para filtrar por Responsable/Contador dentro del mismo
+// `columnFilters` que ya usan los procesos (por estado) — el shape (Set de
+// valores permitidos) es idéntico, solo cambia qué campo del company se
+// compara contra el set. Reusar el mismo state evita duplicar el badge de
+// "N filtros de columna" y el botón de limpiar.
+const RESPONSABLE_FILTER_KEY = '__responsable'
+const CONTADOR_FILTER_KEY = '__contador'
+const SIN_ASIGNAR = '(Sin asignar)'
+
+// El ícono de filtro vive SIEMPRE en la esquina superior-derecha de su
+// header (position:absolute), como una chapita fija — no en una franja
+// propia de ancho completo (eso dejaba, en columnas angostas, un renglón
+// vacío con el ícono flotando solo). HEADER_TOP_CLEARANCE es el padding-top
+// que le reserva ese rincón al ícono ANTES de que empiece el texto: al ser
+// espacio vertical (no horizontal), el título sigue centrado/alineado en
+// todo el ancho de la columna — nunca compite de lado a lado con el ícono
+// como pasaba antes, que es lo que lo cortaba o lo corría del centro.
+const FILTER_BTN_SIZE = 14
+// Separado de la franja azul superior (HEADER_ACCENT_BORDER, 3px) por un
+// margen propio — a top:2 quedaba pisando ese borde, y el hover del botón se
+// veía cortado/superpuesto con la franja.
+const FILTER_BTN_OFFSET = 6
+const HEADER_TOP_CLEARANCE = 22
 
 const emptyCell = { status: 'pending', note: '' }
 
@@ -50,38 +105,54 @@ function headerBoxShadow({ top, bottom, left, right }) {
     .join(', ')
 }
 
-// ─── header sub-component ──────────────────────────────────────────────────
-// El ícono de filtro vive en su propia franja angosta arriba (14px) en vez de
-// flotar sobre el texto — así el nombre del proceso puede centrarse en todo
-// el ancho de la columna sin que el ícono le robe espacio de un lado y quede
-// descentrado. Sin uppercase: en mayúsculas cada palabra ocupa más ancho y
-// fuerza cortes a mitad de palabra en nombres largos como "Autorretención".
+// ─── header sub-components ─────────────────────────────────────────────────
+
+// Ícono de filtro anclado en la esquina superior-derecha del header (que
+// debe reservarle el espacio con padding-top: HEADER_TOP_CLEARANCE) — una
+// chapita fija en el rincón, no una franja de ancho completo. El título
+// nunca comparte línea horizontal con él (por eso no le hace falta padding
+// lateral ni se descentra), solo le cede un poco de alto arriba.
+function FilterButton({ onClick, hasFilter, title }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`absolute flex items-center justify-center rounded transition-colors ${
+        hasFilter
+          ? 'text-[#004ac6] dark:text-[#7ba8f0] bg-[#e8eefc] dark:bg-[#1a2444]'
+          : 'text-[#b0b4c8] dark:text-[#4b5170] hover:text-[#6b7280] dark:hover:text-[#8890b5] hover:bg-[#edeef0] dark:hover:bg-[#252840]'
+      }`}
+      style={{ width: FILTER_BTN_SIZE, height: FILTER_BTN_SIZE, top: FILTER_BTN_OFFSET, right: 4 }}
+      title={title}
+    >
+      <span className="material-symbols-outlined" style={{ fontSize: 10 }}>filter_alt</span>
+    </button>
+  )
+}
+
+// Sin uppercase: en mayúsculas cada palabra ocupa más ancho y fuerza cortes a
+// mitad de palabra en nombres largos como "Autorretención".
 function ProcessHeaderCell({ proc, editable, isFirst, isLast, onMoveLeft, onMoveRight, startEditProcess, setDeleteConfirm, onFilterClick, hasFilter }) {
   return (
     <th
       title={proc.name}
-      className="bg-[#f8f9fc] dark:bg-[#1a1d2e] text-[#6b7280] dark:text-[#8890b5]"
+      className="bg-[#f0f4ff] dark:bg-[#182544] text-[#6b7280] dark:text-[#8890b5]"
       style={{
-        width: COL_WIDTH, minWidth: COL_WIDTH, verticalAlign: 'bottom', padding: '2px 4px 6px',
-        boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, right: BORDER_COL }),
+        // Sin `width`: columna proporcional al largo de su nombre (ver
+        // procColWidth), calculada en el <col> del colgroup. minWidth es el
+        // único piso acá. position:relative acá es seguro (este th NO es
+        // sticky) — es lo que ancla el FilterButton absolute a la esquina.
+        minWidth: MIN_COL_WIDTH, verticalAlign: 'bottom', position: 'relative',
+        padding: !editable ? `${HEADER_TOP_CLEARANCE}px 4px 6px` : '2px 4px 6px',
+        boxShadow: headerBoxShadow({ top: HEADER_ACCENT_BORDER, bottom: HEADER_ACCENT_BORDER, right: BORDER_COL }),
       }}
     >
       {!editable ? (
         <>
-          <div className="flex justify-end" style={{ height: 14 }}>
-            <button
-              onClick={(e) => onFilterClick(proc.id, e)}
-              className={`flex items-center justify-center rounded transition-colors ${
-                hasFilter
-                  ? 'text-[#004ac6] dark:text-[#7ba8f0] bg-[#e8eefc] dark:bg-[#1a2444]'
-                  : 'text-[#b0b4c8] dark:text-[#4b5170] hover:text-[#6b7280] dark:hover:text-[#8890b5] hover:bg-[#edeef0] dark:hover:bg-[#252840]'
-              }`}
-              style={{ width: 16, height: 14 }}
-              title={hasFilter ? `Filtro activo — ${proc.name}` : `Filtrar "${proc.name}" por estado`}
-            >
-              <span className="material-symbols-outlined" style={{ fontSize: 11 }}>filter_alt</span>
-            </button>
-          </div>
+          <FilterButton
+            onClick={(e) => onFilterClick('status', proc.id, proc.name, e)}
+            hasFilter={hasFilter}
+            title={hasFilter ? `Filtro activo — ${proc.name}` : `Filtrar "${proc.name}" por estado`}
+          />
           <div className="text-[10.5px] font-semibold leading-snug text-center" style={{ overflowWrap: 'break-word' }}>
             {proc.name}
           </div>
@@ -127,6 +198,38 @@ function ProcessHeaderCell({ proc, editable, isFirst, isLast, onMoveLeft, onMove
           </div>
         </div>
       )}
+    </th>
+  )
+}
+
+// Header de Responsable/Contador — mismo th sticky que ya tenían, con el
+// mismo FilterButton en la esquina que ProcessHeaderCell para que las tres
+// columnas filtrables se vean consistentes. NO lleva position:'relative' —
+// el th ya es position:sticky (clase "sticky"), y sticky también actúa como
+// contenedor de posicionamiento para hijos absolute (igual que relative).
+// Agregarlo pisaba el `position:sticky` por especificidad de inline style y
+// convertía el `left` (pensado como umbral de sticky) en un offset relativo
+// real, corriendo todo el header fuera de su columna — ver el ancho fijo en
+// EMPRESA/RESPONSABLE/CONTADOR_COL_WIDTH.
+function NameFilterHeaderCell({ label, width, left, onFilterClick, hasFilter, filterKey }) {
+  return (
+    <th
+      className="sticky top-0 z-30 bg-[#f0f4ff] dark:bg-[#182544] text-[#6b7280] dark:text-[#8890b5]"
+      style={{
+        left,
+        width, minWidth: width, verticalAlign: 'bottom',
+        padding: `${HEADER_TOP_CLEARANCE}px 8px 6px`,
+        boxShadow: headerBoxShadow({ top: HEADER_ACCENT_BORDER, bottom: HEADER_ACCENT_BORDER, right: BORDER_COL }),
+      }}
+    >
+      <FilterButton
+        onClick={(e) => onFilterClick('name', filterKey, label, e)}
+        hasFilter={hasFilter}
+        title={hasFilter ? `Filtro activo — ${label}` : `Filtrar por ${label}`}
+      />
+      <div className="text-[10px] font-bold uppercase tracking-wide text-left leading-snug whitespace-nowrap" style={{ overflowWrap: 'break-word' }}>
+        {label}
+      </div>
     </th>
   )
 }
@@ -213,6 +316,7 @@ export default function EmpresasExternasPage() {
           name: e.name,
           responsableId: e.responsableId,
           responsableNombre: e.responsableNombre,
+          contador: e.contador,
           activa: e.activa,
           cells,
         }
@@ -290,9 +394,34 @@ export default function EmpresasExternasPage() {
     return () => document.removeEventListener('mousedown', h)
   }, [openCell, flushPendingNote])
 
-  // ── column filter (filtro de estado por subcolumna, estilo Excel) ────────
+  // ── column filter — filtro de estado por proceso Y filtro por valor de
+  // Responsable/Contador, estilo Excel, ambos guardados en el mismo
+  // `columnFilters` (key → Set de valores permitidos): para un proceso la
+  // key es su id y los valores son claves de STATUS; para Responsable/
+  // Contador la key es RESPONSABLE_FILTER_KEY/CONTADOR_FILTER_KEY y los
+  // valores son los nombres que realmente aparecen en esa columna. ─────────
 
-  function handleFilterIconClick(procId, e) {
+  // Nombres únicos presentes en cada columna (incluye "(Sin asignar)" si hay
+  // empresas sin ese dato) — son las opciones que ofrece el dropdown de
+  // filtro, calculadas sobre TODAS las empresas visibles (no solo las que
+  // sobreviven a otros filtros ya aplicados), igual que Excel.
+  const responsableOptions = [...new Set(
+    companies.filter(c => canEditStructure || c.activa !== false)
+      .map(c => firstName(c.responsableNombre) || SIN_ASIGNAR)
+  )].sort((a, b) => a.localeCompare(b, 'es'))
+
+  const contadorOptions = [...new Set(
+    companies.filter(c => canEditStructure || c.activa !== false)
+      .map(c => c.contador?.trim() || SIN_ASIGNAR)
+  )].sort((a, b) => a.localeCompare(b, 'es'))
+
+  function optionsForFilterKey(key) {
+    if (key === RESPONSABLE_FILTER_KEY) return responsableOptions
+    if (key === CONTADOR_FILTER_KEY) return contadorOptions
+    return Object.keys(STATUS)
+  }
+
+  function handleFilterIconClick(kind, key, label, e) {
     e.stopPropagation()
     const rect = e.currentTarget.getBoundingClientRect()
     const PW = 208
@@ -301,41 +430,43 @@ export default function EmpresasExternasPage() {
     if (left + PW > window.innerWidth - 8) left = window.innerWidth - PW - 8
     if (left < 8) left = 8
     if (top + 220 > window.innerHeight - 8) top = Math.max(8, rect.top - 220 - 4)
-    setOpenFilter(prev => (prev?.procId === procId ? null : { procId, left, top }))
+    setOpenFilter(prev => (prev?.key === key ? null : { kind, key, label, left, top }))
   }
 
-  function isStatusChecked(procId, statusKey) {
-    const filter = columnFilters[procId]
-    return !filter || filter.has(statusKey)
+  function isOptionChecked(key, optionKey) {
+    const filter = columnFilters[key]
+    return !filter || filter.has(optionKey)
   }
 
-  function toggleStatusFilter(procId, statusKey) {
+  function toggleOptionFilter(key, optionKey) {
+    const allOptions = optionsForFilterKey(key)
     setColumnFilters(prev => {
-      const baseline = prev[procId] ?? new Set(Object.keys(STATUS))
+      const baseline = prev[key] ?? new Set(allOptions)
       const next = new Set(baseline)
-      if (next.has(statusKey)) next.delete(statusKey)
-      else next.add(statusKey)
-      if (next.size === Object.keys(STATUS).length) {
-        const { [procId]: _omit, ...rest } = prev
+      if (next.has(optionKey)) next.delete(optionKey)
+      else next.add(optionKey)
+      if (next.size === allOptions.length) {
+        const { [key]: _omit, ...rest } = prev
         return rest
       }
-      return { ...prev, [procId]: next }
+      return { ...prev, [key]: next }
     })
   }
 
-  function clearColumnFilter(procId) {
+  function clearColumnFilter(key) {
     setColumnFilters(prev => {
-      const { [procId]: _omit, ...rest } = prev
+      const { [key]: _omit, ...rest } = prev
       return rest
     })
   }
 
-  function toggleSelectAllFilter(procId) {
+  function toggleSelectAllFilter(key) {
+    const allOptions = optionsForFilterKey(key)
     setColumnFilters(prev => {
-      const total = Object.keys(STATUS).length
-      const current = prev[procId] ?? new Set(Object.keys(STATUS))
-      if (current.size === total) return { ...prev, [procId]: new Set() }
-      const { [procId]: _omit, ...rest } = prev
+      const total = allOptions.length
+      const current = prev[key] ?? new Set(allOptions)
+      if (current.size === total) return { ...prev, [key]: new Set() }
+      const { [key]: _omit, ...rest } = prev
       return rest
     })
   }
@@ -430,7 +561,6 @@ export default function EmpresasExternasPage() {
   const openCompany  = openCell ? companies.find(c => c.id === openCell.companyId) : null
   const openProcess  = openCell ? processes.find(p => p.id === openCell.procId) : null
   const openCellData = openCompany?.cells[openCell?.procId] ?? emptyCell
-  const openFilterProcess = openFilter ? processes.find(p => p.id === openFilter.procId) : null
 
   // ── tooltip helpers ──────────────────────────────────────────────────────
 
@@ -554,12 +684,12 @@ export default function EmpresasExternasPage() {
   // ── company actions (solo admin, desde "Editar estructura") ─────────────
 
   function openCreateEmpresaModal() {
-    setEmpresaModal({ mode: 'create', id: null, name: '', responsableId: '', activa: true })
+    setEmpresaModal({ mode: 'create', id: null, name: '', responsableId: '', contador: '', activa: true })
   }
   function openEditEmpresaModal(company) {
     setEmpresaModal({
       mode: 'edit', id: company.id, name: company.name,
-      responsableId: company.responsableId ?? '', activa: company.activa,
+      responsableId: company.responsableId ?? '', contador: company.contador ?? '', activa: company.activa,
     })
   }
   function closeEmpresaModal() {
@@ -574,7 +704,7 @@ export default function EmpresasExternasPage() {
 
     if (modal.mode === 'create') {
       try {
-        await api.createExtEmpresa({ name, responsableId: modal.responsableId || null })
+        await api.createExtEmpresa({ name, responsableId: modal.responsableId || null, contador: modal.contador?.trim() || null })
         fetchGrid()
       } catch (err) {
         alert('Error al crear empresa: ' + err.message)
@@ -583,10 +713,12 @@ export default function EmpresasExternasPage() {
     }
 
     try {
-      // '' del <select> significa "sin responsable" — se manda null explícito,
-      // no se omite (omitirlo dejaría el responsable anterior sin tocar).
+      // '' del <select>/input significa "sin asignar" — se manda null
+      // explícito, no se omite (omitirlo dejaría el valor anterior sin tocar).
       await api.updateExtEmpresa(modal.id, {
-        name, activa: modal.activa, responsableId: modal.responsableId || null,
+        name, activa: modal.activa,
+        responsableId: modal.responsableId || null,
+        contador: modal.contador?.trim() || null,
       })
       fetchGrid()
     } catch (err) {
@@ -632,11 +764,13 @@ export default function EmpresasExternasPage() {
     // o borrarlas de verdad) — en la vista normal quedan fuera, igual que un
     // proceso desactivado no aparece en meses nuevos.
     if (!canEditStructure && c.activa === false) return false
-    const matchSearch = !q
-      || c.name.toLowerCase().includes(q)
-      || (c.responsableNombre ?? '').toLowerCase().includes(q)
-    const matchColumnFilters = Object.entries(columnFilters).every(([procId, allowed]) => {
-      const status = c.cells[procId]?.status ?? 'pending'
+    // Solo empresa: Responsable/Contador ya tienen su propio filtro por
+    // columna, no hace falta que el buscador también los cubra.
+    const matchSearch = !q || c.name.toLowerCase().includes(q)
+    const matchColumnFilters = Object.entries(columnFilters).every(([key, allowed]) => {
+      if (key === RESPONSABLE_FILTER_KEY) return allowed.has(firstName(c.responsableNombre) || SIN_ASIGNAR)
+      if (key === CONTADOR_FILTER_KEY) return allowed.has(c.contador?.trim() || SIN_ASIGNAR)
+      const status = c.cells[key]?.status ?? 'pending'
       return allowed.has(status)
     })
     return matchSearch && matchColumnFilters
@@ -651,9 +785,18 @@ export default function EmpresasExternasPage() {
   )
   const pct = totalCells ? Math.round((doneCells / totalCells) * 100) : 0
 
-  const columnWidths = [EMPRESA_COL_WIDTH, RESPONSABLE_COL_WIDTH, ...visibleProcesses.map(() => COL_WIDTH)]
-  const totalLeafColumns = columnWidths.length
-  const gridWidth = columnWidths.reduce((a, b) => a + b, 0)
+  // Las 3 fijas (sticky) + las N de Proceso, repartidas proporcional al
+  // largo de cada nombre (ver comentario de PROC_MIN_WEIGHT) en vez de en
+  // partes iguales — así "Caja" no ocupa lo mismo que "Pago seguridad
+  // social". calc() resuelve el % real recién en el navegador contra el
+  // ancho verdadero del contenedor, así sigue siendo responsive.
+  const fixedColWidths = [EMPRESA_COL_WIDTH, RESPONSABLE_COL_WIDTH, CONTADOR_COL_WIDTH]
+  const totalFixedWidth = fixedColWidths.reduce((a, b) => a + b, 0)
+  const procWeights = visibleProcesses.map(p => Math.max(p.name.length, PROC_MIN_WEIGHT))
+  const totalProcWeight = procWeights.reduce((a, b) => a + b, 0) || 1
+  const procColWidth = (weight) =>
+    `calc((100% - ${totalFixedWidth}px) * ${(weight / totalProcWeight).toFixed(4)})`
+  const totalLeafColumns = fixedColWidths.length + visibleProcesses.length
 
   function renderProcessCell(company, proc, rowBg) {
     const cell = company.cells[proc.id] ?? emptyCell
@@ -663,7 +806,7 @@ export default function EmpresasExternasPage() {
       <td
         key={proc.id}
         style={{
-          width: COL_WIDTH, minWidth: COL_WIDTH, padding: 2, background: rowBg,
+          minWidth: MIN_COL_WIDTH, padding: 2, background: rowBg,
           borderTop: BORDER, borderBottom: BORDER, borderLeft: BORDER_COL, borderRight: BORDER_COL,
         }}
       >
@@ -785,7 +928,7 @@ export default function EmpresasExternasPage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar empresa o responsable..."
+            placeholder="Buscar empresa..."
             className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
           />
         </div>
@@ -824,31 +967,44 @@ export default function EmpresasExternasPage() {
         className="overflow-auto rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm scrollbar-styled"
         style={{ maxHeight: 'calc(100vh - 6rem)' }}
       >
-        <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: `${gridWidth}px`, minWidth: `${gridWidth}px` }}>
+        {/* width:100% (no un ancho fijo en px) es lo que hace la grilla
+            responsive: ocupa siempre el ancho real del contenedor. Cada
+            columna de Proceso pesa proporcional al largo de su nombre (ver
+            procColWidth) — si la ventana se achica más allá de lo que dan
+            los MIN_COL_WIDTH de cada una, recién ahí aparece el scroll
+            horizontal del contenedor de arriba, como último recurso. */}
+        <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%' }}>
           <colgroup>
-            {columnWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
+            {fixedColWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
+            {visibleProcesses.map((p, i) => <col key={p.id} style={{ width: procColWidth(procWeights[i]) }} />)}
           </colgroup>
           <thead className="sticky top-0 z-20">
             <tr>
               <th
-                className="sticky left-0 top-0 z-30 bg-[#f8f9fc] dark:bg-[#1a1d2e] text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
+                className="sticky left-0 top-0 z-30 bg-[#f0f4ff] dark:bg-[#182544] text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
                 style={{
                   width: EMPRESA_COL_WIDTH, minWidth: EMPRESA_COL_WIDTH, verticalAlign: 'bottom', padding: '6px 8px 8px',
-                  boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, left: BORDER, right: BORDER_COL }),
+                  boxShadow: headerBoxShadow({ top: HEADER_ACCENT_BORDER, bottom: HEADER_ACCENT_BORDER, left: BORDER, right: BORDER_COL }),
                 }}
               >
                 Empresa
               </th>
-              <th
-                className="sticky top-0 z-30 bg-[#f8f9fc] dark:bg-[#1a1d2e] text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
-                style={{
-                  left: EMPRESA_COL_WIDTH,
-                  width: RESPONSABLE_COL_WIDTH, minWidth: RESPONSABLE_COL_WIDTH, verticalAlign: 'bottom', padding: '6px 8px 8px',
-                  boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, right: BORDER_COL }),
-                }}
-              >
-                Responsable
-              </th>
+              <NameFilterHeaderCell
+                label="Responsable"
+                width={RESPONSABLE_COL_WIDTH}
+                left={EMPRESA_COL_WIDTH}
+                onFilterClick={handleFilterIconClick}
+                hasFilter={Boolean(columnFilters[RESPONSABLE_FILTER_KEY])}
+                filterKey={RESPONSABLE_FILTER_KEY}
+              />
+              <NameFilterHeaderCell
+                label="Contador"
+                width={CONTADOR_COL_WIDTH}
+                left={EMPRESA_COL_WIDTH + RESPONSABLE_COL_WIDTH}
+                onFilterClick={handleFilterIconClick}
+                hasFilter={Boolean(columnFilters[CONTADOR_FILTER_KEY])}
+                filterKey={CONTADOR_FILTER_KEY}
+              />
               {visibleProcesses.map((proc, idx) => (
                 <ProcessHeaderCell
                   key={proc.id}
@@ -932,7 +1088,22 @@ export default function EmpresasExternasPage() {
                   >
                     <div className="flex items-center h-full px-2">
                       <span className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate flex-1 min-w-0" title={company.responsableNombre ?? undefined}>
-                        {company.responsableNombre ?? <span className="text-[#c3c8dd] dark:text-[#5a5f7a]">—</span>}
+                        {firstName(company.responsableNombre) || <span className="text-[#c3c8dd] dark:text-[#5a5f7a]">—</span>}
+                      </span>
+                    </div>
+                  </td>
+                  <td
+                    className="sticky z-10"
+                    style={{
+                      left: EMPRESA_COL_WIDTH + RESPONSABLE_COL_WIDTH,
+                      width: CONTADOR_COL_WIDTH, minWidth: CONTADOR_COL_WIDTH, maxWidth: CONTADOR_COL_WIDTH,
+                      background: rowBg, height: 36, padding: 0,
+                      boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, right: BORDER_COL }),
+                    }}
+                  >
+                    <div className="flex items-center h-full px-2">
+                      <span className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate flex-1 min-w-0" title={company.contador ?? undefined}>
+                        {company.contador || <span className="text-[#c3c8dd] dark:text-[#5a5f7a]">—</span>}
                       </span>
                     </div>
                   </td>
@@ -1018,20 +1189,20 @@ export default function EmpresasExternasPage() {
         </div>
       )}
 
-      {/* ── Filtro de columna (por estado) ──────────────────────────────── */}
-      {openFilter && openFilterProcess && (
+      {/* ── Filtro de columna (por estado, o por Responsable/Contador) ───── */}
+      {openFilter && (
         <div
           ref={filterDropdownRef}
           className="fixed z-50 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-2xl p-3 w-52"
           style={{ left: openFilter.left, top: openFilter.top }}
         >
           <div className="flex items-center justify-between gap-2 mb-2">
-            <p className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={openFilterProcess.name}>
-              {openFilterProcess.name}
+            <p className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={openFilter.label}>
+              {openFilter.label}
             </p>
-            {columnFilters[openFilter.procId] && (
+            {columnFilters[openFilter.key] && (
               <button
-                onClick={() => clearColumnFilter(openFilter.procId)}
+                onClick={() => clearColumnFilter(openFilter.key)}
                 className="text-[10px] font-semibold text-[#004ac6] dark:text-[#7ba8f0] hover:underline flex-shrink-0"
               >
                 Limpiar
@@ -1039,13 +1210,13 @@ export default function EmpresasExternasPage() {
             )}
           </div>
           {(() => {
-            const statusKeys = Object.keys(STATUS)
-            const checkedCount = statusKeys.filter(k => isStatusChecked(openFilter.procId, k)).length
-            const allChecked = checkedCount === statusKeys.length
+            const options = optionsForFilterKey(openFilter.key)
+            const checkedCount = options.filter(k => isOptionChecked(openFilter.key, k)).length
+            const allChecked = checkedCount === options.length
             const noneChecked = checkedCount === 0
             return (
               <button
-                onClick={() => toggleSelectAllFilter(openFilter.procId)}
+                onClick={() => toggleSelectAllFilter(openFilter.key)}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840] mb-1"
               >
                 <span
@@ -1069,12 +1240,12 @@ export default function EmpresasExternasPage() {
           })()}
           <div className="h-px bg-[#e2e4ef] dark:bg-[#2e3148] mb-1" />
           <div className="flex flex-col gap-0.5">
-            {Object.entries(STATUS).map(([key, cfg]) => {
-              const checked = isStatusChecked(openFilter.procId, key)
+            {openFilter.kind === 'status' && Object.entries(STATUS).map(([key, cfg]) => {
+              const checked = isOptionChecked(openFilter.key, key)
               return (
                 <button
                   key={key}
-                  onClick={() => toggleStatusFilter(openFilter.procId, key)}
+                  onClick={() => toggleOptionFilter(openFilter.key, key)}
                   className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
                 >
                   <span
@@ -1090,6 +1261,29 @@ export default function EmpresasExternasPage() {
                   </span>
                   <span className="material-symbols-outlined flex-shrink-0" style={{ color: cfg.color, fontSize: 14 }}>{cfg.icon}</span>
                   <span className="font-medium text-[#191c1e] dark:text-[#e4e6f0]">{cfg.label}</span>
+                </button>
+              )
+            })}
+            {openFilter.kind === 'name' && optionsForFilterKey(openFilter.key).map(value => {
+              const checked = isOptionChecked(openFilter.key, value)
+              return (
+                <button
+                  key={value}
+                  onClick={() => toggleOptionFilter(openFilter.key, value)}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
+                >
+                  <span
+                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7] dark:border-[#3e4260]' : ''}`}
+                    style={{
+                      width: 15, height: 15,
+                      borderWidth: 1.5, borderStyle: 'solid',
+                      borderColor: checked ? '#004ac6' : undefined,
+                      background: checked ? '#004ac6' : 'transparent',
+                    }}
+                  >
+                    {checked && <span className="material-symbols-outlined text-white" style={{ fontSize: 11 }}>check</span>}
+                  </span>
+                  <span className="font-medium text-[#191c1e] dark:text-[#e4e6f0] truncate">{value}</span>
                 </button>
               )
             })}
@@ -1193,6 +1387,19 @@ export default function EmpresasExternasPage() {
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
+
+            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Contador</label>
+            <input
+              value={empresaModal.contador}
+              onChange={e => setEmpresaModal(m => ({ ...m, contador: e.target.value }))}
+              onKeyDown={e => { if (e.key === 'Enter') submitEmpresaModal() }}
+              placeholder="Ej. Fernando"
+              list="ext-contador-options"
+              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+            />
+            <datalist id="ext-contador-options">
+              {contadorOptions.filter(v => v !== SIN_ASIGNAR).map(v => <option key={v} value={v} />)}
+            </datalist>
 
             {empresaModal.mode === 'edit' && (
               <>
