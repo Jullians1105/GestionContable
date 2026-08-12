@@ -9,6 +9,8 @@ const {
   exportarBorrador,
   aplicarClasificacionRapida,
   marcarAnomaliaRevisada,
+  getBorrador,
+  patchNomina,
   calcularResumenPeriodo,
   agruparPorMes,
 } = require('../../src/controllers/dianController');
@@ -506,6 +508,100 @@ describe('marcarAnomaliaRevisada', () => {
     const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
 
     await marcarAnomaliaRevisada(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+// getBorrador es lo que las 3 páginas del wizard (Clasificación, Nómina, Exportación) usan
+// para recargar su estado al montar, en vez de confiar en el state de navegación de React
+// Router — ver docs/modulo-dian.md. Verifica que la respuesta tenga la misma forma que
+// filasParaClasificar en uploadDian (mismo proyectarFilaParaClasificar).
+describe('getBorrador', () => {
+  test('devuelve calculos, nomina y filas con requiereClasificacion + clasificación ya persistida', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [{
+        nombre_archivo: 'reporte.xlsx',
+        datos: {
+          filas: [
+            { indice: 0, tipoDocumento: FACTURA, grupo: 'Recibido', total: 119000, iva: 19000, clasificacionRetencion: 'Compras', tasaRetencion: 2.5 },
+            { indice: 1, tipoDocumento: NOTA_CREDITO, grupo: 'Recibido', total: -50000, iva: 0, clasificacionRetencion: null, tasaRetencion: null },
+          ],
+          calculos: { comprasBruto: 100000 },
+          nomina: { empleados: 3, meses: 2, salario: 1300000, tarifaArl: 0.522, tasaAutorretencion: '1.10' },
+        },
+      }],
+    });
+
+    const req = { params: { id: 'b1' }, user: { userId: 'u1' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await getBorrador(req, res, jest.fn());
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'b1',
+      nombreArchivo: 'reporte.xlsx',
+      calculos: { comprasBruto: 100000 },
+      nomina: { empleados: 3, meses: 2, salario: 1300000, tarifaArl: 0.522, tasaAutorretencion: '1.10' },
+      filasParaClasificar: [
+        expect.objectContaining({ indice: 0, requiereClasificacion: true, clasificacionRetencion: 'Compras', tasaRetencion: 2.5 }),
+        expect.objectContaining({ indice: 1, requiereClasificacion: false }),
+      ],
+    }));
+  });
+
+  test('borrador sin nomina guardada todavía devuelve nomina: null', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [{ nombre_archivo: 'reporte.xlsx', datos: { filas: [], calculos: {} } }],
+    });
+
+    const req = { params: { id: 'b1' }, user: { userId: 'u1' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await getBorrador(req, res, jest.fn());
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ nomina: null }));
+  });
+
+  test('borrador inexistente o de otro usuario devuelve 404', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+    const req = { params: { id: 'x' }, user: { userId: 'u1' } };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await getBorrador(req, res, jest.fn());
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+describe('patchNomina', () => {
+  test('guarda los campos de nómina en datos.nomina', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{}] }) // SELECT existencia
+      .mockResolvedValueOnce({ rows: [] }); // UPDATE
+
+    const req = {
+      params: { id: 'b1' },
+      user: { userId: 'u1' },
+      body: { empleados: 3, meses: 2, salario: 1300000, tarifaArl: 0.522, tasaAutorretencion: '1.10' },
+    };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await patchNomina(req, res, jest.fn());
+
+    expect(res.json).toHaveBeenCalledWith({ success: true });
+    expect(db.query).toHaveBeenLastCalledWith(
+      expect.stringContaining("jsonb_set(datos, '{nomina}'"),
+      [JSON.stringify({ empleados: 3, meses: 2, salario: 1300000, tarifaArl: 0.522, tasaAutorretencion: '1.10' }), 'b1']
+    );
+  });
+
+  test('borrador inexistente devuelve 404', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+    const req = { params: { id: 'x' }, user: { userId: 'u1' }, body: {} };
+    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+
+    await patchNomina(req, res, jest.fn());
 
     expect(res.status).toHaveBeenCalledWith(404);
   });

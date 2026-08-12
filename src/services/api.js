@@ -36,11 +36,16 @@ async function refreshAccessToken() {
   return _refreshPromise;
 }
 
-async function request(path, options = {}, retry = true) {
+// fetch con el ciclo de refresh de token — sin asumir nada sobre el body de la respuesta
+// (JSON, blob, lo que sea), a diferencia de request() más abajo. Se usa directamente en las
+// llamadas que no son JSON puro (upload de FormData, descarga de blob) para que también se
+// beneficien del refresh automático en vez de reimplementarlo cada una por su lado — eso fue
+// exactamente lo que le pasó a exportarDian: al no pasar por acá, un token vencido durante
+// una sesión larga se mostraba como "Token inválido o expirado" en vez de refrescarse solo.
+async function fetchWithAuth(path, options = {}, retry = true) {
   const { skipAuthRedirect, ...fetchOptions } = options;
   const token = getToken();
   const headers = {
-    'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...fetchOptions.headers,
   };
@@ -51,7 +56,7 @@ async function request(path, options = {}, retry = true) {
     if (getRefreshToken()) {
       try {
         await refreshAccessToken();
-        return request(path, options, false);
+        return fetchWithAuth(path, options, false);
       } catch {
         throw new Error('Sesión expirada');
       }
@@ -63,6 +68,13 @@ async function request(path, options = {}, retry = true) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || 'Credenciales incorrectas');
   }
+
+  return res;
+}
+
+async function request(path, options = {}, retry = true) {
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  const res = await fetchWithAuth(path, { ...options, headers }, retry);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
@@ -296,13 +308,8 @@ export const api = {
   },
 
   // DIAN
-  uploadDian: (formData) => {
-    const token = getToken()
-    return fetch(`${BASE}/dian/upload`, {
-      method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: formData,
-    }).then(async (res) => {
+  uploadDian: (formData) =>
+    fetchWithAuth('/dian/upload', { method: 'POST', body: formData }).then(async (res) => {
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: res.statusText }))
         const err = new Error(body.error || `Error ${res.status}`)
@@ -310,10 +317,14 @@ export const api = {
         throw err
       }
       return res.json()
-    })
-  },
+    }),
+  getDianBorrador: (id) => request(`/dian/borradores/${id}`),
+
   patchDianBorrador: (id, data) =>
     request(`/dian/borradores/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+
+  patchDianNomina: (id, data) =>
+    request(`/dian/borradores/${id}/nomina`, { method: 'PATCH', body: JSON.stringify(data) }),
 
   patchDianClasificacionRapida: (borradorId, { clasificacionRetencion, tasaRetencion }) =>
     request(`/dian/borradores/${borradorId}/aplicar-clasificacion-rapida`, {
@@ -322,13 +333,9 @@ export const api = {
     }),
 
   exportarDian: (borradorId, { empleados, meses, salario, tarifaArl, tasaAutorretencion }) => {
-    const token = getToken()
-    return fetch(`${BASE}/dian/borradores/${borradorId}/exportar`, {
+    return fetchWithAuth(`/dian/borradores/${borradorId}/exportar`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ empleados, meses, salario, tarifaArl, tasaAutorretencion }),
     }).then((res) => {
       if (!res.ok) return res.json().then((e) => { throw new Error(e.error || `Error ${res.status}`) })

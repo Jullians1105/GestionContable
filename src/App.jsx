@@ -112,10 +112,10 @@ function Layout() {
             <Route path="/fondo-emprender/empresas/:empresaId" element={<FondoEmprenderEmpresaDetallePage />} />
             <Route path="/fondo-emprender/pagos" element={<FondoEmprenderPagosPage />} />
             <Route path="/empresas-externas" element={<EmpresasExternasPage />} />
-            <Route path="/dian/upload"         element={<DianUploadPage />} />
-            <Route path="/dian/clasificacion" element={<DianClasificacionPage />} />
-            <Route path="/dian/nomina"        element={<DianNominaPage />} />
-            <Route path="/dian/exportacion"   element={<DianExportacionPage />} />
+            <Route path="/dian/upload"                       element={<DianUploadPage />} />
+            <Route path="/dian/clasificacion/:borradorId"    element={<DianClasificacionPage />} />
+            <Route path="/dian/nomina/:borradorId"           element={<DianNominaPage />} />
+            <Route path="/dian/exportacion/:borradorId"      element={<DianExportacionPage />} />
             <Route path="/tasks/recurrentes" element={<RecurringTasksPage />} />
           </Routes>
         </div>

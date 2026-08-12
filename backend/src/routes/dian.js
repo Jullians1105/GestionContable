@@ -3,7 +3,7 @@ const multer = require('multer');
 const { body } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
-const { uploadDian, patchBorrador, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada, TASAS_AUTORRETENCION } = require('../controllers/dianController');
+const { uploadDian, patchBorrador, getBorrador, patchNomina, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada, TASAS_AUTORRETENCION } = require('../controllers/dianController');
 
 const router = Router();
 
@@ -88,6 +88,24 @@ router.post('/upload', handleUpload, uploadDian);
 /**
  * @openapi
  * /api/dian/borradores/{id}:
+ *   get:
+ *     tags: [DIAN]
+ *     summary: Recargar el estado completo del borrador (calculos, filas con clasificación persistida, nómina)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200:
+ *         description: Estado actual del borrador.
+ *       404:
+ *         description: Borrador no encontrado o no pertenece al usuario.
+ */
+router.get('/borradores/:id', getBorrador);
+
+/**
+ * @openapi
+ * /api/dian/borradores/{id}:
  *   patch:
  *     tags: [DIAN]
  *     summary: Clasificar una fila del borrador (clasificacionRetencion + tasaRetencion)
@@ -127,6 +145,32 @@ router.patch('/borradores/:id/aplicar-clasificacion-rapida',
   body('tasaRetencion').optional({ nullable: true }).isFloat({ min: 0 }).toFloat(),
   validate,
   aplicarClasificacionRapida
+);
+
+/**
+ * @openapi
+ * /api/dian/borradores/{id}/nomina:
+ *   patch:
+ *     tags: [DIAN]
+ *     summary: Autoguardar los inputs del formulario de Nómina (se pisan completos en cada llamada)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200:
+ *         description: Nómina guardada.
+ *       404:
+ *         description: Borrador no encontrado o no pertenece al usuario.
+ */
+router.patch('/borradores/:id/nomina',
+  body('empleados').optional({ nullable: true }).isInt({ min: 0 }).toInt(),
+  body('meses').optional({ nullable: true }).isInt({ min: 0 }).toInt(),
+  body('salario').optional({ nullable: true }).isFloat({ min: 0 }).toFloat(),
+  body('tarifaArl').optional({ nullable: true }).isFloat({ min: 0 }).toFloat(),
+  body('tasaAutorretencion').optional({ nullable: true }).isIn(TASAS_AUTORRETENCION),
+  validate,
+  patchNomina
 );
 
 /**
