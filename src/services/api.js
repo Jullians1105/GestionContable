@@ -264,6 +264,37 @@ export const api = {
   updateFondoProcesoGrupo: (id, data) => request(`/fondo/proceso-grupos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteFondoProcesoGrupo: (id) => request(`/fondo/proceso-grupos/${id}`, { method: 'DELETE' }),
 
+  // Empresas Externas — Empresas
+  getExtEmpresas: () => request('/externas/empresas'),
+  getExtEmpresa: (id) => request(`/externas/empresas/${id}`),
+  createExtEmpresa: (data) => request('/externas/empresas', { method: 'POST', body: JSON.stringify(data) }),
+  updateExtEmpresa: (id, data) => request(`/externas/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteExtEmpresa: (id) => request(`/externas/empresas/${id}`, { method: 'DELETE' }),
+
+  // Empresas Externas — Catálogo de procesos (checklist)
+  getExtProcesos: (incluirInactivos) => {
+    const qs = incluirInactivos ? '?incluirInactivos=true' : ''
+    return request(`/externas/procesos${qs}`)
+  },
+  createExtProceso: (data) => request('/externas/procesos', { method: 'POST', body: JSON.stringify(data) }),
+  updateExtProceso: (id, data) => request(`/externas/procesos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Empresas Externas — Checklist mensual
+  getExtChecklist: (empresaId, anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/externas/checklist/${empresaId}?${qs}`);
+  },
+  // Checklist del mes para todas las empresas en una sola llamada (evita 1 request por empresa)
+  getExtChecklistMes: (anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/externas/checklist/mes?${qs}`);
+  },
+  updateExtChecklistItem: (empresaId, procesoId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/externas/checklist/${empresaId}/item/${procesoId}?${qs}`,
+      { method: 'PUT', body: JSON.stringify(data) });
+  },
+
   // DIAN
   uploadDian: (formData) => {
     const token = getToken()
