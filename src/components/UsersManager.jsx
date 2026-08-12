@@ -27,6 +27,18 @@ function getFondoPerm(user, key) {
   return user.permissions?.modulos?.fondoEmprender?.[key] ?? false
 }
 
+// Sin canGestionar: crear/editar/eliminar empresas se hace desde "Editar
+// estructura" en la grilla, y eso ya es admin-only por diseño (no hay página
+// aparte de Empresas) — el único permiso granular que aplica acá es marcar
+// el checklist mensual.
+const EXTERNAS_PERMS = [
+  { key: 'canEditar', icon: 'edit', label: 'Editar checklist' },
+]
+
+function getExternasPerm(user, key) {
+  return user.permissions?.modulos?.empresasExternas?.[key] ?? false
+}
+
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Administrador' },
   { value: 'leader', label: 'Líder' },
@@ -182,6 +194,23 @@ export default function UsersManager() {
     }
   }
 
+  const handleToggleExternasPerm = async (user, key) => {
+    const currentModulos = user.permissions?.modulos ?? {}
+    const current = currentModulos.empresasExternas?.[key] ?? false
+    const updated = {
+      ...(user.permissions ?? {}),
+      modulos: {
+        ...currentModulos,
+        empresasExternas: { ...currentModulos.empresasExternas, [key]: !current },
+      },
+    }
+    try {
+      await updateMember(user.id, { permissions: updated })
+    } catch (err) {
+      addToast(err.message || 'Error al actualizar permisos de Empresas Externas', 'error')
+    }
+  }
+
   const handleDelete = async (userId) => {
     try {
       await deleteMember(userId)
@@ -254,13 +283,18 @@ export default function UsersManager() {
                   Fondo Emprender
                 </th>
               )}
+              {showPermCols && (
+                <th className="px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] text-left hidden lg:table-cell">
+                  Empresas Externas
+                </th>
+              )}
               <th className="px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#edeef0] dark:divide-[#2e3148]">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={showPermCols ? 6 : 4} className="text-center py-10 text-sm text-[#434655] dark:text-[#c4c8e8]">
+                <td colSpan={showPermCols ? 7 : 4} className="text-center py-10 text-sm text-[#434655] dark:text-[#c4c8e8]">
                   No se encontraron usuarios
                 </td>
               </tr>
@@ -356,6 +390,31 @@ export default function UsersManager() {
                       </td>
                     )}
 
+                    {/* ── Empresas Externas perms ────────────────────── */}
+                    {showPermCols && (
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {EXTERNAS_PERMS.map(({ key, icon, label }) => {
+                            const active = getExternasPerm(user, key)
+                            return (
+                              <button
+                                key={key}
+                                title={label}
+                                onClick={() => handleToggleExternasPerm(user, key)}
+                                className="w-6 h-6 rounded flex items-center justify-center transition hover:scale-110"
+                                style={{
+                                  background: active ? '#dcfce7' : '#f3f4f6',
+                                  color:      active ? '#16a34a' : '#9ca3af',
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{icon}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </td>
+                    )}
+
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         {showPermCols && (
@@ -404,7 +463,7 @@ export default function UsersManager() {
                   </tr>
                   {isExpanded && (
                     <tr className="bg-[#f8f9ff] dark:bg-[#181a2e]">
-                      <td colSpan={showPermCols ? 6 : 4} className="px-6 py-4 space-y-4">
+                      <td colSpan={showPermCols ? 7 : 4} className="px-6 py-4 space-y-4">
                         {/* Gestor de Tareas */}
                         <div>
                           <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
@@ -487,6 +546,31 @@ export default function UsersManager() {
                             </div>
                           </div>
                         )}
+
+                        {/* Empresas Externas */}
+                        <div>
+                          <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">corporate_fare</span>
+                            Empresas Externas
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {EXTERNAS_PERMS.map(({ key, icon, label }) => (
+                              <label
+                                key={key}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] cursor-pointer hover:border-[#004ac6] transition select-none"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={getExternasPerm(user, key)}
+                                  onChange={() => handleToggleExternasPerm(user, key)}
+                                  className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
+                                />
+                                <span className="material-symbols-outlined text-[#8890b5]" style={{ fontSize: 13 }}>{icon}</span>
+                                <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   )}
