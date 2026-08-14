@@ -174,6 +174,16 @@ const TIPOS_COMPRA = [...TIPOS_FACTURA_EQUIVALENTE, DOC_EQUIVALENTE, DOC_TRANSPO
 // aportan a comprasBruto pero igual bloqueaban el export hasta clasificarlas a mano.
 const requiereClasificacion = (f) => f.grupo === RECIBIDO && TIPOS_COMPRA.includes(f.tipoDocumento);
 
+// Impuestos que van incluidos en "Total" pero no son costo real de la compra — la base de
+// retención en la fuente debe quedar neta de TODOS estos, no solo del IVA (si un proveedor
+// trae, p.ej., ICA o INC además de IVA, dejarlos en la base infla la retención calculada).
+const CAMPOS_IMPUESTOS_BASE = [
+  'iva', 'ica', 'ic', 'inc', 'timbre', 'incBolsas', 'inCarbono',
+  'inCombustibles', 'icDatos', 'icl', 'inpp', 'ibua', 'icui',
+];
+const getBaseRetencion = (f) =>
+  (f.total ?? 0) - CAMPOS_IMPUESTOS_BASE.reduce((acc, campo) => acc + (f[campo] ?? 0), 0);
+
 // Proyección de una fila para el frontend (pantalla de clasificación): solo lo que la UI
 // necesita, más el flag requiereClasificacion — así el frontend nunca reimplementa esta
 // regla por su cuenta (eso fue exactamente lo que causó el bug de "toma 458 en vez de 425").
@@ -188,6 +198,18 @@ const proyectarFilaParaClasificar = (f) => ({
   nitEmisor:              f.nitEmisor,
   total:                  f.total,
   iva:                    f.iva,
+  ica:                    f.ica,
+  ic:                     f.ic,
+  inc:                    f.inc,
+  timbre:                 f.timbre,
+  incBolsas:              f.incBolsas,
+  inCarbono:              f.inCarbono,
+  inCombustibles:         f.inCombustibles,
+  icDatos:                f.icDatos,
+  icl:                    f.icl,
+  inpp:                   f.inpp,
+  ibua:                   f.ibua,
+  icui:                   f.icui,
   grupo:                  f.grupo,
   estado:                 f.estado,
   folio:                  f.folio ?? null,
@@ -1108,7 +1130,7 @@ function buildDetalleComprasContent(ws, filasRecibido, { freeze = true } = {}) {
 
   filasRecibido.forEach((fila, i) => {
     const iva = fila.iva ?? 0;
-    const subtotal = (fila.total ?? 0) - iva;
+    const subtotal = getBaseRetencion(fila);
     const retencion = round2(subtotal * ((fila.tasaRetencion ?? 0) / 100));
     const row = ws.addRow([
       fechaES(fila.fechaEmision),
@@ -1540,7 +1562,7 @@ function calcularResumenPeriodo(filasPeriodo) {
   const filasRecibido = filasPeriodo.filter(requiereClasificacion);
   let totalRetenciones = 0;
   for (const fila of filasRecibido) {
-    const subtotal = (fila.total ?? 0) - (fila.iva ?? 0);
+    const subtotal = getBaseRetencion(fila);
     totalRetenciones += subtotal * ((fila.tasaRetencion ?? 0) / 100);
   }
   totalRetenciones = round2(totalRetenciones);
@@ -1686,8 +1708,8 @@ const exportarBorrador = async (req, res, next) => {
     // de esta hoja y no se repite en el resumen mensual.
     const retencionesPorProveedor = {};
     for (const fila of filasRecibido) {
-      const { nitEmisor, nombreEmisor, total, iva, clasificacionRetencion, tasaRetencion } = fila;
-      const subtotal = (total ?? 0) - (iva ?? 0);
+      const { nitEmisor, nombreEmisor, clasificacionRetencion, tasaRetencion } = fila;
+      const subtotal = getBaseRetencion(fila);
       const retencion = subtotal * ((tasaRetencion ?? 0) / 100);
       const key = nitEmisor ?? 'SIN_NIT';
       if (!retencionesPorProveedor[key]) {
@@ -1866,7 +1888,7 @@ const exportarBorrador = async (req, res, next) => {
   }
 };
 
-const CLASES_VALIDAS = ['Compras', 'Servicios', 'Arrendamiento', 'Honorarios', 'N/A'];
+const CLASES_VALIDAS = ['Compras', 'Servicios', 'Arrendamiento', 'Honorarios', 'N/A', 'Autorretenedor'];
 
 const aplicarClasificacionRapida = async (req, res, next) => {
   try {
@@ -1890,7 +1912,7 @@ const aplicarClasificacionRapida = async (req, res, next) => {
       return res.json({ filasActualizadas: 0, filasRestanteSinClasificar: 0, mensaje: 'No hay filas sin clasificar' });
     }
 
-    const nuevaTasa = clasificacionRetencion === 'N/A' ? null : (tasaRetencion ?? null);
+    const nuevaTasa = ['N/A', 'Autorretenedor'].includes(clasificacionRetencion) ? null : (tasaRetencion ?? null);
     const nuevasFilas = filas.map((f) =>
       requiereClasificacion(f) && f.clasificacionRetencion == null
         ? { ...f, clasificacionRetencion, tasaRetencion: nuevaTasa }

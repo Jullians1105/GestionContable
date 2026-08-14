@@ -6,6 +6,7 @@ import { api } from '../services/api'
 // ── opciones de clasificación (incluyendo N/A) ─────────────────────────────────
 const OPCIONES = [
   { label: 'N/A (No aplica)',      clasificacion: 'N/A',           tasa: null  },
+  { label: 'Autorretenedor',      clasificacion: 'Autorretenedor', tasa: null  },
   { label: 'Compras 0,10%',       clasificacion: 'Compras',        tasa: 0.10 },
   { label: 'Compras 1,50%',       clasificacion: 'Compras',        tasa: 1.50 },
   { label: 'Compras 2,50%',       clasificacion: 'Compras',        tasa: 2.50 },
@@ -32,10 +33,15 @@ const formatCOP = (n) =>
 const truncate = (s, n) =>
   s && s.length > n ? s.slice(0, n) + '…' : (s || '—')
 
-// Base = Total − IVA — es sobre lo que realmente se calcula la retención (ver
-// backend, exportarBorrador: subtotal = fila.total - fila.iva), así que la columna
-// muestra/filtra/ordena por este valor en vez del Total con IVA incluido.
-const getBase = (f) => (f.total ?? 0) - (f.iva ?? 0)
+// Base = Total neto de TODOS los impuestos que trae la fila (no solo IVA) — es sobre lo
+// que realmente se calcula la retención (ver backend, getBaseRetencion), así que la
+// columna muestra/filtra/ordena por este valor en vez del Total con impuestos incluidos.
+const CAMPOS_IMPUESTOS_BASE = [
+  'iva', 'ica', 'ic', 'inc', 'timbre', 'incBolsas', 'inCarbono',
+  'inCombustibles', 'icDatos', 'icl', 'inpp', 'ibua', 'icui',
+]
+const getBase = (f) =>
+  (f.total ?? 0) - CAMPOS_IMPUESTOS_BASE.reduce((acc, campo) => acc + (f[campo] ?? 0), 0)
 
 // ── indicador de autoguardado ──────────────────────────────────────────────────
 function SaveIndicator({ estado }) {
