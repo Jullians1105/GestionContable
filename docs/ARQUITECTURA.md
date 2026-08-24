@@ -1,7 +1,7 @@
 # Gestcon (GestionTareasOficina) — Arquitectura
 
-**Versión:** 3.0.0
-**Última actualización de este documento:** 2026-07-16
+**Versión:** 3.1.0
+**Última actualización de este documento:** 2026-08-14
 **Rama al momento de escribir:** `main`
 
 > **Nota de nombres:** el proyecto nació como "TaskFlow Pro" y el 2026-07-20 se completó el
@@ -15,10 +15,12 @@
 
 ## Visión general
 
-Dos superficies principales sobre la misma base de datos y el mismo backend:
+Cuatro superficies principales sobre la misma base de datos y el mismo backend:
 
-1. **Gestor de Tareas** — tareas, subtareas, comentarios, kanban, calendario, tareas recurrentes, tablero de carga de trabajo, grupos con liderazgo por grupo.
+1. **Gestor de Tareas** — tareas, subtareas, comentarios, kanban, calendario, tareas recurrentes, tablero de carga de trabajo, grupos con liderazgo por grupo. Incluye también un espacio **personal** por usuario (no compartido con el equipo): tareas pendientes propias (`/pendientes`) y notas propias con editor enriquecido (`/notas`).
 2. **Fondo Emprender** — módulo de seguimiento de un programa de acompañamiento contable a ~30 empresas: checklist mensual de 23 procesos, ficha por empresa con 6 macroprocesos activos, checklist de impuestos, y pagos mensuales a la fiduciaria con flujo de autorización.
+3. **Empresas Externas** — catálogo de ~34 empresas externas (fuera del programa Fondo Emprender) con checklist mensual de 11 procesos contables por empresa (Nómina electrónica, Ventas, Compras, Autorretención, etc.), cada una con un responsable y un contador asignado.
+4. **Contabilidad DIAN** — wizard de 4 pasos que toma el reporte Excel exportado del portal de la DIAN, calcula IVA/INC/retenciones/nómina/autorretención en renta, y genera un Excel de vuelta (varias hojas: Resumen, Resumen mensual, IVA, INC, Retenciones por proveedor, Detalle de compras, Nómina, Autorretención) sin depender de un ERP externo. Ver detalle abajo.
 
 Todo corre en un monorepo con tres piezas ejecutables independientes: `src/` (frontend Vite), `backend/` (API Express), `mcpServer/` (servidor MCP, **legacy**, no forma parte del flujo de producción).
 
@@ -57,7 +59,7 @@ GestionTareasOficina/
 │   ├── main.jsx                 # Entry point, registra el Service Worker
 │   ├── context/                 # 9 contextos (ver "Estado global")
 │   ├── components/              # Componentes reutilizables (15 archivos)
-│   ├── pages/                   # 21 páginas (ver "Rutas")
+│   ├── pages/                   # 28 páginas (ver "Rutas")
 │   ├── hooks/                   # usePullToRefresh, useLocalStorage, useTasks, useTeam
 │   ├── services/api.js          # Cliente HTTP único: JWT, auto-refresh, todos los endpoints
 │   └── utils/                   # helpers, permissions, validators, storage, sampleData
@@ -65,7 +67,7 @@ GestionTareasOficina/
 │   ├── src/
 │   │   ├── index.js             # Entry point: Express + Socket.io + Swagger + crons
 │   │   ├── config/               # env.js, database.js (pg-pool)
-│   │   ├── controllers/          # 13 controladores (ver tabla de endpoints)
+│   │   ├── controllers/          # 18 controladores (ver tabla de endpoints)
 │   │   ├── middleware/           # auth.js, roles vía controllers, fondoAccess.js,
 │   │   │                        # groupAccess.js, errorHandler.js, validation.js, security.js
 │   │   ├── routes/               # 1 router por recurso, documentado con swagger-jsdoc inline
@@ -127,10 +129,17 @@ BrowserRouter
 | `/notifications` | `NotificationsPage` | |
 | `/settings`, `/profile` | `SettingsPage`, `ProfilePage` | |
 | `/usuarios` | `UsersPage` | Solo admin — CRUD usuarios + permisos granulares |
+| `/pendientes` | `PersonalTasksPage` | Tareas personales del usuario logueado, no compartidas con el equipo |
+| `/notas` | `PersonalNotesPage` | Notas personales, editor enriquecido (BlockNote/Tiptap) — cargada `lazy()`, chunk separado (~230KB gzip) que solo baja al entrar a la ruta |
 | `/fondo-emprender` | `FondoEmprenderPage` | Seguimiento mensual: checklist 23 procesos × ~30 empresas |
 | `/fondo-emprender/empresas` | `FondoEmprenderEmpresasPage` | CRUD empresas con semáforo |
 | `/fondo-emprender/empresas/:empresaId` | `FondoEmprenderEmpresaDetallePage` | Ficha con 6 macroprocesos |
 | `/fondo-emprender/pagos` | `FondoEmprenderPagosPage` | Tabla de pagos a la fiduciaria |
+| `/empresas-externas` | `EmpresasExternasPage` | Checklist mensual de 11 procesos × ~34 empresas externas (fuera de Fondo Emprender) |
+| `/dian/upload` | `DianUploadPage` | Paso 1: sube el Excel exportado del portal DIAN |
+| `/dian/clasificacion/:borradorId` | `DianClasificacionPage` | Paso 2: clasifica retención en la fuente por cada compra recibida |
+| `/dian/nomina/:borradorId` | `DianNominaPage` | Paso 3: datos de nómina y tarifa de autorretención en renta |
+| `/dian/exportacion/:borradorId` | `DianExportacionPage` | Paso 4: genera y descarga el Excel final (varias hojas) |
 
 ### Estado global (Context API)
 
@@ -150,7 +159,7 @@ BrowserRouter
 
 ### `src/services/api.js`
 
-Cliente HTTP único. Maneja JWT en memoria + refresh automático en 401, y expone una función por endpoint (incluye todo el namespace `fondo*`: `getFondoEmpresas`, `getFondoDetalle`, `getFondoImpuestos`, `getFondoPagos`, `getFondoPagosTodasEmpresas`, `getFondoPagosMesActual`, etc.).
+Cliente HTTP único. Maneja JWT en memoria + refresh automático en 401, y expone una función por endpoint (incluye todo el namespace `fondo*`: `getFondoEmpresas`, `getFondoDetalle`, `getFondoImpuestos`, `getFondoPagos`, `getFondoPagosTodasEmpresas`, `getFondoPagosMesActual`, etc.; el namespace `dian*`: `uploadDian`, `getDianBorrador`, `patchDianBorrador`, `patchDianClasificacionRapida`, `patchDianNomina`, `exportarDianBorrador`, etc.; y el namespace de Empresas Externas).
 
 ### Patrones UI establecidos (ver también `docs/` si existiera guía de estilo)
 
@@ -182,8 +191,10 @@ Cliente HTTP único. Maneja JWT en memoria + refresh automático en 401, y expon
 | Prefijo | Controlador | Alcance |
 |---|---|---|
 | `/api/auth` | `authController` | register, login, refresh, logout, me, forgot/reset-password |
-| `/api/tasks` | `taskController` | CRUD tareas, subtareas, comentarios, historial, búsqueda, templates recurrentes |
+| `/api/tasks` | `taskController` | CRUD tareas, subtareas, comentarios, historial, búsqueda, templates recurrentes, asignados múltiples (`task_assignees`), solicitudes de borrado (`task_delete_requests`) |
 | `/api/tasks/:id/fondo-link` | `fondoLinksController` (montado sobre `/api/tasks`) | vincula una tarea a un macroproceso o checklist de Fondo Emprender |
+| `/api/personal-tasks` | `personalTaskController` | tareas personales del usuario (no compartidas), con sub-items |
+| `/api/personal-notes` | `personalNoteController` | notas personales del usuario, contenido enriquecido |
 | `/api/employees` | (empleados, sin controlador propio listado aquí) | CRUD empleados |
 | `/api/groups` | `groupController` | CRUD grupos, miembros, liderazgo (`is_leader`) |
 | `/api/tags` | (tags) | CRUD etiquetas, crear sin restricción de rol |
@@ -191,10 +202,15 @@ Cliente HTTP único. Maneja JWT en memoria + refresh automático en 401, y expon
 | `/api/notifications` | (notificaciones) | listar, marcar leídas, VAPID pública, push-subscribe |
 | `/api/fondo/empresas` | `fondoEmpresasController` | CRUD empresas del programa |
 | `/api/fondo/procesos` | `fondoProcesosController` | catálogo de 23 procesos del checklist mensual |
+| `/api/fondo/proceso-grupos` | `fondoProcesoGruposController` | catálogo de grupos de proceso (NOMINA, CONTABILIDAD, …) usados para derivar mp2/mp5 |
 | `/api/fondo/checklist` | `fondoChecklistController` | checklist mensual por empresa (alimenta mp5) |
 | `/api/fondo/detalle` | `fondoDetalleController` | 6 macroprocesos por empresa/mes (mp1-mp7, ver detalle abajo) |
 | `/api/fondo/impuestos` | `fondoImpuestosController` | checklist de 4 impuestos por empresa/mes (alimenta mp6) |
 | `/api/fondo/pagos` | `fondoPagosController` | pagos mensuales a la fiduciaria + autorización + mes habilitado |
+| `/api/externas/empresas` | `extEmpresasController` | CRUD del catálogo de empresas externas (nombre, responsable, contador, activa) |
+| `/api/externas/procesos` | `extProcesosController` | catálogo de 11 procesos del checklist de Empresas Externas |
+| `/api/externas/checklist` | `extChecklistController` | checklist mensual por empresa externa |
+| `/api/dian` | `dianController` | wizard de 4 pasos: upload de reporte DIAN, clasificación de retención, nómina/autorretención, export a Excel (ver detalle abajo) |
 
 ### Middleware de seguridad y permisos
 
@@ -281,6 +297,28 @@ Catálogo fijo de 4 obligaciones (`autorretencion`, `retencion`, `iva`, `consumo
 
 ---
 
+## Módulo Contabilidad DIAN — detalle
+
+Wizard de 4 pasos sobre un "borrador" (`calculo_borradores`, JSONB, expira a los 14 días) que no toca datos contables reales de las empresas — todo el cálculo se rehace desde `datos.filas` en cada paso/export, así que editar una clasificación después de subir el archivo siempre queda reflejado en el resultado final.
+
+1. **Upload** (`/dian/upload` → `POST /api/dian/upload`) — sube el `.xlsx` exportado del portal de la DIAN. Se parsea con ExcelJS; se guarda `archivo_original` (BYTEA, migración 036) tal cual se subió, y un array `filas` con: totales, IVA y los 12 impuestos adicionales que puede traer un documento (ICA, IC, INC, Timbre, INC Bolsas, IN Carbono, IN Combustibles, IC Datos, ICL, INPP, IBUA, ICUI), retenciones que ya trae el documento (Rete IVA/Renta/ICA), tipo de documento y Grupo (Emitido/Recibido).
+2. **Clasificación de retención** (`/dian/clasificacion/:borradorId`) — cada compra recibida real (`requiereClasificacion`: Grupo=Recibido + tipo en `TIPOS_COMPRA`) necesita una clasificación (`Compras`/`Servicios`/`Arrendamiento`/`Honorarios` con tarifa, o `N/A`/`Autorretenedor` cuando no aplica retención) antes de poder exportar. Autoguardado por fila (debounce 1.5s, `PATCH /borradores/:id`), más "clasificación rápida" (aplica una clasificación a todas las filas aún sin clasificar) y selección múltiple. La "Base" sobre la que se calcula la retención (columna en pantalla y columnas Subtotal/Retención del Excel) es el Total de la fila neto de **todos** los impuestos que trae (`getBaseRetencion`), no solo el IVA.
+3. **Nómina** (`/dian/nomina/:borradorId`) — datos de nómina del período (empleados, meses, salario, tarifa ARL) para seguridad social/parafiscales, y la tarifa de autorretención en renta (`TASAS_AUTORRETENCION`; obligatoria solo si el período tiene nómina Y ventas).
+4. **Exportación** (`/dian/exportacion/:borradorId` → `POST /borradores/:id/exportar`) — genera el Excel final con ExcelJS. Hojas: `RESUMEN` (+ `RESUMEN_MENSUAL` si el período cruza más de un mes calendario), `IVA`, `INC` (solo si hubo INC en el período), `RETENCIONES_POR_PROVEEDOR`, `DETALLE_COMPRAS`, `NOMINA`, `AUTORRETENCION` (solo si aplica), `METADATOS`. `archivo_original` se conserva en BD para poder volver a generar/descargar el export sin tener que resubir el reporte.
+
+Puntos de diseño a tener en cuenta:
+- Ventas/Compras Netas y Utilidad Bruta se calculan **sin IVA ni INC** (ninguno es ingreso/costo real); las retenciones practicadas a proveedores tampoco se restan de la utilidad (son un anticipo de impuesto al proveedor, no un costo de la empresa).
+- Notas de crédito, "Documento soporte con no obligados a facturar" (Grupo invertido: `Emitido` = compra propia) y notas de ajuste no piden clasificación de retención ni entran a `DETALLE_COMPRAS`.
+- `calcularAnomalias` detecta CUFE duplicado, totales negativos en facturas (no en notas crédito) y tipos de documento no parametrizados; se pueden marcar como "revisada" sin alterar ningún cálculo.
+
+---
+
+## Módulo Empresas Externas — detalle
+
+Catálogo de empresas fuera del programa Fondo Emprender (sin macroprocesos derivados ni módulo de pagos): checklist mensual de 11 procesos contables (`ext_procesos` — Nómina electrónica, Ventas, Compras, Autorretención, Depreciación, Nómina, Pago nómina, Conciliación, Pago seguridad social, Pago impuestos, Caja) por empresa (`ext_empresas`, ~34 registros) y mes (`ext_checklist_meses` + `ext_checklist_items`, estado `pending|in_progress|done|na`). Cada empresa tiene un `responsable_id` (usuario del equipo, asignado inicialmente por nombre en la migración 039) y una columna `contador` de texto libre (migración 040). Mismo patrón que los catálogos de Fondo Emprender: un proceso con historial no se borra, solo se desactiva (`ON DELETE RESTRICT` + `activo`).
+
+---
+
 ## Base de datos (PostgreSQL)
 
 ### Sistema de migraciones
@@ -305,6 +343,7 @@ Catálogo fijo de 4 obligaciones (`autorretencion`, `retencion`, `iva`, `consumo
 | 011 | `task_fondo_links` (puente tareas ↔ Fondo Emprender) |
 | 012 | `fondo_detalle_macroprocesos`: columnas `anio`/`mes` |
 | 013_recurring_tasks | `tasks.is_recurring`, `tasks.recurrence JSONB`, `tasks.template_id` |
+| 013_calculo_borradores | Tabla `calculo_borradores` (módulo DIAN — borradores de cálculo, expiran a los 14 días) — colisión de número con la anterior, mismo patrón que 018 más abajo |
 | 014 | `tasks.start_time` (existe en BD, revertida del código — no usada) |
 | 015 | Tabla `push_subscriptions` (Web Push / PWA) |
 | 016 | `tasks.reminder_sent_at TIMESTAMPTZ` |
@@ -312,19 +351,48 @@ Catálogo fijo de 4 obligaciones (`autorretencion`, `retencion`, `iva`, `consumo
 | 018_fondo_pagos_autorizado | `fondo_pagos.autorizado BOOLEAN DEFAULT false` |
 | 018_group_leaders | `group_members.is_leader BOOLEAN` + índice parcial `WHERE is_leader = true` (colisión de número con la anterior — ambas archivos distintos, mismo prefijo) |
 | 019_fondo_pagos_mes_actual | Tabla singleton `fondo_pagos_mes_actual` (mes habilitado, ver arriba) |
-| 023_fondo_impuestos | `fondo_impuestos` (catálogo) + `fondo_impuestos_items` (registro por empresa/impuesto/mes) — **nótese el salto 019→023**, no hay 020-022 en el repo actual |
+| 020_task_assignees | Tabla `task_assignees` (asignados múltiples por tarea) |
+| 021_subtask_completed_by | `task_subtasks.completed_by` / `completed_at` |
+| 022_task_delete_requests | Tabla `task_delete_requests` (solicitud de borrado de tarea, para roles sin permiso de borrado directo) |
+| 023_fondo_impuestos | `fondo_impuestos` (catálogo) + `fondo_impuestos_items` (registro por empresa/impuesto/mes) |
+| 024_fondo_proceso_grupos | Tabla `fondo_proceso_grupos` + `fondo_procesos.grupo_id` (agrupa procesos para derivar mp2/mp5) |
+| 025_fondo_procesos_vigencia | `fondo_procesos`: rango de vigencia (`vigente_desde/hasta_anio/mes`) |
+| 026_fondo_checklist_enviado | `fondo_checklist_meses`: `enviado`, `enviado_at`, `confirmed_at` |
+| 027_fondo_procesos_macroproceso_link | `fondo_procesos.macroproceso_id` (vincula proceso → mpX por id, no por nombre) |
+| 028_fondo_grupos_macroproceso_link | `fondo_proceso_grupos.macroproceso_id` (mismo vínculo, a nivel de grupo) |
+| 029_personal_tasks | Tablas `personal_tasks` + `personal_task_items` (tareas personales por usuario) |
+| 030_personal_notes | Tabla `personal_notes` (notas personales por usuario) |
+| 031_fondo_checklist_confirmado_por_grupo | `fondo_checklist_meses`: separa confirmación/envío en `_contabilidad` vs `_nomina` |
+| 032_fondo_produccion_ventas_link | `fondo_procesos`: vínculo para mp7 (Producción y ventas) |
+| 033_task_custom_reminder | `tasks.custom_reminder_at` / `custom_reminder_sent_at` |
+| 034_personal_task_reminder | `personal_tasks.reminder_at` / `reminder_sent_at` |
+| 035_remove_task_custom_reminder | Revierte la 033 (columnas eliminadas — feature descartada) |
+| 036_calculo_borradores_archivo_original | `calculo_borradores.archivo_original BYTEA` (guarda el Excel original subido, módulo DIAN) |
+| 037_fondo_empresas_codigo_siigo | `fondo_empresas.codigo_siigo VARCHAR(20)` |
+| 038_empresas_externas | Tablas `ext_empresas`, `ext_procesos` (+ seed de 11 procesos y ~34 empresas), `ext_checklist_meses`, `ext_checklist_items` |
+| 039_empresas_externas_responsables | Asigna `ext_empresas.responsable_id` inicial por nombre de usuario (`ILIKE`), a partir de `docs/EMPRESAS.xlsx` |
+| 040_empresas_externas_contador | `ext_empresas.contador VARCHAR(255)` |
 
 ### Tablas principales (fuera de las evidentes por nombre)
 
 ```
 users                     → bcrypt, role, permissions JSONB (incluye modulos.fondoEmprender.*)
 tasks                     → is_recurring, recurrence JSONB, template_id, due_time, reminder_sent_at
+task_assignees            → asignados múltiples por tarea (además del creador)
+task_delete_requests      → solicitudes de borrado pendientes de aprobación
 group_members             → is_leader (liderazgo por grupo, no solo global)
 task_fondo_links          → empresa_id, macro_id ('mp1'..'mp7'), link_type, proceso_id, anio, mes
 fondo_detalle_macroprocesos → empresa_id, macroproceso_id, anio, mes, estado, responsable_id, nota
+fondo_proceso_grupos      → agrupa procesos del checklist mensual (NOMINA, CONTABILIDAD, …), vinculado a mpX
 fondo_pagos               → empresa_id, anio, mes, estado, autorizado, monto, nota, fechas
 fondo_pagos_mes_actual    → singleton (id=1), mes habilitado global
 fondo_impuestos_items     → empresa_id, impuesto_id, anio, mes, estado, nota
+personal_tasks            → tareas personales por usuario (+ personal_task_items, sub-items)
+personal_notes            → notas personales por usuario, contenido enriquecido
+calculo_borradores        → borradores del wizard DIAN, datos JSONB + archivo_original BYTEA, expiran a 14 días
+ext_empresas              → catálogo Empresas Externas: name, responsable_id, contador, activa
+ext_procesos              → catálogo de 11 procesos del checklist de Empresas Externas
+ext_checklist_items       → estado por empresa/proceso/mes (pending|in_progress|done|na)
 push_subscriptions        → suscripciones Web Push por usuario/dispositivo
 login_attempts            → detección de fuerza bruta (OWASP hardening)
 ```
@@ -365,9 +433,15 @@ Root `.env` (para `docker-compose.yml`): `PORT`, `CLIENT_URL`, `DB_PORT/NAME/USE
 
 ```
 backend/tests/
-├── unit/         → 8 archivos: authController, taskController, groupController,
-│                   statsController, middleware, routes, helpers, validators
-├── integration/  → auth.test.js, tasks.test.js (se saltan si no hay BD disponible)
+├── unit/         → 18 archivos: authController, taskController, groupController,
+│                   statsController, middleware, routes, helpers, validators,
+│                   groupAccess, fondoChecklistController, fondoEmpresasController,
+│                   fondoProcesosController, fondoProcesoGruposController,
+│                   personalTaskController, personalNoteController,
+│                   extEmpresasController, extChecklistController, dianController
+├── integration/  → auth.test.js, tasks.test.js (necesitan una BD Postgres de pruebas
+│                   real — DB_TEST_NAME/`taskflow_test` — y se cuelgan si no existe,
+│                   en vez de saltarse limpiamente)
 └── e2e/          → vacío (el E2E real vive en /cypress, no aquí)
 
 cypress/e2e/
@@ -402,6 +476,7 @@ Servidor MCP standalone en TypeScript con su **propia base SQLite** (`better-sql
 - `DEPLOY.md` — guía de despliegue a `192.168.1.12`.
 - `SETUP_MACOS.md` — setup de entorno de desarrollo.
 - `CAMBIOS_FASE_3.md`, `CAMBIOS_SESION_*.md` — changelogs de sesiones específicas.
-- `TAREAS_RECURRENTES.md`, `N8N_SETUP.md`, `WHATSAPP_BUSINESS_N8N.md`, `PROPUESTA_MODULO_CONTABILIDAD_DIAN.md` — specs de features puntuales.
+- `TAREAS_RECURRENTES.md`, `N8N_SETUP.md`, `WHATSAPP_BUSINESS_N8N.md` — specs de features puntuales.
+- `PROPUESTA_MODULO_CONTABILIDAD_DIAN.md` — propuesta original del módulo DIAN; ya implementado (ver "Módulo Contabilidad DIAN — detalle" arriba), este documento queda como contexto histórico de diseño, no como estado actual.
 
 Este documento (`ARQUITECTURA.md`) es el resumen de referencia rápida; para el detalle día a día de qué cambió y por qué, `ESTADO_PROYECTO.md` tiene más profundidad histórica.
