@@ -19,6 +19,59 @@ function isValidFile(file) {
 const formatoMoneda = (n) =>
   `$ ${Number(n ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+// 1001/1006/1007 quedan visibles pero deshabilitados hasta que se implementen — no toda
+// empresa necesita los 4 formatos (ej. una empresa pequeña puede solo requerir 1005+1001),
+// así que el usuario marca cuáles aplican en vez de procesarlos todos de una.
+const FORMATOS_DISPONIBLES = [
+  { id: '1001', codigo: '1001', nombre: 'Gastos/Compras', icon: 'payments', disponible: false },
+  { id: '1005', codigo: '1005', nombre: 'Impuestos descontables', icon: 'receipt_long', disponible: true },
+  { id: '1006', codigo: '1006', nombre: 'IVA/Inc generado', icon: 'sell', disponible: false },
+  { id: '1007', codigo: '1007', nombre: 'Ingresos', icon: 'trending_up', disponible: false },
+]
+
+function FormatoCard({ formato, checked, onToggle }) {
+  const { nombre, codigo, icon, disponible } = formato
+
+  const base = 'relative flex flex-col items-start gap-2 rounded-2xl border-2 transition-all duration-150 px-4 py-4 text-left'
+  const style = !disponible
+    ? `${base} border-dashed border-[#e2e4ef] dark:border-[#2e3148] opacity-50 cursor-not-allowed`
+    : checked
+      ? `${base} border-solid border-[#004ac6] bg-[#e8f0fe] dark:bg-[#1a2550] cursor-pointer`
+      : `${base} border-dashed border-[#c3c6d7] dark:border-[#3a3e5c] bg-[#f8f9ff] dark:bg-[#181a2e] hover:border-[#004ac6] hover:bg-[#eef2fd] dark:hover:bg-[#1a2040] cursor-pointer`
+
+  return (
+    <div
+      className={style}
+      onClick={() => disponible && onToggle(formato.id)}
+      role="checkbox"
+      aria-checked={checked}
+      aria-disabled={!disponible}
+      tabIndex={disponible ? 0 : -1}
+      onKeyDown={(e) => { if (disponible && e.key === 'Enter') onToggle(formato.id) }}
+    >
+      {disponible ? (
+        <span
+          className="absolute top-3 right-3 material-symbols-outlined text-lg"
+          style={{ color: checked ? '#004ac6' : '#c3c6d7' }}
+        >
+          {checked ? 'check_circle' : 'radio_button_unchecked'}
+        </span>
+      ) : (
+        <span className="absolute top-3 right-3 text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#f0f2f8] dark:bg-[#252840] text-[#8890b5] dark:text-[#5a5f7a]">
+          Próximamente
+        </span>
+      )}
+      <span className="material-symbols-outlined text-2xl" style={{ color: disponible ? '#004ac6' : '#9ca3af' }}>
+        {icon}
+      </span>
+      <div>
+        <p className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0]">{codigo}</p>
+        <p className="text-xs text-[#6b7280] dark:text-[#8890b5]">{nombre}</p>
+      </div>
+    </div>
+  )
+}
+
 function Dropzone({ label, hint, icon, file, onFile }) {
   const inputRef = useRef(null)
   const [isDragOver, setIsDragOver] = useState(false)
@@ -69,6 +122,7 @@ function Dropzone({ label, hint, icon, file, onFile }) {
 export default function ExogenasUploadPage() {
   const [estado, setEstado]   = useState('idle') // idle | analizando | preview | generando | generado | error
   const [errorMsg, setErrorMsg] = useState('')
+  const [formatos, setFormatos]           = useState(['1005'])
   const [tokenFile, setTokenFile]         = useState(null)
   const [plantillaFile, setPlantillaFile] = useState(null)
   const [borrador, setBorrador]           = useState(null) // { id, totalTerceros, totalVimp, registros }
@@ -76,6 +130,10 @@ export default function ExogenasUploadPage() {
   // volver a pedirle el archivo al backend — el borrador se borra del servidor apenas se
   // genera con éxito (mismo patrón que Contabilidad DIAN).
   const [descarga, setDescarga] = useState(null) // { blob, filename }
+
+  const toggleFormato = useCallback((id) => {
+    setFormatos((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]))
+  }, [])
 
   const dispararDescarga = useCallback((blob, filename) => {
     const url = window.URL.createObjectURL(blob)
@@ -89,6 +147,11 @@ export default function ExogenasUploadPage() {
   }, [])
 
   const analizar = useCallback(async () => {
+    if (formatos.length === 0) {
+      setEstado('error')
+      setErrorMsg('Marca al menos un formato para generar')
+      return
+    }
     if (!isValidFile(tokenFile) || !isValidFile(plantillaFile)) {
       setEstado('error')
       setErrorMsg('Selecciona ambos archivos en formato Excel (.xlsx, .xls)')
@@ -98,7 +161,9 @@ export default function ExogenasUploadPage() {
     setErrorMsg('')
 
     const formData = new FormData()
-    formData.append('formato', '1005')
+    // El backend hoy solo procesa un formato a la vez — con más de uno implementado, esto
+    // pasa a mandar formatos.join(',') y el motor combina todo en un solo archivo de salida.
+    formData.append('formato', formatos[0])
     formData.append('token', tokenFile)
     formData.append('plantilla', plantillaFile)
 
@@ -110,7 +175,7 @@ export default function ExogenasUploadPage() {
       setEstado('error')
       setErrorMsg(err.message || 'Error al procesar los archivos')
     }
-  }, [tokenFile, plantillaFile])
+  }, [formatos, tokenFile, plantillaFile])
 
   const generar = useCallback(async () => {
     if (!borrador) return
@@ -136,13 +201,14 @@ export default function ExogenasUploadPage() {
   const reiniciar = useCallback(() => {
     setEstado('idle')
     setErrorMsg('')
+    setFormatos(['1005'])
     setTokenFile(null)
     setPlantillaFile(null)
     setBorrador(null)
     setDescarga(null)
   }, [])
 
-  const puedeAnalizar = tokenFile && plantillaFile && estado !== 'analizando'
+  const puedeAnalizar = formatos.length > 0 && tokenFile && plantillaFile && estado !== 'analizando'
 
   return (
     <div className="max-w-[900px] mx-auto mt-8 mb-16">
@@ -153,9 +219,23 @@ export default function ExogenasUploadPage() {
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Exógenas</h1>
         </div>
         <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
-          Formato 1005 — IVA descontable. Sube el TOKEN (detalle de compras) y la plantilla SIIGO para generar el reporte.
+          Marca los formatos que necesitas, sube el TOKEN y la plantilla SIIGO, y genera el reporte.
         </p>
       </div>
+
+      {(estado === 'idle' || estado === 'analizando' || estado === 'error') && (
+        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-6 mb-4">
+          <h2 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">¿Qué formatos deseas generar?</h2>
+          <p className="text-xs text-[#9ca3af] dark:text-[#6b7280] mb-4">
+            No toda empresa necesita los 4 — marca solo los que apliquen. El archivo final trae todos los marcados en una sola plantilla.
+          </p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {FORMATOS_DISPONIBLES.map((f) => (
+              <FormatoCard key={f.id} formato={f} checked={formatos.includes(f.id)} onToggle={toggleFormato} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {(estado === 'idle' || estado === 'analizando' || estado === 'error') && (
         <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-8">
@@ -322,7 +402,7 @@ export default function ExogenasUploadPage() {
               ) : (
                 <>
                   <span className="material-symbols-outlined text-base">file_download</span>
-                  Generar Excel 1005
+                  Generar Excel {formatos.join(', ')}
                 </>
               )}
             </button>

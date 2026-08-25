@@ -107,14 +107,22 @@ describe('utils/plantillaExcel', () => {
 });
 
 const COLUMNAS_TOKEN = ['Tipo de documento', 'NIT Emisor', 'Nombre Emisor', 'IVA', 'Grupo'];
+const COLUMNAS_DEV_VENTAS = ['NIT Receptor', 'Nombre Receptor', 'IVA'];
 
-async function construirToken(filas, { nombreHoja = 'COMPRAS' } = {}) {
+async function construirToken(filas, { nombreHoja = 'COMPRAS', devVentasFilas = null } = {}) {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(nombreHoja);
   ws.addRow(COLUMNAS_TOKEN);
   filas.forEach((f) => {
     ws.addRow([f.tipo ?? 'Factura electrónica', f.nit, f.nombre, f.iva ?? 0, f.grupo ?? 'Recibido']);
   });
+
+  if (devVentasFilas) {
+    const wsDev = wb.addWorksheet('DEV VENTAS');
+    wsDev.addRow(COLUMNAS_DEV_VENTAS);
+    devVentasFilas.forEach((f) => wsDev.addRow([f.nit, f.nombre, f.iva ?? 0]));
+  }
+
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
@@ -123,7 +131,7 @@ const HEADERS_1005 = [
   'Dígito de Verificación (DV)', 'Primer Apellido del informado (APL1)',
   'Segundo Apellido del informado (APL2)', 'Primer Nombre del informado (NOM1)',
   'Otros Nombres del informado (NOM2)', 'Razón Social del Informado (RAZ)',
-  'Impuesto descontable (VIMP)',
+  'Impuesto descontable (VIMP)', 'IVA resultante por devoluciones en ventas anuladas (IVADE)',
 ];
 
 async function construirPlantilla({ nombreHoja = '1005', filaHeader = 7 } = {}) {
@@ -166,13 +174,44 @@ describe('formato1005.leerYAgrupar', () => {
     const token = await construirToken([{ nit: '1', nombre: 'X', iva: 1 }], { nombreHoja: 'OTRA' });
     await expect(leerYAgrupar(token)).rejects.toThrow(/COMPRAS/);
   });
+
+  test('DEV VENTAS (opcional): agrega clientes nuevos con IVADE, tomando el tercero del Receptor', async () => {
+    const token = await construirToken(
+      [{ nit: '900123456', nombre: 'ACME SAS', iva: 100 }],
+      { devVentasFilas: [{ nit: '80123456', nombre: 'Juan Perez', iva: 30 }] }
+    );
+    const registros = await leerYAgrupar(token);
+
+    expect(registros).toHaveLength(2);
+    const cliente = registros.find((r) => r.identificacion === '80123456');
+    expect(cliente).toMatchObject({ tipoDocumento: 13, vimp: 0, ivade: 30 });
+    const proveedor = registros.find((r) => r.identificacion === '900123456');
+    expect(proveedor).toMatchObject({ vimp: 100, ivade: 0 });
+  });
+
+  test('DEV VENTAS: si el mismo NIT ya existe por COMPRAS, se fusiona en una sola fila (no se duplica el NID)', async () => {
+    const token = await construirToken(
+      [{ nit: '900123456', nombre: 'ACME SAS', iva: 100 }],
+      { devVentasFilas: [{ nit: '900123456', nombre: 'ACME SAS', iva: 30 }] }
+    );
+    const registros = await leerYAgrupar(token);
+
+    expect(registros).toHaveLength(1);
+    expect(registros[0]).toMatchObject({ identificacion: '900123456', vimp: 100, ivade: 30 });
+  });
+
+  test('sin hoja DEV VENTAS, ivade queda en 0 para todos los registros', async () => {
+    const token = await construirToken([{ nit: '900123456', nombre: 'ACME SAS', iva: 100 }]);
+    const registros = await leerYAgrupar(token);
+    expect(registros[0].ivade).toBe(0);
+  });
 });
 
 describe('formato1005.llenarPlantilla', () => {
-  test('jurídica: escribe CPT fijo, TDOC/NID/DV y todo el nombre en RAZ', async () => {
+  test('jurídica: escribe CPT fijo, TDOC/NID/DV, todo el nombre en RAZ, VIMP e IVADE', async () => {
     const { wb, ws } = await construirPlantilla();
     const registros = [
-      { tipoDocumento: 31, identificacion: '900123456', digitoVerificacion: 8, razonSocial: 'ACME SAS', vimp: 1234.56 },
+      { tipoDocumento: 31, identificacion: '900123456', digitoVerificacion: 8, razonSocial: 'ACME SAS', vimp: 1234.56, ivade: 30 },
     ];
     const buffer = await llenarPlantilla(Buffer.from(await wb.xlsx.writeBuffer()), registros);
 
@@ -185,20 +224,21 @@ describe('formato1005.llenarPlantilla', () => {
     expect(fila.getCell(4).value).toBe(8);    // DV
     expect(fila.getCell(9).value).toBe('ACME SAS'); // RAZ
     expect(fila.getCell(10).value).toBe(1234.56); // VIMP
+    expect(fila.getCell(11).value).toBe(30);  // IVADE
     expect(ws).toBeDefined();
   });
 
   test('persona natural: separa el nombre en APL1/APL2/NOM1/NOM2 y deja RAZ vacío', async () => {
     const { wb } = await construirPlantilla();
     const registros = [
-      { tipoDocumento: 13, identificacion: '80123456', digitoVerificacion: 3, razonSocial: 'Juan Carlos Perez Gomez', vimp: 100 },
+      { tipoDocumento: 13, identificacion: '80123456', digitoVerificacion: 3, razonSocial: 'Juan Carlos Perez Gomez', vimp: 100, ivade: 0 },
     ];
     const buffer = await llenarPlantilla(Buffer.from(await wb.xlsx.writeBuffer()), registros);
 
     const wb2 = new ExcelJS.Workbook();
     await wb2.xlsx.load(buffer);
     const fila = wb2.getWorksheet('1005').getRow(8);
-    // Orden de columnas en HEADERS_1005: 1 CPT, 2 TDOC, 3 NID, 4 DV, 5 APL1, 6 APL2, 7 NOM1, 8 NOM2, 9 RAZ, 10 VIMP
+    // Orden de columnas en HEADERS_1005: 1 CPT, 2 TDOC, 3 NID, 4 DV, 5 APL1, 6 APL2, 7 NOM1, 8 NOM2, 9 RAZ, 10 VIMP, 11 IVADE
     expect(fila.getCell(5).value).toBe('PEREZ');  // APL1
     expect(fila.getCell(6).value).toBe('GOMEZ');  // APL2
     expect(fila.getCell(7).value).toBe('JUAN');   // NOM1
@@ -206,17 +246,17 @@ describe('formato1005.llenarPlantilla', () => {
     expect(fila.getCell(9).value).toBeNull();     // RAZ vacío para persona natural
   });
 
-  test('no toca columnas fuera de las 10 objetivo (IVADE/IVAVCG no existen en esta plantilla de prueba)', async () => {
+  test('no toca columnas fuera de las 11 objetivo (IVAVCG no existe en esta plantilla de prueba)', async () => {
     const { wb } = await construirPlantilla();
     const wsAntes = wb.getWorksheet('1005');
-    wsAntes.getCell('K1').value = 'no tocar';
+    wsAntes.getCell('L1').value = 'no tocar';
 
     const buffer = await llenarPlantilla(Buffer.from(await wb.xlsx.writeBuffer()), [
-      { tipoDocumento: 31, identificacion: '1', digitoVerificacion: 1, razonSocial: 'X', vimp: 1 },
+      { tipoDocumento: 31, identificacion: '1', digitoVerificacion: 1, razonSocial: 'X', vimp: 1, ivade: 0 },
     ]);
     const wb2 = new ExcelJS.Workbook();
     await wb2.xlsx.load(buffer);
-    expect(wb2.getWorksheet('1005').getCell('K1').value).toBe('no tocar');
+    expect(wb2.getWorksheet('1005').getCell('L1').value).toBe('no tocar');
   });
 
   test('lanza error si la plantilla no tiene hoja 1005', async () => {
