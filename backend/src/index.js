@@ -35,6 +35,7 @@ const fondoImpuestosRoutes  = require('./routes/fondoImpuestos');
 const fondoPagosRoutes      = require('./routes/fondoPagos');
 const fondoLinksRoutes      = require('./routes/fondoLinks');
 const dianRoutes            = require('./routes/dian');
+const exogenasRoutes        = require('./routes/exogenas');
 const extEmpresasRoutes     = require('./routes/extEmpresas');
 const extProcesosRoutes     = require('./routes/extProcesos');
 const extChecklistRoutes    = require('./routes/extChecklist');
@@ -160,6 +161,7 @@ app.use('/api/externas/empresas',  extEmpresasRoutes);
 app.use('/api/externas/procesos',  extProcesosRoutes);
 app.use('/api/externas/checklist', extChecklistRoutes);
 app.use('/api/dian',             dianRoutes);
+app.use('/api/exogenas',         exogenasRoutes);
 
 // Frontend is served by nginx in production — this block only runs locally
 if (env.NODE_ENV === 'development') {

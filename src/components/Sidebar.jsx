@@ -26,19 +26,20 @@ const navItems = [
 const modules = [
   { id: 'tasks',   label: 'Gestor de Tareas',    icon: 'task_alt' },
   { id: 'fondo',   label: 'Fondo Emprender',      icon: 'rocket_launch' },
-  { id: 'dian',    label: 'Contabilidad DIAN',    icon: 'receipt_long' },
+  { id: 'dian',    label: 'DIAN',                 icon: 'receipt_long' },
   { id: 'empresas', label: 'Empresas Externas',   icon: 'corporate_fare' },
 ]
 
 const MODULE_TITLES = {
   tasks:    'Gestor de Tareas',
   fondo:    'Fondo Emprender',
-  dian:     'Contabilidad DIAN',
+  dian:     'DIAN',
   empresas: 'Empresas Externas',
 }
 
 const DIAN_NAV = [
-  { to: '/dian/upload', label: 'Subir reporte', icon: 'upload_file', end: true },
+  { to: '/dian/upload',     label: 'Contabilidad DIAN', icon: 'upload_file',   end: true },
+  { to: '/exogenas/upload', label: 'Exógenas',          icon: 'request_quote', end: true },
 ]
 
 const EXTERNAS_NAV = [
@@ -173,12 +174,23 @@ export default function Sidebar({ open, onClose }) {
           }`}
         >
           {/* Header row */}
-          <div className="flex items-center gap-1 px-2 h-16 flex-shrink-0 border-b border-[#e8eaf0] dark:border-[#2e3148]">
-            <span
-              className={`text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-200 ${labelCls}`}
+          <div className="flex items-center gap-1 pl-3 pr-2 h-16 flex-shrink-0 border-b border-[#e8eaf0] dark:border-[#2e3148]">
+            <div
+              className={`flex items-center gap-2.5 overflow-hidden transition-[max-width,opacity] duration-200 ${
+                pinned
+                  ? 'max-w-[210px] opacity-100'
+                  : 'max-w-0 opacity-0 group-hover/nav:max-w-[210px] group-hover/nav:opacity-100'
+              }`}
             >
-              {MODULE_TITLES[activeModule]}
-            </span>
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-[#e8f0fe] dark:bg-[#1a2550]">
+                <span className="material-symbols-outlined text-lg text-[#004ac6] dark:text-[#7ba8f0]">
+                  {modules.find((m) => m.id === activeModule)?.icon}
+                </span>
+              </span>
+              <span className="text-[15px] font-bold tracking-tight text-[#191c1e] dark:text-[#e4e6f0] whitespace-nowrap">
+                {MODULE_TITLES[activeModule]}
+              </span>
+            </div>
             {/* spacer that only exists when expanded */}
             <span
               className={`transition-[flex] duration-200 ${

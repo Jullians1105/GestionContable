@@ -249,7 +249,7 @@ export default function DianExportacionPage() {
           <div className="flex flex-col items-center gap-4 py-2">
             {status === 'idle' && (
               <>
-                <span className="material-symbols-outlined text-5xl text-[#004ac6]">download</span>
+                <span className="material-symbols-outlined text-5xl text-green-500">download</span>
                 <p className="text-sm text-[#6b7280] dark:text-[#8890b5] text-center">
                   El archivo se generará con todos los cálculos finales.
                 </p>
@@ -282,7 +282,7 @@ export default function DianExportacionPage() {
               onClick={handleDescargar}
               disabled={status === 'loading'}
               className="flex items-center gap-2.5 px-8 py-3 rounded-xl text-base font-bold text-white transition active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-              style={{ background: '#004ac6' }}
+              style={{ background: '#16a34a' }}
             >
               <span className="material-symbols-outlined text-xl">download</span>
               {status === 'error' ? 'Reintentar descarga' : 'DESCARGAR EXCEL'}
@@ -291,49 +291,30 @@ export default function DianExportacionPage() {
         </div>
       ) : (
         /* ── Estado COMPLETADO ────────────────────────────────────────── */
-        <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl border border-green-200 dark:border-green-700 p-6 mb-5">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-2xl">check_circle</span>
+        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-4 mb-5">
+          <div className="flex flex-col items-center gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="material-symbols-outlined text-2xl text-green-500 flex-shrink-0">check_circle</span>
+              <p className="text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] truncate">{filename}</p>
             </div>
-            <div className="flex-1">
-              <h2 className="text-base font-bold text-green-800 dark:text-green-300">
-                Proceso completado
-              </h2>
-              <p className="text-sm text-green-700 dark:text-green-400 mt-1">
-                El archivo <span className="font-semibold">{filename}</span> se envió a descargar.
-              </p>
-              <p className="text-xs text-green-600 dark:text-green-500 mt-1.5">
-                Si el explorador de archivos se cerró o hubo un error al guardar, usa
-                &quot;Descargar de nuevo&quot; abajo — el borrador ya se eliminó del servidor,
-                pero el archivo generado se queda disponible en esta pantalla mientras no la cierres.
-              </p>
-            </div>
-          </div>
 
-          <div className="flex items-center gap-3 mt-5 pt-4 border-t border-green-200 dark:border-green-700 flex-wrap">
-            <button
-              onClick={handleDescargarDeNuevo}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-              style={{ background: '#004ac6' }}
-            >
-              <span className="material-symbols-outlined text-base">download</span>
-              Descargar de nuevo
-            </button>
-            <button
-              onClick={() => navigate('/dian/upload')}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] dark:border-[#3a3e5c] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition active:scale-[0.97]"
-            >
-              <span className="material-symbols-outlined text-base">upload_file</span>
-              Procesar otro reporte
-            </button>
-            <button
-              onClick={() => navigate('/')}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] dark:border-[#3a3e5c] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition active:scale-[0.97]"
-            >
-              <span className="material-symbols-outlined text-base">home</span>
-              Ir a inicio
-            </button>
+            <div className="flex items-center gap-2 flex-wrap justify-center">
+              <button
+                onClick={handleDescargarDeNuevo}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition active:scale-[0.97] hover:opacity-90"
+                style={{ background: '#16a34a' }}
+              >
+                <span className="material-symbols-outlined text-lg">download</span>
+                Descargar de nuevo
+              </button>
+              <button
+                onClick={() => navigate('/dian/upload')}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] dark:border-[#3a3e5c] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition active:scale-[0.97]"
+              >
+                <span className="material-symbols-outlined text-base">upload_file</span>
+                Procesar otro reporte
+              </button>
+            </div>
           </div>
         </div>
       )}
