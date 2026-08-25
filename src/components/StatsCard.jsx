@@ -7,6 +7,9 @@ export default function StatsCard({
   // comporta exactamente igual que antes (usada también por Dashboard y
   // FondoEmprenderEmpresasPage, que no necesitan esto).
   monthLabel, onPrevMonth, onNextMonth, prevMonthDisabled, nextMonthDisabled,
+  // Decimales — opcional, para valores monetarios (ej. Exógenas). Sin esto, el resto de
+  // páginas (conteos enteros) se comporta exactamente igual que antes.
+  decimals = 0, decimalSeparator, thousandSeparator,
 }) {
   const countUpRef = useRef(null)
   const { update } = useCountUp({
@@ -15,6 +18,9 @@ export default function StatsCard({
     end: value,
     duration: 0.7,
     useEasing: true,
+    decimals,
+    decimal: decimalSeparator,
+    separator: thousandSeparator,
   })
 
   // Re-animate whenever value changes (skip first render — initial anim handles it)

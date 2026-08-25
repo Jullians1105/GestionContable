@@ -347,6 +347,30 @@ export const api = {
     })
   },
 
+  // Exógenas
+  uploadExogenas: (formData) =>
+    fetchWithAuth('/exogenas/upload', { method: 'POST', body: formData }).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        const err = new Error(body.error || `Error ${res.status}`)
+        err.status = res.status
+        throw err
+      }
+      return res.json()
+    }),
+
+  getExogenasBorrador: (id) => request(`/exogenas/borradores/${id}`),
+
+  generarExogenas: (id) => {
+    return fetchWithAuth(`/exogenas/borradores/${id}/generar`, { method: 'POST' }).then((res) => {
+      if (!res.ok) return res.json().then((e) => { throw new Error(e.error || `Error ${res.status}`) })
+      const cd = res.headers.get('content-disposition') ?? ''
+      const match = cd.match(/filename="([^"]+)"/)
+      const filename = match ? match[1] : `Exogenas_${id.slice(0, 8)}.xlsx`
+      return res.blob().then((blob) => ({ blob, filename }))
+    })
+  },
+
   // Notifications
   getNotifications: () => request('/notifications'),
   markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: 'PUT' }),
