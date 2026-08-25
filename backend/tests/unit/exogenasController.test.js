@@ -19,7 +19,7 @@ const HEADERS_1005 = [
   'Dígito de Verificación (DV)', 'Primer Apellido del informado (APL1)',
   'Segundo Apellido del informado (APL2)', 'Primer Nombre del informado (NOM1)',
   'Otros Nombres del informado (NOM2)', 'Razón Social del Informado (RAZ)',
-  'Impuesto descontable (VIMP)',
+  'Impuesto descontable (VIMP)', 'IVA resultante por devoluciones en ventas anuladas (IVADE)',
 ];
 
 async function construirPlantilla({ nombreHoja = '1005' } = {}) {
@@ -172,7 +172,7 @@ describe('generarExogenas', () => {
 
   test('éxito: genera el Excel, lo envía y borra el borrador', async () => {
     const plantilla = await construirPlantilla();
-    const registros = [{ tipoDocumento: 31, identificacion: '900123456', digitoVerificacion: 8, razonSocial: 'ACME SAS', vimp: 100 }];
+    const registros = [{ tipoDocumento: 31, identificacion: '900123456', digitoVerificacion: 8, razonSocial: 'ACME SAS', vimp: 100, ivade: 0 }];
     db.query
       .mockResolvedValueOnce({ rows: [{ formato: '1005', registros, plantilla_original: plantilla, nombre_plantilla: 'Plantilla Cliente.xlsx' }] })
       .mockResolvedValueOnce({ rows: [] });

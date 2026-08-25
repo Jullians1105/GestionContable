@@ -4,6 +4,10 @@
 // - Solo Grupo = "Recibido" (las compras que sí aplican ya vienen pre-seleccionadas por el
 //   contador en la hoja "COMPRAS" del TOKEN; este filtro es una red de seguridad adicional).
 // - Las notas crédito de compras NUNCA se incluyen en el VIMP.
+// - Hoja "DEV VENTAS" (opcional): notas crédito sobre VENTAS de la empresa a sus clientes —
+//   ahí el tercero está en NIT/Nombre RECEPTOR, no Emisor (el Emisor ahí es la propia
+//   empresa, al revés que en COMPRAS). Su IVA alimenta la columna IVADE. Si un mismo NIT
+//   aparece en COMPRAS y en DEV VENTAS, se fusiona en una sola fila (un NID no se repite).
 const ExcelJS = require('exceljs');
 const { normalizeXlsxBuffer } = require('./utils/normalizeXlsx');
 const { normalizarTexto, limpiarIdentificacion, calcularDV, inferirTipoDocumento, esNotaCredito, separarNombrePersona, round2 } = require('./utils/dian');
@@ -11,6 +15,9 @@ const { getCellText, encontrarFilaYColumnas, copiarEstiloFila } = require('./uti
 
 const HOJA_TOKEN = 'COMPRAS';
 const COLUMNAS_TOKEN_REQUERIDAS = ['Tipo de documento', 'NIT Emisor', 'Nombre Emisor', 'IVA', 'Grupo'];
+
+const HOJA_DEV_VENTAS = 'DEV VENTAS';
+const COLUMNAS_DEV_VENTAS_REQUERIDAS = ['NIT Receptor', 'Nombre Receptor', 'IVA'];
 
 const HOJA_PLANTILLA = '1005';
 
@@ -31,8 +38,9 @@ const CAMPOS_PLANTILLA = [
   { match: 'OTROS NOMBRES DEL INFORMADO', key: 'NOM2' },
   { match: 'RAZON SOCIAL DEL INFORMADO', key: 'RAZ' },
   { match: 'IMPUESTO DESCONTABLE', key: 'VIMP' },
-  // IVADE / IVAVCG deliberadamente fuera de esta lista: no se tocan (ni se limpian ni se
-  // escriben) — quedan tal cual vengan en la plantilla.
+  { match: 'IVA RESULTANTE POR DEVOLUCIONES', key: 'IVADE' },
+  // IVAVCG deliberadamente fuera de esta lista: no se toca (ni se limpia ni se escribe) —
+  // no hay fuente de datos confirmada para esa columna todavía.
 ];
 const HEADERS_PLANTILLA = CAMPOS_PLANTILLA.map((c) => c.match);
 
@@ -52,6 +60,31 @@ function encontrarHoja(workbook, nombreExacto) {
   return workbook.worksheets.find((ws) => ws.name.trim().toUpperCase() === nombreExacto.toUpperCase());
 }
 
+function mapearColumnas(ws, columnasRequeridas, nombreHoja) {
+  const colMap = {};
+  ws.getRow(1).eachCell({ includeEmpty: false }, (cell, colNumber) => {
+    const nombre = getCellText(cell).trim();
+    if (nombre) colMap[nombre] = colNumber;
+  });
+  const faltantes = columnasRequeridas.filter((c) => !(c in colMap));
+  if (faltantes.length > 0) {
+    throw new Error(`A la hoja "${nombreHoja}" le faltan columnas requeridas: ${faltantes.join(', ')}.`);
+  }
+  return colMap;
+}
+
+function obtenerOCrear(acumulador, tipoDocumento, identificacion, razonSocial) {
+  const key = `${tipoDocumento}|${identificacion}`;
+  let entrada = acumulador.get(key);
+  if (!entrada) {
+    entrada = { tipoDocumento, identificacion, razonSocial, vimp: 0, ivade: 0 };
+    acumulador.set(key, entrada);
+  } else if (razonSocial.length > entrada.razonSocial.length) {
+    entrada.razonSocial = razonSocial;
+  }
+  return entrada;
+}
+
 async function leerYAgrupar(bufferToken) {
   const bufferNormalizado = await normalizeXlsxBuffer(bufferToken);
   const workbook = new ExcelJS.Workbook();
@@ -62,52 +95,56 @@ async function leerYAgrupar(bufferToken) {
     throw new Error(`El archivo TOKEN debe tener una hoja llamada "${HOJA_TOKEN}" con las compras ya validadas.`);
   }
 
-  const colMap = {};
-  ws.getRow(1).eachCell({ includeEmpty: false }, (cell, colNumber) => {
-    const nombre = getCellText(cell).trim();
-    if (nombre) colMap[nombre] = colNumber;
-  });
+  const acumulador = new Map(); // key: `${tipoDocumento}|${identificacion}` -> { identificacion, tipoDocumento, razonSocial, vimp, ivade }
 
-  const faltantes = COLUMNAS_TOKEN_REQUERIDAS.filter((c) => !(c in colMap));
-  if (faltantes.length > 0) {
-    throw new Error(`A la hoja "${HOJA_TOKEN}" le faltan columnas requeridas: ${faltantes.join(', ')}.`);
+  // --- COMPRAS -> VIMP (proveedores, tercero en Emisor) ---
+  {
+    const colMap = mapearColumnas(ws, COLUMNAS_TOKEN_REQUERIDAS, HOJA_TOKEN);
+    const getStr = (row, nombreCol) => getCellText(row.getCell(colMap[nombreCol])).trim() || null;
+    const getNum = (row, nombreCol) => aNumero(row.getCell(colMap[nombreCol]).value);
+
+    ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return;
+
+      const grupo = normalizarTexto(getStr(row, 'Grupo'));
+      if (grupo !== 'RECIBIDO') return;
+
+      const tipoDocExcel = getStr(row, 'Tipo de documento');
+      if (esNotaCredito(tipoDocExcel)) return;
+
+      const identificacion = limpiarIdentificacion(getStr(row, 'NIT Emisor'));
+      const nombre = getStr(row, 'Nombre Emisor');
+      if (!identificacion || !nombre) return;
+
+      const iva = getNum(row, 'IVA');
+      if (iva === 0) return;
+
+      const tipoDocumento = inferirTipoDocumento(identificacion, nombre);
+      obtenerOCrear(acumulador, tipoDocumento, identificacion, nombre).vimp += iva;
+    });
   }
 
-  const getStr = (row, nombreCol) => {
-    const raw = getCellText(row.getCell(colMap[nombreCol])).trim();
-    return raw || null;
-  };
-  const getNum = (row, nombreCol) => aNumero(row.getCell(colMap[nombreCol]).value);
+  // --- DEV VENTAS -> IVADE (clientes, tercero en Receptor) — hoja opcional ---
+  const wsDevVentas = encontrarHoja(workbook, HOJA_DEV_VENTAS);
+  if (wsDevVentas) {
+    const colMap = mapearColumnas(wsDevVentas, COLUMNAS_DEV_VENTAS_REQUERIDAS, HOJA_DEV_VENTAS);
+    const getStr = (row, nombreCol) => getCellText(row.getCell(colMap[nombreCol])).trim() || null;
+    const getNum = (row, nombreCol) => aNumero(row.getCell(colMap[nombreCol]).value);
 
-  const acumulador = new Map(); // key: `${tipoDocumento}|${identificacion}` -> { identificacion, tipoDocumento, razonSocial, vimp }
+    wsDevVentas.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return;
 
-  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    if (rowNumber === 1) return;
+      const identificacion = limpiarIdentificacion(getStr(row, 'NIT Receptor'));
+      const nombre = getStr(row, 'Nombre Receptor');
+      if (!identificacion || !nombre) return;
 
-    const grupo = normalizarTexto(getStr(row, 'Grupo'));
-    if (grupo !== 'RECIBIDO') return;
+      const iva = getNum(row, 'IVA');
+      if (iva === 0) return;
 
-    const tipoDocExcel = getStr(row, 'Tipo de documento');
-    if (esNotaCredito(tipoDocExcel)) return;
-
-    const identificacion = limpiarIdentificacion(getStr(row, 'NIT Emisor'));
-    const nombre = getStr(row, 'Nombre Emisor');
-    if (!identificacion || !nombre) return;
-
-    const iva = getNum(row, 'IVA');
-    if (iva === 0) return;
-
-    const tipoDocumento = inferirTipoDocumento(identificacion, nombre);
-    const key = `${tipoDocumento}|${identificacion}`;
-
-    const existente = acumulador.get(key);
-    if (existente) {
-      existente.vimp += iva;
-      if (nombre.length > existente.razonSocial.length) existente.razonSocial = nombre;
-    } else {
-      acumulador.set(key, { tipoDocumento, identificacion, razonSocial: nombre, vimp: iva });
-    }
-  });
+      const tipoDocumento = inferirTipoDocumento(identificacion, nombre);
+      obtenerOCrear(acumulador, tipoDocumento, identificacion, nombre).ivade += iva;
+    });
+  }
 
   const registros = Array.from(acumulador.values()).map((r) => ({
     tipoDocumento: r.tipoDocumento,
@@ -115,6 +152,7 @@ async function leerYAgrupar(bufferToken) {
     digitoVerificacion: calcularDV(r.identificacion),
     razonSocial: r.razonSocial,
     vimp: round2(r.vimp),
+    ivade: round2(r.ivade),
   }));
 
   registros.sort((a, b) => {
@@ -176,7 +214,8 @@ async function llenarPlantilla(bufferPlantilla, registros) {
       row.getCell(col.APL2).value = apl2;
     }
 
-    row.getCell(col.VIMP).value = registro.vimp;
+    row.getCell(col.VIMP).value  = registro.vimp;
+    row.getCell(col.IVADE).value = registro.ivade;
   });
 
   return workbook.xlsx.writeBuffer();
