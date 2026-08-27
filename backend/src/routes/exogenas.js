@@ -3,7 +3,9 @@ const multer = require('multer');
 const { body } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
-const { uploadExogenas, getExogenasBorrador, generarExogenas, FORMATOS_SOPORTADOS } = require('../controllers/exogenasController');
+const {
+  uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado, FORMATOS_SOPORTADOS,
+} = require('../controllers/exogenasController');
 
 const router = Router();
 
@@ -52,8 +54,8 @@ router.use(authMiddleware);
  *           schema:
  *             type: object
  *             properties:
- *               formato:   { type: string, enum: [1005] }
- *               token:     { type: string, format: binary, description: Detalle de compras (hoja COMPRAS) }
+ *               formato:   { type: string, enum: [1005, 1006] }
+ *               token:     { type: string, format: binary, description: Detalle de compras/ventas (hoja COMPRAS o VENTAS según el formato) }
  *               plantilla: { type: string, format: binary, description: Plantilla SIIGO del formato correspondiente }
  *     responses:
  *       201:
@@ -105,5 +107,36 @@ router.get('/borradores/:id', getExogenasBorrador);
  *         description: Borrador no encontrado o no pertenece al usuario.
  */
 router.post('/borradores/:id/generar', generarExogenas);
+
+/**
+ * @openapi
+ * /api/exogenas/generar-combinado:
+ *   post:
+ *     tags: [Exógenas]
+ *     summary: Escribir varios borradores (uno por formato) en un solo Excel, cada uno en su propia hoja
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ids: { type: array, items: { type: string, format: uuid }, minItems: 1 }
+ *     responses:
+ *       200:
+ *         description: Archivo Excel generado con la hoja de cada formato ya llena.
+ *       400:
+ *         description: "ids" ausente/vacío, o error de negocio al llenar alguna hoja.
+ *       404:
+ *         description: Alguno de los borradores no existe, ya expiró o no pertenece al usuario.
+ */
+router.post('/generar-combinado',
+  body('ids').isArray({ min: 1 }).withMessage('Se requiere un arreglo "ids" con al menos un borrador'),
+  body('ids.*').isUUID().withMessage('Cada id debe ser un UUID válido'),
+  validate,
+  generarExogenasCombinado
+);
 
 module.exports = router;

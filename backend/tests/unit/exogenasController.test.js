@@ -2,7 +2,9 @@ jest.mock('../../src/config/database');
 
 const ExcelJS = require('exceljs');
 const db = require('../../src/config/database');
-const { uploadExogenas, getExogenasBorrador, generarExogenas } = require('../../src/controllers/exogenasController');
+const {
+  uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado,
+} = require('../../src/controllers/exogenasController');
 
 const COLUMNAS_TOKEN = ['Tipo de documento', 'NIT Emisor', 'Nombre Emisor', 'IVA', 'Grupo'];
 
@@ -189,5 +191,83 @@ describe('generarExogenas', () => {
     const deleteCall = db.query.mock.calls[1];
     expect(deleteCall[0]).toMatch(/DELETE FROM exogenas_borradores/);
     expect(deleteCall[1]).toEqual(['b1', 'u1']);
+  });
+});
+
+const HEADERS_1006 = [
+  'Concepto (CPT)', 'Tipo de Documento (TDOC)', 'Número de Identificacion (NID)',
+  'Dígito de Verificación (DV)', 'Primer Apellido del informado (APL1)',
+  'Segundo Apellido del informado (APL2)', 'Primer Nombre del informado (NOM1)',
+  'Otros Nombres del informado (NOM2)', 'Razón Social del Informado (RAZ)',
+  'Impuesto generado (IMP)', 'IVA Recuperado en devoluciones en compras anuladas rescindidas o resueltas (IVA)',
+  'Impuesto nacional al consumo (ICON)',
+];
+
+async function construirPlantillaCombinada() {
+  const wb = new ExcelJS.Workbook();
+  const ws1005 = wb.addWorksheet('1005');
+  for (let i = 1; i < 7; i++) ws1005.addRow([]);
+  ws1005.addRow(HEADERS_1005);
+  const ws1006 = wb.addWorksheet('1006');
+  for (let i = 1; i < 7; i++) ws1006.addRow([]);
+  ws1006.addRow(HEADERS_1006);
+  return Buffer.from(await wb.xlsx.writeBuffer());
+}
+
+describe('generarExogenasCombinado', () => {
+  test('404 si falta alguno de los ids (no existe, ya expiró, o no es del usuario)', async () => {
+    db.query.mockResolvedValueOnce({ rows: [{ id: 'b1', formato: '1005', registros: [], plantilla_original: Buffer.from(''), nombre_plantilla: 'p.xlsx' }] });
+    const req = { body: { ids: ['b1', 'b2'] }, user: { userId: 'u1' } };
+    const res = mockRes();
+    await generarExogenasCombinado(req, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('400 con el mensaje de negocio si a la plantilla le falta la hoja de alguno de los formatos', async () => {
+    const plantilla = await construirPlantilla(); // solo trae hoja "1005"
+    db.query.mockResolvedValueOnce({
+      rows: [
+        { id: 'b1', formato: '1005', registros: [], plantilla_original: plantilla, nombre_plantilla: 'p.xlsx' },
+        { id: 'b2', formato: '1006', registros: [], plantilla_original: plantilla, nombre_plantilla: 'p.xlsx' },
+      ],
+    });
+    const req = { body: { ids: ['b1', 'b2'] }, user: { userId: 'u1' } };
+    const res = mockRes();
+    await generarExogenasCombinado(req, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json.mock.calls[0][0].error).toMatch(/"1006"/);
+  });
+
+  test('éxito: un solo Excel con ambas hojas llenas, borra los dos borradores', async () => {
+    const plantilla = await construirPlantillaCombinada();
+    const registros1005 = [{ tipoDocumento: 31, identificacion: '900123456', digitoVerificacion: 8, razonSocial: 'ACME SAS', vimp: 100, ivade: 0 }];
+    const registros1006 = [{ tipoDocumento: 31, identificacion: '900654321', digitoVerificacion: 3, razonSocial: 'OTRA SAS', imp: 200, iva: 0, icon: 0 }];
+    db.query
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'b1', formato: '1005', registros: registros1005, plantilla_original: plantilla, nombre_plantilla: 'Plantilla Cliente.xlsx' },
+          { id: 'b2', formato: '1006', registros: registros1006, plantilla_original: plantilla, nombre_plantilla: 'Plantilla Cliente.xlsx' },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const req = { body: { ids: ['b1', 'b2'] }, user: { userId: 'u1' } };
+    const res = mockRes();
+    const next = jest.fn();
+    await generarExogenasCombinado(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Disposition', expect.stringContaining('1005-1006 GENERADO.xlsx'));
+    const buffer = res.send.mock.calls[0][0];
+    expect(Buffer.isBuffer(buffer)).toBe(true);
+
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(buffer);
+    expect(wb2.getWorksheet('1005').getRow(8).getCell(9).value).toBe('ACME SAS');
+    expect(wb2.getWorksheet('1006').getRow(8).getCell(9).value).toBe('OTRA SAS');
+
+    const deleteCall = db.query.mock.calls[1];
+    expect(deleteCall[0]).toMatch(/DELETE FROM exogenas_borradores/);
+    expect(deleteCall[1]).toEqual([['b1', 'b2'], 'u1']);
   });
 });
