@@ -1,32 +1,35 @@
-// Formato 1005 — IVA descontable. Puerto de exogena_1005_app.py (docs/arqExogena.md).
+// Formato 1006 — IVA generado + Impuesto nacional al consumo (INC). Espejo de formato1005.js,
+// pero del lado de VENTAS en vez de COMPRAS.
 //
-// Reglas de negocio fijas para 1005 (confirmadas por el usuario, no son opciones de UI):
-// - Solo Grupo = "Recibido" (las compras que sí aplican ya vienen pre-seleccionadas por el
-//   contador en la hoja "COMPRAS" del TOKEN; este filtro es una red de seguridad adicional).
-// - Las notas crédito de compras NUNCA se incluyen en el VIMP.
-// - Hoja "DEV VENTAS" (opcional): notas crédito sobre VENTAS de la empresa a sus clientes —
-//   ahí el tercero está en NIT/Nombre RECEPTOR, no Emisor (el Emisor ahí es la propia
-//   empresa, al revés que en COMPRAS). Su IVA alimenta la columna IVADE. Si un mismo NIT
-//   aparece en COMPRAS y en DEV VENTAS, se fusiona en una sola fila (un NID no se repite).
+// Reglas de negocio fijas para 1006 (confirmadas por el usuario contra el autoFilter real del
+// TOKEN de prueba, no solo por el texto de la columna Grupo):
+// - Hoja "VENTAS": solo Grupo = "Emitido" y Tipo de documento distinto de nota crédito (la
+//   empresa es quien emite la venta) — mismo patrón que Grupo="Recibido" en COMPRAS para 1005.
+//   El IVA de esas filas alimenta IMP (impuesto generado); el INC de esas mismas filas alimenta
+//   ICON (impuesto nacional al consumo generado).
+// - Hoja "DEV COMPRAS" (opcional): notas crédito que la empresa RECIBIÓ de sus proveedores
+//   (devolución de compras) — ahí el tercero está en NIT/Nombre EMISOR (el proveedor que emite
+//   la nota), y solo cuentan filas con Grupo = "Recibido" y Tipo de documento = nota crédito
+//   (a diferencia de VENTAS/COMPRAS, acá SÍ se filtra por nota crédito porque es justamente lo
+//   que se busca, no lo que se excluye). Su IVA alimenta la columna de salida "IVA" (recuperado
+//   en devoluciones en compras anuladas/rescindidas/resueltas).
 const ExcelJS = require('exceljs');
 const { normalizeXlsxBuffer } = require('./utils/normalizeXlsx');
 const { normalizarTexto, limpiarIdentificacion, calcularDV, inferirTipoDocumento, esNotaCredito, separarNombrePersona, round2 } = require('./utils/dian');
 const { getCellText, encontrarFilaYColumnas, copiarEstiloFila } = require('./utils/plantillaExcel');
 
-const HOJA_TOKEN = 'COMPRAS';
-const COLUMNAS_TOKEN_REQUERIDAS = ['Tipo de documento', 'NIT Emisor', 'Nombre Emisor', 'IVA', 'Grupo'];
+const HOJA_TOKEN = 'VENTAS';
+const COLUMNAS_TOKEN_REQUERIDAS = ['Tipo de documento', 'NIT Receptor', 'Nombre Receptor', 'IVA', 'INC', 'Grupo'];
 
-const HOJA_DEV_VENTAS = 'DEV VENTAS';
-const COLUMNAS_DEV_VENTAS_REQUERIDAS = ['NIT Receptor', 'Nombre Receptor', 'IVA'];
+const HOJA_DEV_COMPRAS = 'DEV COMPRAS';
+const COLUMNAS_DEV_COMPRAS_REQUERIDAS = ['Tipo de documento', 'NIT Emisor', 'Nombre Emisor', 'IVA', 'Grupo'];
 
-const HOJA_PLANTILLA = '1005';
+const HOJA_PLANTILLA = '1006';
 
-// Concepto (CPT) fijo para todo el 1005 — confirmado contra un reporte real ya presentado
-// (docs/EXOGENA - GUIA FORMATOS.xlsx, hoja "1005 OK").
-const CONCEPTO_1005 = 5555;
+// Concepto (CPT) fijo para todo el 1006 — confirmado contra la guía oficial
+// (docs/EXOGENA - GUIA FORMATOS.xlsx, hoja "1006 OK").
+const CONCEPTO_1006 = 6666;
 
-// match: substring normalizado a buscar en el encabezado de la plantilla (ver
-// encontrarFilaYColumnas). key: nombre corto usado en el resto de este archivo.
 const CAMPOS_PLANTILLA = [
   { match: 'CONCEPTO', key: 'CPT' },
   { match: 'TIPO DE DOCUMENTO', key: 'TDOC' },
@@ -37,10 +40,9 @@ const CAMPOS_PLANTILLA = [
   { match: 'PRIMER NOMBRE DEL INFORMADO', key: 'NOM1' },
   { match: 'OTROS NOMBRES DEL INFORMADO', key: 'NOM2' },
   { match: 'RAZON SOCIAL DEL INFORMADO', key: 'RAZ' },
-  { match: 'IMPUESTO DESCONTABLE', key: 'VIMP' },
-  { match: 'IVA RESULTANTE POR DEVOLUCIONES', key: 'IVADE' },
-  // IVAVCG deliberadamente fuera de esta lista: no se toca (ni se limpia ni se escribe) —
-  // no hay fuente de datos confirmada para esa columna todavía.
+  { match: 'IMPUESTO GENERADO', key: 'IMP' },
+  { match: 'IVA RECUPERADO EN DEVOLUCIONES', key: 'IVA' },
+  { match: 'IMPUESTO NACIONAL AL CONSUMO', key: 'ICON' },
 ];
 const HEADERS_PLANTILLA = CAMPOS_PLANTILLA.map((c) => c.match);
 
@@ -77,7 +79,7 @@ function obtenerOCrear(acumulador, tipoDocumento, identificacion, razonSocial) {
   const key = `${tipoDocumento}|${identificacion}`;
   let entrada = acumulador.get(key);
   if (!entrada) {
-    entrada = { tipoDocumento, identificacion, razonSocial, vimp: 0, ivade: 0 };
+    entrada = { tipoDocumento, identificacion, razonSocial, imp: 0, iva: 0, icon: 0 };
     acumulador.set(key, entrada);
   } else if (razonSocial.length > entrada.razonSocial.length) {
     entrada.razonSocial = razonSocial;
@@ -92,12 +94,12 @@ async function leerYAgrupar(bufferToken) {
 
   const ws = encontrarHoja(workbook, HOJA_TOKEN);
   if (!ws) {
-    throw new Error(`El archivo TOKEN debe tener una hoja llamada "${HOJA_TOKEN}" con las compras ya validadas.`);
+    throw new Error(`El archivo TOKEN debe tener una hoja llamada "${HOJA_TOKEN}" con las ventas ya validadas.`);
   }
 
-  const acumulador = new Map(); // key: `${tipoDocumento}|${identificacion}` -> { identificacion, tipoDocumento, razonSocial, vimp, ivade }
+  const acumulador = new Map(); // key: `${tipoDocumento}|${identificacion}` -> { identificacion, tipoDocumento, razonSocial, imp, iva, icon }
 
-  // --- COMPRAS -> VIMP (proveedores, tercero en Emisor) ---
+  // --- VENTAS -> IMP + ICON (clientes, tercero en Receptor) ---
   {
     const colMap = mapearColumnas(ws, COLUMNAS_TOKEN_REQUERIDAS, HOJA_TOKEN);
     const getStr = (row, nombreCol) => getCellText(row.getCell(colMap[nombreCol])).trim() || null;
@@ -107,10 +109,41 @@ async function leerYAgrupar(bufferToken) {
       if (rowNumber === 1) return;
 
       const grupo = normalizarTexto(getStr(row, 'Grupo'));
-      if (grupo !== 'RECIBIDO') return;
+      if (grupo !== 'EMITIDO') return;
 
       const tipoDocExcel = getStr(row, 'Tipo de documento');
       if (esNotaCredito(tipoDocExcel)) return;
+
+      const identificacion = limpiarIdentificacion(getStr(row, 'NIT Receptor'));
+      const nombre = getStr(row, 'Nombre Receptor');
+      if (!identificacion || !nombre) return;
+
+      const iva = getNum(row, 'IVA');
+      const inc = getNum(row, 'INC');
+      if (iva === 0 && inc === 0) return;
+
+      const tipoDocumento = inferirTipoDocumento(identificacion, nombre);
+      const entrada = obtenerOCrear(acumulador, tipoDocumento, identificacion, nombre);
+      entrada.imp += iva;
+      entrada.icon += inc;
+    });
+  }
+
+  // --- DEV COMPRAS -> IVA (proveedores, tercero en Emisor) — hoja opcional ---
+  const wsDevCompras = encontrarHoja(workbook, HOJA_DEV_COMPRAS);
+  if (wsDevCompras) {
+    const colMap = mapearColumnas(wsDevCompras, COLUMNAS_DEV_COMPRAS_REQUERIDAS, HOJA_DEV_COMPRAS);
+    const getStr = (row, nombreCol) => getCellText(row.getCell(colMap[nombreCol])).trim() || null;
+    const getNum = (row, nombreCol) => aNumero(row.getCell(colMap[nombreCol]).value);
+
+    wsDevCompras.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return;
+
+      const grupo = normalizarTexto(getStr(row, 'Grupo'));
+      if (grupo !== 'RECIBIDO') return;
+
+      const tipoDocExcel = getStr(row, 'Tipo de documento');
+      if (!esNotaCredito(tipoDocExcel)) return;
 
       const identificacion = limpiarIdentificacion(getStr(row, 'NIT Emisor'));
       const nombre = getStr(row, 'Nombre Emisor');
@@ -120,29 +153,7 @@ async function leerYAgrupar(bufferToken) {
       if (iva === 0) return;
 
       const tipoDocumento = inferirTipoDocumento(identificacion, nombre);
-      obtenerOCrear(acumulador, tipoDocumento, identificacion, nombre).vimp += iva;
-    });
-  }
-
-  // --- DEV VENTAS -> IVADE (clientes, tercero en Receptor) — hoja opcional ---
-  const wsDevVentas = encontrarHoja(workbook, HOJA_DEV_VENTAS);
-  if (wsDevVentas) {
-    const colMap = mapearColumnas(wsDevVentas, COLUMNAS_DEV_VENTAS_REQUERIDAS, HOJA_DEV_VENTAS);
-    const getStr = (row, nombreCol) => getCellText(row.getCell(colMap[nombreCol])).trim() || null;
-    const getNum = (row, nombreCol) => aNumero(row.getCell(colMap[nombreCol]).value);
-
-    wsDevVentas.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      if (rowNumber === 1) return;
-
-      const identificacion = limpiarIdentificacion(getStr(row, 'NIT Receptor'));
-      const nombre = getStr(row, 'Nombre Receptor');
-      if (!identificacion || !nombre) return;
-
-      const iva = getNum(row, 'IVA');
-      if (iva === 0) return;
-
-      const tipoDocumento = inferirTipoDocumento(identificacion, nombre);
-      obtenerOCrear(acumulador, tipoDocumento, identificacion, nombre).ivade += iva;
+      obtenerOCrear(acumulador, tipoDocumento, identificacion, nombre).iva += iva;
     });
   }
 
@@ -151,8 +162,9 @@ async function leerYAgrupar(bufferToken) {
     identificacion: r.identificacion,
     digitoVerificacion: calcularDV(r.identificacion),
     razonSocial: r.razonSocial,
-    vimp: round2(r.vimp),
-    ivade: round2(r.ivade),
+    imp: round2(r.imp),
+    iva: round2(r.iva),
+    icon: round2(r.icon),
   }));
 
   registros.sort((a, b) => {
@@ -165,10 +177,9 @@ async function leerYAgrupar(bufferToken) {
   return registros;
 }
 
-// Llena la hoja "1005" de un workbook ya cargado en memoria, sin cargarlo ni guardarlo — así
+// Llena la hoja "1006" de un workbook ya cargado en memoria, sin cargarlo ni guardarlo — así
 // varios formatos pueden escribir cada uno su propia hoja sobre el MISMO workbook antes de
-// serializarlo una sola vez (ver services/exogenas/index.js#llenarPlantillaCombinada), en vez
-// de que cada formato genere su propio archivo de salida por separado.
+// serializarlo una sola vez (ver services/exogenas/index.js#llenarPlantillaCombinada).
 function llenarHoja(workbook, registros) {
   const ws = encontrarHoja(workbook, HOJA_PLANTILLA);
   if (!ws) {
@@ -191,20 +202,14 @@ function llenarHoja(workbook, registros) {
 
   registros.forEach((registro, i) => {
     const fila = filaInicio + i;
-    // Se re-aplica el estilo de la fila modelo a toda fila de datos (excepto la modelo
-    // misma): más simple y seguro que intentar detectar si una fila "ya tenía estilo" (la
-    // plantilla real no usa bandas de color alternadas en estas columnas), a diferencia de
-    // copiar_estilo_fila en Python que solo lo hacía para filas nuevas o sin estilo previo.
     if (fila !== filaInicio) copiarEstiloFila(ws, filaInicio, fila);
 
     const row = ws.getRow(fila);
-    row.getCell(col.CPT).value  = CONCEPTO_1005;
+    row.getCell(col.CPT).value  = CONCEPTO_1006;
     row.getCell(col.TDOC).value = registro.tipoDocumento;
     row.getCell(col.NID).value  = Number(registro.identificacion);
     row.getCell(col.DV).value   = registro.digitoVerificacion;
 
-    // Jurídica (31): nombre completo en Razón Social. Natural (13): nombre separado en
-    // NOM1/NOM2/APL1/APL2 — ver separarNombrePersona (heurística, no exacta).
     if (registro.tipoDocumento === 31) {
       row.getCell(col.RAZ).value = registro.razonSocial;
     } else {
@@ -215,8 +220,9 @@ function llenarHoja(workbook, registros) {
       row.getCell(col.APL2).value = apl2;
     }
 
-    row.getCell(col.VIMP).value  = registro.vimp;
-    row.getCell(col.IVADE).value = registro.ivade;
+    row.getCell(col.IMP).value  = registro.imp;
+    row.getCell(col.IVA).value  = registro.iva;
+    row.getCell(col.ICON).value = registro.icon;
   });
 }
 
@@ -230,4 +236,4 @@ async function llenarPlantilla(bufferPlantilla, registros) {
   return workbook.xlsx.writeBuffer();
 }
 
-module.exports = { leerYAgrupar, llenarHoja, llenarPlantilla, HOJA_TOKEN, COLUMNAS_TOKEN_REQUERIDAS };
+module.exports = { leerYAgrupar, llenarHoja, llenarPlantilla };

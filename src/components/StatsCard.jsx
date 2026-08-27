@@ -30,9 +30,16 @@ export default function StatsCard({
     update(value)
   }, [value, update])
 
+  // Números grandes (montos en pesos sin decimales de por medio) no tienen espacios donde
+  // hacer salto de línea — en vez de partirse a la mitad o desbordar la tarjeta, la letra se
+  // achica según la cantidad de dígitos enteros, y así siempre cabe en una sola línea.
+  const digitos = Math.abs(Math.trunc(value ?? 0)).toString().length
+  const tamañoValor =
+    digitos <= 6 ? 'text-[32px]' : digitos <= 9 ? 'text-[24px]' : digitos <= 12 ? 'text-[19px]' : 'text-[15px]'
+
   return (
     <div
-      className="bg-white dark:bg-[#1e2030] p-6 rounded-xl shadow-sm border-l-4 flex flex-col justify-between hover:shadow-md transition-shadow"
+      className="h-full min-w-0 bg-white dark:bg-[#1e2030] p-6 rounded-xl shadow-sm border-l-4 flex flex-col justify-between hover:shadow-md transition-shadow"
       style={{ borderLeftColor: borderColor }}
     >
       <div className="flex justify-between items-start">
@@ -61,7 +68,7 @@ export default function StatsCard({
         </div>
       )}
       <div className="mt-4">
-        <h3 className="text-[32px] font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-none">
+        <h3 className={`${tamañoValor} font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-none whitespace-nowrap`}>
           <span ref={countUpRef} />
         </h3>
         {sub && (

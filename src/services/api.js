@@ -371,6 +371,22 @@ export const api = {
     })
   },
 
+  // Un solo Excel con la hoja de cada formato analizado ya llena (reemplaza a generarExogenas
+  // cuando hay varios formatos a la vez, que es el caso normal desde que existe más de uno).
+  generarExogenasCombinado: (ids) => {
+    return fetchWithAuth('/exogenas/generar-combinado', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    }).then((res) => {
+      if (!res.ok) return res.json().then((e) => { throw new Error(e.error || `Error ${res.status}`) })
+      const cd = res.headers.get('content-disposition') ?? ''
+      const match = cd.match(/filename="([^"]+)"/)
+      const filename = match ? match[1] : 'Exogenas_GENERADO.xlsx'
+      return res.blob().then((blob) => ({ blob, filename }))
+    })
+  },
+
   // Notifications
   getNotifications: () => request('/notifications'),
   markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: 'PUT' }),

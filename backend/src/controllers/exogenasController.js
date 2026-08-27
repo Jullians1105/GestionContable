@@ -1,13 +1,28 @@
 const db = require('../config/database');
-const { getEstrategia } = require('../services/exogenas');
+const { getEstrategia, llenarPlantillaCombinada } = require('../services/exogenas');
 
-// Solo 1005 está en alcance de esta fase — 1001/1006/1007 se habilitan acá cuando les
-// llegue su turno, reusando el mismo controller (la lógica específica vive en la estrategia).
-const FORMATOS_SOPORTADOS = ['1005'];
+// 1001/1007 se habilitan acá cuando les llegue su turno, reusando el mismo controller (la
+// lógica específica vive en la estrategia).
+const FORMATOS_SOPORTADOS = ['1005', '1006'];
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
-const sumarVimp = (registros) => round2(registros.reduce((s, r) => s + r.vimp, 0));
+// Cada formato tiene sus propios campos monetarios en el registro agrupado — acá solo se
+// listan para poder sumarlos genéricamente sin acoplar el controller a un formato específico.
+const CAMPOS_MONETARIOS_POR_FORMATO = {
+  1005: ['vimp', 'ivade'],
+  1006: ['imp', 'iva', 'icon'],
+};
+
+function calcularTotales(formato, registros) {
+  const campos = CAMPOS_MONETARIOS_POR_FORMATO[formato] || [];
+  const totales = {};
+  for (const campo of campos) {
+    const totalKey = `total${campo.charAt(0).toUpperCase()}${campo.slice(1)}`;
+    totales[totalKey] = round2(registros.reduce((s, r) => s + (r[campo] || 0), 0));
+  }
+  return totales;
+}
 
 const uploadExogenas = async (req, res, next) => {
   try {
@@ -60,7 +75,7 @@ const uploadExogenas = async (req, res, next) => {
       id: rows[0].id,
       formato,
       totalTerceros: registros.length,
-      totalVimp: sumarVimp(registros),
+      ...calcularTotales(formato, registros),
       registros,
     });
   } catch (err) {
@@ -85,7 +100,7 @@ const getExogenasBorrador = async (req, res, next) => {
       ...meta,
       registros,
       totalTerceros: registros.length,
-      totalVimp: sumarVimp(registros),
+      ...calcularTotales(meta.formato, registros),
     });
   } catch (err) {
     next(err);
@@ -131,4 +146,54 @@ const generarExogenas = async (req, res, next) => {
   }
 };
 
-module.exports = { uploadExogenas, getExogenasBorrador, generarExogenas, FORMATOS_SOPORTADOS };
+// Un solo botón "Generar Excel" para todos los formatos analizados juntos: arma UN archivo con
+// la hoja de cada formato ya llena, a partir de la misma plantilla SIIGO (el usuario la sube
+// una sola vez por corrida, así que todos los borradores de esa corrida comparten los mismos
+// bytes de plantilla_original — se usa la del primero como base). Reemplaza a generarExogenas
+// (un solo id) en el frontend, pero ese endpoint se deja intacto por si algo más lo necesita.
+const generarExogenasCombinado = async (req, res, next) => {
+  try {
+    const { ids } = req.body;
+
+    const { rows } = await db.query(
+      `SELECT id, formato, registros, plantilla_original, nombre_plantilla
+       FROM exogenas_borradores WHERE id = ANY($1) AND creado_por = $2`,
+      [ids, req.user.userId]
+    );
+    if (rows.length !== ids.length) {
+      return res.status(404).json({ error: 'Alguno de los borradores no existe, ya expiró o ya fue generado.' });
+    }
+
+    const registrosPorFormato = {};
+    rows.forEach((r) => { registrosPorFormato[r.formato] = r.registros; });
+    const plantillaBuffer = rows[0].plantilla_original;
+    const nombrePlantilla = rows[0].nombre_plantilla;
+
+    let buffer;
+    try {
+      buffer = await llenarPlantillaCombinada(plantillaBuffer, registrosPorFormato);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    const nombreSan = nombrePlantilla
+      .replace(/\.xlsx?$/i, '')
+      .replace(/[^A-Za-z0-9 _-]/g, '')
+      .trim()
+      .slice(0, 60) || 'PLANTILLA';
+    const formatosStr = Object.keys(registrosPorFormato).sort().join('-');
+    const filename = `${nombreSan} - ${formatosStr} GENERADO.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(Buffer.from(buffer));
+
+    await db.query('DELETE FROM exogenas_borradores WHERE id = ANY($1) AND creado_por = $2', [ids, req.user.userId]);
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = {
+  uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado, FORMATOS_SOPORTADOS,
+};
