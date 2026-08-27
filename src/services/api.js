@@ -387,6 +387,19 @@ export const api = {
     })
   },
 
+  // Terceros — base de datos de dirección/municipio/departamento extraídos de PDFs de factura
+  // DIAN. De uso general (no exclusiva de Exógenas), hoy alimenta el formato 1001.
+  uploadTerceros: (formData) =>
+    fetchWithAuth('/terceros/upload', { method: 'POST', body: formData }).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        const err = new Error(body.error || `Error ${res.status}`)
+        err.status = res.status
+        throw err
+      }
+      return res.json()
+    }),
+
   // Notifications
   getNotifications: () => request('/notifications'),
   markNotificationRead: (id) => request(`/notifications/${id}/read`, { method: 'PUT' }),
