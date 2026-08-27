@@ -320,7 +320,7 @@ export default function TercerosPage() {
                       <ul className="space-y-0.5 pl-4 list-disc">
                         {t.cambios.map((c, j) => (
                           <li key={j}>
-                            <span className="font-semibold">{c.campo}:</span> "{c.antes ?? '—'}" → "{c.despues ?? '—'}"
+                            <span className="font-semibold">{c.campo}:</span> &ldquo;{c.antes ?? '—'}&rdquo; → &ldquo;{c.despues ?? '—'}&rdquo;
                           </li>
                         ))}
                       </ul>
