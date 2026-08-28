@@ -3,7 +3,7 @@ const multer = require('multer');
 const { body } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
-const { uploadTerceros, TIPOS_OPERACION } = require('../controllers/tercerosController');
+const { uploadTerceros, consultarTercero, TIPOS_OPERACION } = require('../controllers/tercerosController');
 
 const router = Router();
 
@@ -70,5 +70,31 @@ router.post('/upload',
   validate,
   uploadTerceros
 );
+
+/**
+ * @openapi
+ * /api/terceros/{nit}:
+ *   get:
+ *     tags: [Terceros]
+ *     summary: Consultar un tercero guardado por NIT/documento ("Consulta Tercero")
+ *     description: Devuelve todos los datos guardados del tercero, incluyendo régimen fiscal, responsabilidad tributaria, teléfono y correo — estos 4 solo se exponen acá, nunca en el resumen de /upload.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: nit
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Datos del tercero.
+ *       400:
+ *         description: Documento inválido.
+ *       404:
+ *         description: No hay ningún tercero guardado con ese documento.
+ *       401:
+ *         description: No autenticado.
+ */
+router.get('/:nit', consultarTercero);
 
 module.exports = router;

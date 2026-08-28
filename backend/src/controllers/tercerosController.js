@@ -1,10 +1,14 @@
 const db = require('../config/database');
-const { extraerTerceroDePdf, DocumentoNoFacturaError } = require('../services/terceros');
+const { extraerTerceroDePdf, describirRegimenFiscal, DocumentoNoFacturaError } = require('../services/terceros');
+const { limpiarIdentificacion } = require('../services/exogenas/utils/dian');
 
 const TIPOS_OPERACION = ['compras', 'ventas'];
 
 // Columnas que le importan al usuario para saber "qué cambió" cuando un NIT ya existía — no se
 // incluyen created_at/updated_at/actualizado_por, que siempre "cambian" y no dicen nada útil.
+// Tampoco régimen fiscal/responsabilidad tributaria/teléfono/correo (sí se guardan, sí se
+// devuelven en `rows[0]`, pero a propósito no entran acá): el usuario pidió que esos 4 campos
+// solo aparezcan en la Consulta Tercero, nunca en el resumen de la pantalla de subida.
 const CAMPOS_COMPARABLES = [
   { columna: 'razon_social', etiqueta: 'Razón social' },
   { columna: 'direccion', etiqueta: 'Dirección' },
@@ -62,20 +66,26 @@ const uploadTerceros = async (req, res, next) => {
         const { rows } = await db.query(
           `INSERT INTO terceros
              (nit, razon_social, direccion, municipio, codigo_municipio_dane,
-              departamento, codigo_departamento_dane, actualizado_por)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+              departamento, codigo_departamento_dane, regimen_fiscal,
+              responsabilidad_tributaria, telefono, correo, actualizado_por)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
            ON CONFLICT (nit) DO UPDATE SET
-             razon_social             = EXCLUDED.razon_social,
-             direccion                = COALESCE(EXCLUDED.direccion, terceros.direccion),
-             municipio                = COALESCE(EXCLUDED.municipio, terceros.municipio),
-             codigo_municipio_dane    = COALESCE(EXCLUDED.codigo_municipio_dane, terceros.codigo_municipio_dane),
-             departamento             = COALESCE(EXCLUDED.departamento, terceros.departamento),
-             codigo_departamento_dane = COALESCE(EXCLUDED.codigo_departamento_dane, terceros.codigo_departamento_dane),
-             actualizado_por          = EXCLUDED.actualizado_por
+             razon_social                = EXCLUDED.razon_social,
+             direccion                   = COALESCE(EXCLUDED.direccion, terceros.direccion),
+             municipio                   = COALESCE(EXCLUDED.municipio, terceros.municipio),
+             codigo_municipio_dane       = COALESCE(EXCLUDED.codigo_municipio_dane, terceros.codigo_municipio_dane),
+             departamento                = COALESCE(EXCLUDED.departamento, terceros.departamento),
+             codigo_departamento_dane    = COALESCE(EXCLUDED.codigo_departamento_dane, terceros.codigo_departamento_dane),
+             regimen_fiscal              = COALESCE(EXCLUDED.regimen_fiscal, terceros.regimen_fiscal),
+             responsabilidad_tributaria  = COALESCE(EXCLUDED.responsabilidad_tributaria, terceros.responsabilidad_tributaria),
+             telefono                    = COALESCE(EXCLUDED.telefono, terceros.telefono),
+             correo                      = COALESCE(EXCLUDED.correo, terceros.correo),
+             actualizado_por             = EXCLUDED.actualizado_por
            RETURNING *`,
           [
             t.nit, t.razonSocial, t.direccion, t.municipio, t.codigoMunicipioDane,
-            t.departamento, t.codigoDepartamentoDane, req.user.userId,
+            t.departamento, t.codigoDepartamentoDane, t.regimenFiscal,
+            t.responsabilidadTributaria, t.telefono, t.correo, req.user.userId,
           ]
         );
 
@@ -111,4 +121,28 @@ const uploadTerceros = async (req, res, next) => {
   }
 };
 
-module.exports = { uploadTerceros, TIPOS_OPERACION };
+// "Consulta Tercero": busca un tercero ya guardado por NIT/documento. A diferencia del resumen
+// de subida, acá SÍ se devuelven régimen fiscal, responsabilidad tributaria, teléfono y correo
+// (pedido explícito del usuario) — es la única pantalla donde se muestran.
+const consultarTercero = async (req, res, next) => {
+  try {
+    const nit = limpiarIdentificacion(req.params.nit);
+    if (!nit) {
+      return res.status(400).json({ error: 'Documento inválido.' });
+    }
+
+    const { rows } = await db.query('SELECT * FROM terceros WHERE nit = $1', [nit]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'No hay ningún tercero guardado con ese documento.' });
+    }
+
+    res.status(200).json({
+      ...rows[0],
+      regimen_fiscal_descripcion: describirRegimenFiscal(rows[0].regimen_fiscal),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { uploadTerceros, consultarTercero, TIPOS_OPERACION };

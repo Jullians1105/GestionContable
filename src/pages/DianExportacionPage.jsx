@@ -171,7 +171,7 @@ export default function DianExportacionPage() {
         <div className="flex items-center gap-3 mb-2">
           <span className="material-symbols-outlined text-3xl text-[#004ac6]">table_view</span>
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">
-            Exportación DIAN
+            Exportación
           </h1>
         </div>
         <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
@@ -186,7 +186,7 @@ export default function DianExportacionPage() {
         </h2>
         <div className="space-y-2">
           {[
-            'Reporte DIAN subido y procesado',
+            'Reporte subido y procesado',
             'Clasificación de retenciones completa',
             tieneNomina
               ? `Nómina: ${calcNomina.empleados} empleado${calcNomina.empleados !== 1 ? 's' : ''} × ${calcNomina.meses} mes${calcNomina.meses !== 1 ? 'es' : ''} (ARL ${calcNomina.tarifaArl}%)`

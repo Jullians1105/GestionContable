@@ -13,6 +13,7 @@ const { normalizarTexto, quitarAcentos, limpiarIdentificacion } = require('../ex
 const { MUNICIPIOS_DANE } = require('./data/municipiosDane');
 const { DEPARTAMENTOS_DANE } = require('./data/departamentosDane');
 const { NOMENCLATURA_OFICIAL, ALIAS_COMUNES } = require('./data/nomenclaturaDian');
+const { REGIMEN_FISCAL_DIAN } = require('./data/regimenFiscalDian');
 
 // Reglas de la DIAN para archivos estructurados de exógenas: solo A-Z sin tildes ni Ñ, dígitos,
 // espacios, puntos y comas — cualquier otro carácter (#, $, %, guiones, etc.) puede corromper la
@@ -194,9 +195,19 @@ function extraerParte(texto) {
   const departamento = extraerCampo(texto, 'Departamento');
   const municipio = extraerCampo(texto, 'Municipio\\s*/\\s*Ciudad');
   const direccion = extraerCampo(texto, 'Dirección');
+  // Estos 4 campos ya estaban en ETIQUETAS como "tope" para delimitar los de arriba, pero no se
+  // extraían como valor propio. Solo se guardan/muestran en la Consulta Tercero, nunca en el
+  // resumen de la pantalla de subida (ver tercerosController.js#CAMPOS_COMPARABLES).
+  const regimenFiscal = extraerCampo(texto, 'Régimen [Ff]iscal');
+  const responsabilidadTributaria = extraerCampo(texto, 'Responsabilidad tributaria');
+  const telefono = extraerCampo(texto, 'Teléfono\\s*/\\s*Móvil');
+  const correo = extraerCampo(texto, 'Correo');
 
   if (!identificacion || !razonSocial) return null;
-  return { identificacion, razonSocial, departamento, municipio, direccion };
+  return {
+    identificacion, razonSocial, departamento, municipio, direccion,
+    regimenFiscal, responsabilidadTributaria, telefono, correo,
+  };
 }
 
 // Nombres completos/ceremoniales que DANE registra con un nombre más corto en su propia tabla
@@ -304,6 +315,15 @@ function mapearCodigoDane(departamento, municipio) {
   return vacio;
 }
 
+// El campo "Régimen Fiscal" de la factura trae solo el código (ver REGIMEN_FISCAL_DIAN); esto
+// le pone la descripción al lado para Consulta Tercero. Un código que no esté en la tabla (fuera
+// de los 5 conocidos) se muestra tal cual en vez de ocultarlo — puede ser uno nuevo que la DIAN
+// agregue después.
+function describirRegimenFiscal(codigo) {
+  if (!codigo) return null;
+  return REGIMEN_FISCAL_DIAN[codigo.trim().toUpperCase()] ?? null;
+}
+
 function conCodigoDane(p) {
   if (!p) return null;
   const { codigoMunicipio, codigoDepartamento, nombreMunicipio, nombreDepartamento, ambiguo } =
@@ -319,6 +339,15 @@ function conCodigoDane(p) {
     departamento: limpiarParaDian(nombreDepartamento ?? p.departamento),
     codigoDepartamentoDane: codigoDepartamento,
     pendienteDesambiguar: ambiguo,
+    // Sin limpieza DIAN (esa nomenclatura es solo para direcciones) — se guardan tal como vienen
+    // en el PDF, solo recortando espacios (ya lo hace extraerCampo). El correo se pasa a
+    // minúsculas porque un mismo correo puede venir en distinta capitalización entre facturas
+    // (visto en datos reales) y así no se cuenta como "cambio" en el resumen por un caso solo de
+    // mayúsculas/minúsculas.
+    regimenFiscal: p.regimenFiscal,
+    responsabilidadTributaria: p.responsabilidadTributaria,
+    telefono: p.telefono,
+    correo: p.correo ? p.correo.toLowerCase() : p.correo,
   };
 }
 
@@ -380,5 +409,5 @@ async function extraerTerceroDePdf(buffer, tipoOperacion) {
 
 module.exports = {
   extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, normalizarDireccion, limpiarParaDian,
-  DocumentoNoFacturaError,
+  describirRegimenFiscal, DocumentoNoFacturaError,
 };

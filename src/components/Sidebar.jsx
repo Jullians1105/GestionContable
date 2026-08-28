@@ -26,21 +26,22 @@ const navItems = [
 const modules = [
   { id: 'tasks',   label: 'Gestor de Tareas',    icon: 'task_alt' },
   { id: 'fondo',   label: 'Fondo Emprender',      icon: 'rocket_launch' },
-  { id: 'dian',    label: 'DIAN',                 icon: 'receipt_long' },
+  { id: 'dian',    label: 'Gestión Tributaria',   icon: 'receipt_long' },
   { id: 'empresas', label: 'Empresas Externas',   icon: 'corporate_fare' },
 ]
 
 const MODULE_TITLES = {
   tasks:    'Gestor de Tareas',
   fondo:    'Fondo Emprender',
-  dian:     'DIAN',
+  dian:     'Gestión Tributaria',
   empresas: 'Empresas Externas',
 }
 
 const DIAN_NAV = [
-  { to: '/dian/upload',     label: 'Contabilidad DIAN', icon: 'upload_file',   end: true },
+  { to: '/dian/upload',     label: 'Contabilidad',     icon: 'upload_file',   end: true },
   { to: '/exogenas/upload', label: 'Exógenas',          icon: 'request_quote', end: true },
-  { to: '/dian/terceros',   label: 'Datos de Terceros', icon: 'location_on',   end: true },
+  { to: '/dian/terceros',   label: 'Importar Terceros', icon: 'location_on',   end: true },
+  { to: '/dian/consulta-tercero', label: 'Consulta Tercero', icon: 'person_search', end: true },
 ]
 
 const EXTERNAS_NAV = [
