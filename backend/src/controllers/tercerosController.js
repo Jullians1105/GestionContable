@@ -16,6 +16,8 @@ const CAMPOS_COMPARABLES = [
   { columna: 'codigo_municipio_dane', etiqueta: 'Código municipio' },
   { columna: 'departamento', etiqueta: 'Departamento' },
   { columna: 'codigo_departamento_dane', etiqueta: 'Código departamento' },
+  { columna: 'pais', etiqueta: 'País' },
+  { columna: 'codigo_pais_dian', etiqueta: 'Código país' },
 ];
 
 // Compara la fila antes/después del upsert y arma la lista de qué cambió — así el usuario puede
@@ -66,9 +68,9 @@ const uploadTerceros = async (req, res, next) => {
         const { rows } = await db.query(
           `INSERT INTO terceros
              (nit, razon_social, direccion, municipio, codigo_municipio_dane,
-              departamento, codigo_departamento_dane, regimen_fiscal,
+              departamento, codigo_departamento_dane, pais, codigo_pais_dian, regimen_fiscal,
               responsabilidad_tributaria, telefono, correo, actualizado_por)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
            ON CONFLICT (nit) DO UPDATE SET
              razon_social                = EXCLUDED.razon_social,
              direccion                   = COALESCE(EXCLUDED.direccion, terceros.direccion),
@@ -76,6 +78,8 @@ const uploadTerceros = async (req, res, next) => {
              codigo_municipio_dane       = COALESCE(EXCLUDED.codigo_municipio_dane, terceros.codigo_municipio_dane),
              departamento                = COALESCE(EXCLUDED.departamento, terceros.departamento),
              codigo_departamento_dane    = COALESCE(EXCLUDED.codigo_departamento_dane, terceros.codigo_departamento_dane),
+             pais                        = COALESCE(EXCLUDED.pais, terceros.pais),
+             codigo_pais_dian            = COALESCE(EXCLUDED.codigo_pais_dian, terceros.codigo_pais_dian),
              regimen_fiscal              = COALESCE(EXCLUDED.regimen_fiscal, terceros.regimen_fiscal),
              responsabilidad_tributaria  = COALESCE(EXCLUDED.responsabilidad_tributaria, terceros.responsabilidad_tributaria),
              telefono                    = COALESCE(EXCLUDED.telefono, terceros.telefono),
@@ -84,7 +88,7 @@ const uploadTerceros = async (req, res, next) => {
            RETURNING *`,
           [
             t.nit, t.razonSocial, t.direccion, t.municipio, t.codigoMunicipioDane,
-            t.departamento, t.codigoDepartamentoDane, t.regimenFiscal,
+            t.departamento, t.codigoDepartamentoDane, t.pais, t.codigoPaisDian, t.regimenFiscal,
             t.responsabilidadTributaria, t.telefono, t.correo, req.user.userId,
           ]
         );

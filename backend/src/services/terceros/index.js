@@ -14,6 +14,7 @@ const { MUNICIPIOS_DANE } = require('./data/municipiosDane');
 const { DEPARTAMENTOS_DANE } = require('./data/departamentosDane');
 const { NOMENCLATURA_OFICIAL, ALIAS_COMUNES } = require('./data/nomenclaturaDian');
 const { REGIMEN_FISCAL_DIAN } = require('./data/regimenFiscalDian');
+const { PAISES_DIAN } = require('./data/paisesDian');
 
 // Reglas de la DIAN para archivos estructurados de exógenas: solo A-Z sin tildes ni Ñ, dígitos,
 // espacios, puntos y comas — cualquier otro carácter (#, $, %, guiones, etc.) puede corromper la
@@ -61,6 +62,20 @@ const DEPARTAMENTOS_POR_NOMBRE = new Map(
   DEPARTAMENTOS_DANE.map(([codigo, nombre]) => [normalizarLugar(nombre), codigo])
 );
 const NOMBRE_DEPARTAMENTO_POR_CODIGO = new Map(DEPARTAMENTOS_DANE);
+
+// Un solo país por factura, sin la ambigüedad de nombres repetidos que sí tiene municipio — no
+// hace falta desambiguar por otro campo, alcanza con coincidencia exacta (mismo criterio que
+// departamento, que tampoco usa fuzzy).
+const PAISES_POR_NOMBRE = new Map(
+  PAISES_DIAN.map(([codigo, nombre]) => [normalizarLugar(nombre), codigo])
+);
+const NOMBRE_PAIS_POR_CODIGO = new Map(PAISES_DIAN);
+
+function mapearCodigoPais(pais) {
+  if (!pais) return { codigoPais: null, nombrePais: null };
+  const codigo = PAISES_POR_NOMBRE.get(normalizarLugar(pais));
+  return codigo ? { codigoPais: codigo, nombrePais: NOMBRE_PAIS_POR_CODIGO.get(codigo) } : { codigoPais: null, nombrePais: null };
+}
 
 // Bogotá se organiza en localidades (Kennedy, Suba, Chapinero...), que NO son municipios propios
 // en DIVIPOLA — cuando la factura trae la localidad en vez de "Bogotá" en el campo Municipio, se
@@ -192,6 +207,7 @@ function extraerParte(texto) {
     extraerDigitos(texto, 'Nit del Emisor') ?? extraerDigitos(texto, 'Número Documento')
   );
   const razonSocial = extraerCampo(texto, 'Razón Social') ?? extraerCampo(texto, 'Nombre o Razón Social');
+  const pais = extraerCampo(texto, 'País');
   const departamento = extraerCampo(texto, 'Departamento');
   const municipio = extraerCampo(texto, 'Municipio\\s*/\\s*Ciudad');
   const direccion = extraerCampo(texto, 'Dirección');
@@ -205,7 +221,7 @@ function extraerParte(texto) {
 
   if (!identificacion || !razonSocial) return null;
   return {
-    identificacion, razonSocial, departamento, municipio, direccion,
+    identificacion, razonSocial, pais, departamento, municipio, direccion,
     regimenFiscal, responsabilidadTributaria, telefono, correo,
   };
 }
@@ -328,12 +344,15 @@ function conCodigoDane(p) {
   if (!p) return null;
   const { codigoMunicipio, codigoDepartamento, nombreMunicipio, nombreDepartamento, ambiguo } =
     mapearCodigoDane(p.departamento, p.municipio);
+  const { codigoPais, nombrePais } = mapearCodigoPais(p.pais);
   return {
     nit: p.identificacion,
     razonSocial: limpiarParaDian(p.razonSocial, '&'),
     direccion: limpiarParaDian(normalizarDireccion(p.direccion)),
     // Si hubo coincidencia con el catálogo oficial, se guarda el nombre tal como lo escribe la
     // DIAN (pedido del usuario) — si no, se deja el texto de la factura tal cual, limpio.
+    pais: limpiarParaDian(nombrePais ?? p.pais),
+    codigoPaisDian: codigoPais,
     municipio: limpiarParaDian(nombreMunicipio ?? p.municipio),
     codigoMunicipioDane: codigoMunicipio,
     departamento: limpiarParaDian(nombreDepartamento ?? p.departamento),
@@ -408,6 +427,6 @@ async function extraerTerceroDePdf(buffer, tipoOperacion) {
 }
 
 module.exports = {
-  extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, normalizarDireccion, limpiarParaDian,
-  describirRegimenFiscal, DocumentoNoFacturaError,
+  extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, mapearCodigoPais, normalizarDireccion,
+  limpiarParaDian, describirRegimenFiscal, DocumentoNoFacturaError,
 };

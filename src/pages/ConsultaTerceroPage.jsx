@@ -1,15 +1,48 @@
 import { useState, useCallback } from 'react'
 import { api } from '../services/api'
+import { useToast } from '../context/ToastContext'
 
 // Campo simple de la tarjeta de resultado: etiqueta + valor, con "—" si no hay dato (puede pasar
 // si el PDF no traía ese campo, o si el tercero se guardó antes de la migración 043).
-function Campo({ icon, label, value }) {
+// `copiable`: agrega un botón para copiar el valor al portapapeles (Dirección/Teléfono/Correo,
+// los que el usuario más pega en otro lado) — no tiene sentido para valores cortos como
+// Municipio/Departamento que ya se leen de un vistazo.
+function Campo({ icon, label, value, copiable }) {
+  const { addToast } = useToast()
+  const [copiado, setCopiado] = useState(false)
+
+  const copiar = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiado(true)
+      addToast('Copiado al portapapeles', 'success', 1800)
+      setTimeout(() => setCopiado(false), 1500)
+    } catch {
+      addToast('No se pudo copiar', 'error')
+    }
+  }, [value, addToast])
+
   return (
     <div className="flex items-start gap-3 py-3">
       <span className="material-symbols-outlined text-lg text-[#9ca3af] mt-0.5">{icon}</span>
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af] dark:text-[#6b7280]">{label}</p>
-        <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0] break-words">{value || '—'}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0] break-words">{value || '—'}</p>
+          {copiable && value && (
+            <button
+              type="button"
+              onClick={copiar}
+              aria-label={`Copiar ${label.toLowerCase()}`}
+              title={`Copiar ${label.toLowerCase()}`}
+              className="flex-shrink-0 text-[#9ca3af] hover:text-[#004ac6] transition active:scale-90"
+            >
+              <span className="material-symbols-outlined text-base">
+                {copiado ? 'check' : 'content_copy'}
+              </span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -118,22 +151,26 @@ export default function ConsultaTerceroPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 divide-[#e2e4ef] dark:divide-[#2e3148]">
-              <Campo icon="location_on" label="Dirección" value={tercero.direccion} />
-              <Campo icon="map" label="Municipio" value={tercero.municipio} />
-              <Campo icon="public" label="Departamento" value={tercero.departamento} />
-              <Campo icon="call" label="Teléfono" value={tercero.telefono} />
-              <Campo icon="mail" label="Correo" value={tercero.correo} />
-              <Campo
-                icon="gavel"
-                label="Régimen fiscal"
-                value={tercero.regimen_fiscal && (
-                  tercero.regimen_fiscal_descripcion
-                    ? `${tercero.regimen_fiscal} — ${tercero.regimen_fiscal_descripcion}`
-                    : tercero.regimen_fiscal
-                )}
-              />
-              <Campo icon="account_balance" label="Responsabilidad tributaria" value={tercero.responsabilidad_tributaria} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+              <div className="divide-y divide-[#e2e4ef] dark:divide-[#2e3148]">
+                <Campo icon="public" label="Departamento" value={tercero.departamento} />
+                <Campo icon="map" label="Municipio" value={tercero.municipio} />
+                <Campo icon="location_on" label="Dirección" value={tercero.direccion} copiable />
+                <Campo icon="call" label="Teléfono" value={tercero.telefono} copiable />
+              </div>
+              <div className="divide-y divide-[#e2e4ef] dark:divide-[#2e3148]">
+                <Campo icon="mail" label="Correo" value={tercero.correo} copiable />
+                <Campo
+                  icon="gavel"
+                  label="Régimen fiscal"
+                  value={tercero.regimen_fiscal && (
+                    tercero.regimen_fiscal_descripcion
+                      ? `${tercero.regimen_fiscal} — ${tercero.regimen_fiscal_descripcion}`
+                      : tercero.regimen_fiscal
+                  )}
+                />
+                <Campo icon="account_balance" label="Responsabilidad tributaria" value={tercero.responsabilidad_tributaria} />
+              </div>
             </div>
           </div>
 
