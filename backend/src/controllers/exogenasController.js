@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const { getEstrategia, llenarPlantillaCombinada } = require('../services/exogenas');
+const formato1001 = require('../services/exogenas/formato1001');
 
 // 1001/1007 se habilitan acá cuando les llegue su turno, reusando el mismo controller (la
 // lógica específica vive en la estrategia).
@@ -194,6 +195,45 @@ const generarExogenasCombinado = async (req, res, next) => {
   }
 };
 
+// Chequeo previo al 1001 (todavía sin concepto ni montos — ver formato1001.js): sube el TOKEN
+// de compras, agrupa por tercero y cruza contra `terceros` para saber a quién le falta subir
+// factura en "Importar Terceros" antes de poder generar la exógena. No guarda ningún borrador
+// (no hay nada que "generar" todavía), es solo diagnóstico.
+const verificarTerceros1001 = async (req, res, next) => {
+  try {
+    const tokenFile = req.file;
+    if (!tokenFile) {
+      return res.status(400).json({ error: 'Se requiere el archivo TOKEN (detalle de compras).' });
+    }
+
+    let registros;
+    try {
+      registros = await formato1001.leerYAgrupar(tokenFile.buffer);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (registros.length === 0) {
+      return res.status(400).json({
+        error: 'No se encontraron terceros para verificar. Revisa el archivo TOKEN.',
+      });
+    }
+
+    const terceros = await formato1001.enriquecerConTerceros(registros);
+    const completos = terceros.filter((t) => t.tieneDatosCompletos).length;
+
+    res.status(200).json({
+      totalTerceros: terceros.length,
+      completos,
+      faltantes: terceros.length - completos,
+      terceros,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
-  uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado, FORMATOS_SOPORTADOS,
+  uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado,
+  verificarTerceros1001, FORMATOS_SOPORTADOS,
 };

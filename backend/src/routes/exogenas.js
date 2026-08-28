@@ -4,29 +4,44 @@ const { body } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const {
-  uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado, FORMATOS_SOPORTADOS,
+  uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado,
+  verificarTerceros1001, FORMATOS_SOPORTADOS,
 } = require('../controllers/exogenasController');
 
 const router = Router();
 
+const EXCEL_MIMES = [
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+];
+const excelFileFilter = (_req, file, cb) => {
+  if (EXCEL_MIMES.includes(file.mimetype) || file.mimetype === 'application/octet-stream') {
+    cb(null, true);
+  } else {
+    cb(new Error('Solo se aceptan archivos Excel (.xlsx)'));
+  }
+};
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-    ];
-    if (allowed.includes(file.mimetype) || file.mimetype === 'application/octet-stream') {
-      cb(null, true);
-    } else {
-      cb(new Error('Solo se aceptan archivos Excel (.xlsx)'));
-    }
-  },
+  fileFilter: excelFileFilter,
 });
 
 const handleUpload = (req, res, next) => {
   upload.fields([{ name: 'token', maxCount: 1 }, { name: 'plantilla', maxCount: 1 }])(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ error: `Error de carga: ${err.message}` });
+    }
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+};
+
+const handleUploadToken = (req, res, next) => {
+  upload.single('token')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       return res.status(400).json({ error: `Error de carga: ${err.message}` });
     }
@@ -138,5 +153,32 @@ router.post('/generar-combinado',
   validate,
   generarExogenasCombinado
 );
+
+/**
+ * @openapi
+ * /api/exogenas/1001/verificar-terceros:
+ *   post:
+ *     tags: [Exógenas]
+ *     summary: Verificar qué terceros de un TOKEN de compras ya tienen dirección/ubicación completa (paso previo al 1001)
+ *     description: No genera ningún Excel — el 1001 completo (concepto + montos) todavía no está implementado. Solo agrupa por tercero y cruza contra `terceros` para avisar a quién le falta subir factura en "Importar Terceros".
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token: { type: string, format: binary, description: Detalle de compras (hoja COMPRAS) }
+ *     responses:
+ *       200:
+ *         description: Resumen (total/completos/faltantes) + lista de terceros con su estado.
+ *       400:
+ *         description: Archivo ausente, o columna/hoja requerida faltante en el TOKEN.
+ *       401:
+ *         description: No autenticado.
+ */
+router.post('/1001/verificar-terceros', handleUploadToken, verificarTerceros1001);
 
 module.exports = router;
