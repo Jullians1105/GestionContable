@@ -20,22 +20,24 @@ function isValidFile(file) {
 const formatoMoneda = (n) =>
   `$ ${Number(n ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-// 1007 queda visible pero deshabilitado hasta que se implemente. 1001 SÍ se puede marcar, pero
-// todavía es solo "Fase 1" (ver formato1001.js en el backend): verifica qué terceros ya tienen
-// dirección completa, no genera ningún Excel — el concepto (CPT) y las columnas de dinero
-// siguen sin definir. `soloVerificacion` distingue ese caso especial en el resto de la página
-// (no entra a `borradores`, no se puede incluir en "Generar Excel").
+// 1001 y 1007 SÍ se pueden marcar, pero los dos son todavía solo "Fase 1" (ver formato1001.js/
+// formato1007.js en el backend): calculan lo que ya está confirmado (ubicación de terceros en
+// 1001; IBRU/DEV en 1007), pero no generan ningún Excel — el concepto (CPT) de cada uno sigue
+// sin definir. `soloVerificacion` distingue ese caso especial en el resto de la página (no
+// entra a `borradores`, no se puede incluir en "Generar Excel") y apunta a la función de la API
+// que hay que llamar y al componente que muestra su resultado.
 const FORMATOS_DISPONIBLES = [
-  { id: '1001', codigo: '1001', nombre: 'Gastos/Compras (verificación)', icon: 'payments', disponible: true, soloVerificacion: true },
+  { id: '1001', codigo: '1001', nombre: 'Gastos/Compras (verificación)', icon: 'payments', disponible: true, soloVerificacion: true, verificar: (fd) => api.verificarTerceros1001(fd) },
   { id: '1005', codigo: '1005', nombre: 'Impuestos descontables', icon: 'receipt_long', disponible: true },
   { id: '1006', codigo: '1006', nombre: 'IVA/Inc generado', icon: 'sell', disponible: true },
-  { id: '1007', codigo: '1007', nombre: 'Ingresos', icon: 'trending_up', disponible: false },
+  { id: '1007', codigo: '1007', nombre: 'Ingresos (verificación)', icon: 'trending_up', disponible: true, soloVerificacion: true, verificar: (fd) => api.verificarIngresos1007(fd) },
 ]
 
 // Hoja obligatoria del TOKEN y campos monetarios de salida por formato — usado para adaptar
 // hints y la tabla de vista previa sin acoplar el resto de la página a un formato específico.
 const CONFIG_FORMATO = {
   '1001': { hojaToken: 'COMPRAS', campos: [] },
+  '1007': { hojaToken: 'VENTAS', campos: [] },
   '1005': {
     hojaToken: 'COMPRAS',
     campos: [
@@ -243,6 +245,93 @@ function Verificacion1001View({ verificacion }) {
   )
 }
 
+// Contenido de la pestaña "1007": IBRU/DEV ya calculados (Total menos impuestos) por tercero —
+// sin concepto todavía, así que no hay estado "completo/incompleto" como en 1001, solo la
+// tabla para que el usuario revise la resta de impuestos contra su TOKEN real.
+function VerificacionIngresos1007View({ verificacion }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-4 py-2.5">
+        <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-base flex-shrink-0">info</span>
+        <p className="text-xs text-amber-800 dark:text-amber-400">
+          Esto solo calcula ingresos brutos y devoluciones sin impuestos — el 1007 completo
+          (concepto) todavía no se puede generar aquí.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap sm:flex-nowrap gap-4 mb-6">
+        <div className="w-full sm:w-36 flex-shrink-0">
+          <StatsCard
+            title="Terceros agrupados"
+            value={verificacion.totalTerceros}
+            icon="groups"
+            borderColor="#004ac6"
+            iconColor="#004ac6"
+          />
+        </div>
+        <div className="w-full sm:flex-1">
+          <StatsCard
+            title="Total IBRU"
+            value={verificacion.totalIbru}
+            decimals={2}
+            decimalSeparator=","
+            thousandSeparator="."
+            icon="trending_up"
+            borderColor="#16a34a"
+            iconColor="#16a34a"
+            sub="Ingresos brutos, sin impuestos"
+            subColor="#16a34a"
+          />
+        </div>
+        <div className="w-full sm:flex-1">
+          <StatsCard
+            title="Total DEV"
+            value={verificacion.totalDev}
+            decimals={2}
+            decimalSeparator=","
+            thousandSeparator="."
+            icon="undo"
+            borderColor="#d97706"
+            iconColor="#d97706"
+            sub="Devoluciones/rebajas/descuentos, sin impuestos"
+            subColor="#d97706"
+          />
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr>
+              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-3 py-2.5 text-left whitespace-nowrap">Razón social</th>
+              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-left whitespace-nowrap">NIT</th>
+              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-right whitespace-nowrap">IBRU</th>
+              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-right whitespace-nowrap">DEV</th>
+            </tr>
+          </thead>
+          <tbody>
+            {verificacion.registros.map((r, idx) => (
+              <tr key={`${r.identificacion}-${idx}`} className={idx % 2 === 1 ? 'bg-[#fafbff] dark:bg-[#1a1c2e]' : ''}>
+                <td className="px-3 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] break-words">{r.razonSocial}</td>
+                <td className="px-2 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] whitespace-nowrap">{r.identificacion}</td>
+                <td className="px-2 py-2 text-right border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-medium">{formatoMoneda(r.ibru)}</td>
+                <td className="px-2 py-2 text-right border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-medium">{formatoMoneda(r.dev)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// Componente que renderiza cada verificación por formato — separado de FORMATOS_DISPONIBLES
+// (que solo tiene datos serializables) para no mezclar componentes React ahí.
+const VISTA_VERIFICACION = {
+  '1001': Verificacion1001View,
+  '1007': VerificacionIngresos1007View,
+}
+
 export default function ExogenasUploadPage() {
   // Si la URL ya trae ids de borradores al montar, arranca en 'restaurando' (no 'idle') para
   // que el formulario de carga nunca llegue a pintarse mientras se piden los datos — si
@@ -259,9 +348,10 @@ export default function ExogenasUploadPage() {
   // "Analizar" llama el endpoint una vez por cada formato marcado y guarda cada resultado acá,
   // indexado por formato, para poder cambiar de pestaña sin volver a subir los archivos.
   const [borradores, setBorradores] = useState({}) // { [formato]: { id, totalTerceros, ..., registros } }
-  // 1001 no crea un borrador real (no hay nada que generar todavía) — su resultado vive aparte,
-  // con su propia forma { totalTerceros, completos, faltantes, terceros }.
-  const [verificacion1001, setVerificacion1001] = useState(null)
+  // Los formatos `soloVerificacion` (1001, 1007) no crean un borrador real (no hay nada que
+  // generar todavía) — su resultado vive aparte, indexado por formato, con su propia forma
+  // según el formato (ver VISTA_VERIFICACION).
+  const [verificaciones, setVerificaciones] = useState({})
   const [tabActivo, setTabActivo]   = useState(null) // solo controla qué pestaña se PREVISUALIZA
   const [generando, setGenerando]   = useState(false)
   // Un solo botón "Generar Excel" para TODOS los formatos analizados juntos — el backend arma
@@ -361,26 +451,28 @@ export default function ExogenasUploadPage() {
 
     // Un formato a la vez (limitación actual del backend) — se analizan todos los marcados en
     // secuencia y se guardan por separado; si alguno falla se corta ahí y no se pierde el
-    // mensaje de cuál formato fue. 1001 no pasa por uploadExogenas (no genera un borrador real
-    // todavía) — usa su propio endpoint de solo verificación, con únicamente el TOKEN.
+    // mensaje de cuál formato fue. Los `soloVerificacion` (1001, 1007) no pasan por
+    // uploadExogenas (no generan un borrador real todavía) — cada uno usa su propia función de
+    // verificación, con únicamente el TOKEN.
     const nuevosBorradores = {}
-    let nuevaVerificacion1001 = null
+    const nuevasVerificaciones = {}
     try {
-      for (const formato of formatos) {
-        if (formato === '1001') {
+      for (const formatoId of formatos) {
+        const formatoConfig = FORMATOS_DISPONIBLES.find((f) => f.id === formatoId)
+        if (formatoConfig?.soloVerificacion) {
           const formData = new FormData()
           formData.append('token', tokenFile)
-          nuevaVerificacion1001 = await api.verificarTerceros1001(formData)
+          nuevasVerificaciones[formatoId] = await formatoConfig.verificar(formData)
           continue
         }
         const formData = new FormData()
-        formData.append('formato', formato)
+        formData.append('formato', formatoId)
         formData.append('token', tokenFile)
         formData.append('plantilla', plantillaFile)
-        nuevosBorradores[formato] = await api.uploadExogenas(formData)
+        nuevosBorradores[formatoId] = await api.uploadExogenas(formData)
       }
       setBorradores(nuevosBorradores)
-      setVerificacion1001(nuevaVerificacion1001)
+      setVerificaciones(nuevasVerificaciones)
       setTabActivo(formatos[0])
       setEstado('preview')
       actualizarUrlBorradores(nuevosBorradores)
@@ -424,23 +516,26 @@ export default function ExogenasUploadPage() {
     setTokenFile(null)
     setPlantillaFile(null)
     setBorradores({})
-    setVerificacion1001(null)
+    setVerificaciones({})
     setTabActivo(null)
     setDescargaCombinada(null)
     actualizarUrlBorradores({})
   }, [actualizarUrlBorradores])
 
-  // Simplificación a propósito: 1001 no necesita la plantilla (no escribe nada en ella
-  // todavía), pero se sigue exigiendo igual que a los demás — en la práctica siempre se marca
-  // junto a 1005/1006, que sí la necesitan.
+  // Simplificación a propósito: los `soloVerificacion` no necesitan la plantilla (no escriben
+  // nada en ella todavía), pero se sigue exigiendo igual que a los demás — en la práctica
+  // siempre se marcan junto a 1005/1006, que sí la necesitan.
   const puedeAnalizar = formatos.length > 0 && tokenFile && plantillaFile && estado !== 'analizando'
   const borrador = borradores[tabActivo] ?? null
   const camposFormato = CONFIG_FORMATO[tabActivo]?.campos ?? []
-  const mostrando1001 = tabActivo === '1001'
+  const formatoActivoConfig = FORMATOS_DISPONIBLES.find((f) => f.id === tabActivo)
+  const verificacionActiva = formatoActivoConfig?.soloVerificacion ? verificaciones[tabActivo] : null
+  const VistaVerificacionActiva = verificacionActiva ? VISTA_VERIFICACION[tabActivo] : null
   // Pestañas: formatos ya analizados (con datos) + los que aún no están implementados, siempre
   // visibles como "Próximamente" al final — así el usuario ve hacia dónde va creciendo esto.
-  // 1001 no guarda su resultado en `borradores` (ver analizar) — se chequea `verificacion1001`.
-  const tieneResultado = (f) => (f.soloVerificacion ? Boolean(verificacion1001) : Boolean(borradores[f.id]))
+  // Los `soloVerificacion` no guardan su resultado en `borradores` (ver analizar) — se chequea
+  // `verificaciones`.
+  const tieneResultado = (f) => (f.soloVerificacion ? Boolean(verificaciones[f.id]) : Boolean(borradores[f.id]))
   const tabsFormato = FORMATOS_DISPONIBLES.filter((f) => (f.disponible ? tieneResultado(f) : true))
   // Con 1-2 formatos el botón muestra los códigos (informativo y corto); con más, un conteo —
   // "Generar Excel 1001, 1005, 1006, 1007" ya no cabe cómodo ni aporta más que el número. 1001
@@ -492,7 +587,12 @@ export default function ExogenasUploadPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Dropzone
               label="TOKEN (detalle de compras/ventas)"
-              hint={`Debe traer la${formatos.length > 1 ? 's' : ''} hoja${formatos.length > 1 ? 's' : ''} ${formatos.map((f) => CONFIG_FORMATO[f]?.hojaToken).filter(Boolean).join(' y ') || 'correspondiente'} ya validada${formatos.length > 1 ? 's' : ''}`}
+              hint={(() => {
+                // Dedupe: dos formatos pueden compartir hoja (ej. 1006 y 1007 leen VENTAS) — sin
+                // esto el hint diría "hoja VENTAS y VENTAS".
+                const hojas = [...new Set(formatos.map((f) => CONFIG_FORMATO[f]?.hojaToken).filter(Boolean))]
+                return `Debe traer la${hojas.length > 1 ? 's' : ''} hoja${hojas.length > 1 ? 's' : ''} ${hojas.join(' y ') || 'correspondiente'} ya validada${hojas.length > 1 ? 's' : ''}`
+              })()}
               icon="upload_file"
               file={tokenFile}
               onFile={onTokenFile}
@@ -541,7 +641,7 @@ export default function ExogenasUploadPage() {
         </div>
       )}
 
-      {estado === 'preview' && (borrador || (mostrando1001 && verificacion1001)) && (
+      {estado === 'preview' && (borrador || verificacionActiva) && (
         <div>
           <div className="flex items-center gap-2 mb-6 flex-wrap">
             {tabsFormato.map((f) => {
@@ -576,8 +676,8 @@ export default function ExogenasUploadPage() {
             })}
           </div>
 
-          {mostrando1001 ? (
-            <Verificacion1001View verificacion={verificacion1001} />
+          {VistaVerificacionActiva ? (
+            <VistaVerificacionActiva verificacion={verificacionActiva} />
           ) : (
             <>
               {/* Siempre en una sola fila de tablet para arriba (sm:flex-nowrap) — nunca baja tarjetas

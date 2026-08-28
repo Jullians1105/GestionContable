@@ -385,6 +385,20 @@ export const api = {
       return res.json()
     }),
 
+  // Chequeo previo al 1007 (todavía no genera ningún Excel — ver formato1007.js en el backend):
+  // sube el TOKEN de ventas y devuelve IBRU/DEV (Total menos impuestos) ya calculados por
+  // tercero.
+  verificarIngresos1007: (formData) =>
+    fetchWithAuth('/exogenas/1007/verificar-ingresos', { method: 'POST', body: formData }).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        const err = new Error(body.error || `Error ${res.status}`)
+        err.status = res.status
+        throw err
+      }
+      return res.json()
+    }),
+
   // Un solo Excel con la hoja de cada formato analizado ya llena (reemplaza a generarExogenas
   // cuando hay varios formatos a la vez, que es el caso normal desde que existe más de uno).
   generarExogenasCombinado: (ids) => {

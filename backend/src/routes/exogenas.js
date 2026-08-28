@@ -5,7 +5,7 @@ const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const {
   uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado,
-  verificarTerceros1001, FORMATOS_SOPORTADOS,
+  verificarTerceros1001, verificarIngresos1007, FORMATOS_SOPORTADOS,
 } = require('../controllers/exogenasController');
 
 const router = Router();
@@ -180,5 +180,32 @@ router.post('/generar-combinado',
  *         description: No autenticado.
  */
 router.post('/1001/verificar-terceros', handleUploadToken, verificarTerceros1001);
+
+/**
+ * @openapi
+ * /api/exogenas/1007/verificar-ingresos:
+ *   post:
+ *     tags: [Exógenas]
+ *     summary: Calcular IBRU/DEV por tercero a partir de un TOKEN de ventas (paso previo al 1007)
+ *     description: No genera ningún Excel — el 1007 completo (concepto) todavía no está implementado. Agrupa por tercero y calcula Total menos impuestos (IVA, ICA, IC, INC, Timbre, INC Bolsas, IN Carbono, IN Combustibles, IC Datos, ICL, INPP, IBUA, ICUI — las que existan en el archivo) para VENTAS (IBRU) y DEV VENTAS (DEV).
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token: { type: string, format: binary, description: Detalle de ventas (hoja VENTAS) }
+ *     responses:
+ *       200:
+ *         description: Resumen (total terceros/IBRU/DEV) + lista de registros por tercero.
+ *       400:
+ *         description: Archivo ausente, o columna/hoja requerida faltante en el TOKEN.
+ *       401:
+ *         description: No autenticado.
+ */
+router.post('/1007/verificar-ingresos', handleUploadToken, verificarIngresos1007);
 
 module.exports = router;

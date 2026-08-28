@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const { getEstrategia, llenarPlantillaCombinada } = require('../services/exogenas');
 const formato1001 = require('../services/exogenas/formato1001');
+const formato1007 = require('../services/exogenas/formato1007');
 
 // 1001/1007 se habilitan acá cuando les llegue su turno, reusando el mismo controller (la
 // lógica específica vive en la estrategia).
@@ -233,7 +234,42 @@ const verificarTerceros1001 = async (req, res, next) => {
   }
 };
 
+// Chequeo previo al 1007 (concepto CPT pendiente — ver formato1007.js): sube el TOKEN de
+// ventas y devuelve IBRU/DEV ya calculados (Total menos impuestos) por tercero, para revisar
+// esa resta contra el reporte real antes de que el 1007 se pueda generar de verdad. Igual que
+// 1001, no guarda ningún borrador — solo diagnóstico.
+const verificarIngresos1007 = async (req, res, next) => {
+  try {
+    const tokenFile = req.file;
+    if (!tokenFile) {
+      return res.status(400).json({ error: 'Se requiere el archivo TOKEN (detalle de ventas).' });
+    }
+
+    let registros;
+    try {
+      registros = await formato1007.leerYAgrupar(tokenFile.buffer);
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (registros.length === 0) {
+      return res.status(400).json({
+        error: 'No se encontraron registros válidos para procesar. Revisa el archivo TOKEN.',
+      });
+    }
+
+    res.status(200).json({
+      totalTerceros: registros.length,
+      totalIbru: round2(registros.reduce((s, r) => s + r.ibru, 0)),
+      totalDev: round2(registros.reduce((s, r) => s + r.dev, 0)),
+      registros,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado,
-  verificarTerceros1001, FORMATOS_SOPORTADOS,
+  verificarTerceros1001, verificarIngresos1007, FORMATOS_SOPORTADOS,
 };
