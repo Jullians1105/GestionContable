@@ -6,7 +6,7 @@ jest.mock('../../src/config/database');
 
 const pdfParse = require('pdf-parse');
 const db = require('../../src/config/database');
-const { extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, normalizarDireccion, limpiarParaDian } = require('../../src/services/terceros');
+const { extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, mapearCodigoPais, normalizarDireccion, limpiarParaDian } = require('../../src/services/terceros');
 const { uploadTerceros, consultarTercero } = require('../../src/controllers/tercerosController');
 
 // Texto real extraído (pdf-parse) de docs/PDF-901939874-AAC2.pdf — factura de muestra de
@@ -145,6 +145,21 @@ describe('mapearCodigoDane', () => {
   });
 });
 
+describe('mapearCodigoPais', () => {
+  test('resuelve un país conocido ignorando tildes/mayúsculas', () => {
+    expect(mapearCodigoPais('Colombia')).toEqual({ codigoPais: '169', nombrePais: 'COLOMBIA' });
+    expect(mapearCodigoPais('estados unidos')).toEqual({ codigoPais: '249', nombrePais: 'ESTADOS UNIDOS' });
+  });
+
+  test('sin país no intenta mapear', () => {
+    expect(mapearCodigoPais(null)).toEqual({ codigoPais: null, nombrePais: null });
+  });
+
+  test('país no reconocido queda sin mapear (no adivina)', () => {
+    expect(mapearCodigoPais('Narnia')).toEqual({ codigoPais: null, nombrePais: null });
+  });
+});
+
 describe('normalizarDireccion', () => {
   test('reemplaza palabras completas de la tabla oficial por su código', () => {
     expect(normalizarDireccion('Calle 15 # 8-32 Barrio El Prado')).toBe('CL 15 # 8-32 BRR EL PRADO');
@@ -210,6 +225,8 @@ describe('extraerPartesDePdf', () => {
       nit: '901939874',
       razonSocial: 'ASOCIACION AVICOLA CHICAMOCHA',
       direccion: 'VRD SAGRA ABAJO SEC COTAMO FCA EL ENCERRADO', // "VDA" -> alias de Vereda
+      pais: 'COLOMBIA',
+      codigoPaisDian: '169',
       municipio: 'SOCHA', // nombre oficial DIAN, no el texto de la factura
       codigoMunicipioDane: '15757',
       departamento: 'BOYACA', // sin tilde — regla DIAN de caracteres
@@ -224,6 +241,8 @@ describe('extraerPartesDePdf', () => {
       nit: '222222222',
       razonSocial: 'CONSUMIDOR FINAL',
       direccion: 'CL 000',
+      pais: 'COLOMBIA',
+      codigoPaisDian: '169',
       municipio: 'BOGOTA, D.C.', // "Bogotá, D.c." de la factura -> nombre oficial, sin tilde
       codigoMunicipioDane: '11001',
       departamento: 'BOGOTA D.C.',
