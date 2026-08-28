@@ -342,7 +342,7 @@ export const api = {
       // Extraer nombre sugerido del header Content-Disposition
       const cd = res.headers.get('content-disposition') ?? ''
       const match = cd.match(/filename="([^"]+)"/)
-      const filename = match ? match[1] : `ContabilidadDIAN_${borradorId.slice(0,8)}.xlsx`
+      const filename = match ? match[1] : `Contabilidad_${borradorId.slice(0,8)}.xlsx`
       return res.blob().then((blob) => ({ blob, filename }))
     })
   },
@@ -391,6 +391,20 @@ export const api = {
   // DIAN. De uso general (no exclusiva de Exógenas), hoy alimenta el formato 1001.
   uploadTerceros: (formData) =>
     fetchWithAuth('/terceros/upload', { method: 'POST', body: formData }).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        const err = new Error(body.error || `Error ${res.status}`)
+        err.status = res.status
+        throw err
+      }
+      return res.json()
+    }),
+
+  // Consulta Tercero — busca un tercero ya guardado por NIT/documento. Devuelve también régimen
+  // fiscal, responsabilidad tributaria, teléfono y correo (a diferencia de uploadTerceros, que
+  // nunca los expone en su resumen).
+  consultarTercero: (nit) =>
+    fetchWithAuth(`/terceros/${encodeURIComponent(nit)}`).then(async (res) => {
       if (!res.ok) {
         const body = await res.json().catch(() => ({ error: res.statusText }))
         const err = new Error(body.error || `Error ${res.status}`)

@@ -287,7 +287,7 @@ const uploadDian = async (req, res, next) => {
     if (hojaReservada) {
       return res.status(400).json({
         error: `Este archivo ya parece ser un reporte exportado por esta herramienta (contiene la hoja "${hojaReservada.name}"). ` +
-          'Sube el reporte original tal como lo descargaste del portal de la DIAN.',
+          'Sube el reporte original, no uno ya procesado por esta herramienta.',
       });
     }
 
@@ -1873,7 +1873,7 @@ const exportarBorrador = async (req, res, next) => {
 
     const mesAnio       = periodoDesde ? periodoDesde.slice(0, 7) : new Date().toISOString().slice(0, 7);
     const nombreSan     = empresaNombre.replace(/[^A-Za-z0-9]/g, '_').replace(/_+/g, '_').replace(/_$/, '').slice(0, 20);
-    const filename      = `ContabilidadDIAN_${nombreSan}_${mesAnio}.xlsx`;
+    const filename      = `Contabilidad_${nombreSan}_${mesAnio}.xlsx`;
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

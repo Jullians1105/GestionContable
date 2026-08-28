@@ -57,7 +57,7 @@ function DropzoneMultiple({ archivos, onAgregar, onQuitar, onLimpiar }) {
         <p className="text-sm font-semibold text-[#434655] dark:text-[#c4c8e8]">
           {archivos.length > 0
             ? `${archivos.length} PDF${archivos.length > 1 ? 's' : ''} listo${archivos.length > 1 ? 's' : ''} para procesar`
-            : 'Arrastra PDFs de factura DIAN, o haz clic para elegir'}
+            : 'Arrastra PDFs de factura electrónica, o haz clic para elegir'}
         </p>
         <p className="text-xs text-[#9ca3af] dark:text-[#6b7280]">
           {archivos.length > 0 ? 'Puedes seguir agregando más' : 'Se pueden seleccionar varios a la vez'}
@@ -157,12 +157,12 @@ export default function TercerosPage() {
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <span className="material-symbols-outlined text-3xl text-[#004ac6]">location_on</span>
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Datos de Terceros</h1>
+          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Importar Terceros</h1>
         </div>
         <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
-          Sube los PDFs de documento electrónico descargados de la DIAN (factura, nota crédito, documento
-          soporte) — se extrae dirección, municipio y departamento (con su código DANE) del tercero y queda
-          guardado para cuando generes el formato 1001.
+          Sube los PDFs de factura electrónica de venta (factura, nota crédito, documento soporte) —
+          se extrae dirección, municipio, departamento y demás datos del tercero, y quedan guardados
+          para consultarlos después en &ldquo;Consulta Tercero&rdquo;.
         </p>
       </div>
 

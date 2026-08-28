@@ -43,6 +43,7 @@ import DianNominaPage from './pages/DianNominaPage'
 import DianExportacionPage from './pages/DianExportacionPage'
 import ExogenasUploadPage from './pages/ExogenasUploadPage'
 import TercerosPage from './pages/TercerosPage'
+import ConsultaTerceroPage from './pages/ConsultaTerceroPage'
 import RecurringTasksPage from './pages/RecurringTasksPage'
 import EmpresasExternasPage from './pages/EmpresasExternasPage'
 
@@ -120,6 +121,7 @@ function Layout() {
             <Route path="/dian/exportacion/:borradorId"      element={<DianExportacionPage />} />
             <Route path="/exogenas/upload"                   element={<ExogenasUploadPage />} />
             <Route path="/dian/terceros"                     element={<TercerosPage />} />
+            <Route path="/dian/consulta-tercero"             element={<ConsultaTerceroPage />} />
             <Route path="/tasks/recurrentes" element={<RecurringTasksPage />} />
           </Routes>
         </div>

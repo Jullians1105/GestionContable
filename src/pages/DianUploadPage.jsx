@@ -96,11 +96,11 @@ export default function DianUploadPage() {
         <div className="flex items-center gap-3 mb-2">
           <span className="material-symbols-outlined text-3xl text-[#004ac6]">receipt_long</span>
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">
-            Reporte DIAN
+            Reporte de Retenciones
           </h1>
         </div>
         <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
-          Sube el archivo Excel exportado del portal DIAN para calcular retenciones.
+          Sube el archivo Excel del reporte de compras/ventas para calcular retenciones.
         </p>
       </div>
 
@@ -137,7 +137,7 @@ export default function DianUploadPage() {
                 <p className="text-sm font-semibold text-[#434655] dark:text-[#c4c8e8]">
                   {isDragOver
                     ? 'Suelta el archivo aquí'
-                    : 'Arrastra tu reporte DIAN aquí o haz clic para seleccionar'}
+                    : 'Arrastra tu reporte aquí o haz clic para seleccionar'}
                 </p>
                 <p className="text-xs text-[#9ca3af] dark:text-[#6b7280] mt-1">
                   Formato aceptado: .xlsx, .xls

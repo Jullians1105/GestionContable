@@ -7,7 +7,7 @@ jest.mock('../../src/config/database');
 const pdfParse = require('pdf-parse');
 const db = require('../../src/config/database');
 const { extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, normalizarDireccion, limpiarParaDian } = require('../../src/services/terceros');
-const { uploadTerceros } = require('../../src/controllers/tercerosController');
+const { uploadTerceros, consultarTercero } = require('../../src/controllers/tercerosController');
 
 // Texto real extraído (pdf-parse) de docs/PDF-901939874-AAC2.pdf — factura de muestra de
 // "ASOCIACION AVICOLA CHICAMOCHA" generada por la DIAN. No se referencia el PDF binario porque
@@ -215,6 +215,10 @@ describe('extraerPartesDePdf', () => {
       departamento: 'BOYACA', // sin tilde — regla DIAN de caracteres
       codigoDepartamentoDane: '15',
       pendienteDesambiguar: false,
+      regimenFiscal: 'R-99-PN',
+      responsabilidadTributaria: '01 - IVA',
+      telefono: '3208176645',
+      correo: 'meryvegat98@gmail.com', // pasado a minúsculas (venía en mayúsculas en la factura)
     });
     expect(adquiriente).toEqual({
       nit: '222222222',
@@ -225,6 +229,10 @@ describe('extraerPartesDePdf', () => {
       departamento: 'BOGOTA D.C.',
       codigoDepartamentoDane: '11',
       pendienteDesambiguar: false,
+      regimenFiscal: 'R-99-PN',
+      responsabilidadTributaria: 'ZZ - No aplica',
+      telefono: '0000000',
+      correo: 'meryvegat98@gmail.com',
     });
   });
 
@@ -439,5 +447,62 @@ describe('uploadTerceros', () => {
     expect(body.terceros[0].esNuevo).toBe(false);
     expect(body.terceros[0].cambios).toEqual([]);
     expect(body.actualizados).toBe(0);
+  });
+});
+
+describe('consultarTercero', () => {
+  beforeEach(() => db.query.mockReset());
+
+  test('devuelve el tercero, incluyendo régimen fiscal/responsabilidad/teléfono/correo', async () => {
+    const fila = {
+      nit: '901939874',
+      razon_social: 'ASOCIACION AVICOLA CHICAMOCHA',
+      direccion: 'VRD SAGRA ABAJO SEC COTAMO FCA EL ENCERRADO',
+      municipio: 'SOCHA',
+      codigo_municipio_dane: '15757',
+      departamento: 'BOYACA',
+      codigo_departamento_dane: '15',
+      regimen_fiscal: 'R-99-PN',
+      responsabilidad_tributaria: '01 - IVA',
+      telefono: '3208176645',
+      correo: 'meryvegat98@gmail.com',
+    };
+    db.query.mockResolvedValue({ rows: [fila] });
+
+    const req = { params: { nit: '901.939.874-0' } }; // con puntos/guion, como lo pegaría el usuario
+    const res = mockRes();
+    await consultarTercero(req, res, jest.fn());
+
+    expect(db.query.mock.calls[0][1][0]).toBe('9019398740'); // limpiarIdentificacion solo quita no-dígitos
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ ...fila, regimen_fiscal_descripcion: 'No responsable' });
+  });
+
+  test('describe el régimen fiscal con la tabla de códigos DIAN, o null si no se reconoce', async () => {
+    db.query.mockResolvedValue({ rows: [{ nit: '111', regimen_fiscal: 'R-99-PN' }] });
+    const res1 = mockRes();
+    await consultarTercero({ params: { nit: '111' } }, res1, jest.fn());
+    expect(res1.json.mock.calls[0][0].regimen_fiscal_descripcion).toBe('No responsable');
+
+    db.query.mockResolvedValue({ rows: [{ nit: '222', regimen_fiscal: 'CODIGO-DESCONOCIDO' }] });
+    const res2 = mockRes();
+    await consultarTercero({ params: { nit: '222' } }, res2, jest.fn());
+    expect(res2.json.mock.calls[0][0].regimen_fiscal_descripcion).toBeNull();
+  });
+
+  test('responde 404 si no hay ningún tercero con ese documento', async () => {
+    db.query.mockResolvedValue({ rows: [] });
+    const req = { params: { nit: '999999999' } };
+    const res = mockRes();
+    await consultarTercero(req, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('responde 400 si el documento queda vacío tras limpiar', async () => {
+    const req = { params: { nit: '---' } };
+    const res = mockRes();
+    await consultarTercero(req, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
   });
 });
