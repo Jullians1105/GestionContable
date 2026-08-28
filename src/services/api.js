@@ -371,6 +371,20 @@ export const api = {
     })
   },
 
+  // Chequeo previo al 1001 (todavía no genera ningún Excel — ver formato1001.js en el backend):
+  // sube el TOKEN de compras y devuelve qué terceros ya tienen dirección completa en `terceros`
+  // y a cuáles les falta subir factura en "Importar Terceros".
+  verificarTerceros1001: (formData) =>
+    fetchWithAuth('/exogenas/1001/verificar-terceros', { method: 'POST', body: formData }).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        const err = new Error(body.error || `Error ${res.status}`)
+        err.status = res.status
+        throw err
+      }
+      return res.json()
+    }),
+
   // Un solo Excel con la hoja de cada formato analizado ya llena (reemplaza a generarExogenas
   // cuando hay varios formatos a la vez, que es el caso normal desde que existe más de uno).
   generarExogenasCombinado: (ids) => {
