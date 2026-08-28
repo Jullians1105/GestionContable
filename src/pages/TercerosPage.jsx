@@ -160,9 +160,10 @@ export default function TercerosPage() {
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Importar Terceros</h1>
         </div>
         <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
-          Sube los PDFs de factura electrónica de venta (factura, nota crédito, documento soporte) —
-          se extrae dirección, municipio, departamento y demás datos del tercero, y quedan guardados
-          para consultarlos después en &ldquo;Consulta Tercero&rdquo;.
+          Sube los PDFs de factura electrónica de venta — se extrae dirección, municipio, departamento
+          y demás datos del tercero, y quedan guardados para consultarlos después en
+          &ldquo;Consulta Tercero&rdquo;. Si mezclas notas crédito o documentos soporte en el lote, se
+          omiten automáticamente (no traen esta información).
         </p>
       </div>
 
