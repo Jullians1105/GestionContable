@@ -1,24 +1,53 @@
-// Formato 1001 — Pagos o abonos en cuenta y retenciones practicadas. FASE 1 (parcial): solo
-// identifica los terceros involucrados y cruza su ubicación (dirección/municipio/departamento/
-// país) contra la tabla `terceros` — ver docs/PLANEACION_EXTRACCION_DATOS_FACTURAS.md.
-//
-// Lo que este archivo NO hace todavía (pendiente de reglas de negocio, no inventar):
-// - Concepto (CPT): depende de qué se compró en cada factura (servicios, arrendamientos,
+// Formato 1001 — Pagos o abonos en cuenta y retenciones practicadas. Identifica los terceros
+// involucrados, cruza su ubicación (dirección/municipio/departamento/país) contra la tabla
+// `terceros` (ver docs/PLANEACION_EXTRACCION_DATOS_FACTURAS.md) y ya genera la hoja "1001" de
+// la plantilla con todo lo confirmado. Dos cosas quedan pendientes de definir con el usuario —
+// no se inventan, así que esas columnas se dejan en blanco en el Excel generado:
+// - CPT (concepto): depende de qué se compró en cada factura (servicios, arrendamientos,
 //   honorarios...), pendiente de definir con el usuario.
 // - Columnas de dinero (PAGO, PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM): fuente sin
-//   confirmar todavía.
-// Por eso este módulo NO implementa `llenarHoja`/`llenarPlantilla` ni se registra en
-// `services/exogenas/index.js#ESTRATEGIAS` — no genera ningún Excel de 1001 real. Solo expone
-// `leerYAgrupar` + `enriquecerConTerceros`, usados por exogenasController#verificarTerceros1001
-// para el chequeo previo ("¿a quién le falta la dirección antes de generar la exógena?").
+//   confirmar todavía (hoy es un cálculo manual, según el usuario).
 const ExcelJS = require('exceljs');
 const db = require('../../config/database');
 const { normalizeXlsxBuffer } = require('./utils/normalizeXlsx');
-const { normalizarTexto, limpiarIdentificacion, calcularDV, inferirTipoDocumento } = require('./utils/dian');
-const { getCellText } = require('./utils/plantillaExcel');
+const { normalizarTexto, limpiarIdentificacion, calcularDV, inferirTipoDocumento, separarNombrePersona } = require('./utils/dian');
+const { getCellText, encontrarFilaYColumnas, copiarEstiloFila } = require('./utils/plantillaExcel');
 
 const HOJA_TOKEN = 'COMPRAS';
 const COLUMNAS_TOKEN_REQUERIDAS = ['Tipo de documento', 'NIT Emisor', 'Nombre Emisor', 'Grupo'];
+
+const HOJA_PLANTILLA = '1001';
+
+// Headers reales de la hoja "1001" de la plantilla SIIGO — sacados de
+// docs/EXOGENA - GUIA FORMATOS.xlsx (hoja "1001 OK"), no inventados. Igual que 1007, el 1001 NO
+// tiene columna de Dígito de Verificación (DV), y sí trae DIR/DPTO/MUN/PAIS. RETP y RETA
+// comparten literalmente el mismo texto descriptivo en la plantilla real ("Retención en la
+// fuente practicada Renta") — el match incluye el sufijo "(RETP)"/"(RETA)" para no confundirlas.
+// CONCEPTO y las columnas de dinero se incluyen en el mapeo (para poder limpiarlas en cada
+// corrida) pero deliberadamente no se les escribe ningún valor — ver cabecera del archivo.
+const CAMPOS_PLANTILLA = [
+  { match: 'CONCEPTO', key: 'CPT' },
+  { match: 'TIPO DE DOCUMENTO', key: 'TDOC' },
+  { match: 'NUMERO DE IDENTIFICACION', key: 'NID' },
+  { match: 'PRIMER APELLIDO DEL INFORMADO', key: 'APL1' },
+  { match: 'SEGUNDO APELLIDO DEL INFORMADO', key: 'APL2' },
+  { match: 'PRIMER NOMBRE DEL INFORMADO', key: 'NOM1' },
+  { match: 'OTROS NOMBRES DEL INFORMADO', key: 'NOM2' },
+  { match: 'RAZON SOCIAL DEL INFORMADO', key: 'RAZ' },
+  { match: 'DIRECCION (DIR)', key: 'DIR' },
+  { match: 'CODIGO DEL DEPARTAMENTO', key: 'DPTO' },
+  { match: 'CODIGO DEL MUNICIPIO', key: 'MUN' },
+  { match: 'PAIS DE RESIDENCIA O DOMICILIO', key: 'PAIS' },
+  { match: 'PAGO O ABONO EN CUENTA (PAGO)', key: 'PAGO' },
+  { match: 'PAGO O ABONO EN CUENTA NO DEDUCIBLE', key: 'PNDED' },
+  { match: 'IVA MAYOR VALOR DEL COSTO O GASTO DEDUCIBLE', key: 'IDED' },
+  { match: 'IVA MAYOR VALOR DEL COSTO O GASTO NO DEDUCIBLE', key: 'INDED' },
+  { match: 'RETENCION EN LA FUENTE PRACTICADA RENTA (RETP)', key: 'RETP' },
+  { match: 'RETENCION EN LA FUENTE PRACTICADA RENTA (RETA)', key: 'RETA' },
+  { match: 'RETENCION EN LA FUENTE PRACTICADA IVA A RESPONSABLES', key: 'COMUN' },
+  { match: 'RETENCION EN LA FUENTE PRACTICADA IVA A NO RESIDENTES', key: 'NDOM' },
+];
+const HEADERS_PLANTILLA = CAMPOS_PLANTILLA.map((c) => c.match);
 
 function encontrarHoja(workbook, nombreExacto) {
   return workbook.worksheets.find((ws) => ws.name.trim().toUpperCase() === nombreExacto.toUpperCase());
@@ -69,6 +98,7 @@ async function leerYAgrupar(bufferToken) {
   const acumulador = new Map();
   ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
     if (rowNumber === 1) return;
+    if (row.hidden) return; // fila oculta por el AutoFilter del TOKEN (el contador copia el TOKEN completo y filtra a lo que necesita esa hoja) — no se debe contar
 
     const grupo = normalizarTexto(getStr(row, 'Grupo'));
     if (grupo !== 'RECIBIDO') return;
@@ -132,4 +162,71 @@ async function enriquecerConTerceros(registros) {
   });
 }
 
-module.exports = { leerYAgrupar, enriquecerConTerceros, HOJA_TOKEN, COLUMNAS_TOKEN_REQUERIDAS };
+// Llena la hoja "1001" de un workbook ya cargado en memoria — mismo patrón que 1007 (ver
+// services/exogenas/index.js#llenarPlantillaCombinada). CPT y las columnas de dinero no se
+// escriben (ver cabecera del archivo): la limpieza de esas columnas sí corre, así que quedan en
+// blanco y no con un valor de una corrida anterior. DIR/DPTO/MUN/PAIS solo se escriben si
+// `enriquecerConTerceros` ya los encontró en `terceros` — si no, quedan en blanco hasta que se
+// suba la factura de ese tercero.
+function llenarHoja(workbook, registros) {
+  const ws = encontrarHoja(workbook, HOJA_PLANTILLA);
+  if (!ws) {
+    throw new Error(`La plantilla SIIGO debe tener una hoja llamada "${HOJA_PLANTILLA}".`);
+  }
+
+  const { filaDatos: filaInicio, columnas } = encontrarFilaYColumnas(ws, HEADERS_PLANTILLA, 40);
+  const col = {};
+  for (const { match, key } of CAMPOS_PLANTILLA) col[key] = columnas[match];
+
+  const maxRowOriginal = ws.rowCount;
+  const filaFinLimpieza = Math.max(maxRowOriginal, filaInicio + registros.length + 50);
+  const colsObjetivo = Object.values(col);
+
+  for (let fila = filaInicio; fila <= filaFinLimpieza; fila++) {
+    for (const c of colsObjetivo) {
+      ws.getRow(fila).getCell(c).value = null;
+    }
+  }
+
+  registros.forEach((registro, i) => {
+    const fila = filaInicio + i;
+    if (fila !== filaInicio) copiarEstiloFila(ws, filaInicio, fila);
+
+    const row = ws.getRow(fila);
+    row.getCell(col.TDOC).value = registro.tipoDocumento;
+    row.getCell(col.NID).value  = Number(registro.identificacion);
+
+    if (registro.tipoDocumento === 31) {
+      row.getCell(col.RAZ).value = registro.razonSocial;
+    } else {
+      const { nom1, nom2, apl1, apl2 } = separarNombrePersona(registro.razonSocial);
+      row.getCell(col.NOM1).value = nom1;
+      row.getCell(col.NOM2).value = nom2;
+      row.getCell(col.APL1).value = apl1;
+      row.getCell(col.APL2).value = apl2;
+    }
+
+    if (registro.direccion) row.getCell(col.DIR).value = registro.direccion;
+    if (registro.codigoDepartamentoDane) row.getCell(col.DPTO).value = registro.codigoDepartamentoDane;
+    // MUN pide solo los 3 dígitos de municipio dentro del departamento (no el código DANE
+    // completo de 5) — confirmado contra la guía real: fila de ejemplo con DPTO=15, MUN=001
+    // para un código DANE completo terminado en "001".
+    if (registro.codigoMunicipioDane) row.getCell(col.MUN).value = registro.codigoMunicipioDane.slice(-3);
+    if (registro.codigoPaisDian) row.getCell(col.PAIS).value = Number(registro.codigoPaisDian);
+  });
+}
+
+// Uso individual (un solo formato): carga la plantilla, llena la hoja y devuelve el archivo ya
+// serializado. La generación combinada de varios formatos no pasa por acá — ver
+// services/exogenas/index.js#llenarPlantillaCombinada.
+async function llenarPlantilla(bufferPlantilla, registros) {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(bufferPlantilla);
+  llenarHoja(workbook, registros);
+  return workbook.xlsx.writeBuffer();
+}
+
+module.exports = {
+  leerYAgrupar, enriquecerConTerceros, llenarHoja, llenarPlantilla,
+  HOJA_TOKEN, COLUMNAS_TOKEN_REQUERIDAS,
+};

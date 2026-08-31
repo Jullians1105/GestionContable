@@ -1,15 +1,20 @@
 const ExcelJS = require('exceljs');
+const formato1001 = require('./formato1001');
 const formato1005 = require('./formato1005');
 const formato1006 = require('./formato1006');
+const formato1007 = require('./formato1007');
 
 // Cada formato implementa:
 //   leerYAgrupar(bufferToken) -> registros[]
 //   llenarHoja(workbook, registros)          — llena su propia hoja sobre un workbook compartido
 //   llenarPlantilla(bufferPlantilla, registros) -> Buffer — atajo de un solo formato (carga+llena+serializa)
-// 1001 y 1007 se agregan acá cuando lleguen sus fases, sin tocar 1005/1006.
+// 1001 y 1007 dejan CPT (y algunas otras columnas de 1001) en blanco hasta que se definan esas
+// reglas de negocio — ver formato1001.js / formato1007.js.
 const ESTRATEGIAS = {
+  1001: formato1001,
   1005: formato1005,
   1006: formato1006,
+  1007: formato1007,
 };
 
 function getEstrategia(formato) {

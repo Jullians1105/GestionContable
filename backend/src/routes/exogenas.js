@@ -5,7 +5,7 @@ const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const {
   uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado,
-  verificarTerceros1001, FORMATOS_SOPORTADOS,
+  FORMATOS_SOPORTADOS,
 } = require('../controllers/exogenasController');
 
 const router = Router();
@@ -40,18 +40,6 @@ const handleUpload = (req, res, next) => {
   });
 };
 
-const handleUploadToken = (req, res, next) => {
-  upload.single('token')(req, res, (err) => {
-    if (err instanceof multer.MulterError) {
-      return res.status(400).json({ error: `Error de carga: ${err.message}` });
-    }
-    if (err) {
-      return res.status(400).json({ error: err.message });
-    }
-    next();
-  });
-};
-
 router.use(authMiddleware);
 
 /**
@@ -69,7 +57,7 @@ router.use(authMiddleware);
  *           schema:
  *             type: object
  *             properties:
- *               formato:   { type: string, enum: [1005, 1006] }
+ *               formato:   { type: string, enum: [1001, 1005, 1006, 1007] }
  *               token:     { type: string, format: binary, description: Detalle de compras/ventas (hoja COMPRAS o VENTAS según el formato) }
  *               plantilla: { type: string, format: binary, description: Plantilla SIIGO del formato correspondiente }
  *     responses:
@@ -153,32 +141,5 @@ router.post('/generar-combinado',
   validate,
   generarExogenasCombinado
 );
-
-/**
- * @openapi
- * /api/exogenas/1001/verificar-terceros:
- *   post:
- *     tags: [Exógenas]
- *     summary: Verificar qué terceros de un TOKEN de compras ya tienen dirección/ubicación completa (paso previo al 1001)
- *     description: No genera ningún Excel — el 1001 completo (concepto + montos) todavía no está implementado. Solo agrupa por tercero y cruza contra `terceros` para avisar a quién le falta subir factura en "Importar Terceros".
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               token: { type: string, format: binary, description: Detalle de compras (hoja COMPRAS) }
- *     responses:
- *       200:
- *         description: Resumen (total/completos/faltantes) + lista de terceros con su estado.
- *       400:
- *         description: Archivo ausente, o columna/hoja requerida faltante en el TOKEN.
- *       401:
- *         description: No autenticado.
- */
-router.post('/1001/verificar-terceros', handleUploadToken, verificarTerceros1001);
 
 module.exports = router;

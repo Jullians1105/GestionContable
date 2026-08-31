@@ -105,6 +105,7 @@ async function leerYAgrupar(bufferToken) {
 
     ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       if (rowNumber === 1) return;
+      if (row.hidden) return; // fila oculta por el AutoFilter del TOKEN (el contador copia el TOKEN completo y filtra a lo que necesita esa hoja) — no se debe contar
 
       const grupo = normalizarTexto(getStr(row, 'Grupo'));
       if (grupo !== 'RECIBIDO') return;
@@ -133,6 +134,7 @@ async function leerYAgrupar(bufferToken) {
 
     wsDevVentas.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       if (rowNumber === 1) return;
+      if (row.hidden) return; // fila oculta por el AutoFilter del TOKEN — no se debe contar
 
       const identificacion = limpiarIdentificacion(getStr(row, 'NIT Receptor'));
       const nombre = getStr(row, 'Nombre Receptor');
