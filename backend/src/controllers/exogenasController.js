@@ -3,17 +3,20 @@ const { getEstrategia, llenarPlantillaCombinada } = require('../services/exogena
 const formato1001 = require('../services/exogenas/formato1001');
 const formato1007 = require('../services/exogenas/formato1007');
 
-// 1001/1007 se habilitan acá cuando les llegue su turno, reusando el mismo controller (la
-// lógica específica vive en la estrategia).
-const FORMATOS_SOPORTADOS = ['1005', '1006'];
+// 1001 y 1007 generan Excel con lo confirmado y dejan CPT (y en el caso de 1001, además las
+// columnas de dinero) en blanco cuando falten — ver formato1001.js / formato1007.js.
+const FORMATOS_SOPORTADOS = ['1001', '1005', '1006', '1007'];
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 // Cada formato tiene sus propios campos monetarios en el registro agrupado — acá solo se
 // listan para poder sumarlos genéricamente sin acoplar el controller a un formato específico.
+// 1001 no tiene entrada: sus columnas de dinero (PAGO, PNDED, etc.) siguen sin definir, así que
+// no hay nada que sumar todavía.
 const CAMPOS_MONETARIOS_POR_FORMATO = {
   1005: ['vimp', 'ivade'],
   1006: ['imp', 'iva', 'icon'],
+  1007: ['ibru', 'dev'],
 };
 
 function calcularTotales(formato, registros) {
@@ -47,6 +50,11 @@ const uploadExogenas = async (req, res, next) => {
     let registros;
     try {
       registros = await estrategia.leerYAgrupar(tokenFile.buffer);
+      // La ubicación del 1001 y el país del 1007 salen de `terceros`, no del TOKEN — se
+      // enriquecen acá, antes de guardar el borrador, para que tanto la previsualización como
+      // el Excel generado (llenarHoja) ya los tengan disponibles sin volver a consultar la base.
+      if (formato === '1001') registros = await formato1001.enriquecerConTerceros(registros);
+      if (formato === '1007') registros = await formato1007.enriquecerConPais(registros);
     } catch (err) {
       return res.status(400).json({ error: err.message });
     }
@@ -196,80 +204,7 @@ const generarExogenasCombinado = async (req, res, next) => {
   }
 };
 
-// Chequeo previo al 1001 (todavía sin concepto ni montos — ver formato1001.js): sube el TOKEN
-// de compras, agrupa por tercero y cruza contra `terceros` para saber a quién le falta subir
-// factura en "Importar Terceros" antes de poder generar la exógena. No guarda ningún borrador
-// (no hay nada que "generar" todavía), es solo diagnóstico.
-const verificarTerceros1001 = async (req, res, next) => {
-  try {
-    const tokenFile = req.file;
-    if (!tokenFile) {
-      return res.status(400).json({ error: 'Se requiere el archivo TOKEN (detalle de compras).' });
-    }
-
-    let registros;
-    try {
-      registros = await formato1001.leerYAgrupar(tokenFile.buffer);
-    } catch (err) {
-      return res.status(400).json({ error: err.message });
-    }
-
-    if (registros.length === 0) {
-      return res.status(400).json({
-        error: 'No se encontraron terceros para verificar. Revisa el archivo TOKEN.',
-      });
-    }
-
-    const terceros = await formato1001.enriquecerConTerceros(registros);
-    const completos = terceros.filter((t) => t.tieneDatosCompletos).length;
-
-    res.status(200).json({
-      totalTerceros: terceros.length,
-      completos,
-      faltantes: terceros.length - completos,
-      terceros,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-// Chequeo previo al 1007 (concepto CPT pendiente — ver formato1007.js): sube el TOKEN de
-// ventas y devuelve IBRU/DEV ya calculados (Total menos impuestos) por tercero, para revisar
-// esa resta contra el reporte real antes de que el 1007 se pueda generar de verdad. Igual que
-// 1001, no guarda ningún borrador — solo diagnóstico.
-const verificarIngresos1007 = async (req, res, next) => {
-  try {
-    const tokenFile = req.file;
-    if (!tokenFile) {
-      return res.status(400).json({ error: 'Se requiere el archivo TOKEN (detalle de ventas).' });
-    }
-
-    let registros;
-    try {
-      registros = await formato1007.leerYAgrupar(tokenFile.buffer);
-    } catch (err) {
-      return res.status(400).json({ error: err.message });
-    }
-
-    if (registros.length === 0) {
-      return res.status(400).json({
-        error: 'No se encontraron registros válidos para procesar. Revisa el archivo TOKEN.',
-      });
-    }
-
-    res.status(200).json({
-      totalTerceros: registros.length,
-      totalIbru: round2(registros.reduce((s, r) => s + r.ibru, 0)),
-      totalDev: round2(registros.reduce((s, r) => s + r.dev, 0)),
-      registros,
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
 module.exports = {
   uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado,
-  verificarTerceros1001, verificarIngresos1007, FORMATOS_SOPORTADOS,
+  FORMATOS_SOPORTADOS,
 };

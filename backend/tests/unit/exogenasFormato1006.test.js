@@ -128,6 +128,24 @@ describe('formato1006.leerYAgrupar', () => {
     const registros = await leerYAgrupar(token);
     expect(registros[0].iva).toBe(0);
   });
+
+  test('ignora filas ocultas por un filtro (AutoFilter) en VENTAS y en DEV COMPRAS', async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('VENTAS');
+    ws.addRow(COLUMNAS_VENTAS);
+    ws.addRow(['Factura electrónica', '900123456', 'ACME SAS', 100, 10, 'Emitido']);
+    const filaOculta = ws.addRow(['Factura electrónica', '900654321', 'OTRO CLIENTE', 200, 20, 'Emitido']);
+    filaOculta.hidden = true;
+
+    const wsDev = wb.addWorksheet('DEV COMPRAS');
+    wsDev.addRow(COLUMNAS_DEV_COMPRAS);
+    const filaDevOculta = wsDev.addRow(['Nota de crédito electrónica', '900111222', 'PROVEEDOR SAS', 30, 'Recibido']);
+    filaDevOculta.hidden = true;
+
+    const registros = await leerYAgrupar(Buffer.from(await wb.xlsx.writeBuffer()));
+    expect(registros).toHaveLength(1); // el cliente oculto y la nota crédito oculta de DEV COMPRAS no generan registros
+    expect(registros[0]).toMatchObject({ identificacion: '900123456', imp: 100, icon: 10, iva: 0 });
+  });
 });
 
 describe('formato1006.llenarPlantilla', () => {

@@ -20,24 +20,48 @@ function isValidFile(file) {
 const formatoMoneda = (n) =>
   `$ ${Number(n ?? 0).toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-// 1001 y 1007 SÍ se pueden marcar, pero los dos son todavía solo "Fase 1" (ver formato1001.js/
-// formato1007.js en el backend): calculan lo que ya está confirmado (ubicación de terceros en
-// 1001; IBRU/DEV en 1007), pero no generan ningún Excel — el concepto (CPT) de cada uno sigue
-// sin definir. `soloVerificacion` distingue ese caso especial en el resto de la página (no
-// entra a `borradores`, no se puede incluir en "Generar Excel") y apunta a la función de la API
-// que hay que llamar y al componente que muestra su resultado.
+// Los 4 formatos generan Excel — 1001 y 1007 dejan algunas columnas en blanco cuando falta una
+// regla de negocio por definir con el usuario (ver CONFIG_FORMATO#aviso de cada uno, y
+// formato1001.js/formato1007.js en el backend).
 const FORMATOS_DISPONIBLES = [
-  { id: '1001', codigo: '1001', nombre: 'Gastos/Compras (verificación)', icon: 'payments', disponible: true, soloVerificacion: true, verificar: (fd) => api.verificarTerceros1001(fd) },
+  { id: '1001', codigo: '1001', nombre: 'Gastos/Compras', icon: 'payments', disponible: true },
   { id: '1005', codigo: '1005', nombre: 'Impuestos descontables', icon: 'receipt_long', disponible: true },
   { id: '1006', codigo: '1006', nombre: 'IVA/Inc generado', icon: 'sell', disponible: true },
-  { id: '1007', codigo: '1007', nombre: 'Ingresos (verificación)', icon: 'trending_up', disponible: true, soloVerificacion: true, verificar: (fd) => api.verificarIngresos1007(fd) },
+  { id: '1007', codigo: '1007', nombre: 'Ingresos', icon: 'trending_up', disponible: true },
 ]
 
 // Hoja obligatoria del TOKEN y campos monetarios de salida por formato — usado para adaptar
 // hints y la tabla de vista previa sin acoplar el resto de la página a un formato específico.
+// `aviso` (opcional): banner informativo mostrado arriba de las tarjetas, para formatos que
+// generan Excel con algo todavía pendiente de definir. `columnasExtra` (opcional): columnas
+// adicionales en la tabla, entre DV y los campos monetarios, cada una con su propio render por
+// fila — hoy las usan 1001 (Dirección/Estado del tercero) y 1007 (país del tercero).
+// Clases completas y literales por color (no interpoladas) — Tailwind escanea el código fuente
+// buscando nombres de clase tal cual aparecen, así que `bg-${color}-100` no generaría el CSS.
+const BADGE_ESTILOS = {
+  green: 'text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  amber: 'text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+  red: 'text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+}
+const badge = (color, texto) => <span className={BADGE_ESTILOS[color]}>{texto}</span>
 const CONFIG_FORMATO = {
-  '1001': { hojaToken: 'COMPRAS', campos: [] },
-  '1007': { hojaToken: 'VENTAS', campos: [] },
+  '1001': {
+    hojaToken: 'COMPRAS',
+    aviso: 'El concepto (CPT) y las columnas de dinero (PAGO, PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM) todavía no están definidos — esas columnas quedan vacías en el Excel generado. La dirección/DPTO/MUN/PAIS se toman de los terceros ya guardados en "Importar Terceros"; si un tercero no está ahí, esas columnas también quedan vacías. Antes de generar cada exógena, sube ahí las facturas de los proveedores de este TOKEN para completarlo.',
+    campos: [],
+    columnasExtra: [
+      { label: 'Dirección', width: 'w-40', render: (r) => r.direccion || '—' },
+      {
+        label: 'Estado',
+        width: 'w-24',
+        render: (r) => (
+          r.tieneDatosCompletos ? badge('green', 'Completo')
+            : r.tieneTercero ? badge('amber', 'Incompleto')
+            : badge('red', 'Sin factura')
+        ),
+      },
+    ],
+  },
   '1005': {
     hojaToken: 'COMPRAS',
     campos: [
@@ -51,6 +75,21 @@ const CONFIG_FORMATO = {
       { key: 'imp', totalKey: 'totalImp', label: 'IMP', statTitle: 'Total IVA generado', statSub: 'IMP acumulado de todos los terceros' },
       { key: 'iva', totalKey: 'totalIva', label: 'IVA', statTitle: 'Total IVA devoluciones compras', statSub: 'IVA acumulado de todos los terceros' },
       { key: 'icon', totalKey: 'totalIcon', label: 'ICON', statTitle: 'Total INC generado', statSub: 'ICON acumulado de todos los terceros' },
+    ],
+  },
+  '1007': {
+    hojaToken: 'VENTAS',
+    aviso: 'El concepto (CPT) todavía no está definido — esa columna queda vacía en el Excel generado. El país (PAIS) se toma de los terceros ya guardados en "Importar Terceros"; si un cliente no está ahí, también queda vacío. Antes de generar cada exógena, sube las facturas de los clientes de este TOKEN para completarlo.',
+    campos: [
+      { key: 'ibru', totalKey: 'totalIbru', label: 'IBRU', statTitle: 'Total ingresos brutos', statSub: 'IBRU acumulado de todos los terceros' },
+      { key: 'dev', totalKey: 'totalDev', label: 'DEV', statTitle: 'Total devoluciones', statSub: 'DEV acumulado de todos los terceros' },
+    ],
+    columnasExtra: [
+      {
+        label: 'PAIS',
+        width: 'w-24',
+        render: (r) => (r.tienePais ? badge('green', r.pais || r.codigoPaisDian) : badge('amber', 'Sin país')),
+      },
     ],
   },
 }
@@ -163,175 +202,6 @@ function Dropzone({ label, hint, icon, file, onFile, onClear }) {
   )
 }
 
-// Contenido de la pestaña "1001" — distinto del resto (StatsCard de dinero + tabla de montos):
-// acá no hay monto ni concepto, solo el chequeo de qué terceros ya tienen dirección completa
-// en `terceros`, con los faltantes primero (es lo accionable).
-function Verificacion1001View({ verificacion }) {
-  const terceros = [...verificacion.terceros].sort(
-    (a, b) => Number(a.tieneDatosCompletos) - Number(b.tieneDatosCompletos)
-  )
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-4 py-2.5">
-        <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-base flex-shrink-0">info</span>
-        <p className="text-xs text-amber-800 dark:text-amber-400">
-          Esto solo verifica ubicación de terceros — el 1001 completo (concepto y retenciones)
-          todavía no se puede generar aquí.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap sm:flex-nowrap gap-4 mb-6">
-        <div className="w-full sm:flex-1">
-          <StatsCard
-            title="Terceros en el TOKEN"
-            value={verificacion.totalTerceros}
-            icon="groups"
-            borderColor="#004ac6"
-            iconColor="#004ac6"
-          />
-        </div>
-        <div className="w-full sm:flex-1">
-          <StatsCard
-            title="Con dirección completa"
-            value={verificacion.completos}
-            icon="check_circle"
-            borderColor="#16a34a"
-            iconColor="#16a34a"
-          />
-        </div>
-        <div className="w-full sm:flex-1">
-          <StatsCard
-            title="Faltantes"
-            value={verificacion.faltantes}
-            icon="error_outline"
-            borderColor={verificacion.faltantes > 0 ? '#dc2626' : '#9ca3af'}
-            iconColor={verificacion.faltantes > 0 ? '#dc2626' : '#9ca3af'}
-          />
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-3 py-2.5 text-left whitespace-nowrap">Razón social</th>
-              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-left whitespace-nowrap">NIT</th>
-              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-left whitespace-nowrap">Dirección</th>
-              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-left whitespace-nowrap">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {terceros.map((t, idx) => (
-              <tr key={`${t.identificacion}-${idx}`} className={idx % 2 === 1 ? 'bg-[#fafbff] dark:bg-[#1a1c2e]' : ''}>
-                <td className="px-3 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0]">{t.razonSocial}</td>
-                <td className="px-2 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] whitespace-nowrap">{t.identificacion}</td>
-                <td className="px-2 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8]">{t.direccion || '—'}</td>
-                <td className="px-2 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] whitespace-nowrap">
-                  {t.tieneDatosCompletos ? (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Completo</span>
-                  ) : t.tieneTercero ? (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">Incompleto</span>
-                  ) : (
-                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Sin factura subida</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-// Contenido de la pestaña "1007": IBRU/DEV ya calculados (Total menos impuestos) por tercero —
-// sin concepto todavía, así que no hay estado "completo/incompleto" como en 1001, solo la
-// tabla para que el usuario revise la resta de impuestos contra su TOKEN real.
-function VerificacionIngresos1007View({ verificacion }) {
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-4 py-2.5">
-        <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-base flex-shrink-0">info</span>
-        <p className="text-xs text-amber-800 dark:text-amber-400">
-          Esto solo calcula ingresos brutos y devoluciones sin impuestos — el 1007 completo
-          (concepto) todavía no se puede generar aquí.
-        </p>
-      </div>
-
-      <div className="flex flex-wrap sm:flex-nowrap gap-4 mb-6">
-        <div className="w-full sm:w-36 flex-shrink-0">
-          <StatsCard
-            title="Terceros agrupados"
-            value={verificacion.totalTerceros}
-            icon="groups"
-            borderColor="#004ac6"
-            iconColor="#004ac6"
-          />
-        </div>
-        <div className="w-full sm:flex-1">
-          <StatsCard
-            title="Total IBRU"
-            value={verificacion.totalIbru}
-            decimals={2}
-            decimalSeparator=","
-            thousandSeparator="."
-            icon="trending_up"
-            borderColor="#16a34a"
-            iconColor="#16a34a"
-            sub="Ingresos brutos, sin impuestos"
-            subColor="#16a34a"
-          />
-        </div>
-        <div className="w-full sm:flex-1">
-          <StatsCard
-            title="Total DEV"
-            value={verificacion.totalDev}
-            decimals={2}
-            decimalSeparator=","
-            thousandSeparator="."
-            icon="undo"
-            borderColor="#d97706"
-            iconColor="#d97706"
-            sub="Devoluciones/rebajas/descuentos, sin impuestos"
-            subColor="#d97706"
-          />
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-3 py-2.5 text-left whitespace-nowrap">Razón social</th>
-              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-left whitespace-nowrap">NIT</th>
-              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-right whitespace-nowrap">IBRU</th>
-              <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-right whitespace-nowrap">DEV</th>
-            </tr>
-          </thead>
-          <tbody>
-            {verificacion.registros.map((r, idx) => (
-              <tr key={`${r.identificacion}-${idx}`} className={idx % 2 === 1 ? 'bg-[#fafbff] dark:bg-[#1a1c2e]' : ''}>
-                <td className="px-3 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] break-words">{r.razonSocial}</td>
-                <td className="px-2 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] whitespace-nowrap">{r.identificacion}</td>
-                <td className="px-2 py-2 text-right border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-medium">{formatoMoneda(r.ibru)}</td>
-                <td className="px-2 py-2 text-right border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-medium">{formatoMoneda(r.dev)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
-
-// Componente que renderiza cada verificación por formato — separado de FORMATOS_DISPONIBLES
-// (que solo tiene datos serializables) para no mezclar componentes React ahí.
-const VISTA_VERIFICACION = {
-  '1001': Verificacion1001View,
-  '1007': VerificacionIngresos1007View,
-}
-
 export default function ExogenasUploadPage() {
   // Si la URL ya trae ids de borradores al montar, arranca en 'restaurando' (no 'idle') para
   // que el formulario de carga nunca llegue a pintarse mientras se piden los datos — si
@@ -348,10 +218,6 @@ export default function ExogenasUploadPage() {
   // "Analizar" llama el endpoint una vez por cada formato marcado y guarda cada resultado acá,
   // indexado por formato, para poder cambiar de pestaña sin volver a subir los archivos.
   const [borradores, setBorradores] = useState({}) // { [formato]: { id, totalTerceros, ..., registros } }
-  // Los formatos `soloVerificacion` (1001, 1007) no crean un borrador real (no hay nada que
-  // generar todavía) — su resultado vive aparte, indexado por formato, con su propia forma
-  // según el formato (ver VISTA_VERIFICACION).
-  const [verificaciones, setVerificaciones] = useState({})
   const [tabActivo, setTabActivo]   = useState(null) // solo controla qué pestaña se PREVISUALIZA
   const [generando, setGenerando]   = useState(false)
   // Un solo botón "Generar Excel" para TODOS los formatos analizados juntos — el backend arma
@@ -451,20 +317,10 @@ export default function ExogenasUploadPage() {
 
     // Un formato a la vez (limitación actual del backend) — se analizan todos los marcados en
     // secuencia y se guardan por separado; si alguno falla se corta ahí y no se pierde el
-    // mensaje de cuál formato fue. Los `soloVerificacion` (1001, 1007) no pasan por
-    // uploadExogenas (no generan un borrador real todavía) — cada uno usa su propia función de
-    // verificación, con únicamente el TOKEN.
+    // mensaje de cuál formato fue.
     const nuevosBorradores = {}
-    const nuevasVerificaciones = {}
     try {
       for (const formatoId of formatos) {
-        const formatoConfig = FORMATOS_DISPONIBLES.find((f) => f.id === formatoId)
-        if (formatoConfig?.soloVerificacion) {
-          const formData = new FormData()
-          formData.append('token', tokenFile)
-          nuevasVerificaciones[formatoId] = await formatoConfig.verificar(formData)
-          continue
-        }
         const formData = new FormData()
         formData.append('formato', formatoId)
         formData.append('token', tokenFile)
@@ -472,7 +328,6 @@ export default function ExogenasUploadPage() {
         nuevosBorradores[formatoId] = await api.uploadExogenas(formData)
       }
       setBorradores(nuevosBorradores)
-      setVerificaciones(nuevasVerificaciones)
       setTabActivo(formatos[0])
       setEstado('preview')
       actualizarUrlBorradores(nuevosBorradores)
@@ -516,30 +371,21 @@ export default function ExogenasUploadPage() {
     setTokenFile(null)
     setPlantillaFile(null)
     setBorradores({})
-    setVerificaciones({})
     setTabActivo(null)
     setDescargaCombinada(null)
     actualizarUrlBorradores({})
   }, [actualizarUrlBorradores])
 
-  // Simplificación a propósito: los `soloVerificacion` no necesitan la plantilla (no escriben
-  // nada en ella todavía), pero se sigue exigiendo igual que a los demás — en la práctica
-  // siempre se marcan junto a 1005/1006, que sí la necesitan.
   const puedeAnalizar = formatos.length > 0 && tokenFile && plantillaFile && estado !== 'analizando'
   const borrador = borradores[tabActivo] ?? null
   const camposFormato = CONFIG_FORMATO[tabActivo]?.campos ?? []
-  const formatoActivoConfig = FORMATOS_DISPONIBLES.find((f) => f.id === tabActivo)
-  const verificacionActiva = formatoActivoConfig?.soloVerificacion ? verificaciones[tabActivo] : null
-  const VistaVerificacionActiva = verificacionActiva ? VISTA_VERIFICACION[tabActivo] : null
+  const avisoFormato = CONFIG_FORMATO[tabActivo]?.aviso ?? null
+  const columnasExtra = CONFIG_FORMATO[tabActivo]?.columnasExtra ?? []
   // Pestañas: formatos ya analizados (con datos) + los que aún no están implementados, siempre
   // visibles como "Próximamente" al final — así el usuario ve hacia dónde va creciendo esto.
-  // Los `soloVerificacion` no guardan su resultado en `borradores` (ver analizar) — se chequea
-  // `verificaciones`.
-  const tieneResultado = (f) => (f.soloVerificacion ? Boolean(verificaciones[f.id]) : Boolean(borradores[f.id]))
-  const tabsFormato = FORMATOS_DISPONIBLES.filter((f) => (f.disponible ? tieneResultado(f) : true))
+  const tabsFormato = FORMATOS_DISPONIBLES.filter((f) => (f.disponible ? Boolean(borradores[f.id]) : true))
   // Con 1-2 formatos el botón muestra los códigos (informativo y corto); con más, un conteo —
-  // "Generar Excel 1001, 1005, 1006, 1007" ya no cabe cómodo ni aporta más que el número. 1001
-  // nunca entra acá: no genera Excel, solo verifica (ver FORMATOS_DISPONIBLES#soloVerificacion).
+  // "Generar Excel 1001, 1005, 1006, 1007" ya no cabe cómodo ni aporta más que el número.
   const formatosAnalizados = Object.keys(borradores).sort()
   const etiquetaGenerar = formatosAnalizados.length <= 2
     ? `Generar Excel ${formatosAnalizados.join(', ')}`
@@ -641,11 +487,11 @@ export default function ExogenasUploadPage() {
         </div>
       )}
 
-      {estado === 'preview' && (borrador || verificacionActiva) && (
+      {estado === 'preview' && borrador && (
         <div>
           <div className="flex items-center gap-2 mb-6 flex-wrap">
             {tabsFormato.map((f) => {
-              const tieneDatos = tieneResultado(f)
+              const tieneDatos = Boolean(borradores[f.id])
               if (!tieneDatos) {
                 return (
                   <span
@@ -676,94 +522,101 @@ export default function ExogenasUploadPage() {
             })}
           </div>
 
-          {VistaVerificacionActiva ? (
-            <VistaVerificacionActiva verificacion={verificacionActiva} />
-          ) : (
-            <>
-              {/* Siempre en una sola fila de tablet para arriba (sm:flex-nowrap) — nunca baja tarjetas
-                  a una segunda fila, sin importar si el formato activo trae 1, 2 o 4 campos de
-                  monto. "Terceros" es angosta y fija (trae poco contenido, no necesita crecer); las
-                  tarjetas de monto crecen con flex-1 para repartirse TODO el ancho sobrante entre
-                  ellas (sin max-width — un tope ahí dejaba espacio muerto a la derecha cuando hay
-                  pocas tarjetas, como en 1005 con solo 2) y, si el espacio queda justo (muchas
-                  tarjetas a la vez), se encogen (flex-shrink) en vez de forzar un salto de línea —
-                  el número nunca desborda porque StatsCard le achica la letra automáticamente según
-                  el ancho disponible. En mobile (debajo de sm) sí se apilan una debajo de otra,
-                  porque ahí literalmente no entra nada en una sola fila. */}
-              <div className="flex flex-wrap sm:flex-nowrap gap-4 mb-6">
-                <div className="w-full sm:w-36 flex-shrink-0">
-                  <StatsCard
-                    title="Terceros agrupados"
-                    value={borrador.totalTerceros}
-                    icon="groups"
-                    borderColor="#004ac6"
-                    iconColor="#004ac6"
-                  />
-                </div>
-                {camposFormato.map((c, i) => (
-                  <div key={c.key} className="w-full sm:w-auto sm:flex-1">
-                    <StatsCard
-                      title={c.statTitle}
-                      value={borrador[c.totalKey]}
-                      decimals={2}
-                      decimalSeparator=","
-                      thousandSeparator="."
-                      icon="payments"
-                      borderColor={STAT_COLORS[i % STAT_COLORS.length]}
-                      iconColor={STAT_COLORS[i % STAT_COLORS.length]}
-                      sub={c.statSub}
-                      subColor={STAT_COLORS[i % STAT_COLORS.length]}
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden">
-                {/* table-fixed + anchos fijos en todo menos Razón social: así la tabla siempre cabe
-                    en el ancho del contenedor sin scroll horizontal, y los nombres largos envuelven
-                    en vez de forzar el ancho de la columna (antes con whitespace-nowrap + sticky). */}
-                <table className="w-full border-collapse text-sm table-fixed">
-                  <thead>
-                    <tr>
-                      <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-3 py-2.5 text-left">Razón social</th>
-                      <th className="w-14 bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-center">TDOC</th>
-                      <th className="w-32 bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-left">Identificación</th>
-                      <th className="w-10 bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-center">DV</th>
-                      {camposFormato.map((c) => (
-                        <th key={c.key} className="w-36 bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-right">{c.label}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {borrador.registros.map((r, idx) => (
-                      <tr key={`${r.tipoDocumento}-${r.identificacion}`} className={idx % 2 === 1 ? 'bg-[#fafbff] dark:bg-[#1a1c2e]' : ''}>
-                        <td className="px-3 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] break-words">{r.razonSocial}</td>
-                        <td className="px-2 py-2 text-center border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8]">{r.tipoDocumento}</td>
-                        <td className="px-2 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] break-words">{r.identificacion}</td>
-                        <td className="px-2 py-2 text-center border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8]">{r.digitoVerificacion}</td>
-                        {camposFormato.map((c) => (
-                          <td key={c.key} className="px-2 py-2 text-right border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-medium break-words">{formatoMoneda(r[c.key])}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td className="px-3 py-2.5 bg-[#f8f9fe] dark:bg-[#252840] border-t-2 border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-bold">
-                        Total ({borrador.totalTerceros} terceros)
-                      </td>
-                      <td className="bg-[#f8f9fe] dark:bg-[#252840] border-t-2 border-[#e2e4ef] dark:border-[#2e3148]" colSpan={3} />
-                      {camposFormato.map((c) => (
-                        <td key={c.key} className="px-2 py-2.5 text-right bg-[#f8f9fe] dark:bg-[#252840] border-t-2 border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-bold break-words">
-                          {formatoMoneda(borrador[c.totalKey])}
-                        </td>
-                      ))}
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </>
+          {avisoFormato && (
+            <div className="flex items-center gap-2 mb-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-4 py-2.5">
+              <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-base flex-shrink-0">info</span>
+              <p className="text-xs text-amber-800 dark:text-amber-400">{avisoFormato}</p>
+            </div>
           )}
+
+          {/* Siempre en una sola fila de tablet para arriba (sm:flex-nowrap) — nunca baja tarjetas
+              a una segunda fila, sin importar si el formato activo trae 1, 2 o 4 campos de
+              monto. "Terceros" es angosta y fija (trae poco contenido, no necesita crecer); las
+              tarjetas de monto crecen con flex-1 para repartirse TODO el ancho sobrante entre
+              ellas (sin max-width — un tope ahí dejaba espacio muerto a la derecha cuando hay
+              pocas tarjetas, como en 1005 con solo 2) y, si el espacio queda justo (muchas
+              tarjetas a la vez), se encogen (flex-shrink) en vez de forzar un salto de línea —
+              el número nunca desborda porque StatsCard le achica la letra automáticamente según
+              el ancho disponible. En mobile (debajo de sm) sí se apilan una debajo de otra,
+              porque ahí literalmente no entra nada en una sola fila. */}
+          <div className="flex flex-wrap sm:flex-nowrap gap-4 mb-6">
+            <div className="w-full sm:w-36 flex-shrink-0">
+              <StatsCard
+                title="Terceros agrupados"
+                value={borrador.totalTerceros}
+                icon="groups"
+                borderColor="#004ac6"
+                iconColor="#004ac6"
+              />
+            </div>
+            {camposFormato.map((c, i) => (
+              <div key={c.key} className="w-full sm:w-auto sm:flex-1">
+                <StatsCard
+                  title={c.statTitle}
+                  value={borrador[c.totalKey]}
+                  decimals={2}
+                  decimalSeparator=","
+                  thousandSeparator="."
+                  icon="payments"
+                  borderColor={STAT_COLORS[i % STAT_COLORS.length]}
+                  iconColor={STAT_COLORS[i % STAT_COLORS.length]}
+                  sub={c.statSub}
+                  subColor={STAT_COLORS[i % STAT_COLORS.length]}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden">
+            {/* table-fixed + anchos fijos en todo menos Razón social: así la tabla siempre cabe
+                en el ancho del contenedor sin scroll horizontal, y los nombres largos envuelven
+                en vez de forzar el ancho de la columna (antes con whitespace-nowrap + sticky). */}
+            <table className="w-full border-collapse text-sm table-fixed">
+              <thead>
+                <tr>
+                  <th className="bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-3 py-2.5 text-left">Razón social</th>
+                  <th className="w-14 bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-center">TDOC</th>
+                  <th className="w-32 bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-left">Identificación</th>
+                  <th className="w-10 bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-center">DV</th>
+                  {columnasExtra.map((c) => (
+                    <th key={c.label} className={`${c.width || 'w-24'} bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-center`}>{c.label}</th>
+                  ))}
+                  {camposFormato.map((c) => (
+                    <th key={c.key} className="w-36 bg-[#f8f9fe] dark:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] font-semibold border-b border-[#e2e4ef] dark:border-[#2e3148] px-2 py-2.5 text-right">{c.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {borrador.registros.map((r, idx) => (
+                  <tr key={`${r.tipoDocumento}-${r.identificacion}`} className={idx % 2 === 1 ? 'bg-[#fafbff] dark:bg-[#1a1c2e]' : ''}>
+                    <td className="px-3 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] break-words">{r.razonSocial}</td>
+                    <td className="px-2 py-2 text-center border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8]">{r.tipoDocumento}</td>
+                    <td className="px-2 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] break-words">{r.identificacion}</td>
+                    <td className="px-2 py-2 text-center border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8]">{r.digitoVerificacion}</td>
+                    {columnasExtra.map((c) => (
+                      <td key={c.label} className="px-2 py-2 text-center border-b border-[#e2e4ef] dark:border-[#2e3148] break-words">{c.render(r)}</td>
+                    ))}
+                    {camposFormato.map((c) => (
+                      <td key={c.key} className="px-2 py-2 text-right border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-medium break-words">{formatoMoneda(r[c.key])}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td className="px-3 py-2.5 bg-[#f8f9fe] dark:bg-[#252840] border-t-2 border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-bold">
+                    Total ({borrador.totalTerceros} terceros)
+                  </td>
+                  <td className="bg-[#f8f9fe] dark:bg-[#252840] border-t-2 border-[#e2e4ef] dark:border-[#2e3148]" colSpan={3 + columnasExtra.length} />
+                  {camposFormato.map((c) => (
+                    <td key={c.key} className="px-2 py-2.5 text-right bg-[#f8f9fe] dark:bg-[#252840] border-t-2 border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-bold break-words">
+                      {formatoMoneda(borrador[c.totalKey])}
+                    </td>
+                  ))}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
 
           {errorMsg && (
             <div className="mt-5 flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
@@ -772,44 +625,50 @@ export default function ExogenasUploadPage() {
             </div>
           )}
 
-          <div className="mt-6 flex items-center justify-center gap-3">
-            <button
-              onClick={reiniciar}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] dark:border-[#3a3e5c] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition active:scale-[0.97]"
-            >
-              <span className="material-symbols-outlined text-base">refresh</span>
-              Procesar otro archivo
-            </button>
-
-            {/* Si solo se analizó 1001, no hay ningún borrador real que generar — ver
-                FORMATOS_DISPONIBLES#soloVerificacion. */}
-            {formatosAnalizados.length > 0 && (
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <div className="flex items-center justify-center gap-3">
               <button
-                onClick={descargaCombinada ? descargarDeNuevo : generar}
-                disabled={generando}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-60"
-                style={{ background: '#16a34a' }}
+                onClick={reiniciar}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] dark:border-[#3a3e5c] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition active:scale-[0.97]"
               >
-                {generando ? (
-                  <>
-                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                      <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                    Generando…
-                  </>
-                ) : descargaCombinada ? (
-                  <>
-                    <span className="material-symbols-outlined text-base">download</span>
-                    Descargar de nuevo
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-base">file_download</span>
-                    {etiquetaGenerar}
-                  </>
-                )}
+                <span className="material-symbols-outlined text-base">refresh</span>
+                Procesar otro archivo
               </button>
+
+              {formatosAnalizados.length > 0 && (
+                <button
+                  onClick={descargaCombinada ? descargarDeNuevo : generar}
+                  disabled={generando}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-60"
+                  style={{ background: '#16a34a' }}
+                >
+                  {generando ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                        <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Generando…
+                    </>
+                  ) : descargaCombinada ? (
+                    <>
+                      <span className="material-symbols-outlined text-base">download</span>
+                      Descargar de nuevo
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-base">file_download</span>
+                      {etiquetaGenerar}
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {formatosAnalizados.length > 0 && (
+              <p className="text-xs text-[#9ca3af] dark:text-[#6b7280] text-center">
+                Se va a generar: <span className="font-semibold text-[#434655] dark:text-[#c4c8e8]">{formatosAnalizados.join(', ')}</span>
+              </p>
             )}
           </div>
         </div>

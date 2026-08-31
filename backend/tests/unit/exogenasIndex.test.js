@@ -3,8 +3,10 @@ const { getEstrategia, llenarPlantillaCombinada } = require('../../src/services/
 
 describe('getEstrategia', () => {
   test('devuelve la estrategia de un formato soportado', () => {
+    expect(getEstrategia('1001')).toHaveProperty('leerYAgrupar');
     expect(getEstrategia('1005')).toHaveProperty('leerYAgrupar');
     expect(getEstrategia('1006')).toHaveProperty('leerYAgrupar');
+    expect(getEstrategia('1007')).toHaveProperty('leerYAgrupar');
   });
 
   test('lanza error con los formatos disponibles si no existe', () => {

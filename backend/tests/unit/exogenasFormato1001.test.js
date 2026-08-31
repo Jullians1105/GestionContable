@@ -2,8 +2,8 @@ jest.mock('../../src/config/database');
 
 const ExcelJS = require('exceljs');
 const db = require('../../src/config/database');
-const { leerYAgrupar, enriquecerConTerceros } = require('../../src/services/exogenas/formato1001');
-const { verificarTerceros1001 } = require('../../src/controllers/exogenasController');
+const { calcularDV } = require('../../src/services/exogenas/utils/dian');
+const { leerYAgrupar, enriquecerConTerceros, llenarPlantilla } = require('../../src/services/exogenas/formato1001');
 
 const COLUMNAS_TOKEN = ['Tipo de documento', 'NIT Emisor', 'Nombre Emisor', 'Grupo'];
 
@@ -43,6 +43,19 @@ describe('formato1001 — leerYAgrupar', () => {
   test('lanza error si falta la hoja COMPRAS', async () => {
     const buffer = await construirToken([{ nit: '1', nombre: 'X' }], { nombreHoja: 'OTRA' });
     await expect(leerYAgrupar(buffer)).rejects.toThrow(/COMPRAS/);
+  });
+
+  test('ignora filas ocultas por un filtro (AutoFilter) — el contador copia el TOKEN completo y filtra lo que necesita', async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('COMPRAS');
+    ws.addRow(COLUMNAS_TOKEN);
+    ws.addRow(['Factura electrónica', '900123456', 'PROVEEDOR UNO SAS', 'Recibido']);
+    const filaOculta = ws.addRow(['Factura electrónica', '800654321', 'PROVEEDOR DOS SAS', 'Recibido']);
+    filaOculta.hidden = true;
+
+    const registros = await leerYAgrupar(Buffer.from(await wb.xlsx.writeBuffer()));
+    expect(registros).toHaveLength(1);
+    expect(registros[0].identificacion).toBe('900123456');
   });
 });
 
@@ -88,39 +101,89 @@ describe('formato1001 — enriquecerConTerceros', () => {
   });
 });
 
-function mockRes() {
-  return { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+const HEADERS_1001 = [
+  'Concepto (CPT)', 'Tipo de Documento (TDOC)', 'Número de Identificacion (NID)',
+  'Primer Apellido del informado (APL1)', 'Segundo Apellido del informado (APL2)',
+  'Primer Nombre del informado (NOM1)', 'Otros Nombres del informado (NOM2)',
+  'Razón Social del Informado (RAZ)', 'Dirección (DIR)', 'Código del Departamento (DPTO)',
+  'Código del Municipio (MUN)', 'País de Residencia o domicilio (PAIS)',
+  'Pago o Abono en cuenta (PAGO)', 'Pago o abono en cuenta NO deducible (PNDED)',
+  'IVA mayor valor del costo o gasto deducible (IDED)',
+  'IVA mayor valor del costo o gasto no deducible (INDED)',
+  'Retención en la fuente practicada Renta (RETP)', 'Retención en la fuente practicada Renta (RETA)',
+  'Retención en la fuente practicada IVA a responsables del IVA (COMUN)',
+  'Retención en la fuente practicada IVA a no residentes o no domiciliados (NDOM)',
+];
+
+async function construirPlantilla({ nombreHoja = '1001', filaHeader = 7 } = {}) {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(nombreHoja);
+  for (let i = 1; i < filaHeader; i++) ws.addRow([]);
+  ws.addRow(HEADERS_1001);
+  return wb;
 }
 
-describe('verificarTerceros1001 (controller)', () => {
-  beforeEach(() => db.query.mockReset());
+describe('formato1001.llenarPlantilla', () => {
+  test('jurídica: TDOC/NID, todo el nombre en RAZ, DIR/DPTO/MUN/PAIS — CPT y montos quedan en blanco', async () => {
+    const wb = await construirPlantilla();
+    const registros = [{
+      tipoDocumento: 31, identificacion: '900123456', digitoVerificacion: calcularDV('900123456'),
+      razonSocial: 'ACME SAS', direccion: 'CL 1 2 3', codigoDepartamentoDane: '11',
+      codigoMunicipioDane: '11001', codigoPaisDian: '169',
+    }];
+    const buffer = await llenarPlantilla(Buffer.from(await wb.xlsx.writeBuffer()), registros);
 
-  test('rechaza si no se envió el archivo TOKEN', async () => {
-    const req = { file: null };
-    const res = mockRes();
-    await verificarTerceros1001(req, res, jest.fn());
-    expect(res.status).toHaveBeenCalledWith(400);
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(buffer);
+    const fila = wb2.getWorksheet('1001').getRow(8);
+    expect(fila.getCell(1).value).toBeNull();     // CPT en blanco (concepto sin definir)
+    expect(fila.getCell(2).value).toBe(31);        // TDOC
+    expect(fila.getCell(3).value).toBe(900123456); // NID
+    expect(fila.getCell(8).value).toBe('ACME SAS'); // RAZ
+    expect(fila.getCell(9).value).toBe('CL 1 2 3'); // DIR
+    expect(fila.getCell(10).value).toBe('11');      // DPTO
+    expect(fila.getCell(11).value).toBe('001');     // MUN: últimos 3 dígitos del código DANE completo
+    expect(fila.getCell(12).value).toBe(169);       // PAIS
+    expect(fila.getCell(13).value).toBeNull();      // PAGO en blanco (columnas de dinero sin definir)
   });
 
-  test('devuelve el resumen completos/faltantes cruzando contra terceros', async () => {
-    const buffer = await construirToken([
-      { nit: '900123456', nombre: 'CON DATOS SAS' },
-      { nit: '800654321', nombre: 'SIN DATOS SAS' },
-    ]);
-    db.query.mockResolvedValue({
-      rows: [{
-        nit: '900123456', direccion: 'CL 1 2 3', codigo_municipio_dane: '11001', codigo_departamento_dane: '11',
-      }],
-    });
+  test('sin datos de terceros (NIT no está en `terceros`), DIR/DPTO/MUN/PAIS quedan en blanco', async () => {
+    const wb = await construirPlantilla();
+    const registros = [{
+      tipoDocumento: 31, identificacion: '900123456', digitoVerificacion: 8, razonSocial: 'ACME SAS',
+      direccion: null, codigoDepartamentoDane: null, codigoMunicipioDane: null, codigoPaisDian: null,
+    }];
+    const buffer = await llenarPlantilla(Buffer.from(await wb.xlsx.writeBuffer()), registros);
 
-    const req = { file: { buffer } };
-    const res = mockRes();
-    await verificarTerceros1001(req, res, jest.fn());
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(buffer);
+    const fila = wb2.getWorksheet('1001').getRow(8);
+    expect(fila.getCell(9).value).toBeNull();  // DIR
+    expect(fila.getCell(10).value).toBeNull(); // DPTO
+    expect(fila.getCell(11).value).toBeNull(); // MUN
+    expect(fila.getCell(12).value).toBeNull(); // PAIS
+  });
 
-    expect(res.status).toHaveBeenCalledWith(200);
-    const body = res.json.mock.calls[0][0];
-    expect(body.totalTerceros).toBe(2);
-    expect(body.completos).toBe(1);
-    expect(body.faltantes).toBe(1);
+  test('persona natural: separa el nombre en APL1/APL2/NOM1/NOM2 y deja RAZ vacío', async () => {
+    const wb = await construirPlantilla();
+    const registros = [{
+      tipoDocumento: 13, identificacion: '80123456', digitoVerificacion: 3, razonSocial: 'Juan Carlos Perez Gomez',
+    }];
+    const buffer = await llenarPlantilla(Buffer.from(await wb.xlsx.writeBuffer()), registros);
+
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(buffer);
+    const fila = wb2.getWorksheet('1001').getRow(8);
+    // Orden en HEADERS_1001: 1 CPT, 2 TDOC, 3 NID, 4 APL1, 5 APL2, 6 NOM1, 7 NOM2, 8 RAZ, ...
+    expect(fila.getCell(4).value).toBe('PEREZ');  // APL1
+    expect(fila.getCell(5).value).toBe('GOMEZ');  // APL2
+    expect(fila.getCell(6).value).toBe('JUAN');   // NOM1
+    expect(fila.getCell(7).value).toBe('CARLOS'); // NOM2
+    expect(fila.getCell(8).value).toBeNull();     // RAZ vacío para persona natural
+  });
+
+  test('lanza error si la plantilla no tiene hoja 1001', async () => {
+    const wb = await construirPlantilla({ nombreHoja: 'OTRA' });
+    await expect(llenarPlantilla(Buffer.from(await wb.xlsx.writeBuffer()), [])).rejects.toThrow(/"1001"/);
   });
 });

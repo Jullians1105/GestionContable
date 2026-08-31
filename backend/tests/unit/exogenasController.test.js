@@ -133,6 +133,137 @@ describe('uploadExogenas', () => {
   });
 });
 
+describe('uploadExogenas — 1007', () => {
+  const COLUMNAS_VENTAS = ['Tipo de documento', 'NIT Receptor', 'Nombre Receptor', 'Total', 'IVA', 'Grupo'];
+
+  async function construirTokenVentas(filas) {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('VENTAS');
+    ws.addRow(COLUMNAS_VENTAS);
+    filas.forEach((f) => ws.addRow([f.tipo ?? 'Factura electrónica', f.nit, f.nombre, f.total, f.iva ?? 0, f.grupo ?? 'Emitido']));
+    return Buffer.from(await wb.xlsx.writeBuffer());
+  }
+
+  async function construirPlantilla1007() {
+    const headers = [
+      'Concepto (CPT)', 'Tipo de Documento (TDOC)', 'Número de Identificacion (NID)',
+      'Primer Apellido del informado (APL1)', 'Segundo Apellido del informado (APL2)',
+      'Primer Nombre del informado (NOM1)', 'Otros Nombres del informado (NOM2)',
+      'Razón Social del Informado (RAZ)', 'País de Residencia o domicilio (PAIS)',
+      'Ingresos brutos recibidos (IBRU)', 'Devoluciones rebajas y descuentos (DEV)',
+    ];
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('1007');
+    for (let i = 1; i < 7; i++) ws.addRow([]);
+    ws.addRow(headers);
+    return Buffer.from(await wb.xlsx.writeBuffer());
+  }
+
+  test('enriquece con país (desde `terceros`) antes de guardar el borrador', async () => {
+    const token = await construirTokenVentas([
+      { nit: '900123456', nombre: 'CON PAIS SAS', total: 119000, iva: 19000 },
+      { nit: '800654321', nombre: 'SIN PAIS SAS', total: 119000, iva: 19000 },
+    ]);
+    const plantilla = await construirPlantilla1007();
+    db.query
+      .mockResolvedValueOnce({ rows: [{ nit: '900123456', pais: 'COLOMBIA', codigo_pais_dian: '169' }] }) // enriquecerConPais
+      .mockResolvedValueOnce({ rows: [{ id: 'borrador-1007' }] }); // INSERT
+
+    const req = {
+      body: { formato: '1007' },
+      user: { userId: 'usuario-1' },
+      files: {
+        token: [{ buffer: token, originalname: 't.xlsx' }],
+        plantilla: [{ buffer: plantilla, originalname: 'p.xlsx' }],
+      },
+    };
+    const res = mockRes();
+    const next = jest.fn();
+    await uploadExogenas(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(201);
+    const body = res.json.mock.calls[0][0];
+    expect(body).toMatchObject({ formato: '1007', totalTerceros: 2, totalIbru: 200000 });
+
+    const registroConPais = body.registros.find((r) => r.identificacion === '900123456');
+    expect(registroConPais).toMatchObject({ tienePais: true, codigoPaisDian: '169' });
+    const registroSinPais = body.registros.find((r) => r.identificacion === '800654321');
+    expect(registroSinPais).toMatchObject({ tienePais: false, codigoPaisDian: null });
+  });
+});
+
+describe('uploadExogenas — 1001', () => {
+  const COLUMNAS_COMPRAS = ['Tipo de documento', 'NIT Emisor', 'Nombre Emisor', 'Grupo'];
+
+  async function construirTokenCompras(filas) {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('COMPRAS');
+    ws.addRow(COLUMNAS_COMPRAS);
+    filas.forEach((f) => ws.addRow([f.tipo ?? 'Factura electrónica', f.nit, f.nombre, f.grupo ?? 'Recibido']));
+    return Buffer.from(await wb.xlsx.writeBuffer());
+  }
+
+  async function construirPlantilla1001() {
+    const headers = [
+      'Concepto (CPT)', 'Tipo de Documento (TDOC)', 'Número de Identificacion (NID)',
+      'Primer Apellido del informado (APL1)', 'Segundo Apellido del informado (APL2)',
+      'Primer Nombre del informado (NOM1)', 'Otros Nombres del informado (NOM2)',
+      'Razón Social del Informado (RAZ)', 'Dirección (DIR)', 'Código del Departamento (DPTO)',
+      'Código del Municipio (MUN)', 'País de Residencia o domicilio (PAIS)',
+      'Pago o Abono en cuenta (PAGO)', 'Pago o abono en cuenta NO deducible (PNDED)',
+      'IVA mayor valor del costo o gasto deducible (IDED)',
+      'IVA mayor valor del costo o gasto no deducible (INDED)',
+      'Retención en la fuente practicada Renta (RETP)', 'Retención en la fuente practicada Renta (RETA)',
+      'Retención en la fuente practicada IVA a responsables del IVA (COMUN)',
+      'Retención en la fuente practicada IVA a no residentes o no domiciliados (NDOM)',
+    ];
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('1001');
+    for (let i = 1; i < 7; i++) ws.addRow([]);
+    ws.addRow(headers);
+    return Buffer.from(await wb.xlsx.writeBuffer());
+  }
+
+  test('enriquece con datos de `terceros` (dirección/DPTO/MUN/PAIS) antes de guardar el borrador', async () => {
+    const token = await construirTokenCompras([
+      { nit: '900123456', nombre: 'CON DATOS SAS' },
+      { nit: '800654321', nombre: 'SIN DATOS SAS' },
+    ]);
+    const plantilla = await construirPlantilla1001();
+    db.query
+      .mockResolvedValueOnce({
+        rows: [{
+          nit: '900123456', direccion: 'CL 1 2 3', codigo_municipio_dane: '11001',
+          codigo_departamento_dane: '11', pais: 'COLOMBIA', codigo_pais_dian: '169',
+        }],
+      }) // enriquecerConTerceros
+      .mockResolvedValueOnce({ rows: [{ id: 'borrador-1001' }] }); // INSERT
+
+    const req = {
+      body: { formato: '1001' },
+      user: { userId: 'usuario-1' },
+      files: {
+        token: [{ buffer: token, originalname: 't.xlsx' }],
+        plantilla: [{ buffer: plantilla, originalname: 'p.xlsx' }],
+      },
+    };
+    const res = mockRes();
+    const next = jest.fn();
+    await uploadExogenas(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(201);
+    const body = res.json.mock.calls[0][0];
+    expect(body).toMatchObject({ formato: '1001', totalTerceros: 2 });
+
+    const conDatos = body.registros.find((r) => r.identificacion === '900123456');
+    expect(conDatos).toMatchObject({ tieneDatosCompletos: true, direccion: 'CL 1 2 3', codigoPaisDian: '169' });
+    const sinDatos = body.registros.find((r) => r.identificacion === '800654321');
+    expect(sinDatos).toMatchObject({ tieneDatosCompletos: false, tieneTercero: false, direccion: null });
+  });
+});
+
 describe('getExogenasBorrador', () => {
   test('404 si no existe o no es del usuario', async () => {
     const req = { params: { id: 'x' }, user: { userId: 'u1' } };
