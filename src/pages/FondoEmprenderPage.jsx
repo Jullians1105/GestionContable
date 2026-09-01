@@ -474,6 +474,13 @@ export default function FondoEmprenderPage() {
   const openCellRef    = useRef(openCell)   // lets effects read the latest openCell without re-subscribing
   openCellRef.current  = openCell
   const noteDirtyRef   = useRef(false)      // true while the open textarea has unsaved keystrokes
+  // El textarea escribe acá, NO directo en `companies` — con 65 empresas ×
+  // 23 procesos (~1500 celdas), cada tecla disparaba un setCompanies() que
+  // volvía a renderizar la grilla entera, y en una máquina no tan rápida eso
+  // se sentía como que el texto "se trababa" al escribir. `companies` recién
+  // se sincroniza una vez, al perder el foco (handleNoteBlur/handleClearNote),
+  // no en cada letra.
+  const [noteDraft, setNoteDraft] = useState('')
 
   // tooltip for notes (Excel-style, resizable, per-cell size)
   const [tooltip, setTooltip]         = useState(null)
@@ -582,10 +589,14 @@ export default function FondoEmprenderPage() {
     }
   }, [year, month])
 
-  // Single place that persists a note to the backend. Used both by the
-  // textarea's onBlur and by flushPendingNote() below.
+  // Single place that persists a note to the backend AND syncs it into
+  // `companies` (the dot indicator / tooltip / reopening the same cell later
+  // all read from there) — se hace UNA vez acá, no en cada tecla, ver
+  // noteDraft más arriba. Usado por el blur del textarea, "Borrar nota" y
+  // flushPendingNote() más abajo.
   const saveNote = useCallback(async (companyId, procId, note) => {
     noteDirtyRef.current = false
+    updateCellLocal(companyId, procId, { note })
     try {
       await api.updateFondoChecklistItem(companyId, procId, year, month + 1, { nota: note || null })
     } catch (err) {
@@ -768,6 +779,7 @@ export default function FondoEmprenderPage() {
     if (top  + PH > window.innerHeight - 8) top  = rect.top - PH - 4
     if (top  < 8) top  = 8
     noteDirtyRef.current = false
+    setNoteDraft(companies.find(c => c.id === companyId)?.cells[procId]?.note ?? '')
     setOpenCell({ companyId, procId, left, top })
   }
 
@@ -815,9 +827,9 @@ export default function FondoEmprenderPage() {
     }
   }
 
-  function handleNoteChange(companyId, procId, note) {
+  function handleNoteChange(note) {
     noteDirtyRef.current = true
-    updateCellLocal(companyId, procId, { note })
+    setNoteDraft(note)
   }
 
   function handleNoteBlur(companyId, procId, note) {
@@ -825,7 +837,7 @@ export default function FondoEmprenderPage() {
   }
 
   function handleClearNote(companyId, procId) {
-    updateCellLocal(companyId, procId, { note: '' })
+    setNoteDraft('')
     saveNote(companyId, procId, '')
   }
 
@@ -2070,9 +2082,9 @@ export default function FondoEmprenderPage() {
           </div>
           <textarea
             ref={noteTextareaRef}
-            value={openCellData.note}
+            value={noteDraft}
             onChange={e => {
-              handleNoteChange(openCell.companyId, openCell.procId, e.target.value)
+              handleNoteChange(e.target.value)
               e.target.style.height = 'auto'
               const h = Math.min(e.target.scrollHeight, 200)
               e.target.style.height = h + 'px'
@@ -2086,7 +2098,7 @@ export default function FondoEmprenderPage() {
           <div className="mt-2 flex items-center gap-2">
             <button
               onClick={() => handleClearNote(openCell.companyId, openCell.procId)}
-              disabled={!openCellData.note?.trim()}
+              disabled={!noteDraft?.trim()}
               className="flex-1 py-1 text-xs text-red-500 hover:text-red-600 transition text-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-red-500"
             >
               Borrar nota
