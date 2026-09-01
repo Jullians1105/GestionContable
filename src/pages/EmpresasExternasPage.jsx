@@ -80,7 +80,7 @@ const FILTER_BTN_SIZE = 14
 const FILTER_BTN_OFFSET = 6
 const HEADER_TOP_CLEARANCE = 22
 
-const emptyCell = { status: 'pending', note: '' }
+const emptyCell = { status: 'pending', note: '', readonly: false, fuente: null }
 
 // Convierte un string de borde ("1px solid #hex") en un segmento de
 // box-shadow inset para ese lado — ver el comentario largo en
@@ -262,6 +262,12 @@ export default function EmpresasExternasPage() {
   const openCellRef     = useRef(openCell)
   openCellRef.current   = openCell
   const noteDirtyRef    = useRef(false)
+  // El textarea escribe acá, NO directo en `companies` — mismo fix que en
+  // FondoEmprenderPage.jsx: cada tecla disparaba un setCompanies() que
+  // volvía a renderizar toda la grilla, sintiéndose como texto trabado.
+  // Recién se sincroniza (y se guarda en el servidor) una vez, al salir del
+  // cuadro — ver saveNote más abajo.
+  const [noteDraft, setNoteDraft] = useState('')
 
   const [tooltip, setTooltip]         = useState(null)
   const [tooltipSize, setTooltipSize] = useState({ width: 220, height: 80 })
@@ -309,7 +315,7 @@ export default function EmpresasExternasPage() {
           const key = `${e.id}:${it.id}`
           cells[it.id] = pendingCellWritesRef.current.has(key) && prevCells?.[it.id]
             ? prevCells[it.id]
-            : { status: it.estado, note: it.nota ?? '' }
+            : { status: it.estado, note: it.nota ?? '', readonly: it.readonly ?? false, fuente: it.fuente ?? null }
         })
         return {
           id: e.id,
@@ -333,6 +339,7 @@ export default function EmpresasExternasPage() {
 
   const saveNote = useCallback(async (companyId, procId, note) => {
     noteDirtyRef.current = false
+    updateCellLocal(companyId, procId, { note })
     try {
       await api.updateExtChecklistItem(companyId, procId, year, month + 1, { nota: note || null })
     } catch (err) {
@@ -517,6 +524,7 @@ export default function EmpresasExternasPage() {
     if (top  + PH > window.innerHeight - 8) top  = rect.top - PH - 4
     if (top  < 8) top  = 8
     noteDirtyRef.current = false
+    setNoteDraft(companies.find(c => c.id === companyId)?.cells[procId]?.note ?? '')
     setOpenCell({ companyId, procId, left, top })
   }
 
@@ -544,9 +552,9 @@ export default function EmpresasExternasPage() {
     }
   }
 
-  function handleNoteChange(companyId, procId, note) {
+  function handleNoteChange(note) {
     noteDirtyRef.current = true
-    updateCellLocal(companyId, procId, { note })
+    setNoteDraft(note)
   }
 
   function handleNoteBlur(companyId, procId, note) {
@@ -554,7 +562,7 @@ export default function EmpresasExternasPage() {
   }
 
   function handleClearNote(companyId, procId) {
-    updateCellLocal(companyId, procId, { note: '' })
+    setNoteDraft('')
     saveNote(companyId, procId, '')
   }
 
@@ -802,6 +810,12 @@ export default function EmpresasExternasPage() {
     const cell = company.cells[proc.id] ?? emptyCell
     const cfg  = STATUS[cell.status] ?? STATUS.pending
     const hasNote = !!cell.note?.trim()
+    // "Nómina electrónica": cuando la empresa está enlazada desde el módulo
+    // de Nómina Electrónica, esa celda deja de editarse acá (ver
+    // nominaElectronicaSync.js) — clic deshabilitado, ícono de enlace
+    // chiquito y apagado en la esquina (no un candado: no es un permiso que
+    // falte, es que se marca en otro lado).
+    const isReadonly = !!cell.readonly
     return (
       <td
         key={proc.id}
@@ -811,10 +825,13 @@ export default function EmpresasExternasPage() {
         }}
       >
         <button
-          onClick={e => handleCellClick(company.id, proc.id, e)}
+          onClick={isReadonly ? undefined : e => handleCellClick(company.id, proc.id, e)}
           onMouseEnter={hasNote ? e => showTooltip(e, cell.note, `${company.id}_${proc.id}`) : undefined}
           onMouseLeave={hasNote ? scheduleHide : undefined}
-          className="w-full flex items-center justify-center relative transition-all hover:opacity-75 hover:scale-90 active:scale-75 rounded"
+          title={isReadonly ? 'Se marca desde Nómina Electrónica' : undefined}
+          className={`w-full flex items-center justify-center relative transition-all rounded ${
+            isReadonly ? 'cursor-default' : 'hover:opacity-75 hover:scale-90 active:scale-75'
+          }`}
           style={{ height: 32, background: cfg.bg }}
         >
           <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 17 }}>
@@ -822,6 +839,14 @@ export default function EmpresasExternasPage() {
           </span>
           {hasNote && (
             <span className="absolute bg-amber-400 rounded-full border border-white" style={{ width: 6, height: 6, top: 1, right: 1 }} />
+          )}
+          {isReadonly && (
+            <span
+              className="material-symbols-outlined absolute"
+              style={{ fontSize: 9, bottom: 1, right: 1, color: cfg.color, opacity: 0.45 }}
+            >
+              link
+            </span>
           )}
         </button>
       </td>
@@ -1161,9 +1186,9 @@ export default function EmpresasExternasPage() {
           </div>
           <textarea
             ref={noteTextareaRef}
-            value={openCellData.note}
+            value={noteDraft}
             onChange={e => {
-              handleNoteChange(openCell.companyId, openCell.procId, e.target.value)
+              handleNoteChange(e.target.value)
               e.target.style.height = 'auto'
               const h = Math.min(e.target.scrollHeight, 200)
               e.target.style.height = h + 'px'
@@ -1177,7 +1202,7 @@ export default function EmpresasExternasPage() {
           <div className="mt-2 flex items-center gap-2">
             <button
               onClick={() => handleClearNote(openCell.companyId, openCell.procId)}
-              disabled={!openCellData.note?.trim()}
+              disabled={!noteDraft?.trim()}
               className="flex-1 py-1 text-xs text-red-500 hover:text-red-600 transition text-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-red-500"
             >
               Borrar nota

@@ -138,7 +138,7 @@ const GROUP_PALETTE = [
     confirmBg: 'bg-[#d97706] dark:bg-[#fbbf24]', confirmText: 'text-[#fffbeb] dark:text-[#2e2410]' },
 ]
 
-const emptyCell = { status: 'pending', note: '' }
+const emptyCell = { status: 'pending', note: '', readonly: false, fuente: null }
 
 // año*12+mes da un entero comparable — evita comparar año y mes por separado
 // para saber si (year, month) cae dentro del rango de vigencia de un proceso.
@@ -474,6 +474,13 @@ export default function FondoEmprenderPage() {
   const openCellRef    = useRef(openCell)   // lets effects read the latest openCell without re-subscribing
   openCellRef.current  = openCell
   const noteDirtyRef   = useRef(false)      // true while the open textarea has unsaved keystrokes
+  // El textarea escribe acá, NO directo en `companies` — con 65 empresas ×
+  // 23 procesos (~1500 celdas), cada tecla disparaba un setCompanies() que
+  // volvía a renderizar la grilla entera, y en una máquina no tan rápida eso
+  // se sentía como que el texto "se trababa" al escribir. `companies` recién
+  // se sincroniza una vez, al perder el foco (handleNoteBlur/handleClearNote),
+  // no en cada letra.
+  const [noteDraft, setNoteDraft] = useState('')
 
   // tooltip for notes (Excel-style, resizable, per-cell size)
   const [tooltip, setTooltip]         = useState(null)
@@ -550,7 +557,7 @@ export default function FondoEmprenderPage() {
           const key = `${e.id}:${it.id}`
           cells[it.id] = pendingCellWritesRef.current.has(key) && prevCells?.[it.id]
             ? prevCells[it.id]
-            : { status: it.estado, note: it.nota ?? '' }
+            : { status: it.estado, note: it.nota ?? '', readonly: it.readonly ?? false, fuente: it.fuente ?? null }
         })
         return {
           id: e.id,
@@ -582,10 +589,14 @@ export default function FondoEmprenderPage() {
     }
   }, [year, month])
 
-  // Single place that persists a note to the backend. Used both by the
-  // textarea's onBlur and by flushPendingNote() below.
+  // Single place that persists a note to the backend AND syncs it into
+  // `companies` (the dot indicator / tooltip / reopening the same cell later
+  // all read from there) — se hace UNA vez acá, no en cada tecla, ver
+  // noteDraft más arriba. Usado por el blur del textarea, "Borrar nota" y
+  // flushPendingNote() más abajo.
   const saveNote = useCallback(async (companyId, procId, note) => {
     noteDirtyRef.current = false
+    updateCellLocal(companyId, procId, { note })
     try {
       await api.updateFondoChecklistItem(companyId, procId, year, month + 1, { nota: note || null })
     } catch (err) {
@@ -768,6 +779,7 @@ export default function FondoEmprenderPage() {
     if (top  + PH > window.innerHeight - 8) top  = rect.top - PH - 4
     if (top  < 8) top  = 8
     noteDirtyRef.current = false
+    setNoteDraft(companies.find(c => c.id === companyId)?.cells[procId]?.note ?? '')
     setOpenCell({ companyId, procId, left, top })
   }
 
@@ -815,9 +827,9 @@ export default function FondoEmprenderPage() {
     }
   }
 
-  function handleNoteChange(companyId, procId, note) {
+  function handleNoteChange(note) {
     noteDirtyRef.current = true
-    updateCellLocal(companyId, procId, { note })
+    setNoteDraft(note)
   }
 
   function handleNoteBlur(companyId, procId, note) {
@@ -825,7 +837,7 @@ export default function FondoEmprenderPage() {
   }
 
   function handleClearNote(companyId, procId) {
-    updateCellLocal(companyId, procId, { note: '' })
+    setNoteDraft('')
     saveNote(companyId, procId, '')
   }
 
@@ -1389,6 +1401,12 @@ export default function FondoEmprenderPage() {
     // Whitespace-only notes must not count as "has a note" — otherwise
     // the dot/tooltip shows for a cell that looks empty when opened.
     const hasNote = !!cell.note?.trim()
+    // mp3/Nómina electrónica: cuando la empresa está enlazada desde el
+    // módulo de Nómina Electrónica, esa celda deja de editarse acá (ver
+    // nominaElectronicaSync.js) — clic deshabilitado, y un ícono de enlace
+    // chiquito y apagado en la esquina (no un candado: no es un permiso que
+    // falte, es que se marca en otro lado).
+    const isReadonly = !!cell.readonly
     return (
       <td
         key={proc.id}
@@ -1399,10 +1417,13 @@ export default function FondoEmprenderPage() {
         }}
       >
         <button
-          onClick={e => handleCellClick(company.id, proc.id, e)}
+          onClick={isReadonly ? undefined : e => handleCellClick(company.id, proc.id, e)}
           onMouseEnter={hasNote ? e => showTooltip(e, cell.note, `${company.id}_${proc.id}`) : undefined}
           onMouseLeave={hasNote ? scheduleHide : undefined}
-          className="w-full flex items-center justify-center relative transition-all hover:opacity-75 hover:scale-90 active:scale-75 rounded"
+          title={isReadonly ? 'Se marca desde Nómina Electrónica' : undefined}
+          className={`w-full flex items-center justify-center relative transition-all rounded ${
+            isReadonly ? 'cursor-default' : 'hover:opacity-75 hover:scale-90 active:scale-75'
+          }`}
           style={{ height: 32, background: cfg.bg }}
         >
           <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 17 }}>
@@ -1413,6 +1434,14 @@ export default function FondoEmprenderPage() {
               className="absolute bg-amber-400 rounded-full border border-white"
               style={{ width: 6, height: 6, top: 1, right: 1 }}
             />
+          )}
+          {isReadonly && (
+            <span
+              className="material-symbols-outlined absolute"
+              style={{ fontSize: 9, bottom: 1, right: 1, color: cfg.color, opacity: 0.45 }}
+            >
+              link
+            </span>
           )}
         </button>
       </td>
@@ -2053,9 +2082,9 @@ export default function FondoEmprenderPage() {
           </div>
           <textarea
             ref={noteTextareaRef}
-            value={openCellData.note}
+            value={noteDraft}
             onChange={e => {
-              handleNoteChange(openCell.companyId, openCell.procId, e.target.value)
+              handleNoteChange(e.target.value)
               e.target.style.height = 'auto'
               const h = Math.min(e.target.scrollHeight, 200)
               e.target.style.height = h + 'px'
@@ -2069,7 +2098,7 @@ export default function FondoEmprenderPage() {
           <div className="mt-2 flex items-center gap-2">
             <button
               onClick={() => handleClearNote(openCell.companyId, openCell.procId)}
-              disabled={!openCellData.note?.trim()}
+              disabled={!noteDraft?.trim()}
               className="flex-1 py-1 text-xs text-red-500 hover:text-red-600 transition text-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-red-500"
             >
               Borrar nota

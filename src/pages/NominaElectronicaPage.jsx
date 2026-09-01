@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { ESTADOS_VISUAL, resolveEstadoVisual, ORIGEN_LABELS, ORIGEN_ACCENTS, MONTHS, getMesVencidoHabilitado } from '../data/nominaElectronica'
+import { ESTADOS_VISUAL, resolveEstadoVisual, ORIGEN_LABELS, ORIGEN_ACCENTS, MONTHS, getMesHabilitadoNE, formatFechaLimite, getPlazoColor } from '../data/nominaElectronica'
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
 import { useAuth } from '../context/AuthContext'
@@ -40,7 +40,7 @@ export default function NominaElectronicaPage() {
   const { socket } = useSocket()
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const habilitado = getMesVencidoHabilitado()
+  const habilitado = getMesHabilitadoNE()
   const habilitadoYM = toYM(habilitado.anio, habilitado.mes)
 
   const [ym, setYm] = useState(() => {
@@ -82,6 +82,42 @@ export default function NominaElectronicaPage() {
     setSearchParams({ anio: String(anio), mes: String(mes) }, { replace: true })
   }, [anio, mes, setSearchParams])
 
+  // ── plazo de presentación — editado a mano cada mes (ver ne_plazo), no se
+  // calcula acá: el plazo real de la DIAN son los primeros 10 días hábiles
+  // del mes (sin fines de semana ni festivos) y no vale la pena meter un
+  // calendario de festivos colombianos solo para esto.
+  const [plazo, setPlazo] = useState(null) // { fechaLimite, updatedAt }
+  const [editandoPlazo, setEditandoPlazo] = useState(false)
+  const [plazoDraft, setPlazoDraft] = useState('')
+  const [savingPlazo, setSavingPlazo] = useState(false)
+
+  const fetchPlazo = useCallback(async () => {
+    try {
+      const data = await api.getNEPlazo()
+      setPlazo(data)
+    } catch { /* no crítico — el aviso simplemente no aparece */ }
+  }, [])
+
+  useEffect(() => { fetchPlazo() }, [fetchPlazo])
+
+  function startEditPlazo() {
+    setPlazoDraft(plazo?.fechaLimite ?? '')
+    setEditandoPlazo(true)
+  }
+
+  async function savePlazo() {
+    setSavingPlazo(true)
+    try {
+      const data = await api.updateNEPlazo(plazoDraft || null)
+      setPlazo(data)
+      setEditandoPlazo(false)
+    } catch (err) {
+      alert('Error al guardar el plazo: ' + err.message)
+    } finally {
+      setSavingPlazo(false)
+    }
+  }
+
   // ── popup de celda (una sola instancia para toda la página, igual que
   // Seguimiento Mensual) ────────────────────────────────────────────────────
   const [openCell, setOpenCell] = useState(null) // { empresaId, left, top }
@@ -95,6 +131,14 @@ export default function NominaElectronicaPage() {
   const openCellRef = useRef(null)
   openCellRef.current = openCell
   const dirtyRef = useRef({ nota: false, novedadNota: false })
+  // Los textareas escriben acá, NO directo en `rows` — mismo bug que en
+  // Seguimiento Mensual de Fondo Emprender: con 109 empresas, cada tecla
+  // disparaba un patch()/setRows() que volvía a renderizar toda la grilla,
+  // sintiéndose como texto trabado. Recién se sincroniza con `rows` (y se
+  // guarda en el servidor) una vez, al salir del cuadro — ver handleNota/
+  // handleNovedadNota más abajo.
+  const [motivoDraft, setMotivoDraft] = useState('')
+  const [novedadDraft, setNovedadDraft] = useState('')
 
   // ── acciones (optimistas, con rollback silencioso en error) ──────────────────
   const patch = useCallback((empresaId, changes) => {
@@ -156,6 +200,7 @@ export default function NominaElectronicaPage() {
   useEffect(() => {
     if (!socket) return
     const handler = (payload) => {
+      if (payload?.tipo === 'plazo') { fetchPlazo(); return }
       if (payload?.tipo === 'mes' && (payload.anio !== anio || payload.mes !== mes)) return
       clearTimeout(refetchTimerRef.current)
       refetchTimerRef.current = setTimeout(() => { flushPending().then(silentRefetch) }, 1000)
@@ -165,7 +210,7 @@ export default function NominaElectronicaPage() {
       socket.off('nominaElectronica:updated', handler)
       clearTimeout(refetchTimerRef.current)
     }
-  }, [socket, anio, mes, silentRefetch, flushPending])
+  }, [socket, anio, mes, silentRefetch, flushPending, fetchPlazo])
 
   // Al volver a la pestaña (otro usuario pudo editar mientras tanto) — mismo
   // flush-antes-de-refrescar, mismo criterio que el useEffect de arriba.
@@ -195,6 +240,9 @@ export default function NominaElectronicaPage() {
     // anterior (no debería, el mousedown de afuera ya lo hizo), no se
     // arrastra al abrir una celda nueva.
     dirtyRef.current = { nota: false, novedadNota: false }
+    const row = rows.find(r => r.empresaId === empresaId)
+    setMotivoDraft(row?.nota ?? '')
+    setNovedadDraft(row?.novedadNota ?? '')
     const rect = e.currentTarget.getBoundingClientRect()
     const PW = 240, PH = 320
     let left = rect.left
@@ -253,7 +301,10 @@ export default function NominaElectronicaPage() {
   }
   function handleNovedadToggle(empresaId, tieneNovedad) {
     const changes = tieneNovedad ? { tieneNovedad } : { tieneNovedad, novedadNota: null }
-    if (!tieneNovedad) dirtyRef.current.novedadNota = false
+    if (!tieneNovedad) {
+      dirtyRef.current.novedadNota = false
+      setNovedadDraft('')
+    }
     patch(empresaId, changes)
     save(empresaId, changes)
   }
@@ -282,6 +333,13 @@ export default function NominaElectronicaPage() {
   }), [rows])
 
   const openRow = openCell ? rows.find(r => r.empresaId === openCell.empresaId) : null
+
+  const plazoColor = plazo?.fechaLimite ? getPlazoColor(plazo.fechaLimite) : null
+  const diasFaltantesLabel = plazoColor && (
+    plazoColor.diasFaltantes > 0 ? `faltan ${plazoColor.diasFaltantes} día${plazoColor.diasFaltantes === 1 ? '' : 's'}`
+    : plazoColor.diasFaltantes === 0 ? 'vence hoy'
+    : `vencido hace ${-plazoColor.diasFaltantes} día${plazoColor.diasFaltantes === -1 ? '' : 's'}`
+  )
 
   return (
     <div className="flex flex-col gap-4 min-w-0">
@@ -326,6 +384,73 @@ export default function NominaElectronicaPage() {
             </Link>
           )}
         </div>
+      </div>
+
+      {/* ── Aviso de plazo — editable a mano, ver ne_plazo. El color va de
+          verde a amarillo a rojo según cuántos días faltan (getPlazoColor en
+          data/nominaElectronica.js) — sin fecha configurada usa un gris
+          neutro fijo. ──────────────────────────────────────────────────── */}
+      <div
+        className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors duration-500"
+        style={{
+          background: plazoColor?.bg ?? '#f3f4f6',
+          borderColor: plazoColor?.border ?? '#e5e7eb',
+        }}
+      >
+        <span
+          className="material-symbols-outlined text-2xl shrink-0"
+          style={{ color: plazoColor?.text ?? '#9ca3af' }}
+        >
+          event_available
+        </span>
+        <div className="flex-1 min-w-0">
+          {editandoPlazo ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-semibold" style={{ color: plazoColor?.text ?? '#6b7280' }}>Plazo para presentar:</span>
+              <input
+                type="date"
+                autoFocus
+                value={plazoDraft}
+                onChange={(e) => setPlazoDraft(e.target.value)}
+                className="text-sm px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+              />
+              <button
+                onClick={savePlazo}
+                disabled={savingPlazo}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#004ac6] text-white hover:bg-[#003a9c] transition-colors disabled:opacity-60"
+              >
+                {savingPlazo ? 'Guardando...' : 'Guardar'}
+              </button>
+              <button
+                onClick={() => setEditandoPlazo(false)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-[#6b7280] dark:text-[#8890b5] hover:bg-white/60 dark:hover:bg-white/10 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm font-medium" style={{ color: plazoColor?.text ?? '#6b7280' }}>
+              {plazo?.fechaLimite ? (
+                <>
+                  Plazo para presentar: <b>hasta el {formatFechaLimite(plazo.fechaLimite)}</b>
+                  {diasFaltantesLabel && <span className="opacity-80"> ({diasFaltantesLabel})</span>}
+                </>
+              ) : (
+                <span className="italic opacity-70">Plazo no configurado todavía</span>
+              )}
+            </p>
+          )}
+        </div>
+        {puedeGestionarCatalogo && !editandoPlazo && (
+          <button
+            onClick={startEditPlazo}
+            title="Editar plazo"
+            className="hover:bg-white/60 dark:hover:bg-white/10 rounded-full p-1.5 shrink-0 transition-colors"
+            style={{ color: plazoColor?.text ?? '#6b7280' }}
+          >
+            <span className="material-symbols-outlined text-lg">edit</span>
+          </button>
+        )}
       </div>
 
       {/* ── Search + summary ─────────────────────────────────────────────── */}
@@ -444,8 +569,8 @@ export default function NominaElectronicaPage() {
               <p className="text-[10px] font-bold uppercase text-[#8890b5] mb-1">Motivo</p>
               <textarea
                 ref={motivoTextareaRef}
-                value={openRow.nota ?? ''}
-                onChange={(e) => { dirtyRef.current.nota = true; patch(openRow.empresaId, { nota: e.target.value }) }}
+                value={motivoDraft}
+                onChange={(e) => { dirtyRef.current.nota = true; setMotivoDraft(e.target.value) }}
                 onBlur={(e) => handleNota(openRow.empresaId, e.target.value)}
                 placeholder="¿Por qué no aplica?"
                 rows={2}
@@ -466,8 +591,8 @@ export default function NominaElectronicaPage() {
             {openRow.tieneNovedad && (
               <textarea
                 ref={novedadTextareaRef}
-                value={openRow.novedadNota ?? ''}
-                onChange={(e) => { dirtyRef.current.novedadNota = true; patch(openRow.empresaId, { novedadNota: e.target.value }) }}
+                value={novedadDraft}
+                onChange={(e) => { dirtyRef.current.novedadNota = true; setNovedadDraft(e.target.value) }}
                 onBlur={(e) => handleNovedadNota(openRow.empresaId, e.target.value)}
                 placeholder="¿Cuál novedad?"
                 rows={2}

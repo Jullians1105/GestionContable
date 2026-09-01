@@ -1,7 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
-const { isMesHabilitado } = require('../utils/mesVencido');
+const { isMesHabilitado } = require('../utils/mesVencidoNominaElectronica');
 
 const normalizeRow = (row) => ({
   empresaId:         row.empresa_id,
