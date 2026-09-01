@@ -844,7 +844,10 @@ export default function FondoEmprenderPagosPage() {
 
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div>
-        <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Pagos Fondo Emprender</h1>
+        <div className="flex items-center gap-2 mb-0.5">
+          <span className="material-symbols-outlined text-2xl text-[#004ac6]">payments</span>
+          <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Pagos Fondo Emprender</h1>
+        </div>
         <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
           Mensualidades a la fiduciaria · {rows.length} empresas
         </p>

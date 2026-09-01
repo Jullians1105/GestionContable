@@ -858,7 +858,10 @@ export default function EmpresasExternasPage() {
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Empresas Externas</h1>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="material-symbols-outlined text-2xl text-[#004ac6]">table_chart</span>
+            <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Empresas Externas</h1>
+          </div>
           <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">Seguimiento contable mensual</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
