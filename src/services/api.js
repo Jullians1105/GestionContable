@@ -325,6 +325,11 @@ export const api = {
       { method: 'PUT', body: JSON.stringify(data) });
   },
 
+  // Nómina Electrónica — Plazo de presentación (editado a mano)
+  getNEPlazo: () => request('/nomina-electronica/plazo'),
+  updateNEPlazo: (fechaLimite) =>
+    request('/nomina-electronica/plazo', { method: 'PUT', body: JSON.stringify({ fechaLimite }) }),
+
   // DIAN
   uploadDian: (formData) =>
     fetchWithAuth('/dian/upload', { method: 'POST', body: formData }).then(async (res) => {

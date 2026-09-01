@@ -138,7 +138,7 @@ const GROUP_PALETTE = [
     confirmBg: 'bg-[#d97706] dark:bg-[#fbbf24]', confirmText: 'text-[#fffbeb] dark:text-[#2e2410]' },
 ]
 
-const emptyCell = { status: 'pending', note: '' }
+const emptyCell = { status: 'pending', note: '', readonly: false, fuente: null }
 
 // año*12+mes da un entero comparable — evita comparar año y mes por separado
 // para saber si (year, month) cae dentro del rango de vigencia de un proceso.
@@ -550,7 +550,7 @@ export default function FondoEmprenderPage() {
           const key = `${e.id}:${it.id}`
           cells[it.id] = pendingCellWritesRef.current.has(key) && prevCells?.[it.id]
             ? prevCells[it.id]
-            : { status: it.estado, note: it.nota ?? '' }
+            : { status: it.estado, note: it.nota ?? '', readonly: it.readonly ?? false, fuente: it.fuente ?? null }
         })
         return {
           id: e.id,
@@ -1389,6 +1389,12 @@ export default function FondoEmprenderPage() {
     // Whitespace-only notes must not count as "has a note" — otherwise
     // the dot/tooltip shows for a cell that looks empty when opened.
     const hasNote = !!cell.note?.trim()
+    // mp3/Nómina electrónica: cuando la empresa está enlazada desde el
+    // módulo de Nómina Electrónica, esa celda deja de editarse acá (ver
+    // nominaElectronicaSync.js) — clic deshabilitado, y un ícono de enlace
+    // chiquito y apagado en la esquina (no un candado: no es un permiso que
+    // falte, es que se marca en otro lado).
+    const isReadonly = !!cell.readonly
     return (
       <td
         key={proc.id}
@@ -1399,10 +1405,13 @@ export default function FondoEmprenderPage() {
         }}
       >
         <button
-          onClick={e => handleCellClick(company.id, proc.id, e)}
+          onClick={isReadonly ? undefined : e => handleCellClick(company.id, proc.id, e)}
           onMouseEnter={hasNote ? e => showTooltip(e, cell.note, `${company.id}_${proc.id}`) : undefined}
           onMouseLeave={hasNote ? scheduleHide : undefined}
-          className="w-full flex items-center justify-center relative transition-all hover:opacity-75 hover:scale-90 active:scale-75 rounded"
+          title={isReadonly ? 'Se marca desde Nómina Electrónica' : undefined}
+          className={`w-full flex items-center justify-center relative transition-all rounded ${
+            isReadonly ? 'cursor-default' : 'hover:opacity-75 hover:scale-90 active:scale-75'
+          }`}
           style={{ height: 32, background: cfg.bg }}
         >
           <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 17 }}>
@@ -1413,6 +1422,14 @@ export default function FondoEmprenderPage() {
               className="absolute bg-amber-400 rounded-full border border-white"
               style={{ width: 6, height: 6, top: 1, right: 1 }}
             />
+          )}
+          {isReadonly && (
+            <span
+              className="material-symbols-outlined absolute"
+              style={{ fontSize: 9, bottom: 1, right: 1, color: cfg.color, opacity: 0.45 }}
+            >
+              link
+            </span>
           )}
         </button>
       </td>
