@@ -2,6 +2,13 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 const { isMesHabilitado } = require('../utils/mesVencido');
+const { mapEstadoNEaChecklist } = require('../utils/nominaElectronicaSync');
+
+// "Nómina electrónica" es el proceso orden 0 del catálogo ext_procesos (ver
+// migración 038) — no tiene un vínculo por id como mp3 en Fondo Emprender
+// (no hace falta: acá no hay macroprocesos), así que se identifica por
+// nombre normalizado, igual criterio que 027_fondo_procesos_macroproceso_link.sql.
+const esProcesoNominaElectronica = (name) => String(name).trim().toLowerCase() === 'nómina electrónica';
 
 const getChecklistMes = async (req, res, next) => {
   try {
@@ -12,26 +19,36 @@ const getChecklistMes = async (req, res, next) => {
     const result = await db.query(
       `SELECT p.id, p.name, p.orden, p.activo,
               COALESCE(i.estado, 'pending') AS estado,
-              i.nota
+              i.nota,
+              ne.id AS ne_empresa_id, nm.estado AS ne_estado, nm.nota AS ne_nota
        FROM ext_procesos p
        LEFT JOIN ext_checklist_meses m
               ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
        LEFT JOIN ext_checklist_items i
               ON i.mes_id = m.id AND i.proceso_id = p.id
+       LEFT JOIN ne_empresas ne
+              ON ne.ext_empresa_id = $1
+       LEFT JOIN ne_meses nm
+              ON nm.empresa_id = ne.id AND nm.anio = $2 AND nm.mes = $3
        WHERE p.activo = true OR i.id IS NOT NULL
        ORDER BY p.orden`,
       [empresaId, anio, mes]
     );
 
     res.json({
-      items: result.rows.map(row => ({
-        id:     row.id,
-        name:   row.name,
-        orden:  row.orden,
-        activo: row.activo,
-        estado: row.estado,
-        nota:   row.nota,
-      })),
+      items: result.rows.map(row => {
+        const linkedNE = esProcesoNominaElectronica(row.name) && row.ne_empresa_id;
+        return {
+          id:       row.id,
+          name:     row.name,
+          orden:    row.orden,
+          activo:   row.activo,
+          estado:   linkedNE ? mapEstadoNEaChecklist(row.ne_estado) : row.estado,
+          nota:     linkedNE ? row.ne_nota : row.nota,
+          readonly: !!linkedNE,
+          fuente:   linkedNE ? 'nomina_electronica' : undefined,
+        };
+      }),
     });
   } catch (err) {
     next(err);
@@ -51,13 +68,18 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
       `SELECT e.id AS empresa_id,
               p.id, p.name, p.orden, p.activo,
               COALESCE(i.estado, 'pending') AS estado,
-              i.nota
+              i.nota,
+              ne.id AS ne_empresa_id, nm.estado AS ne_estado, nm.nota AS ne_nota
        FROM ext_empresas e
        CROSS JOIN ext_procesos p
        LEFT JOIN ext_checklist_meses m
               ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
        LEFT JOIN ext_checklist_items i
               ON i.mes_id = m.id AND i.proceso_id = p.id
+       LEFT JOIN ne_empresas ne
+              ON ne.ext_empresa_id = e.id
+       LEFT JOIN ne_meses nm
+              ON nm.empresa_id = ne.id AND nm.anio = $1 AND nm.mes = $2
        WHERE p.activo = true OR i.id IS NOT NULL
        ORDER BY e.id, p.orden`,
       [anio, mes]
@@ -70,13 +92,16 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
         entry = { empresaId: row.empresa_id, items: [] };
         porEmpresa.set(row.empresa_id, entry);
       }
+      const linkedNE = esProcesoNominaElectronica(row.name) && row.ne_empresa_id;
       entry.items.push({
-        id:     row.id,
-        name:   row.name,
-        orden:  row.orden,
-        activo: row.activo,
-        estado: row.estado,
-        nota:   row.nota,
+        id:       row.id,
+        name:     row.name,
+        orden:    row.orden,
+        activo:   row.activo,
+        estado:   linkedNE ? mapEstadoNEaChecklist(row.ne_estado) : row.estado,
+        nota:     linkedNE ? row.ne_nota : row.nota,
+        readonly: !!linkedNE,
+        fuente:   linkedNE ? 'nomina_electronica' : undefined,
       });
     }
 
@@ -95,6 +120,16 @@ const updateChecklistItem = async (req, res, next) => {
 
     if (!isMesHabilitado(anio, mes)) {
       return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
+    }
+
+    // "Nómina electrónica" no se edita más acá una vez la empresa está
+    // enlazada desde el módulo de Nómina Electrónica — es la fuente única.
+    const procesoResult = await db.query('SELECT name FROM ext_procesos WHERE id = $1', [procesoId]);
+    if (esProcesoNominaElectronica(procesoResult.rows[0]?.name)) {
+      const neLink = await db.query('SELECT id FROM ne_empresas WHERE ext_empresa_id = $1', [empresaId]);
+      if (neLink.rows[0]) {
+        return res.status(409).json({ error: 'Este proceso se marca desde Nómina Electrónica — la empresa ya está enlazada allá' });
+      }
     }
 
     // Distinguir "el frontend no envió nota" (no tocar el valor guardado) de

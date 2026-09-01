@@ -307,6 +307,24 @@ export const api = {
       { method: 'PUT', body: JSON.stringify(data) });
   },
 
+  // Nómina Electrónica — Empresas (catálogo)
+  getNEEmpresas: () => request('/nomina-electronica/empresas'),
+  getNEEmpresa: (id) => request(`/nomina-electronica/empresas/${id}`),
+  createNEEmpresa: (data) => request('/nomina-electronica/empresas', { method: 'POST', body: JSON.stringify(data) }),
+  updateNEEmpresa: (id, data) => request(`/nomina-electronica/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteNEEmpresa: (id) => request(`/nomina-electronica/empresas/${id}`, { method: 'DELETE' }),
+
+  // Nómina Electrónica — Seguimiento mensual
+  getNEMes: (anio, mes) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/nomina-electronica/meses?${qs}`);
+  },
+  updateNEMes: (empresaId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/nomina-electronica/meses/${empresaId}?${qs}`,
+      { method: 'PUT', body: JSON.stringify(data) });
+  },
+
   // DIAN
   uploadDian: (formData) =>
     fetchWithAuth('/dian/upload', { method: 'POST', body: formData }).then(async (res) => {

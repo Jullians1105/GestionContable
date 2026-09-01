@@ -46,6 +46,8 @@ import TercerosPage from './pages/TercerosPage'
 import ConsultaTerceroPage from './pages/ConsultaTerceroPage'
 import RecurringTasksPage from './pages/RecurringTasksPage'
 import EmpresasExternasPage from './pages/EmpresasExternasPage'
+import NominaElectronicaPage from './pages/NominaElectronicaPage'
+import NominaElectronicaEmpresasPage from './pages/NominaElectronicaEmpresasPage'
 
 function Layout() {
   const { isAuthenticated } = useAuth()
@@ -120,6 +122,8 @@ function Layout() {
             <Route path="/dian/nomina/:borradorId"           element={<DianNominaPage />} />
             <Route path="/dian/exportacion/:borradorId"      element={<DianExportacionPage />} />
             <Route path="/exogenas/upload"                   element={<ExogenasUploadPage />} />
+            <Route path="/dian/nomina-electronica"            element={<NominaElectronicaPage />} />
+            <Route path="/dian/nomina-electronica/empresas"   element={<NominaElectronicaEmpresasPage />} />
             <Route path="/dian/terceros"                     element={<TercerosPage />} />
             <Route path="/dian/consulta-tercero"             element={<ConsultaTerceroPage />} />
             <Route path="/tasks/recurrentes" element={<RecurringTasksPage />} />

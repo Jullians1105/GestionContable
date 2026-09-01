@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 const { isMesHabilitado } = require('../utils/mesVencido');
+const { mapEstadoNEaChecklist } = require('../utils/nominaElectronicaSync');
 
 const MP_CATALOG = [
   { id: 1, nombre: 'Facturación' },
@@ -148,12 +149,17 @@ const getDetalle = async (req, res, next) => {
         [empresaId, anio, mes]
       ),
       db.query(
-        `SELECT COALESCE(i.estado, 'pending') AS estado
+        `SELECT COALESCE(i.estado, 'pending') AS estado,
+                ne.id AS ne_empresa_id, nm.estado AS ne_estado
          FROM fondo_procesos p
          LEFT JOIN fondo_checklist_meses m
                 ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
          LEFT JOIN fondo_checklist_items i
                 ON i.mes_id = m.id AND i.proceso_id = p.id
+         LEFT JOIN ne_empresas ne
+                ON ne.fondo_empresa_id = $1
+         LEFT JOIN ne_meses nm
+                ON nm.empresa_id = ne.id AND nm.anio = $2 AND nm.mes = $3
          WHERE p.macroproceso_id = 'mp3'
          LIMIT 1`,
         [empresaId, anio, mes]
@@ -214,9 +220,15 @@ const getDetalle = async (req, res, next) => {
     const macroprocesos = mpResult.rows.map(normalizeDetalle);
 
     // mp3 (Nómina electrónica): el estado propio de la fila se reemplaza por
-    // el derivado del checklist mensual; responsable/nota/tareasVinculadas
-    // siguen viniendo de fondo_detalle_macroprocesos y se mantienen editables.
-    const nominaElectronicaEstado = nominaElecResult.rows.length > 0 ? nominaElecResult.rows[0].estado : 'pending';
+    // el derivado del checklist mensual — o, si la empresa está enlazada
+    // desde el módulo de Nómina Electrónica (ne_empresas.fondo_empresa_id),
+    // por lo marcado allá, que pasa a ser la fuente única (ver
+    // nominaElectronicaSync.js). responsable/nota/tareasVinculadas siguen
+    // viniendo de fondo_detalle_macroprocesos y se mantienen editables.
+    const nominaElecRow = nominaElecResult.rows[0];
+    const nominaElectronicaEstado = nominaElecRow?.ne_empresa_id
+      ? mapEstadoNEaChecklist(nominaElecRow.ne_estado)
+      : (nominaElecRow?.estado ?? 'pending');
     const mp3Index = macroprocesos.findIndex(m => m.id === 3);
     if (mp3Index !== -1) {
       macroprocesos[mp3Index] = {

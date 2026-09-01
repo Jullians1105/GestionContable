@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 const { isMesHabilitado } = require('../utils/mesVencido');
+const { mapEstadoNEaChecklist } = require('../utils/nominaElectronicaSync');
 
 // Columnas reales por tipo — Nómina y Contabilidad tienen cada una su propio
 // par confirmed/enviado en fondo_checklist_meses (ver migración 031). Nunca
@@ -20,9 +21,10 @@ const getChecklistMes = async (req, res, next) => {
     const mes  = parseInt(req.query.mes, 10);
 
     const result = await db.query(
-      `SELECT p.id, p.name, p.orden, p.activo,
+      `SELECT p.id, p.name, p.orden, p.activo, p.macroproceso_id,
               COALESCE(i.estado, 'pending') AS estado,
               i.nota,
+              ne.id AS ne_empresa_id, nm.estado AS ne_estado, nm.nota AS ne_nota,
               COALESCE(m.confirmed_nomina, false) AS confirmed_nomina,
               m.confirmed_nomina_at,
               COALESCE(m.enviado_nomina, false) AS enviado_nomina,
@@ -36,6 +38,10 @@ const getChecklistMes = async (req, res, next) => {
               ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
        LEFT JOIN fondo_checklist_items i
               ON i.mes_id = m.id AND i.proceso_id = p.id
+       LEFT JOIN ne_empresas ne
+              ON ne.fondo_empresa_id = $1
+       LEFT JOIN ne_meses nm
+              ON nm.empresa_id = ne.id AND nm.anio = $2 AND nm.mes = $3
        WHERE p.activo = true OR i.id IS NOT NULL
        ORDER BY p.orden`,
       [empresaId, anio, mes]
@@ -43,14 +49,22 @@ const getChecklistMes = async (req, res, next) => {
 
     const rows = result.rows;
     const first = rows[0];
-    const items = rows.map(row => ({
-      id:     row.id,
-      name:   row.name,
-      orden:  row.orden,
-      activo: row.activo,
-      estado: row.estado,
-      nota:   row.nota,
-    }));
+    // mp3 ("Nómina electrónica") pasa a ser solo lectura cuando la empresa
+    // está enlazada desde Nómina Electrónica (ne_empresas.fondo_empresa_id) —
+    // ese módulo es la fuente única, ver nominaElectronicaSync.js.
+    const items = rows.map(row => {
+      const linkedNE = row.macroproceso_id === 'mp3' && row.ne_empresa_id;
+      return {
+        id:       row.id,
+        name:     row.name,
+        orden:    row.orden,
+        activo:   row.activo,
+        estado:   linkedNE ? mapEstadoNEaChecklist(row.ne_estado) : row.estado,
+        nota:     linkedNE ? row.ne_nota : row.nota,
+        readonly: !!linkedNE,
+        fuente:   linkedNE ? 'nomina_electronica' : undefined,
+      };
+    });
 
     res.json({
       confirmedNomina:            first?.confirmed_nomina ?? false,
@@ -78,9 +92,10 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
 
     const result = await db.query(
       `SELECT e.id AS empresa_id,
-              p.id, p.name, p.orden, p.activo,
+              p.id, p.name, p.orden, p.activo, p.macroproceso_id,
               COALESCE(i.estado, 'pending') AS estado,
               i.nota,
+              ne.id AS ne_empresa_id, nm.estado AS ne_estado, nm.nota AS ne_nota,
               COALESCE(m.confirmed_nomina, false) AS confirmed_nomina,
               m.confirmed_nomina_at,
               COALESCE(m.enviado_nomina, false) AS enviado_nomina,
@@ -95,6 +110,10 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
               ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
        LEFT JOIN fondo_checklist_items i
               ON i.mes_id = m.id AND i.proceso_id = p.id
+       LEFT JOIN ne_empresas ne
+              ON ne.fondo_empresa_id = e.id
+       LEFT JOIN ne_meses nm
+              ON nm.empresa_id = ne.id AND nm.anio = $1 AND nm.mes = $2
        WHERE p.activo = true OR i.id IS NOT NULL
        ORDER BY e.id, p.orden`,
       [anio, mes]
@@ -118,13 +137,16 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
         };
         porEmpresa.set(row.empresa_id, entry);
       }
+      const linkedNE = row.macroproceso_id === 'mp3' && row.ne_empresa_id;
       entry.items.push({
-        id:     row.id,
-        name:   row.name,
-        orden:  row.orden,
-        activo: row.activo,
-        estado: row.estado,
-        nota:   row.nota,
+        id:       row.id,
+        name:     row.name,
+        orden:    row.orden,
+        activo:   row.activo,
+        estado:   linkedNE ? mapEstadoNEaChecklist(row.ne_estado) : row.estado,
+        nota:     linkedNE ? row.ne_nota : row.nota,
+        readonly: !!linkedNE,
+        fuente:   linkedNE ? 'nomina_electronica' : undefined,
       });
     }
 
@@ -143,6 +165,17 @@ const updateChecklistItem = async (req, res, next) => {
 
     if (!isMesHabilitado(anio, mes)) {
       return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
+    }
+
+    // mp3 ("Nómina electrónica") no se edita más acá una vez la empresa está
+    // enlazada desde el módulo de Nómina Electrónica — es la fuente única
+    // (ver nominaElectronicaSync.js y migración 045).
+    const procesoResult = await db.query('SELECT macroproceso_id FROM fondo_procesos WHERE id = $1', [procesoId]);
+    if (procesoResult.rows[0]?.macroproceso_id === 'mp3') {
+      const neLink = await db.query('SELECT id FROM ne_empresas WHERE fondo_empresa_id = $1', [empresaId]);
+      if (neLink.rows[0]) {
+        return res.status(409).json({ error: 'Este proceso se marca desde Nómina Electrónica — la empresa ya está enlazada allá' });
+      }
     }
 
     // Distinguir "el frontend no envió nota" (no tocar el valor guardado) de
