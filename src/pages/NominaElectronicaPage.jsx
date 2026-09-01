@@ -131,6 +131,14 @@ export default function NominaElectronicaPage() {
   const openCellRef = useRef(null)
   openCellRef.current = openCell
   const dirtyRef = useRef({ nota: false, novedadNota: false })
+  // Los textareas escriben acá, NO directo en `rows` — mismo bug que en
+  // Seguimiento Mensual de Fondo Emprender: con 109 empresas, cada tecla
+  // disparaba un patch()/setRows() que volvía a renderizar toda la grilla,
+  // sintiéndose como texto trabado. Recién se sincroniza con `rows` (y se
+  // guarda en el servidor) una vez, al salir del cuadro — ver handleNota/
+  // handleNovedadNota más abajo.
+  const [motivoDraft, setMotivoDraft] = useState('')
+  const [novedadDraft, setNovedadDraft] = useState('')
 
   // ── acciones (optimistas, con rollback silencioso en error) ──────────────────
   const patch = useCallback((empresaId, changes) => {
@@ -232,6 +240,9 @@ export default function NominaElectronicaPage() {
     // anterior (no debería, el mousedown de afuera ya lo hizo), no se
     // arrastra al abrir una celda nueva.
     dirtyRef.current = { nota: false, novedadNota: false }
+    const row = rows.find(r => r.empresaId === empresaId)
+    setMotivoDraft(row?.nota ?? '')
+    setNovedadDraft(row?.novedadNota ?? '')
     const rect = e.currentTarget.getBoundingClientRect()
     const PW = 240, PH = 320
     let left = rect.left
@@ -290,7 +301,10 @@ export default function NominaElectronicaPage() {
   }
   function handleNovedadToggle(empresaId, tieneNovedad) {
     const changes = tieneNovedad ? { tieneNovedad } : { tieneNovedad, novedadNota: null }
-    if (!tieneNovedad) dirtyRef.current.novedadNota = false
+    if (!tieneNovedad) {
+      dirtyRef.current.novedadNota = false
+      setNovedadDraft('')
+    }
     patch(empresaId, changes)
     save(empresaId, changes)
   }
@@ -555,8 +569,8 @@ export default function NominaElectronicaPage() {
               <p className="text-[10px] font-bold uppercase text-[#8890b5] mb-1">Motivo</p>
               <textarea
                 ref={motivoTextareaRef}
-                value={openRow.nota ?? ''}
-                onChange={(e) => { dirtyRef.current.nota = true; patch(openRow.empresaId, { nota: e.target.value }) }}
+                value={motivoDraft}
+                onChange={(e) => { dirtyRef.current.nota = true; setMotivoDraft(e.target.value) }}
                 onBlur={(e) => handleNota(openRow.empresaId, e.target.value)}
                 placeholder="¿Por qué no aplica?"
                 rows={2}
@@ -577,8 +591,8 @@ export default function NominaElectronicaPage() {
             {openRow.tieneNovedad && (
               <textarea
                 ref={novedadTextareaRef}
-                value={openRow.novedadNota ?? ''}
-                onChange={(e) => { dirtyRef.current.novedadNota = true; patch(openRow.empresaId, { novedadNota: e.target.value }) }}
+                value={novedadDraft}
+                onChange={(e) => { dirtyRef.current.novedadNota = true; setNovedadDraft(e.target.value) }}
                 onBlur={(e) => handleNovedadNota(openRow.empresaId, e.target.value)}
                 placeholder="¿Cuál novedad?"
                 rows={2}

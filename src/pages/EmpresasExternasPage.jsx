@@ -262,6 +262,12 @@ export default function EmpresasExternasPage() {
   const openCellRef     = useRef(openCell)
   openCellRef.current   = openCell
   const noteDirtyRef    = useRef(false)
+  // El textarea escribe acá, NO directo en `companies` — mismo fix que en
+  // FondoEmprenderPage.jsx: cada tecla disparaba un setCompanies() que
+  // volvía a renderizar toda la grilla, sintiéndose como texto trabado.
+  // Recién se sincroniza (y se guarda en el servidor) una vez, al salir del
+  // cuadro — ver saveNote más abajo.
+  const [noteDraft, setNoteDraft] = useState('')
 
   const [tooltip, setTooltip]         = useState(null)
   const [tooltipSize, setTooltipSize] = useState({ width: 220, height: 80 })
@@ -333,6 +339,7 @@ export default function EmpresasExternasPage() {
 
   const saveNote = useCallback(async (companyId, procId, note) => {
     noteDirtyRef.current = false
+    updateCellLocal(companyId, procId, { note })
     try {
       await api.updateExtChecklistItem(companyId, procId, year, month + 1, { nota: note || null })
     } catch (err) {
@@ -517,6 +524,7 @@ export default function EmpresasExternasPage() {
     if (top  + PH > window.innerHeight - 8) top  = rect.top - PH - 4
     if (top  < 8) top  = 8
     noteDirtyRef.current = false
+    setNoteDraft(companies.find(c => c.id === companyId)?.cells[procId]?.note ?? '')
     setOpenCell({ companyId, procId, left, top })
   }
 
@@ -544,9 +552,9 @@ export default function EmpresasExternasPage() {
     }
   }
 
-  function handleNoteChange(companyId, procId, note) {
+  function handleNoteChange(note) {
     noteDirtyRef.current = true
-    updateCellLocal(companyId, procId, { note })
+    setNoteDraft(note)
   }
 
   function handleNoteBlur(companyId, procId, note) {
@@ -554,7 +562,7 @@ export default function EmpresasExternasPage() {
   }
 
   function handleClearNote(companyId, procId) {
-    updateCellLocal(companyId, procId, { note: '' })
+    setNoteDraft('')
     saveNote(companyId, procId, '')
   }
 
@@ -1178,9 +1186,9 @@ export default function EmpresasExternasPage() {
           </div>
           <textarea
             ref={noteTextareaRef}
-            value={openCellData.note}
+            value={noteDraft}
             onChange={e => {
-              handleNoteChange(openCell.companyId, openCell.procId, e.target.value)
+              handleNoteChange(e.target.value)
               e.target.style.height = 'auto'
               const h = Math.min(e.target.scrollHeight, 200)
               e.target.style.height = h + 'px'
@@ -1194,7 +1202,7 @@ export default function EmpresasExternasPage() {
           <div className="mt-2 flex items-center gap-2">
             <button
               onClick={() => handleClearNote(openCell.companyId, openCell.procId)}
-              disabled={!openCellData.note?.trim()}
+              disabled={!noteDraft?.trim()}
               className="flex-1 py-1 text-xs text-red-500 hover:text-red-600 transition text-center disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-red-500"
             >
               Borrar nota
