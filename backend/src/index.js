@@ -40,6 +40,8 @@ const tercerosRoutes        = require('./routes/terceros');
 const extEmpresasRoutes     = require('./routes/extEmpresas');
 const extProcesosRoutes     = require('./routes/extProcesos');
 const extChecklistRoutes    = require('./routes/extChecklist');
+const neEmpresasRoutes      = require('./routes/nominaElectronicaEmpresas');
+const neMesesRoutes         = require('./routes/nominaElectronicaMeses');
 
 const app = express();
 const server = http.createServer(app);
@@ -161,6 +163,8 @@ app.use('/api/tasks',            fondoLinksRoutes);
 app.use('/api/externas/empresas',  extEmpresasRoutes);
 app.use('/api/externas/procesos',  extProcesosRoutes);
 app.use('/api/externas/checklist', extChecklistRoutes);
+app.use('/api/nomina-electronica/empresas', neEmpresasRoutes);
+app.use('/api/nomina-electronica/meses',    neMesesRoutes);
 app.use('/api/dian',             dianRoutes);
 app.use('/api/exogenas',         exogenasRoutes);
 app.use('/api/terceros',         tercerosRoutes);

@@ -30,11 +30,14 @@ function baseReq(overrides = {}) {
   };
 }
 
-// Queues the three db.query calls that happen before the upsert result is
-// asserted: create-month-if-missing, select-month-id, then the upsert itself.
-// The 4th call (audit_log insert) is left for the caller to append.
+// Queues the db.query calls that happen before the upsert result is
+// asserted: proceso lookup (para el chequeo de vínculo con Nómina
+// Electrónica — ver fondoChecklistController.updateChecklistItem), then
+// create-month-if-missing, select-month-id, then the upsert itself. The 5th
+// call (audit_log insert) is left for the caller to append.
 function queueUpsert(resultRow) {
   db.query
+    .mockResolvedValueOnce({ rows: [{ macroproceso_id: null }] }) // SELECT proceso (sin vínculo mp3)
     .mockResolvedValueOnce({ rows: [] })                 // INSERT ... DO NOTHING
     .mockResolvedValueOnce({ rows: [{ id: 'mes-1' }] })   // SELECT mes id
     .mockResolvedValueOnce({ rows: [resultRow] })         // INSERT ... DO UPDATE ... RETURNING *
@@ -53,7 +56,7 @@ describe('updateChecklistItem — manejo de nota', () => {
     const res = mockRes();
     await updateChecklistItem(req, res, mockNext);
 
-    const upsertCall = db.query.mock.calls[2];
+    const upsertCall = db.query.mock.calls[3];
     const params = upsertCall[1];
     // [id, mesId, procesoId, estado, notaToSave, notaProvided]
     expect(params[4]).toBeNull();
@@ -68,7 +71,7 @@ describe('updateChecklistItem — manejo de nota', () => {
     const res = mockRes();
     await updateChecklistItem(req, res, mockNext);
 
-    const upsertCall = db.query.mock.calls[2];
+    const upsertCall = db.query.mock.calls[3];
     const params = upsertCall[1];
     expect(params[4]).toBeNull();
     expect(params[5]).toBe(true);
@@ -81,7 +84,7 @@ describe('updateChecklistItem — manejo de nota', () => {
     const res = mockRes();
     await updateChecklistItem(req, res, mockNext);
 
-    const upsertCall = db.query.mock.calls[2];
+    const upsertCall = db.query.mock.calls[3];
     const params = upsertCall[1];
     expect(params[4]).toBeNull();
     expect(params[5]).toBe(true);
@@ -94,7 +97,7 @@ describe('updateChecklistItem — manejo de nota', () => {
     const res = mockRes();
     await updateChecklistItem(req, res, mockNext);
 
-    const upsertCall = db.query.mock.calls[2];
+    const upsertCall = db.query.mock.calls[3];
     const params = upsertCall[1];
     expect(params[4]).toBe('reunión con el contador');
     expect(params[5]).toBe(true);
