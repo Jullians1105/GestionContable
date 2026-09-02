@@ -35,6 +35,8 @@ const fondoImpuestosRoutes  = require('./routes/fondoImpuestos');
 const fondoPagosRoutes      = require('./routes/fondoPagos');
 const fondoLinksRoutes      = require('./routes/fondoLinks');
 const dianRoutes            = require('./routes/dian');
+const contabEmpresasRoutes  = require('./routes/contabEmpresas');
+const contabConsolidadoRoutes = require('./routes/contabConsolidado');
 const exogenasRoutes        = require('./routes/exogenas');
 const tercerosRoutes        = require('./routes/terceros');
 const extEmpresasRoutes     = require('./routes/extEmpresas');
@@ -168,6 +170,8 @@ app.use('/api/nomina-electronica/empresas', neEmpresasRoutes);
 app.use('/api/nomina-electronica/meses',    neMesesRoutes);
 app.use('/api/nomina-electronica/plazo',    nePlazoRoutes);
 app.use('/api/dian',             dianRoutes);
+app.use('/api/contabilidad/empresas', contabEmpresasRoutes);
+app.use('/api/contabilidad', contabConsolidadoRoutes);
 app.use('/api/exogenas',         exogenasRoutes);
 app.use('/api/terceros',         tercerosRoutes);
 

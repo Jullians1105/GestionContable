@@ -39,6 +39,7 @@ const MODULE_TITLES = {
 
 const DIAN_NAV = [
   { to: '/dian/upload',     label: 'Contabilidad',     icon: 'upload_file',   end: true },
+  { to: '/dian/consolidado', label: 'Consolidado',     icon: 'query_stats',   end: true },
   { to: '/exogenas/upload', label: 'Exógenas',          icon: 'request_quote', end: true },
   { to: '/dian/terceros',   label: 'Importar Terceros', icon: 'location_on',   end: true },
   { to: '/dian/consulta-tercero', label: 'Consulta Tercero', icon: 'person_search', end: true },

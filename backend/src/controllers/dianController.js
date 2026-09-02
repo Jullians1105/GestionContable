@@ -5,6 +5,7 @@ const JSZip = require('jszip');
 const { parse } = require('date-fns');
 const db = require('../config/database');
 const { SALARY_CONSTANTS } = require('../constants/salaryConstants');
+const { limpiarIdentificacion } = require('../services/exogenas/utils/dian');
 
 // El portal de la DIAN exporta el .xlsx con las etiquetas de estos dos namespaces
 // prefijadas (ej. <x:workbook>, <x:sheets>, <ap:Properties>) — válido según OOXML, pero el
@@ -184,6 +185,80 @@ const CAMPOS_IMPUESTOS_BASE = [
 const getBaseRetencion = (f) =>
   (f.total ?? 0) - CAMPOS_IMPUESTOS_BASE.reduce((acc, campo) => acc + (f[campo] ?? 0), 0);
 
+// Deriva el NIT dueño del reporte a partir de las filas ya parseadas, para verificar contra
+// la empresa que el usuario elige en el selector de subida (ver uploadDian). La regla es POR
+// GRUPO: en una fila "Recibido" (nos facturaron) la empresa dueña es el NIT Receptor; en una
+// fila "Emitido" (facturamos nosotros) es el NIT Emisor. Verificado empíricamente sobre un
+// reporte real de 805 filas mixtas: la regla da el mismo valor en el 100% de las filas.
+//
+// NO sirve "el NIT que más se repite entre las dos columnas sin distinguir grupo": en un
+// reporte con solo filas "Emitido", el NIT Receptor puede ser "222222222" (código DIAN de
+// consumidor final) repetido en todas las filas, y ganaría por frecuencia si no se separa
+// por grupo — dando un falso positivo con el NIT genérico en vez de con el de la empresa.
+// También devuelve el nombre real de la empresa tal como aparece en el reporte (razón
+// social del receptor en filas "Recibido" / del emisor en filas "Emitido" — mismo campo,
+// no una fuente nueva) para poder avisar si no se parece en nada al nombre de la empresa
+// elegida en el selector (ver comprobarNombreEmpresa). Necesario porque el catálogo de las
+// 52 empresas se sembró solo con el nombre (el listado de origen no traía NIT de ninguna):
+// sin este chequeo, la PRIMERA vez que se sube un reporte para una empresa sin NIT todavía,
+// el sistema no tiene con qué verificar y aceptaría cualquier NIT sin preguntar — justo el
+// caso real que se coló en pruebas (reporte de "ELIBRY" vinculado a "CATACAKES" sin aviso).
+const derivarNitPropio = (filas) => {
+  const conteoNit = new Map();
+  const nombresPorNit = new Map(); // nit -> Map(nombre -> conteo)
+  for (const f of filas) {
+    const esRecibido = f.grupo === RECIBIDO;
+    const esEmitido = f.grupo === EMITIDO;
+    if (!esRecibido && !esEmitido) continue;
+    const nitCandidato = limpiarIdentificacion(esRecibido ? f.nitReceptor : f.nitEmisor);
+    if (!nitCandidato) continue;
+    conteoNit.set(nitCandidato, (conteoNit.get(nitCandidato) ?? 0) + 1);
+
+    const nombreCandidato = esRecibido ? f.nombreReceptor : f.nombreEmisor;
+    if (nombreCandidato) {
+      if (!nombresPorNit.has(nitCandidato)) nombresPorNit.set(nitCandidato, new Map());
+      const mapaNombres = nombresPorNit.get(nitCandidato);
+      mapaNombres.set(nombreCandidato, (mapaNombres.get(nombreCandidato) ?? 0) + 1);
+    }
+  }
+  if (conteoNit.size === 0) return { nit: null, nombre: null, ambiguo: false };
+  const ordenados = [...conteoNit.entries()].sort((a, b) => b[1] - a[1]);
+  const nitGanador = ordenados[0][0];
+  const nombresGanador = nombresPorNit.get(nitGanador);
+  const nombre = nombresGanador
+    ? [...nombresGanador.entries()].sort((a, b) => b[1] - a[1])[0][0]
+    : null;
+  return { nit: nitGanador, nombre, ambiguo: ordenados.length > 1 };
+};
+
+// Palabras genéricas de razón social colombiana que no sirven para decidir si dos nombres
+// son "la misma empresa" (casi todas las 52 empresas comparten alguna). Comparar solo contra
+// palabras significativas evita falsos negativos ("SAS" en ambos nombres no prueba nada) y
+// falsos positivos serían peores acá: preferimos pedir una confirmación de más que aceptar
+// en silencio una empresa equivocada.
+const PALABRAS_GENERICAS_RAZON_SOCIAL = new Set([
+  'SAS', 'S.A.S', 'LTDA', 'LTDA.', 'SA', 'S.A', 'CIA', 'CIA.', 'COMPANIA', 'COMPAÑIA',
+  'EU', 'E.U', 'ESP', 'E.S.P', 'Y', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'EN', 'CON',
+]);
+
+const normalizarNombreSimple = (texto) =>
+  String(texto ?? '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+const palabrasSignificativas = (nombre) =>
+  normalizarNombreSimple(nombre).split(' ').filter((p) => p.length >= 3 && !PALABRAS_GENERICAS_RAZON_SOCIAL.has(p));
+
+// true si comparten al menos una palabra significativa — heurística permisiva a propósito
+// (nombres de catálogo vs. razón social del reporte pueden variar en orden, abreviaturas,
+// sufijos legales), pensada solo para atrapar el caso evidente de "no tiene nada que ver".
+const nombresSeParecen = (nombreA, nombreB) => {
+  const palabrasA = new Set(palabrasSignificativas(nombreA));
+  const palabrasB = palabrasSignificativas(nombreB);
+  if (palabrasA.size === 0 || palabrasB.length === 0) return true; // sin datos suficientes, no bloquear
+  return palabrasB.some((p) => palabrasA.has(p));
+};
+
 // Proyección de una fila para el frontend (pantalla de clasificación): solo lo que la UI
 // necesita, más el flag requiereClasificacion — así el frontend nunca reimplementa esta
 // regla por su cuenta (eso fue exactamente lo que causó el bug de "toma 458 en vez de 425").
@@ -216,6 +291,8 @@ const proyectarFilaParaClasificar = (f) => ({
   prefijo:                f.prefijo ?? null,
   clasificacionRetencion: f.clasificacionRetencion ?? null,
   tasaRetencion:          f.tasaRetencion ?? null,
+  clasificacionIva:       f.clasificacionIva ?? null,
+  concepto:               f.concepto ?? null,
   requiereClasificacion:  requiereClasificacion(f),
 });
 
@@ -240,7 +317,7 @@ const MOTIVOS_DOCUMENTOS_EXCLUIDOS = {
 // intentar agregar una hoja con un nombre que ya existe. Se rechaza acá, con un mensaje
 // claro, en vez de dejar que falle de forma críptica al exportar.
 const HOJAS_RESERVADAS = new Set([
-  'RESUMEN', 'RESUMEN_MENSUAL', 'IVA', 'INC', 'RETENCIONES_POR_PROVEEDOR', 'DETALLE_COMPRAS', 'NOMINA', 'AUTORRETENCION', 'METADATOS', 'REPORTE_DIAN',
+  'RESUMEN', 'RESUMEN_MENSUAL', 'IVA', 'INC', 'RETENCIONES_POR_PROVEEDOR', 'DETALLE_COMPRAS', 'CONCEPTOS', 'NOMINA', 'AUTORRETENCION', 'METADATOS', 'REPORTE_DIAN',
 ]);
 
 // Tarifas de autorretención en la renta (guía interna, % sobre la base = ventas netas sin
@@ -376,6 +453,8 @@ const uploadDian = async (req, res, next) => {
         grupo,
         clasificacionRetencion: null,
         tasaRetencion:          null,
+        clasificacionIva:       null,
+        concepto:               null,
       });
     });
 
@@ -413,6 +492,71 @@ const uploadDian = async (req, res, next) => {
       incDevolucionVentas:   sumField(esNotaEmitida,     'inc'),
     };
 
+    // ── Empresa (opcional) — "Sin empresa" sigue funcionando exactamente igual que antes
+    // de esta migración: sin empresaId, no se verifica NIT y el borrador no exige las
+    // clasificaciones de IVA/Concepto al exportar (ver exportarBorrador).
+    const empresaId = req.body?.empresaId || null;
+    let empresa = null;
+    if (empresaId) {
+      const empresaRow = await db.query('SELECT id, name, nit FROM contab_empresas WHERE id = $1', [empresaId]);
+      if (empresaRow.rows.length === 0) {
+        return res.status(404).json({ error: 'Empresa no encontrada' });
+      }
+      empresa = empresaRow.rows[0];
+
+      const { nit: nitDetectado, nombre: nombreDetectado } = derivarNitPropio(filas);
+      if (nitDetectado) {
+        if (empresa.nit) {
+          if (limpiarIdentificacion(empresa.nit) !== nitDetectado) {
+            return res.status(409).json({
+              error: `Este reporte parece pertenecer a otra empresa. El NIT del reporte ` +
+                `(${nitDetectado}) no coincide con el NIT registrado para "${empresa.name}" (${empresa.nit}).`,
+              nitEsperado: empresa.nit,
+              nitReporte: nitDetectado,
+              empresaNombre: empresa.name,
+            });
+          }
+        } else {
+          // Primera vez que se sube un reporte para esta empresa: no hay NIT guardado con
+          // qué comparar (el catálogo se sembró solo con nombres). Antes de aceptarlo a
+          // ciegas se hacen dos chequeos — bugs reales encontrados en prueba manual, no
+          // hipotéticos: (a) que ese NIT no pertenezca ya a OTRA empresa del catálogo
+          // (columna UNIQUE, si no la actualización de abajo revienta con un 23505 crudo de
+          // Postgres), y (b) que el nombre real de la empresa en el reporte se parezca al
+          // nombre de la empresa elegida — sin esto, un reporte de "ELIBRY" subido eligiendo
+          // "CATACAKES" se aceptaba en silencio y le pegaba el NIT equivocado.
+          const otraEmpresa = await db.query(
+            'SELECT id, name FROM contab_empresas WHERE nit = $1 AND id != $2',
+            [nitDetectado, empresaId]
+          );
+          if (otraEmpresa.rows.length > 0) {
+            return res.status(409).json({
+              error: `Este reporte parece pertenecer a "${otraEmpresa.rows[0].name}" ` +
+                `(NIT ${nitDetectado}), no a "${empresa.name}". Selecciona la empresa correcta.`,
+              nitEsperado: null,
+              nitReporte: nitDetectado,
+              empresaNombre: otraEmpresa.rows[0].name,
+            });
+          }
+
+          const confirmarEmpresa = req.body?.confirmarEmpresa === 'true' || req.body?.confirmarEmpresa === true;
+          if (nombreDetectado && !nombresSeParecen(empresa.name, nombreDetectado) && !confirmarEmpresa) {
+            return res.status(409).json({
+              error: `El reporte parece pertenecer a "${nombreDetectado}" (NIT ${nitDetectado}), ` +
+                `no a "${empresa.name}" que elegiste. Si de verdad es la misma empresa (razón social ` +
+                `distinta a como está en el catálogo), confirma para continuar.`,
+              requiereConfirmacion: true,
+              nombreDetectado,
+              nitReporte: nitDetectado,
+              empresaNombre: empresa.name,
+            });
+          }
+
+          await db.query('UPDATE contab_empresas SET nit = $1 WHERE id = $2', [nitDetectado, empresaId]);
+        }
+      }
+    }
+
     // Proyección para la respuesta: campos de clasificación + flag requiereClasificacion
     const filasParaClasificar = filas.map(proyectarFilaParaClasificar);
 
@@ -422,12 +566,16 @@ const uploadDian = async (req, res, next) => {
     // evita reconstruir la hoja original desde JSON, que podía perder formato/precisión.
     const id = uuidv4();
     await db.query(
-      `INSERT INTO calculo_borradores (id, nombre_archivo, creado_por, datos, archivo_original)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, req.file.originalname, req.user.userId, JSON.stringify({ filas, calculos }), bufferNormalizado]
+      `INSERT INTO calculo_borradores (id, nombre_archivo, creado_por, datos, archivo_original, empresa_id)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, req.file.originalname, req.user.userId, JSON.stringify({ filas, calculos }), bufferNormalizado, empresaId]
     );
 
-    res.status(201).json({ id, calculos, totalFilas: filas.length, filasParaClasificar });
+    res.status(201).json({
+      id, calculos, totalFilas: filas.length, filasParaClasificar,
+      empresaId,
+      empresaNombre: empresa?.name ?? null,
+    });
   } catch (err) {
     next(err);
   }
@@ -436,10 +584,16 @@ const uploadDian = async (req, res, next) => {
 const patchBorrador = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { indice, clasificacionRetencion, tasaRetencion } = req.body;
+    const { indice, clasificacionRetencion, tasaRetencion, clasificacionIva, concepto } = req.body;
 
     if (indice === undefined || indice === null) {
       return res.status(400).json({ error: '"indice" es requerido' });
+    }
+    if (clasificacionIva !== undefined && clasificacionIva !== null && !CLASES_IVA.includes(clasificacionIva)) {
+      return res.status(400).json({ error: `clasificacionIva inválido. Valores permitidos: ${CLASES_IVA.join(', ')}` });
+    }
+    if (concepto !== undefined && concepto !== null && !CONCEPTOS.includes(concepto)) {
+      return res.status(400).json({ error: `concepto inválido. Valores permitidos: ${CONCEPTOS.join(', ')}` });
     }
 
     // Verificar existencia y propiedad
@@ -453,9 +607,23 @@ const patchBorrador = async (req, res, next) => {
     }
 
     const filas = check.rows[0].filas;
-    if (!Array.isArray(filas) || !filas.some((f) => f.indice === indice)) {
+    const filaActual = Array.isArray(filas) ? filas.find((f) => f.indice === indice) : null;
+    if (!filaActual) {
       return res.status(400).json({ error: `No existe fila con índice ${indice}` });
     }
+
+    // Las tres clasificaciones (retención, IVA, concepto) se autoguardan de forma
+    // independiente desde columnas distintas de la tabla — a diferencia de antes, cuando
+    // solo existía retención y este PATCH siempre traía el par completo. Si acá se pisaran
+    // los cuatro campos en cada llamada, clasificar IVA en una fila borraría (a null) la
+    // retención o el concepto que ya estaban guardados para esa misma fila. Por eso cada
+    // campo se conserva tal cual estaba salvo que el body lo incluya explícitamente
+    // (mismo patrón "provided" que responsableId en extEmpresasController.js).
+    const provisto = (campo) => Object.prototype.hasOwnProperty.call(req.body, campo);
+    const nuevaRetencion = provisto('clasificacionRetencion') ? (clasificacionRetencion ?? null) : filaActual.clasificacionRetencion ?? null;
+    const nuevaTasa      = provisto('tasaRetencion')          ? (tasaRetencion ?? null)          : filaActual.tasaRetencion ?? null;
+    const nuevaIva       = provisto('clasificacionIva')       ? (clasificacionIva ?? null)        : filaActual.clasificacionIva ?? null;
+    const nuevoConcepto  = provisto('concepto')                ? (concepto ?? null)                : filaActual.concepto ?? null;
 
     // Actualizar el elemento del array JSONB in-place
     await db.query(
@@ -467,14 +635,16 @@ const patchBorrador = async (req, res, next) => {
             CASE WHEN (f->>'indice')::int = $2
               THEN f || jsonb_build_object(
                 'clasificacionRetencion', $3::text,
-                'tasaRetencion',          $4::float8
+                'tasaRetencion',          $4::float8,
+                'clasificacionIva',       $5::text,
+                'concepto',               $6::text
               )
               ELSE f
             END
           ) FROM jsonb_array_elements(datos->'filas') f)
        )
        WHERE id = $1`,
-      [id, indice, clasificacionRetencion ?? null, tasaRetencion ?? null]
+      [id, indice, nuevaRetencion, nuevaTasa, nuevaIva, nuevoConcepto]
     );
 
     res.json({ success: true });
@@ -494,7 +664,10 @@ const getBorrador = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { rows } = await db.query(
-      `SELECT nombre_archivo, datos FROM calculo_borradores WHERE id = $1 AND creado_por = $2`,
+      `SELECT b.nombre_archivo, b.datos, b.empresa_id, e.name AS empresa_nombre
+       FROM calculo_borradores b
+       LEFT JOIN contab_empresas e ON e.id = b.empresa_id
+       WHERE b.id = $1 AND b.creado_por = $2`,
       [id, req.user.userId]
     );
     if (rows.length === 0) {
@@ -511,6 +684,8 @@ const getBorrador = async (req, res, next) => {
       calculos,
       filasParaClasificar,
       nomina,
+      empresaId: rows[0].empresa_id,
+      empresaNombre: rows[0].empresa_nombre,
     });
   } catch (err) {
     next(err);
@@ -1125,8 +1300,9 @@ function buildDetalleComprasContent(ws, filasRecibido, { freeze = true } = {}) {
   const hdr = ws.addRow([
     'Fecha Emisión', 'Folio', 'Nombre Emisor', 'NIT Emisor',
     'Total', 'Subtotal', 'IVA', 'Clasificación', 'Tasa (%)', 'Retención',
+    'Clasificación IVA', 'Concepto',
   ]);
-  applyHeaderRow(hdr, 10);
+  applyHeaderRow(hdr, 12);
 
   filasRecibido.forEach((fila, i) => {
     const iva = fila.iva ?? 0;
@@ -1143,6 +1319,8 @@ function buildDetalleComprasContent(ws, filasRecibido, { freeze = true } = {}) {
       fila.clasificacionRetencion ?? '',
       fila.tasaRetencion ?? 0,
       retencion,
+      fila.clasificacionIva ?? '',
+      fila.concepto ?? '',
     ]);
     row.getCell(1).alignment  = { horizontal: 'center' };
     row.getCell(2).alignment  = { horizontal: 'center' };
@@ -1159,7 +1337,9 @@ function buildDetalleComprasContent(ws, filasRecibido, { freeze = true } = {}) {
     row.getCell(9).alignment  = { horizontal: 'center' };
     row.getCell(10).numFmt    = '"$ "#,##0';
     row.getCell(10).alignment = { horizontal: 'right' };
-    applyDataRow(row, 10, i % 2 === 1);
+    row.getCell(11).alignment = { horizontal: 'center' };
+    row.getCell(12).alignment = { horizontal: 'center' };
+    applyDataRow(row, 12, i % 2 === 1);
   });
 
   if (freeze) freezeHeaderRowAt(ws, 1);
@@ -1177,8 +1357,86 @@ function buildDetalleCompras(ws, filasRecibido) {
     { key: 'clasi',     width: 16 },
     { key: 'tasa',      width: 12 },
     { key: 'retencion', width: 18 },
+    { key: 'clasiIva',  width: 16 },
+    { key: 'concepto',  width: 18 },
   ];
   buildDetalleComprasContent(ws, filasRecibido);
+}
+
+// ── Hoja CONCEPTOS ───────────────────────────────────────────────────────────────
+// Solo se agrega si el borrador tiene empresa asociada (mismo criterio que exige clasificar
+// IVA/Concepto para exportar). Es el resumen agrupado que complementa el detalle factura por
+// factura de DETALLE_COMPRAS — mismo espíritu que RETENCIONES_POR_PROVEEDOR ya resuelve para
+// la retención, aplicado acá a las dos clasificaciones nuevas.
+const agruparPorCampo = (filasRecibido, campo, orden) => {
+  const grupos = new Map();
+  for (const f of filasRecibido) {
+    const key = f[campo] ?? 'Sin clasificar';
+    if (!grupos.has(key)) grupos.set(key, { cantidad: 0, base: 0, iva: 0, total: 0 });
+    const g = grupos.get(key);
+    g.cantidad += 1;
+    g.base += getBaseRetencion(f);
+    g.iva += (f.iva ?? 0);
+    g.total += (f.total ?? 0);
+  }
+  const ordenados = [];
+  for (const k of orden) {
+    if (grupos.has(k)) { ordenados.push([k, grupos.get(k)]); grupos.delete(k); }
+  }
+  for (const entry of grupos) ordenados.push(entry);
+  return ordenados;
+};
+
+function buildConceptosContent(ws, { porConcepto, porClasificacionIva, ivaGeneradoVentas }, { freeze = true } = {}) {
+  const COP = '"$ "#,##0';
+
+  const tabla = (titulo, grupos) => {
+    const banda = sectionBand(ws, titulo, 5);
+    const hdr = ws.addRow(['', '# Facturas', 'Base', 'IVA', 'Total']);
+    applyHeaderRow(hdr, 5);
+    let totalCantidad = 0, totalBase = 0, totalIva = 0, totalTotal = 0;
+    grupos.forEach(([nombre, g], i) => {
+      const row = ws.addRow([nombre, g.cantidad, round2(g.base), round2(g.iva), round2(g.total)]);
+      row.getCell(1).alignment = { horizontal: 'left' };
+      row.getCell(2).alignment = { horizontal: 'center' };
+      row.getCell(3).numFmt = COP; row.getCell(3).alignment = { horizontal: 'right' };
+      row.getCell(4).numFmt = COP; row.getCell(4).alignment = { horizontal: 'right' };
+      row.getCell(5).numFmt = COP; row.getCell(5).alignment = { horizontal: 'right' };
+      applyDataRow(row, 5, i % 2 === 1);
+      totalCantidad += g.cantidad; totalBase += g.base; totalIva += g.iva; totalTotal += g.total;
+    });
+    const totalRow = ws.addRow(['TOTAL', totalCantidad, round2(totalBase), round2(totalIva), round2(totalTotal)]);
+    totalRow.getCell(2).alignment = { horizontal: 'center' };
+    totalRow.getCell(3).numFmt = COP; totalRow.getCell(3).alignment = { horizontal: 'right' };
+    totalRow.getCell(4).numFmt = COP; totalRow.getCell(4).alignment = { horizontal: 'right' };
+    totalRow.getCell(5).numFmt = COP; totalRow.getCell(5).alignment = { horizontal: 'right' };
+    applyTotalRow(totalRow, 5);
+    ws.addRow([]);
+    return banda;
+  };
+
+  const primeraBanda = tabla('COMPRAS POR CONCEPTO', porConcepto);
+  tabla('COMPRAS POR CLASIFICACIÓN DE IVA', porClasificacionIva);
+
+  sectionBand(ws, 'VENTAS', 5);
+  const rowVentas = ws.addRow(['IVA generado (ventas)', '', '', round2(ivaGeneradoVentas), '']);
+  rowVentas.getCell(1).alignment = { horizontal: 'left' };
+  rowVentas.getCell(4).numFmt = COP;
+  rowVentas.getCell(4).alignment = { horizontal: 'right' };
+  applyDataRow(rowVentas, 5, false);
+
+  if (freeze) freezeHeaderRowAt(ws, primeraBanda.number);
+}
+
+function buildConceptos(ws, datos) {
+  ws.columns = [
+    { key: 'nombre',   width: 26 },
+    { key: 'cantidad', width: 12 },
+    { key: 'base',     width: 18 },
+    { key: 'iva',      width: 18 },
+    { key: 'total',    width: 18 },
+  ];
+  buildConceptosContent(ws, datos);
 }
 
 // ── Hoja NOMINA ────────────────────────────────────────────────────────────────
@@ -1665,6 +1923,143 @@ function buildResumenMensual(ws, resumenPorMes, resumenTotal) {
   freezeHeaderRowAt(ws, 1);
 }
 
+// ── Guardado permanente en contab_documentos / contab_periodos ─────────────────
+// Agrupa las filas del borrador por mes calendario (según fechaEmision) y las guarda una
+// por una, identificadas por CUFE dentro de esa empresa — así una re-subida del mismo mes
+// actualiza lo que cambió y agrega lo nuevo, sin duplicar filas ya guardadas.
+const agruparFilasPorPeriodo = (filas) => {
+  const grupos = new Map(); // "YYYY-MM" -> filas[]
+  for (const f of filas) {
+    if (!f.fechaEmision) continue; // sin fecha no se puede ubicar en un mes — no se guarda
+    const ym = f.fechaEmision.slice(0, 7);
+    if (!grupos.has(ym)) grupos.set(ym, []);
+    grupos.get(ym).push(f);
+  }
+  return grupos;
+};
+
+// Impuestos que no tienen columna propia en contab_documentos (IVA, IC e INC sí la tienen) —
+// se guardan como JSONB para no agregar once columnas casi siempre en null. Incluye también
+// las retenciones que trae el propio documento (reteIva/reteRenta/reteIca, aplicadas por
+// quien lo emitió), distintas de clasificacionRetencion/tasaRetencion (lo que NOSOTROS le
+// retenemos a un proveedor, asignado a mano en la pantalla de clasificación).
+const CAMPOS_IMPUESTOS_EXTRA = [
+  'ica', 'timbre', 'incBolsas', 'inCarbono', 'inCombustibles',
+  'icDatos', 'icl', 'inpp', 'ibua', 'icui', 'reteIva', 'reteRenta', 'reteIca',
+];
+
+async function guardarDocumentosPermanentes({ empresaId, filas, nombreArchivo, userId, modo }) {
+  // Solo se guardan documentos con relevancia contable real (mismo criterio que
+  // TIPOS_CONTABILIZADOS usa para la transparencia de "documentos no contabilizados" en el
+  // Excel) — quedan fuera "Application response" (acuse técnico en $0, sin valor comercial)
+  // y "Nomina Individual" (documento de nómina electrónica, no una compra/venta). Guardarlos
+  // todos sin filtrar fue un descuido: se coló en la primera prueba real (14 documentos
+  // guardados para 8 facturas reales — encontrado y corregido a raíz de esa prueba).
+  const filasContabilizables = filas.filter((f) => TIPOS_CONTABILIZADOS.has(f.tipoDocumento));
+  const porPeriodo = agruparFilasPorPeriodo(filasContabilizables);
+  if (porPeriodo.size === 0) return { requiereConfirmacion: false, periodos: [] };
+
+  // Sin "modo" explícito, se avisa si algún período de este reporte ya tiene documentos
+  // guardados — el frontend deja elegir actualizar (upsert, conserva lo no reenviado) o
+  // reemplazar (borra el mes y lo vuelve a cargar limpio) antes de escribir nada.
+  if (!modo) {
+    const conflictos = [];
+    for (const [ym, filasPeriodo] of porPeriodo) {
+      const [anio, mes] = ym.split('-').map(Number);
+      const { rows } = await db.query(
+        'SELECT count(*)::int AS n FROM contab_documentos WHERE empresa_id = $1 AND anio = $2 AND mes = $3',
+        [empresaId, anio, mes]
+      );
+      if (rows[0].n > 0) {
+        conflictos.push({ anio, mes, existentes: rows[0].n, enElReporte: filasPeriodo.length });
+      }
+    }
+    if (conflictos.length > 0) {
+      return { requiereConfirmacion: true, periodos: conflictos };
+    }
+  }
+
+  const client = await db.getClient();
+  try {
+    await client.query('BEGIN');
+    const periodosGuardados = [];
+
+    for (const [ym, filasPeriodo] of porPeriodo) {
+      const [anio, mes] = ym.split('-').map(Number);
+
+      if (modo === 'reemplazar') {
+        await client.query(
+          'DELETE FROM contab_documentos WHERE empresa_id = $1 AND anio = $2 AND mes = $3',
+          [empresaId, anio, mes]
+        );
+      }
+
+      for (const f of filasPeriodo) {
+        if (!f.cufe) continue; // sin CUFE no hay llave natural para deduplicar entre subidas
+        const subtotal = getBaseRetencion(f);
+        const valorRetencion = f.clasificacionRetencion && f.tasaRetencion != null
+          ? round2(subtotal * (f.tasaRetencion / 100))
+          : null;
+        const impuestosExtra = {};
+        for (const campo of CAMPOS_IMPUESTOS_EXTRA) {
+          if (f[campo] != null) impuestosExtra[campo] = f[campo];
+        }
+        // El "tercero" es la contraparte del documento: el emisor si nos facturaron
+        // (Recibido), el receptor si facturamos nosotros (Emitido) — nunca nuestros propios
+        // datos, que ya están fijos en la empresa a la que pertenece este registro.
+        const esRecibido = f.grupo === RECIBIDO;
+        await client.query(
+          `INSERT INTO contab_documentos (
+             id, empresa_id, anio, mes, cufe, tipo_documento, grupo, fecha_emision, folio, prefijo,
+             nit_tercero, nombre_tercero, subtotal, total, iva, ic, inc, impuestos,
+             clasificacion_retencion, tasa_retencion, valor_retencion, clasificacion_iva, concepto, creado_por
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+           ON CONFLICT (empresa_id, cufe) DO UPDATE SET
+             anio = EXCLUDED.anio, mes = EXCLUDED.mes, tipo_documento = EXCLUDED.tipo_documento,
+             grupo = EXCLUDED.grupo, fecha_emision = EXCLUDED.fecha_emision, folio = EXCLUDED.folio,
+             prefijo = EXCLUDED.prefijo, nit_tercero = EXCLUDED.nit_tercero,
+             nombre_tercero = EXCLUDED.nombre_tercero, subtotal = EXCLUDED.subtotal,
+             total = EXCLUDED.total, iva = EXCLUDED.iva, ic = EXCLUDED.ic, inc = EXCLUDED.inc,
+             impuestos = EXCLUDED.impuestos, clasificacion_retencion = EXCLUDED.clasificacion_retencion,
+             tasa_retencion = EXCLUDED.tasa_retencion, valor_retencion = EXCLUDED.valor_retencion,
+             clasificacion_iva = EXCLUDED.clasificacion_iva, concepto = EXCLUDED.concepto,
+             creado_por = EXCLUDED.creado_por`,
+          [
+            uuidv4(), empresaId, anio, mes, f.cufe, f.tipoDocumento, f.grupo, f.fechaEmision, f.folio, f.prefijo,
+            esRecibido ? f.nitEmisor : f.nitReceptor,
+            esRecibido ? f.nombreEmisor : f.nombreReceptor,
+            subtotal, f.total ?? 0, f.iva ?? 0, f.ic ?? null, f.inc ?? null, JSON.stringify(impuestosExtra),
+            f.clasificacionRetencion ?? null, f.tasaRetencion ?? null, valorRetencion,
+            f.clasificacionIva ?? null, f.concepto ?? null, userId,
+          ]
+        );
+      }
+
+      const { rows: countRows } = await client.query(
+        'SELECT count(*)::int AS n FROM contab_documentos WHERE empresa_id = $1 AND anio = $2 AND mes = $3',
+        [empresaId, anio, mes]
+      );
+      await client.query(
+        `INSERT INTO contab_periodos (id, empresa_id, anio, mes, nombre_archivo, total_documentos, guardado_por)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)
+         ON CONFLICT (empresa_id, anio, mes) DO UPDATE SET
+           nombre_archivo = EXCLUDED.nombre_archivo, total_documentos = EXCLUDED.total_documentos,
+           guardado_por = EXCLUDED.guardado_por`,
+        [uuidv4(), empresaId, anio, mes, nombreArchivo, countRows[0].n, userId]
+      );
+      periodosGuardados.push({ anio, mes, totalDocumentos: countRows[0].n });
+    }
+
+    await client.query('COMMIT');
+    return { requiereConfirmacion: false, periodos: periodosGuardados };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 const exportarBorrador = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -1677,7 +2072,7 @@ const exportarBorrador = async (req, res, next) => {
 
     // ── 1. Leer borrador y verificar propiedad ─────────────────────────────
     const { rows } = await db.query(
-      `SELECT datos, archivo_original FROM calculo_borradores WHERE id = $1 AND creado_por = $2`,
+      `SELECT nombre_archivo, datos, archivo_original, empresa_id FROM calculo_borradores WHERE id = $1 AND creado_por = $2`,
       [id, req.user.userId]
     );
     if (rows.length === 0) {
@@ -1689,6 +2084,8 @@ const exportarBorrador = async (req, res, next) => {
     // del upload (calculos nunca se actualizaba con esos cambios).
     const { filas, anomaliasRevisadas = [] } = rows[0].datos;
     const archivoOriginal = rows[0].archivo_original;
+    const empresaId = rows[0].empresa_id;
+    const nombreArchivoOriginal = rows[0].nombre_archivo;
 
     // ── 2. Solo compras reales (TIPOS_COMPRA, ver requiereClasificacion) ────
     // Notas de crédito, "Documento soporte con no obligados" y notas de ajuste no piden
@@ -1700,6 +2097,40 @@ const exportarBorrador = async (req, res, next) => {
       return res.status(400).json({
         error: `${sinClasificar.length} fila(s) sin clasificar. Clasifica todas antes de exportar.`,
       });
+    }
+
+    // Las clasificaciones de IVA y Concepto solo son obligatorias cuando el borrador está
+    // ligado a una empresa (es decir, se va a guardar en la base de datos mensual) — sin
+    // empresa, el borrador se comporta exactamente igual que antes de esta migración.
+    if (empresaId) {
+      const sinIva = filasRecibido.filter((f) => f.clasificacionIva == null);
+      if (sinIva.length > 0) {
+        return res.status(400).json({
+          error: `${sinIva.length} fila(s) sin clasificación de IVA. Clasifica todas antes de exportar.`,
+        });
+      }
+      const sinConcepto = filasRecibido.filter((f) => f.concepto == null);
+      if (sinConcepto.length > 0) {
+        return res.status(400).json({
+          error: `${sinConcepto.length} fila(s) sin concepto. Clasifica todas antes de exportar.`,
+        });
+      }
+
+      // ── 2b. Guardado permanente — solo si el borrador tiene empresa asociada ──
+      // Se hace ANTES de generar el Excel (no después): así, si hay un conflicto con datos
+      // ya guardados de un mes anterior, se avisa sin haber gastado el trabajo de armar el
+      // libro. El Excel se sigue generando igual después, esto no lo reemplaza.
+      const modoGuardado = req.body.modo; // 'actualizar' | 'reemplazar' | undefined
+      const guardado = await guardarDocumentosPermanentes({
+        empresaId, filas, nombreArchivo: nombreArchivoOriginal, userId: req.user.userId, modo: modoGuardado,
+      });
+      if (guardado.requiereConfirmacion) {
+        return res.status(409).json({
+          error: 'Ya hay datos guardados para uno o más meses de esta empresa. Elige cómo continuar.',
+          requiereConfirmacionGuardado: true,
+          periodos: guardado.periodos,
+        });
+      }
     }
 
     // ── 3. Retenciones por proveedor (para la hoja RETENCIONES_POR_PROVEEDOR) ──
@@ -1858,6 +2289,13 @@ const exportarBorrador = async (req, res, next) => {
     }
     buildRetenciones(wb.addWorksheet('RETENCIONES_POR_PROVEEDOR'), retencionesPorProveedor, resumen.totalRetenciones);
     buildDetalleCompras(wb.addWorksheet('DETALLE_COMPRAS'), filasRecibido);
+    if (empresaId) {
+      buildConceptos(wb.addWorksheet('CONCEPTOS'), {
+        porConcepto: agruparPorCampo(filasRecibido, 'concepto', CONCEPTOS),
+        porClasificacionIva: agruparPorCampo(filasRecibido, 'clasificacionIva', CLASES_IVA),
+        ivaGeneradoVentas: resumen.ivaGenerado,
+      });
+    }
     if (nominaData) buildNomina(wb.addWorksheet('NOMINA'), nominaData, nominaData.salario);
     if (tieneAutorretencion) {
       buildAutorretencion(wb.addWorksheet('AUTORRETENCION'), {
@@ -1890,13 +2328,39 @@ const exportarBorrador = async (req, res, next) => {
 
 const CLASES_VALIDAS = ['Compras', 'Servicios', 'Arrendamiento', 'Honorarios', 'N/A', 'Autorretenedor'];
 
+// Clasificación de IVA y Concepto — solo para compras (mismas filas que requiereClasificacion),
+// las ventas no se clasifican, solo se guarda su IVA generado. "No aplica" cubre las compras
+// que no encajan en ninguna categoría (ej. servicios públicos, transporte), igual de válida
+// que "N/A" en retención — no es un placeholder vacío.
+const CLASES_IVA = ['Mayor valor', 'Descontable', 'Activo fijo', 'No aplica'];
+const CONCEPTOS = [
+  'Servicios', 'Compras', 'Activo fijo', 'Honorarios', 'Arriendos',
+  'Adecuaciones', 'Compras diversos', 'Diversos', 'No deducible', 'No aplica',
+];
+
+// Config de cada campo clasificable en lote — permite que "Clasificación rápida" y la
+// selección múltiple de la pantalla apliquen cualquiera de los tres campos con la misma
+// función, en vez de triplicar este endpoint.
+const CAMPOS_CLASIFICACION_RAPIDA = {
+  clasificacionRetencion: CLASES_VALIDAS,
+  clasificacionIva:       CLASES_IVA,
+  concepto:               CONCEPTOS,
+};
+
 const aplicarClasificacionRapida = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { clasificacionRetencion, tasaRetencion } = req.body;
+    // Por compatibilidad, sin "campo" se asume clasificacionRetencion (forma original de
+    // este endpoint, antes de que existieran las otras dos clasificaciones).
+    const campo = req.body.campo || 'clasificacionRetencion';
+    const valoresValidos = CAMPOS_CLASIFICACION_RAPIDA[campo];
+    if (!valoresValidos) {
+      return res.status(400).json({ error: `campo inválido. Valores permitidos: ${Object.keys(CAMPOS_CLASIFICACION_RAPIDA).join(', ')}` });
+    }
 
-    if (!CLASES_VALIDAS.includes(clasificacionRetencion)) {
-      return res.status(400).json({ error: `clasificacionRetencion inválido. Valores permitidos: ${CLASES_VALIDAS.join(', ')}` });
+    const valor = campo === 'clasificacionRetencion' ? req.body.clasificacionRetencion : req.body[campo];
+    if (!valoresValidos.includes(valor)) {
+      return res.status(400).json({ error: `${campo} inválido. Valores permitidos: ${valoresValidos.join(', ')}` });
     }
 
     const check = await db.query(
@@ -1906,18 +2370,20 @@ const aplicarClasificacionRapida = async (req, res, next) => {
     if (check.rows.length === 0) return res.status(404).json({ error: 'Borrador no encontrado' });
 
     const filas = check.rows[0].filas;
-    const sinClasificar = filas.filter((f) => requiereClasificacion(f) && f.clasificacionRetencion == null);
+    const sinClasificar = filas.filter((f) => requiereClasificacion(f) && f[campo] == null);
 
     if (sinClasificar.length === 0) {
       return res.json({ filasActualizadas: 0, filasRestanteSinClasificar: 0, mensaje: 'No hay filas sin clasificar' });
     }
 
-    const nuevaTasa = ['N/A', 'Autorretenedor'].includes(clasificacionRetencion) ? null : (tasaRetencion ?? null);
-    const nuevasFilas = filas.map((f) =>
-      requiereClasificacion(f) && f.clasificacionRetencion == null
-        ? { ...f, clasificacionRetencion, tasaRetencion: nuevaTasa }
-        : f
-    );
+    const nuevasFilas = filas.map((f) => {
+      if (!requiereClasificacion(f) || f[campo] != null) return f;
+      if (campo === 'clasificacionRetencion') {
+        const nuevaTasa = ['N/A', 'Autorretenedor'].includes(valor) ? null : (req.body.tasaRetencion ?? null);
+        return { ...f, clasificacionRetencion: valor, tasaRetencion: nuevaTasa };
+      }
+      return { ...f, [campo]: valor };
+    });
 
     await db.query(
       `UPDATE calculo_borradores SET datos = jsonb_set(datos, '{filas}', $1::jsonb) WHERE id = $2 AND creado_por = $3`,
@@ -1969,5 +2435,5 @@ module.exports = {
   // las reglas contables sin montar un borrador completo — ver tests/unit/dianController.test.js
   calcularAnomalias, calcularDocumentosNoContabilizados,
   calcularResumenPeriodo, agruparPorMes,
-  TASAS_AUTORRETENCION,
+  TASAS_AUTORRETENCION, CLASES_IVA, CONCEPTOS,
 };
