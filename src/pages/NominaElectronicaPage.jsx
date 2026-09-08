@@ -442,11 +442,8 @@ export default function NominaElectronicaPage() {
           data/nominaElectronica.js) — sin fecha configurada usa un gris
           neutro fijo. */}
       <div
-        className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors duration-500 w-fit"
-        style={{
-          background: plazoColor?.bg ?? '#f3f4f6',
-          borderColor: plazoColor?.border ?? '#e5e7eb',
-        }}
+        className="flex items-center gap-3 px-4 py-3 rounded-xl transition-colors duration-500 w-fit"
+        style={{ background: plazoColor?.bg ?? '#f3f4f6' }}
       >
         <span
           className={`material-symbols-outlined text-2xl shrink-0 ${plazoColor ? PLAZO_ZONE_CLASS[plazoColor.zone] : 'text-[#9ca3af]'}`}
