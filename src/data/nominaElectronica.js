@@ -31,7 +31,7 @@ export const ESTADOS_VISUAL = {
   sin_marcar: { label: 'Sin marcar',            icon: 'radio_button_unchecked', color: '#9ca3af', bg: '#ffffff' },
   autorizada: { label: 'Ya se puede presentar', icon: 'priority_high',          color: '#dc2626', bg: '#fecaca' },
   presentada: { label: 'Presentada',            icon: 'check_circle',          color: '#15803d', bg: '#bbf7d0' },
-  no_aplica:  { label: 'No aplica',             icon: 'do_not_disturb_on',     color: '#4b5563', bg: '#d1d5db' },
+  no_aplica:  { label: 'Revisar',               icon: 'do_not_disturb_on',     color: '#4b5563', bg: '#d1d5db' },
 }
 
 // Resuelve cuál de los 4 colores de arriba le corresponde a una fila
@@ -94,13 +94,61 @@ export function formatFechaLimite(isoDate) {
 // día del límite (o después, si ya se venció). Es solo aritmética de fechas
 // sobre un valor ya cargado — se recalcula en cada render, no hace falta
 // temporizador ni nada corriendo en segundo plano.
+//
+// Colores vivos, elegidos con el usuario probando un comparativo aparte
+// (verde/amarillo/rojo puros, sin naranjas ni rosados — ver historial de la
+// sesión). La mezcla se hace en HSL, no en RGB: interpolar RGB directo entre
+// verde y amarillo pasa por un tono oliva apagado a mitad de camino (el rojo
+// y el azul bajan a ritmos distintos); en HSL el tono gira derecho de un
+// color al otro sin ese punto muerto.
 const PLAZO_VENTANA_DIAS = 10
-const PLAZO_VERDE  = [22, 163, 74]   // #16a34a
-const PLAZO_AMARILLO = [234, 179, 8] // #eab308
-const PLAZO_ROJO   = [220, 38, 38]   // #dc2626
+const PLAZO_VERDE    = [34, 197, 94]  // #22c55e
+const PLAZO_AMARILLO = [250, 204, 21] // #facc15
+const PLAZO_ROJO     = [239, 68, 68]  // #ef4444
 
-function lerpRgb(a, b, t) {
-  return a.map((av, i) => Math.round(av + (b[i] - av) * t))
+function rgbToHsl([r, g, b]) {
+  r /= 255; g /= 255; b /= 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  let h, s
+  const l = (max + min) / 2
+  if (max === min) {
+    h = s = 0
+  } else {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break
+      case g: h = (b - r) / d + 2; break
+      default: h = (r - g) / d + 4
+    }
+    h /= 6
+  }
+  return [h * 360, s, l]
+}
+
+function hslToRgb([h, s, l]) {
+  h /= 360
+  if (s === 0) { const v = Math.round(l * 255); return [v, v, v] }
+  const hue2rgb = (p, q, t) => {
+    if (t < 0) t += 1
+    if (t > 1) t -= 1
+    if (t < 1 / 6) return p + (q - p) * 6 * t
+    if (t < 1 / 2) return q
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+    return p
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+  const p = 2 * l - q
+  return [
+    Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
+    Math.round(hue2rgb(p, q, h) * 255),
+    Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
+  ]
+}
+
+function lerpHsl(aRgb, bRgb, t) {
+  const a = rgbToHsl(aRgb), b = rgbToHsl(bRgb)
+  return hslToRgb([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t])
 }
 
 // Devuelve null cuando no hay fecha configurada (el aviso usa un color
@@ -118,13 +166,27 @@ export function getPlazoColor(isoDate, now = new Date()) {
   const diasFaltantes = Math.round((limite - hoy) / 86400000)
   const t = Math.min(1, Math.max(0, 1 - diasFaltantes / PLAZO_VENTANA_DIAS))
   const [r, g, b] = t <= 0.5
-    ? lerpRgb(PLAZO_VERDE, PLAZO_AMARILLO, t / 0.5)
-    : lerpRgb(PLAZO_AMARILLO, PLAZO_ROJO, (t - 0.5) / 0.5)
+    ? lerpHsl(PLAZO_VERDE, PLAZO_AMARILLO, t / 0.5)
+    : lerpHsl(PLAZO_AMARILLO, PLAZO_ROJO, (t - 0.5) / 0.5)
+
+  // El texto NO usa este color — con el amarillo intermedio quedaba casi
+  // ilegible sobre su propio fondo (mismo tono, solo con alfa distinto). El
+  // color queda solo en el borde/fondo (decorativos, no necesitan contraste
+  // de texto); el párrafo usa un gris fijo (ver NominaElectronicaPage.jsx).
+  //
+  // El ícono tampoco usa este rgb continuo — el amarillo de en medio es
+  // intrínsecamente claro (alta luminosidad) y se perdía sobre el fondo
+  // pálido del propio aviso, sin importar cuánto se oscureciera a mano.
+  // `zone` da 3 tramos discretos que el frontend mapea a un par de clases
+  // Tailwind ya pensadas para contraste en claro/oscuro (text-*-600/400),
+  // en vez de intentar arreglar un continuo con matices de por medio.
+  const zone = t < 1 / 3 ? 'verde' : t < 2 / 3 ? 'amarillo' : 'rojo'
 
   return {
     diasFaltantes,
+    zone,
     text:   `rgb(${r},${g},${b})`,
-    border: `rgba(${r},${g},${b},0.4)`,
-    bg:     `rgba(${r},${g},${b},0.12)`,
+    border: `rgba(${r},${g},${b},0.78)`,
+    bg:     `rgba(${r},${g},${b},0.22)`,
   }
 }

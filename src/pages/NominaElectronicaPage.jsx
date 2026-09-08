@@ -34,6 +34,17 @@ function prevYM(ym) { return ym % 100 === 1 ? (Math.floor(ym / 100) - 1) * 100 +
 
 const ORIGEN_ORDER = ['maritza', 'diana', 'externas']
 
+// Ícono/botón del aviso de plazo — 3 tramos discretos (plazoColor.zone) en
+// vez del rgb continuo de getPlazoColor: ese continuo pasa por un amarillo
+// intrínsecamente claro que se perdía sobre el fondo pálido del aviso, sin
+// importar cuánto se oscureciera a mano. Estos pares sí están pensados por
+// Tailwind para leerse bien tanto en claro como en oscuro.
+const PLAZO_ZONE_CLASS = {
+  verde:    'text-green-600 dark:text-green-400',
+  amarillo: 'text-amber-600 dark:text-amber-400',
+  rojo:     'text-red-600 dark:text-red-400',
+}
+
 export default function NominaElectronicaPage() {
   const { isAdmin, user } = useAuth()
   const puedeGestionarCatalogo = isAdmin() || user?.permissions?.modulos?.nominaElectronica?.canGestionar === true
@@ -60,6 +71,13 @@ export default function NominaElectronicaPage() {
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
   const [search,  setSearch]  = useState('')
+  // Filtro personal por responsable — siempre arranca en 'all' al entrar (sin
+  // persistir en localStorage, a propósito: que nadie se encuentre la grilla
+  // recortada sin darse cuenta). 'mine' compara responsableId contra el
+  // usuario logueado. La opción "sin responsable" se descartó: la barra de
+  // progreso de más abajo ya muestra cuántas faltan, sin necesidad de un
+  // filtro aparte para eso.
+  const [respFilter, setRespFilter] = useState('all') // 'all' | 'mine'
 
   const fetchMes = useCallback(async () => {
     try {
@@ -314,23 +332,51 @@ export default function NominaElectronicaPage() {
     save(empresaId, { novedadNota })
   }
 
-  // ── agrupación por origen (los 3 bloques del Excel) + búsqueda ───────────────
+  // ── búsqueda + filtro de responsable, en un solo lugar — grouped Y stats
+  // parten de acá, así ambos se recalculan juntos cada vez que cambia el
+  // filtro (antes stats se calculaba sobre `rows` sin filtrar). ────────────
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return rows.filter(r => {
+      if (q && !r.name.toLowerCase().includes(q)) return false
+      if (respFilter === 'mine' && r.responsableId !== user?.id) return false
+      return true
+    })
+  }, [rows, search, respFilter, user?.id])
+
+  // ── agrupación por origen (los 3 bloques del Excel) ──────────────────────
   const grouped = useMemo(() => {
     const g = { maritza: [], diana: [], externas: [], otras: [] }
-    const q = search.trim().toLowerCase()
-    for (const r of rows) {
-      if (q && !r.name.toLowerCase().includes(q)) continue
-      ;(g[r.origen] ?? g.otras).push(r)
+    for (const r of filteredRows) {
+      (g[r.origen] ?? g.otras).push(r)
     }
     return g
-  }, [rows, search])
+  }, [filteredRows])
 
   const stats = useMemo(() => ({
-    autorizadas: rows.filter(r => resolveEstadoVisual(r) === 'autorizada').length,
-    presentadas: rows.filter(r => r.estado === 'presentada').length,
-    noAplica:    rows.filter(r => r.estado === 'no_aplica').length,
-    conNovedad:  rows.filter(r => r.tieneNovedad).length,
-  }), [rows])
+    autorizadas: filteredRows.filter(r => resolveEstadoVisual(r) === 'autorizada').length,
+    noAplica:    filteredRows.filter(r => r.estado === 'no_aplica').length,
+    conNovedad:  filteredRows.filter(r => r.tieneNovedad).length,
+  }), [filteredRows])
+
+  // Progreso de presentación del mes — igual que "Progreso general" en
+  // Seguimiento Mensual de Fondo Emprender (doneCells/totalCells), pero acá
+  // la única "tarea" por empresa es presentar la nómina. Sobre filteredRows
+  // (no `rows` sin filtrar) — antes usaba TODAS las empresas del mes sin
+  // importar el filtro activo, y terminaba mostrando un total que no cuadraba
+  // con los chips de abajo (ej. "9/108" mientras el resumen, ya filtrado a
+  // "Mis empresas", mostraba pendientes sobre un total mucho más chico). Las
+  // "no aplica" se excluyen del total — no es una tarea pendiente si la
+  // empresa no tiene que presentar.
+  const presentacionStats = useMemo(() => {
+    const aplicables = filteredRows.filter(r => r.estado !== 'no_aplica').length
+    const presentadas = filteredRows.filter(r => r.estado === 'presentada').length
+    return {
+      total: aplicables,
+      presentadas,
+      pct: aplicables ? Math.round((presentadas / aplicables) * 100) : 0,
+    }
+  }, [filteredRows])
 
   const openRow = openCell ? rows.find(r => r.empresaId === openCell.empresaId) : null
 
@@ -386,27 +432,31 @@ export default function NominaElectronicaPage() {
         </div>
       </div>
 
-      {/* ── Aviso de plazo — editable a mano, ver ne_plazo. El color va de
-          verde a amarillo a rojo según cuántos días faltan (getPlazoColor en
+      {/* ── Fila superior: aviso de plazo (ancho justo a su texto) + barra de
+          progreso de responsables ocupando el resto — antes el aviso de plazo
+          se estiraba a todo el ancho dejando la mitad vacía. ──────────────── */}
+      <div className="flex items-stretch gap-3 flex-wrap">
+
+      {/* Aviso de plazo — editable a mano, ver ne_plazo. El color va de verde
+          a amarillo a rojo según cuántos días faltan (getPlazoColor en
           data/nominaElectronica.js) — sin fecha configurada usa un gris
-          neutro fijo. ──────────────────────────────────────────────────── */}
+          neutro fijo. */}
       <div
-        className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors duration-500"
+        className="flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors duration-500 w-fit"
         style={{
           background: plazoColor?.bg ?? '#f3f4f6',
           borderColor: plazoColor?.border ?? '#e5e7eb',
         }}
       >
         <span
-          className="material-symbols-outlined text-2xl shrink-0"
-          style={{ color: plazoColor?.text ?? '#9ca3af' }}
+          className={`material-symbols-outlined text-2xl shrink-0 ${plazoColor ? PLAZO_ZONE_CLASS[plazoColor.zone] : 'text-[#9ca3af]'}`}
         >
           event_available
         </span>
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0">
           {editandoPlazo ? (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold" style={{ color: plazoColor?.text ?? '#6b7280' }}>Plazo para presentar:</span>
+              <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">Plazo para presentar:</span>
               <input
                 type="date"
                 autoFocus
@@ -429,11 +479,11 @@ export default function NominaElectronicaPage() {
               </button>
             </div>
           ) : (
-            <p className="text-sm font-medium" style={{ color: plazoColor?.text ?? '#6b7280' }}>
+            <p className="text-sm font-medium text-[#191c1e] dark:text-[#e4e6f0]">
               {plazo?.fechaLimite ? (
                 <>
                   Plazo para presentar: <b>hasta el {formatFechaLimite(plazo.fechaLimite)}</b>
-                  {diasFaltantesLabel && <span className="opacity-80"> ({diasFaltantesLabel})</span>}
+                  {diasFaltantesLabel && <span className="text-[#6b7280] dark:text-[#8890b5]"> ({diasFaltantesLabel})</span>}
                 </>
               ) : (
                 <span className="italic opacity-70">Plazo no configurado todavía</span>
@@ -445,33 +495,97 @@ export default function NominaElectronicaPage() {
           <button
             onClick={startEditPlazo}
             title="Editar plazo"
-            className="hover:bg-white/60 dark:hover:bg-white/10 rounded-full p-1.5 shrink-0 transition-colors"
-            style={{ color: plazoColor?.text ?? '#6b7280' }}
+            className={`hover:bg-white/60 dark:hover:bg-white/10 rounded-full p-1.5 shrink-0 transition-colors ${plazoColor ? PLAZO_ZONE_CLASS[plazoColor.zone] : 'text-[#6b7280] dark:text-[#8890b5]'}`}
           >
             <span className="material-symbols-outlined text-lg">edit</span>
           </button>
         )}
       </div>
 
-      {/* ── Search + summary ─────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[180px] max-w-xs">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#8890b5]" style={{ fontSize: 17 }}>
-            search
+      {/* Barra de progreso de presentación del mes — mismo formato de
+          "Progreso general" en Seguimiento Mensual de Fondo Emprender: % +
+          barra + "van / total" (excluye "no aplica" del total, ver
+          presentacionStats). */}
+      {!loading && !error && presentacionStats.total > 0 && (
+        <div className="flex-1 min-w-[260px] flex items-center gap-3 bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] px-4 py-3 shadow-sm">
+          <span className="material-symbols-outlined text-2xl shrink-0" style={{ color: '#16a34a' }}>
+            check_circle
           </span>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar empresa..."
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
-          />
+          <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] whitespace-nowrap shrink-0">
+            Progreso general
+          </span>
+          <div className="flex-1 min-w-[60px]">
+            <div className="w-full h-2 rounded-full bg-[#f3f4f6] dark:bg-[#252840]">
+              <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${presentacionStats.pct}%`, background: '#16a34a' }} />
+            </div>
+          </div>
+          <span className="text-xs font-bold shrink-0" style={{ color: '#16a34a' }}>{presentacionStats.pct}%</span>
+          <span className="text-xs text-[#6b7280] dark:text-[#8890b5] whitespace-nowrap shrink-0">
+            {presentacionStats.presentadas} / {presentacionStats.total} presentadas
+          </span>
         </div>
-        <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">
-          <b style={{ color: '#ef4444' }}>{stats.autorizadas}</b> ya se pueden presentar
-          {' · '}<b style={{ color: '#16a34a' }}>{stats.presentadas}</b> presentadas
-          {' · '}<b style={{ color: '#6b7280' }}>{stats.noAplica}</b> no aplica
-          {' · '}<b style={{ color: '#d97706' }}>{stats.conNovedad}</b> con novedad
-        </span>
+      )}
+      </div>
+
+      {/* ── Search + filtro de responsable (izquierda) / resumen de estados
+          (derecha, como chips) — justify-between: el resumen se corre a la
+          derecha cuando hay espacio y baja a su propia línea cuando no,
+          en vez de competir por el mismo renglón como texto corrido. ────── */}
+      <div className="flex items-center gap-3 flex-wrap justify-between">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#8890b5]" style={{ fontSize: 17 }}>
+              search
+            </span>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar empresa..."
+              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+            />
+          </div>
+          <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl p-1 shadow-sm">
+            {[
+              { key: 'all',  label: 'Todas' },
+              { key: 'mine', label: 'Mis empresas' },
+            ].map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setRespFilter(opt.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  respFilter === opt.key
+                    ? 'bg-[#004ac6] text-white'
+                    : 'text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Resumen de estados — chips con el mismo icono/color que usa el
+            popup de ESTADOS_VISUAL, para que se lean como una extensión de
+            esa misma paleta en vez de un texto aparte. Se recalcula sobre
+            filteredRows, así cambia junto con el buscador y el toggle de
+            arriba. */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {[
+            { count: stats.autorizadas, label: 'ya se pueden presentar', icon: 'priority_high',        color: '#dc2626', bg: '#fecaca' },
+            { count: stats.presentadas, label: 'presentadas',            icon: 'check_circle',         color: '#15803d', bg: '#bbf7d0' },
+            { count: stats.noAplica,    label: 'revisar',                icon: 'do_not_disturb_on',    color: '#4b5563', bg: '#d1d5db' },
+            { count: stats.conNovedad,  label: 'con novedad',            icon: 'sticky_note_2',        color: '#92400e', bg: '#fef3c7' },
+          ].map(chip => (
+            <span
+              key={chip.label}
+              className="flex items-center gap-1 pl-1.5 pr-2.5 py-1 rounded-lg text-[11px] font-semibold whitespace-nowrap"
+              style={{ background: chip.bg, color: chip.color }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{chip.icon}</span>
+              {chip.count} {chip.label}
+            </span>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -572,7 +686,7 @@ export default function NominaElectronicaPage() {
                 value={motivoDraft}
                 onChange={(e) => { dirtyRef.current.nota = true; setMotivoDraft(e.target.value) }}
                 onBlur={(e) => handleNota(openRow.empresaId, e.target.value)}
-                placeholder="¿Por qué no aplica?"
+                placeholder="¿Qué hay que revisar?"
                 rows={2}
                 className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
               />
