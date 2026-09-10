@@ -560,6 +560,11 @@ const uploadDian = async (req, res, next) => {
     // Proyección para la respuesta: campos de clasificación + flag requiereClasificacion
     const filasParaClasificar = filas.map(proyectarFilaParaClasificar);
 
+    // Transparencia sobre tipos de documento no reconocidos — antes solo vivía en la hoja
+    // METADATOS del Excel exportado (fácil de no abrir nunca); ahora también viaja en la
+    // respuesta para que el frontend pueda avisar en pantalla apenas se sube el reporte.
+    const documentosNoContabilizados = calcularDocumentosNoContabilizados(filas);
+
     // Persistir borrador con campos de clasificación incluidos (expira en 14 días).
     // Se guarda también el archivo normalizado (solo prefijos XML corregidos, NINGÚN
     // dato/formato tocado) para reutilizarlo tal cual al exportar como primera hoja —
@@ -575,6 +580,7 @@ const uploadDian = async (req, res, next) => {
       id, calculos, totalFilas: filas.length, filasParaClasificar,
       empresaId,
       empresaNombre: empresa?.name ?? null,
+      documentosNoContabilizados,
     });
   } catch (err) {
     next(err);
@@ -686,6 +692,9 @@ const getBorrador = async (req, res, next) => {
       nomina,
       empresaId: rows[0].empresa_id,
       empresaNombre: rows[0].empresa_nombre,
+      // Recalculado, no persistido — mismo criterio de siempre (barato de recalcular,
+      // evita guardar un derivado que se puede desincronizar del array de filas real).
+      documentosNoContabilizados: calcularDocumentosNoContabilizados(filas),
     });
   } catch (err) {
     next(err);

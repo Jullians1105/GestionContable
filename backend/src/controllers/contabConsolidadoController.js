@@ -272,21 +272,27 @@ function buildAgrupadoSheet(ws, titulo, grupos) {
 }
 
 function buildDetalleSheet(ws, documentos) {
+  // CUFE primero — es la llave real de la factura (así ya se usa para
+  // deduplicar re-subidas, ver dianController.js), pero angosta por defecto:
+  // a 96 caracteres no vale la pena mostrarla completa de entrada, el valor
+  // real sigue ahí para quien la necesite (barra de fórmulas / ensanchar).
   ws.columns = [
+    { width: 20 },
     { width: 12 }, { width: 10 }, { width: 10 }, { width: 32 }, { width: 15 }, { width: 30 },
     { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 18 },
   ];
   headerRow(ws, [
-    'Fecha', 'Grupo', 'Folio', 'Tercero', 'NIT', 'Dirección',
+    'CUFE', 'Fecha', 'Grupo', 'Folio', 'Tercero', 'NIT', 'Dirección',
     'Subtotal', 'Total', 'IVA', 'INC', 'Retención', 'Clasificación IVA', 'Concepto',
   ]);
   documentos.forEach((d, i) => {
     const row = dataRow(ws, [
+      d.cufe ?? '',
       d.fechaEmision, d.grupo, d.folio ?? '', d.nombreTercero ?? '', d.nitTercero ?? '', d.direccion ?? '',
       d.subtotal, d.total, d.iva, d.inc ?? 0, d.valorRetencion ?? 0, d.clasificacionIva ?? '', d.concepto ?? '',
     ], i % 2 === 1);
-    row.getCell(7).numFmt = COP; row.getCell(8).numFmt = COP;
-    row.getCell(9).numFmt = COP; row.getCell(10).numFmt = COP; row.getCell(11).numFmt = COP;
+    row.getCell(8).numFmt = COP; row.getCell(9).numFmt = COP;
+    row.getCell(10).numFmt = COP; row.getCell(11).numFmt = COP; row.getCell(12).numFmt = COP;
   });
 }
 

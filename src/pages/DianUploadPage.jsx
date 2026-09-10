@@ -198,6 +198,17 @@ export default function DianUploadPage() {
       return
     }
 
+    // Sin esto, un archivo soltado con "Guardar para una empresa" activo pero
+    // sin empresa elegida se subía igual: empresaId vacío no se manda en el
+    // FormData, y el backend lo procesa como "sin empresa" — termina en
+    // clasificación de retención sin avisar que no se guardó para nadie.
+    if (modo === 'empresa' && !empresaId) {
+      setEstado('error')
+      setArchivoNombre(file.name)
+      setErrorMsg('Elige primero una empresa, o cambia a "Solo calcular" si no quieres guardar este reporte.')
+      return
+    }
+
     setArchivoNombre(file.name)
     setEstado('loading')
     setErrorMsg('')
@@ -231,7 +242,7 @@ export default function DianUploadPage() {
           : err.message || 'Error al procesar el archivo'
       )
     }
-  }, [navigate, empresaId])
+  }, [navigate, empresaId, modo])
 
   // ── drag handlers ──────────────────────────────────────────────────────────
   const onDragOver = useCallback((e) => {

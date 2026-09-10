@@ -576,6 +576,11 @@ export default function DianClasificacionPage() {
   // antes de este cambio (solo retención).
   const [empresaId, setEmpresaId]         = useState(null)
   const [empresaNombre, setEmpresaNombre] = useState(null)
+  // Tipos de documento del reporte que NO están en TIPOS_CONTABILIZADOS ni en la lista de
+  // exclusiones conocidas (Application response / Nómina Individual) — antes esto solo se
+  // veía si alguien abría la hoja METADATOS del Excel exportado. Filtra a esConocido=false:
+  // los excluidos conocidos son esperados, no ameritan alarma en pantalla.
+  const [documentosNoReconocidos, setDocumentosNoReconocidos] = useState([])
 
   useEffect(() => {
     let cancelado = false
@@ -587,6 +592,7 @@ export default function DianClasificacionPage() {
         setFilasParaClasificar(data.filasParaClasificar ?? [])
         setEmpresaId(data.empresaId ?? null)
         setEmpresaNombre(data.empresaNombre ?? null)
+        setDocumentosNoReconocidos((data.documentosNoContabilizados ?? []).filter((d) => !d.esConocido))
       })
       .catch((err) => {
         if (cancelado) return
@@ -1007,6 +1013,33 @@ export default function DianClasificacionPage() {
           </div>
         )}
       </div>
+
+      {/* ── Documentos con tipo no reconocido — antes solo se veía en la hoja METADATOS
+          del Excel exportado, fácil de no abrir nunca. No bloquea nada (esos documentos
+          ya quedaron fuera de todos los cálculos), es solo para que no pase desapercibido
+          un tipo de documento nuevo que la DIAN empezó a usar. ─────────────────────── */}
+      {documentosNoReconocidos.length > 0 && (
+        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">warning</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              {documentosNoReconocidos.length === 1
+                ? 'Este reporte trae un tipo de documento que no se reconoce'
+                : `Este reporte trae ${documentosNoReconocidos.length} tipos de documento que no se reconocen`}
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              No entraron en ningún cálculo (ni compras, ni ventas, ni notas) — revisar si hace falta clasificarlos aparte.
+            </p>
+            <ul className="mt-2 flex flex-col gap-1">
+              {documentosNoReconocidos.map((d) => (
+                <li key={d.tipo} className="text-xs text-amber-800 dark:text-amber-300">
+                  <b>{d.tipo}</b> — {d.cantidad} {d.cantidad === 1 ? 'documento' : 'documentos'}, {formatCOP(d.total)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {filasRecibido.length === 0 ? (
         /* ── estado vacío ──────────────────────────────────────────────────── */
