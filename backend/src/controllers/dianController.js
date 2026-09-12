@@ -564,6 +564,9 @@ const uploadDian = async (req, res, next) => {
     // METADATOS del Excel exportado (fácil de no abrir nunca); ahora también viaja en la
     // respuesta para que el frontend pueda avisar en pantalla apenas se sube el reporte.
     const documentosNoContabilizados = calcularDocumentosNoContabilizados(filas);
+    // Mismo criterio: filas sin fecha de emisión utilizable quedan fuera del guardado
+    // permanente por mes en silencio (ver agruparFilasPorPeriodo) — se avisa apenas se sube.
+    const filasSinFecha = calcularFilasSinFechaValida(filas);
 
     // Persistir borrador con campos de clasificación incluidos (expira en 14 días).
     // Se guarda también el archivo normalizado (solo prefijos XML corregidos, NINGÚN
@@ -581,6 +584,7 @@ const uploadDian = async (req, res, next) => {
       empresaId,
       empresaNombre: empresa?.name ?? null,
       documentosNoContabilizados,
+      filasSinFecha,
     });
   } catch (err) {
     next(err);
@@ -683,6 +687,13 @@ const getBorrador = async (req, res, next) => {
     const { filas, calculos, nomina = null } = rows[0].datos;
     const filasParaClasificar = filas.map(proyectarFilaParaClasificar);
 
+    // Aviso temprano de meses ya guardados para esta empresa — igual chequeo que se hace al
+    // exportar (ver guardarDocumentosPermanentes), pero acá es solo informativo: no bloquea
+    // nada, la elección real de actualizar/reemplazar sigue siendo al exportar.
+    const periodosExistentes = rows[0].empresa_id
+      ? await detectarPeriodosExistentes(rows[0].empresa_id, filas)
+      : [];
+
     res.json({
       id,
       nombreArchivo: rows[0].nombre_archivo,
@@ -695,6 +706,8 @@ const getBorrador = async (req, res, next) => {
       // Recalculado, no persistido — mismo criterio de siempre (barato de recalcular,
       // evita guardar un derivado que se puede desincronizar del array de filas real).
       documentosNoContabilizados: calcularDocumentosNoContabilizados(filas),
+      periodosExistentes,
+      filasSinFecha: calcularFilasSinFechaValida(filas),
     });
   } catch (err) {
     next(err);
@@ -762,6 +775,23 @@ const calcularDocumentosNoContabilizados = (filas) => {
   }));
 };
 
+// Filas con relevancia contable pero sin fecha de emisión utilizable (ausente, o en un formato
+// que parseDate no pudo convertir a ISO) — sin esto la fila no se puede ubicar en ningún mes
+// calendario y queda fuera del guardado permanente en silencio (ver agruparFilasPorPeriodo).
+// Pedido explícito del usuario (2026-09-12): antes se había decidido no avisar de esto hasta
+// que apareciera un caso real (ver ESTADO_CONTABILIDAD_EMPRESAS.md); el usuario prefirió
+// adelantarse en vez de esperar a que pasara con datos reales.
+const FECHA_ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+const calcularFilasSinFechaValida = (filas) =>
+  filas
+    .filter((f) => TIPOS_CONTABILIZADOS.has(f.tipoDocumento) && !FECHA_ISO_RE.test(f.fechaEmision ?? ''))
+    .map((f) => ({
+      tipoDocumento: f.tipoDocumento,
+      prefijo: f.prefijo,
+      folio: f.folio,
+      fechaEmisionCruda: f.fechaEmision ?? null,
+    }));
+
 // Anomalías de calidad de datos en el reporte — no cambian ningún cálculo, solo alertan
 // para que el usuario audite antes de confiar en las cifras.
 // anomaliasRevisadas: array de `tipo` marcados manualmente como revisados (persistido en
@@ -804,6 +834,15 @@ const calcularAnomalias = (filas, anomaliasRevisadas = []) => {
       tipo: 'Total negativo inesperado',
       detalle: `${totalNegativoInesperado.length} fila(s) con Total negativo que no son nota crédito ` +
         `(${TIPOS_NOTA_CREDITO.map((t) => `"${t}"`).join(', ')})`,
+    });
+  }
+
+  const filasSinFecha = calcularFilasSinFechaValida(filas);
+  if (filasSinFecha.length > 0) {
+    anomalias.push({
+      tipo: 'Fecha de emisión ausente o irreconocible',
+      detalle: `${filasSinFecha.length} fila(s) sin fecha de emisión utilizable — no se pueden ` +
+        'ubicar en ningún mes calendario y quedan fuera del guardado permanente',
     });
   }
 
@@ -1957,6 +1996,28 @@ const CAMPOS_IMPUESTOS_EXTRA = [
   'icDatos', 'icl', 'inpp', 'ibua', 'icui', 'reteIva', 'reteRenta', 'reteIca',
 ];
 
+// Detecta si algún mes de este reporte ya tiene documentos guardados para esta empresa.
+// Compartida por guardarDocumentosPermanentes (chequeo previo a escribir, al exportar) y
+// getBorrador (aviso temprano en la pantalla de clasificación, apenas se sube el reporte —
+// antes el aviso solo salía al exportar, después de que el usuario ya invirtió tiempo
+// clasificando todo un reporte que de todos modos iba a pedir elegir actualizar/reemplazar).
+async function detectarPeriodosExistentes(empresaId, filas) {
+  const filasContabilizables = filas.filter((f) => TIPOS_CONTABILIZADOS.has(f.tipoDocumento));
+  const porPeriodo = agruparFilasPorPeriodo(filasContabilizables);
+  const conflictos = [];
+  for (const [ym, filasPeriodo] of porPeriodo) {
+    const [anio, mes] = ym.split('-').map(Number);
+    const { rows } = await db.query(
+      'SELECT count(*)::int AS n FROM contab_documentos WHERE empresa_id = $1 AND anio = $2 AND mes = $3',
+      [empresaId, anio, mes]
+    );
+    if (rows[0].n > 0) {
+      conflictos.push({ anio, mes, existentes: rows[0].n, enElReporte: filasPeriodo.length });
+    }
+  }
+  return conflictos;
+}
+
 async function guardarDocumentosPermanentes({ empresaId, filas, nombreArchivo, userId, modo }) {
   // Solo se guardan documentos con relevancia contable real (mismo criterio que
   // TIPOS_CONTABILIZADOS usa para la transparencia de "documentos no contabilizados" en el
@@ -1972,17 +2033,7 @@ async function guardarDocumentosPermanentes({ empresaId, filas, nombreArchivo, u
   // guardados — el frontend deja elegir actualizar (upsert, conserva lo no reenviado) o
   // reemplazar (borra el mes y lo vuelve a cargar limpio) antes de escribir nada.
   if (!modo) {
-    const conflictos = [];
-    for (const [ym, filasPeriodo] of porPeriodo) {
-      const [anio, mes] = ym.split('-').map(Number);
-      const { rows } = await db.query(
-        'SELECT count(*)::int AS n FROM contab_documentos WHERE empresa_id = $1 AND anio = $2 AND mes = $3',
-        [empresaId, anio, mes]
-      );
-      if (rows[0].n > 0) {
-        conflictos.push({ anio, mes, existentes: rows[0].n, enElReporte: filasPeriodo.length });
-      }
-    }
+    const conflictos = await detectarPeriodosExistentes(empresaId, filas);
     if (conflictos.length > 0) {
       return { requiereConfirmacion: true, periodos: conflictos };
     }
@@ -2442,7 +2493,7 @@ module.exports = {
   uploadDian, patchBorrador, getBorrador, patchNomina, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada,
   // Funciones puras (no tocan DB ni request). Se exportan para poder testear directamente
   // las reglas contables sin montar un borrador completo — ver tests/unit/dianController.test.js
-  calcularAnomalias, calcularDocumentosNoContabilizados,
+  calcularAnomalias, calcularDocumentosNoContabilizados, calcularFilasSinFechaValida,
   calcularResumenPeriodo, agruparPorMes,
   TASAS_AUTORRETENCION, CLASES_IVA, CONCEPTOS,
 };

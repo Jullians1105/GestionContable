@@ -39,6 +39,13 @@ const formatFecha = (iso) => {
 const formatCOP = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n ?? 0)
 
+// Mismo arreglo que MESES_ES en DianExportacionPage.jsx — se repite acá para no acoplar dos
+// páginas por un array de 12 strings.
+const MESES_ES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
 const truncate = (s, n) =>
   s && s.length > n ? s.slice(0, n) + '…' : (s || '—')
 
@@ -581,6 +588,17 @@ export default function DianClasificacionPage() {
   // veía si alguien abría la hoja METADATOS del Excel exportado. Filtra a esConocido=false:
   // los excluidos conocidos son esperados, no ameritan alarma en pantalla.
   const [documentosNoReconocidos, setDocumentosNoReconocidos] = useState([])
+  // Meses de este reporte que ya tienen documentos guardados para esta empresa — mismo
+  // chequeo que dianController.js#guardarDocumentosPermanentes hace al exportar, expuesto acá
+  // temprano (apenas se abre esta pantalla) para no hacer clasificar un reporte entero antes
+  // de avisar que ese mes ya existía. Es solo informativo: la elección de actualizar/reemplazar
+  // sigue siendo al exportar, en DianExportacionPage.jsx.
+  const [periodosExistentes, setPeriodosExistentes] = useState([])
+  // Filas con relevancia contable pero sin fecha de emisión utilizable (ausente o en un formato
+  // que el backend no pudo convertir a ISO) — sin esto la fila no se puede ubicar en ningún mes
+  // calendario y queda fuera del guardado permanente en silencio (ver agruparFilasPorPeriodo en
+  // dianController.js). Pedido explícito del usuario (2026-09-12).
+  const [filasSinFecha, setFilasSinFecha] = useState([])
 
   useEffect(() => {
     let cancelado = false
@@ -593,6 +611,8 @@ export default function DianClasificacionPage() {
         setEmpresaId(data.empresaId ?? null)
         setEmpresaNombre(data.empresaNombre ?? null)
         setDocumentosNoReconocidos((data.documentosNoContabilizados ?? []).filter((d) => !d.esConocido))
+        setPeriodosExistentes(data.periodosExistentes ?? [])
+        setFilasSinFecha(data.filasSinFecha ?? [])
       })
       .catch((err) => {
         if (cancelado) return
@@ -1013,6 +1033,58 @@ export default function DianClasificacionPage() {
           </div>
         )}
       </div>
+
+      {/* ── Meses ya guardados para esta empresa — aviso temprano, antes de invertir tiempo
+          clasificando un reporte que de todos modos va a pedir elegir actualizar/reemplazar
+          al exportar (ver DianExportacionPage.jsx). No bloquea nada acá. ─────────────────── */}
+      {periodosExistentes.length > 0 && (
+        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">history</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              Ya hay datos guardados para {periodosExistentes.length === 1 ? 'este mes' : 'estos meses'} de esta empresa
+            </p>
+            <div className="mt-1 space-y-0.5">
+              {periodosExistentes.map((p) => (
+                <p key={`${p.anio}-${p.mes}`} className="text-xs text-amber-700 dark:text-amber-400">
+                  {MESES_ES[p.mes - 1]} {p.anio}: {p.existentes} ya guardada{p.existentes !== 1 ? 's' : ''}, {p.enElReporte} en este reporte
+                </p>
+              ))}
+            </div>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1.5">
+              Puedes seguir clasificando; al exportar podrás elegir actualizar o reemplazar esos meses.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Filas sin fecha de emisión utilizable — no se pueden ubicar en ningún mes
+          calendario, así que quedan fuera del guardado permanente en silencio si hay
+          empresa asociada. No bloquea nada, es solo para que se note antes de exportar. ── */}
+      {filasSinFecha.length > 0 && (
+        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">event_busy</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              {filasSinFecha.length === 1
+                ? 'Hay una fila sin fecha de emisión utilizable'
+                : `Hay ${filasSinFecha.length} filas sin fecha de emisión utilizable`}
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              {empresaId
+                ? 'No se puede determinar a qué mes pertenecen — no quedarán guardadas en el consolidado mensual de esta empresa.'
+                : 'No se puede determinar a qué mes pertenecen — revisa el archivo original si esperabas que se contabilizaran por mes.'}
+            </p>
+            <ul className="mt-2 flex flex-col gap-1">
+              {filasSinFecha.map((f, i) => (
+                <li key={i} className="text-xs text-amber-800 dark:text-amber-300">
+                  <b>{f.tipoDocumento ?? '(sin tipo)'}</b> {f.prefijo}{f.folio ?? ''} — fecha: {f.fechaEmisionCruda ? `"${f.fechaEmisionCruda}"` : '(vacía)'}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {/* ── Documentos con tipo no reconocido — antes solo se veía en la hoja METADATOS
           del Excel exportado, fácil de no abrir nunca. No bloquea nada (esos documentos
