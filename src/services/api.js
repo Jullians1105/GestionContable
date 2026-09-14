@@ -301,6 +301,15 @@ export const api = {
   updateContabEmpresa: (id, data) => request(`/contabilidad/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteContabEmpresa: (id) => request(`/contabilidad/empresas/${id}`, { method: 'DELETE' }),
 
+  // Directorio maestro de empresas — une fondo_empresas/ext_empresas/ne_empresas/contab_empresas
+  getEmpresasDirectorio: () => request('/empresas'),
+  getEmpresasDuplicados: () => request('/empresas/duplicados'),
+  createEmpresaMaestro: (data) => request('/empresas', { method: 'POST', body: JSON.stringify(data) }),
+  updateEmpresaMaestro: (id, data) => request(`/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  habilitarEmpresaModulo: (id, data) => request(`/empresas/${id}/habilitar`, { method: 'POST', body: JSON.stringify(data) }),
+  deshabilitarEmpresaModulo: (id, modulo) => request(`/empresas/${id}/habilitar/${modulo}`, { method: 'DELETE' }),
+  fusionarEmpresas: (empresaIdA, empresaIdB) => request('/empresas/fusionar', { method: 'POST', body: JSON.stringify({ empresaIdA, empresaIdB }) }),
+
   // Empresas Externas — Catálogo de procesos (checklist)
   getExtProcesos: (incluirInactivos) => {
     const qs = incluirInactivos ? '?incluirInactivos=true' : ''

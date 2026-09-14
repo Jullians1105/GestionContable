@@ -6,6 +6,7 @@ const { parse } = require('date-fns');
 const db = require('../config/database');
 const { SALARY_CONSTANTS } = require('../constants/salaryConstants');
 const { limpiarIdentificacion } = require('../services/exogenas/utils/dian');
+const { nombresSeParecen } = require('../utils/nombresSeParecen');
 
 // El portal de la DIAN exporta el .xlsx con las etiquetas de estos dos namespaces
 // prefijadas (ej. <x:workbook>, <x:sheets>, <ap:Properties>) — válido según OOXML, pero el
@@ -236,29 +237,6 @@ const derivarNitPropio = (filas) => {
 // palabras significativas evita falsos negativos ("SAS" en ambos nombres no prueba nada) y
 // falsos positivos serían peores acá: preferimos pedir una confirmación de más que aceptar
 // en silencio una empresa equivocada.
-const PALABRAS_GENERICAS_RAZON_SOCIAL = new Set([
-  'SAS', 'S.A.S', 'LTDA', 'LTDA.', 'SA', 'S.A', 'CIA', 'CIA.', 'COMPANIA', 'COMPAÑIA',
-  'EU', 'E.U', 'ESP', 'E.S.P', 'Y', 'DE', 'DEL', 'LA', 'EL', 'LOS', 'LAS', 'EN', 'CON',
-]);
-
-const normalizarNombreSimple = (texto) =>
-  String(texto ?? '')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-
-const palabrasSignificativas = (nombre) =>
-  normalizarNombreSimple(nombre).split(' ').filter((p) => p.length >= 3 && !PALABRAS_GENERICAS_RAZON_SOCIAL.has(p));
-
-// true si comparten al menos una palabra significativa — heurística permisiva a propósito
-// (nombres de catálogo vs. razón social del reporte pueden variar en orden, abreviaturas,
-// sufijos legales), pensada solo para atrapar el caso evidente de "no tiene nada que ver".
-const nombresSeParecen = (nombreA, nombreB) => {
-  const palabrasA = new Set(palabrasSignificativas(nombreA));
-  const palabrasB = palabrasSignificativas(nombreB);
-  if (palabrasA.size === 0 || palabrasB.length === 0) return true; // sin datos suficientes, no bloquear
-  return palabrasB.some((p) => palabrasA.has(p));
-};
-
 // Proyección de una fila para el frontend (pantalla de clasificación): solo lo que la UI
 // necesita, más el flag requiereClasificacion — así el frontend nunca reimplementa esta
 // regla por su cuenta (eso fue exactamente lo que causó el bug de "toma 458 en vez de 425").
@@ -553,6 +531,18 @@ const uploadDian = async (req, res, next) => {
           }
 
           await db.query('UPDATE contab_empresas SET nit = $1 WHERE id = $2', [nitDetectado, empresaId]);
+          // Cascada hacia el directorio maestro de empresas (ver migración 054): el NIT es
+          // identidad de la empresa real, no solo de su fila en Contabilidad — si esta empresa
+          // ya está habilitada ahí (empresa_id no nulo), también se registra a ese nivel para
+          // que sirva como señal fuerte de duplicado entre módulos (empresasMaestroController
+          // .getPosiblesDuplicados). "AND nit IS NULL" para no pisar un NIT que ya tuviera por
+          // otra vía — no debería pasar hoy (solo Contabilidad lo aprende), pero es la misma
+          // cautela que ya usa la migración 052 para no pisar un NIT real aprendido por uso.
+          await db.query(
+            `UPDATE empresas SET nit = $1
+             WHERE id = (SELECT empresa_id FROM contab_empresas WHERE id = $2) AND nit IS NULL`,
+            [nitDetectado, empresaId]
+          );
         }
       }
     }

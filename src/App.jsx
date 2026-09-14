@@ -47,6 +47,7 @@ import TercerosPage from './pages/TercerosPage'
 import ConsultaTerceroPage from './pages/ConsultaTerceroPage'
 import RecurringTasksPage from './pages/RecurringTasksPage'
 import EmpresasExternasPage from './pages/EmpresasExternasPage'
+import EmpresasPage from './pages/EmpresasPage'
 import NominaElectronicaPage from './pages/NominaElectronicaPage'
 import NominaElectronicaEmpresasPage from './pages/NominaElectronicaEmpresasPage'
 
@@ -118,6 +119,7 @@ function Layout() {
             <Route path="/fondo-emprender/empresas/:empresaId" element={<FondoEmprenderEmpresaDetallePage />} />
             <Route path="/fondo-emprender/pagos" element={<FondoEmprenderPagosPage />} />
             <Route path="/empresas-externas" element={<EmpresasExternasPage />} />
+            <Route path="/empresas" element={<EmpresasPage />} />
             <Route path="/dian/upload"                       element={<DianUploadPage />} />
             <Route path="/dian/clasificacion/:borradorId"    element={<DianClasificacionPage />} />
             <Route path="/dian/nomina/:borradorId"           element={<DianNominaPage />} />

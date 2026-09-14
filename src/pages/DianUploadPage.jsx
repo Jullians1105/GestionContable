@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../services/api'
+import EmpresaCombobox from '../components/EmpresaCombobox'
 
 const SIN_EMPRESA = ''
 
@@ -29,124 +30,6 @@ function PasoLabel({ n, children }) {
       <span className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
         {children}
       </span>
-    </div>
-  )
-}
-
-// ── Buscador de empresa ────────────────────────────────────────────────────────
-// Combobox liviano: input con filtro en vivo + lista desplegable, en vez de un <select> plano
-// con 52+ empresas sin buscador. La opción de agregar una empresa nueva vive integrada en la
-// misma lista (fila final "Agregar '<texto>'") en vez de un formulario aparte.
-function EmpresaCombobox({ empresas, value, onChange, onCrear }) {
-  const [query, setQuery]   = useState('')
-  const [open, setOpen]     = useState(false)
-  const [creando, setCreando] = useState(false)
-  const [errorNueva, setErrorNueva] = useState('')
-  const wrapRef = useRef(null)
-
-  const empresaSeleccionada = empresas.find((e) => e.id === value) ?? null
-
-  useEffect(() => {
-    const onClickFuera = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onClickFuera)
-    return () => document.removeEventListener('mousedown', onClickFuera)
-  }, [])
-
-  const queryNormalizada = query.trim().toLowerCase()
-  const filtradas = queryNormalizada
-    ? empresas.filter((e) => e.name.toLowerCase().includes(queryNormalizada))
-    : empresas
-  const hayCoincidenciaExacta = filtradas.some((e) => e.name.toLowerCase() === queryNormalizada)
-
-  const seleccionar = (empresa) => {
-    onChange(empresa.id)
-    setQuery('')
-    setErrorNueva('')
-    setOpen(false)
-  }
-
-  const crear = async () => {
-    const nombre = query.trim()
-    if (!nombre) return
-    setCreando(true)
-    setErrorNueva('')
-    try {
-      const nueva = await onCrear(nombre)
-      seleccionar(nueva)
-    } catch (err) {
-      setErrorNueva(err.message || 'No se pudo agregar la empresa')
-    } finally {
-      setCreando(false)
-    }
-  }
-
-  return (
-    <div ref={wrapRef} className="relative">
-      {empresaSeleccionada && !open ? (
-        <button
-          type="button"
-          onClick={() => { setOpen(true); setQuery('') }}
-          className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl border border-[#c7d9ff] dark:border-[#2e4470] bg-[#eef3ff] dark:bg-[#1a2540] text-sm transition hover:border-[#004ac6]/50"
-        >
-          <span className="flex items-center gap-2 min-w-0">
-            <span className="material-symbols-outlined text-[#004ac6] text-lg flex-shrink-0">business</span>
-            <span className="truncate font-medium text-[#191c1e] dark:text-[#e4e6f0]">{empresaSeleccionada.name}</span>
-          </span>
-          <span className="material-symbols-outlined text-[#8890b5] text-lg flex-shrink-0">unfold_more</span>
-        </button>
-      ) : (
-        <div className="relative">
-          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af] text-lg pointer-events-none">
-            search
-          </span>
-          <input
-            autoFocus={open}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => setOpen(true)}
-            placeholder="Buscar empresa…"
-            className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/30 focus:border-[#004ac6]"
-          />
-        </div>
-      )}
-
-      {open && (
-        <div className="absolute z-20 mt-1.5 w-full bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-lg overflow-hidden">
-          <div className="max-h-56 overflow-y-auto scrollbar-styled">
-            {filtradas.length === 0 ? (
-              <p className="px-3.5 py-3 text-sm text-[#9ca3af] italic">Ninguna empresa coincide</p>
-            ) : (
-              filtradas.map((e) => (
-                <button
-                  key={e.id}
-                  type="button"
-                  onClick={() => seleccionar(e)}
-                  className="w-full text-left px-3.5 py-2.5 text-sm text-[#191c1e] dark:text-[#e4e6f0] hover:bg-[#eef3ff] dark:hover:bg-[#1a2540] transition-colors flex items-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-[#8890b5] text-base flex-shrink-0">business</span>
-                  <span className="truncate">{e.name}</span>
-                </button>
-              ))
-            )}
-          </div>
-
-          {query.trim() && !hayCoincidenciaExacta && (
-            <button
-              type="button"
-              onClick={crear}
-              disabled={creando}
-              className="w-full text-left px-3.5 py-2.5 text-sm font-semibold text-[#004ac6] hover:bg-[#eef3ff] dark:hover:bg-[#1a2540] border-t border-[#f0f2f8] dark:border-[#2a2e45] transition-colors flex items-center gap-2 disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-base flex-shrink-0">add_circle</span>
-              {creando ? 'Agregando…' : <>Agregar <span className="truncate">&ldquo;{query.trim()}&rdquo;</span> como empresa nueva</>}
-            </button>
-          )}
-        </div>
-      )}
-      {errorNueva && <p className="text-xs text-red-500 mt-1.5">{errorNueva}</p>}
     </div>
   )
 }

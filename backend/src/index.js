@@ -36,6 +36,7 @@ const fondoPagosRoutes      = require('./routes/fondoPagos');
 const fondoLinksRoutes      = require('./routes/fondoLinks');
 const dianRoutes            = require('./routes/dian');
 const contabEmpresasRoutes  = require('./routes/contabEmpresas');
+const empresasMaestroRoutes = require('./routes/empresasMaestro');
 const contabConsolidadoRoutes = require('./routes/contabConsolidado');
 const exogenasRoutes        = require('./routes/exogenas');
 const tercerosRoutes        = require('./routes/terceros');
@@ -172,6 +173,7 @@ app.use('/api/nomina-electronica/plazo',    nePlazoRoutes);
 app.use('/api/dian',             dianRoutes);
 app.use('/api/contabilidad/empresas', contabEmpresasRoutes);
 app.use('/api/contabilidad', contabConsolidadoRoutes);
+app.use('/api/empresas', empresasMaestroRoutes);
 app.use('/api/exogenas',         exogenasRoutes);
 app.use('/api/terceros',         tercerosRoutes);
 
