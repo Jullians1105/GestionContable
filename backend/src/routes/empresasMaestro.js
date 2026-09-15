@@ -11,7 +11,7 @@ const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const {
   getDirectorio, getPosiblesDuplicados, createEmpresa, updateEmpresa,
-  habilitarModulo, deshabilitarModulo, fusionar, MODULOS,
+  habilitarModulo, deshabilitarModulo, fusionar, generarTokenDian, MODULOS,
 } = require('../controllers/empresasMaestroController');
 
 const router = Router();
@@ -19,6 +19,11 @@ router.use(authMiddleware);
 
 router.get('/', getDirectorio);
 router.get('/duplicados', getPosiblesDuplicados);
+
+// Abierto a cualquier autenticado (no admin/leader): generar el token es una acción operativa
+// del día a día para cualquiera de los ~14 usuarios de la página, no algo que deba limitarse
+// como sí se limita crear/fusionar empresas (ahí el riesgo es duplicar identidad; acá no).
+router.post('/:id/generar-token-dian', ...validateUUIDParam('id'), generarTokenDian);
 
 router.use(roleMiddleware('admin', 'leader'));
 

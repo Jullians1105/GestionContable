@@ -2,3 +2,6 @@ backend/
 mcpServer/
 dist/
 node_modules/
+# Perfil real de Chrome para dianTokenService.js — datos de sesión (extensiones, cache), no
+# código nuestro. Vive fuera de backend/ a propósito (ver comentario en dianTokenService.js).
+dian-perfil-real-chrome/

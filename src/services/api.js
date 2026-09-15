@@ -309,6 +309,7 @@ export const api = {
   habilitarEmpresaModulo: (id, data) => request(`/empresas/${id}/habilitar`, { method: 'POST', body: JSON.stringify(data) }),
   deshabilitarEmpresaModulo: (id, modulo) => request(`/empresas/${id}/habilitar/${modulo}`, { method: 'DELETE' }),
   fusionarEmpresas: (empresaIdA, empresaIdB) => request('/empresas/fusionar', { method: 'POST', body: JSON.stringify({ empresaIdA, empresaIdB }) }),
+  generarTokenDian: (id) => request(`/empresas/${id}/generar-token-dian`, { method: 'POST' }),
 
   // Empresas Externas — Catálogo de procesos (checklist)
   getExtProcesos: (incluirInactivos) => {

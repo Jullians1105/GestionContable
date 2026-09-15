@@ -48,6 +48,10 @@ services:
       DB_HOST: postgres
       SMTP_HOST: mailhog
       SMTP_PORT: 1025
+      # dianTokenService.js — perfil de Chrome PERSISTENTE (ver Dockerfile, se calienta una
+      # sola vez con una verificación real de Cloudflare, ver ESTADO_EMPRESAS_DIRECTORIO.md).
+      # Ruta dentro del contenedor; el volumen de abajo la hace sobrevivir a cada rebuild.
+      DIAN_CHROME_PROFILE_DIR: /app/dian-perfil
     ports:
       - "${PORT:-3000}:3000"
     volumes:
@@ -60,6 +64,12 @@ services:
       # /app/shared) — de ahí el punto de montaje. Volumen en vez de agregarlo al
       # Dockerfile: no exige reconstruir la imagen, solo recrear el contenedor.
       - ./shared:/shared:ro
+      # Bind mount (no volumen nombrado) apuntando directo al perfil que YA se calentó a mano
+      # en este servidor con una verificación real de Cloudflare (ver
+      # ESTADO_EMPRESAS_DIRECTORIO.md) — un volumen nombrado empezaría vacío y se perdería ese
+      # trabajo. ${HOME} lo resuelve docker compose contra el shell que lo invoca (el usuario
+      # gestionc-server), no hace falta escribir la ruta absoluta a mano.
+      - ${HOME}/dian-perfil-real-chrome:/app/dian-perfil
 
   frontend:
     build:

@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 const { palabrasSignificativas } = require('../utils/nombresSeParecen');
+const dianTokenService = require('../services/dianTokenService');
 
 // Un módulo = una tabla + sus campos propios (los que SÍ importan para mostrarlos en el
 // directorio; no es la lista completa de columnas de cada tabla, solo lo identificable a
@@ -59,6 +60,8 @@ const normalizeEmpresa = (row) => ({
   id: row.id,
   name: row.name,
   nit: row.nit ?? null,
+  tipoContribuyente: row.tipo_contribuyente ?? null,
+  cedulaRepresentante: row.cedula_representante ?? null,
   activa: row.activa,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
@@ -69,7 +72,7 @@ const getDirectorio = async (req, res, next) => {
   try {
     const { rows } = await db.query(`
       SELECT
-        e.id, e.name, e.nit, e.activa, e.created_at, e.updated_at,
+        e.id, e.name, e.nit, e.tipo_contribuyente, e.cedula_representante, e.activa, e.created_at, e.updated_at,
         fe.id AS fondo_id, fe.categoria AS fondo_categoria, fe.monthly_fee AS fondo_monthly_fee,
         ee.id AS ext_id, ee.responsable_id AS ext_responsable_id,
         ne.id AS ne_id, ne.responsable_id AS ne_responsable_id,
@@ -306,6 +309,33 @@ const fusionar = async (req, res, next) => {
   }
 };
 
+// Genera el token de acceso a la DIAN para esta empresa (ver dianTokenService.js) — dispara el
+// envío del enlace al correo del RUT, no "entra" a ninguna cuenta. Requiere que la empresa ya
+// tenga tipo_contribuyente + los datos que ese tipo necesita (nit siempre; cedula_representante
+// solo si es 'empresa'), cargados de antemano en el directorio — no se piden en el momento para
+// no tener que manejar ese formulario dos veces.
+const generarTokenDian = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { rows } = await db.query(
+      'SELECT nit, tipo_contribuyente, cedula_representante FROM empresas WHERE id = $1',
+      [id]
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'Empresa no encontrada' });
+
+    const { nit, tipo_contribuyente: tipo, cedula_representante: cedulaRepresentante } = rows[0];
+    if (!tipo) {
+      return res.status(400).json({ error: 'Esta empresa no tiene configurado el tipo de contribuyente (empresa/natural) para la DIAN.' });
+    }
+
+    const resultado = await dianTokenService.generarToken({ tipo, nit, cedulaRepresentante });
+    await auditLog(req.user.userId, 'CREATE', 'dian_token', id, { tipo, success: resultado.success });
+    res.json(resultado);
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   MODULOS,
   getDirectorio,
@@ -315,4 +345,5 @@ module.exports = {
   habilitarModulo,
   deshabilitarModulo,
   fusionar,
+  generarTokenDian,
 };

@@ -35,13 +35,22 @@ export default function EmpresasPage() {
 
   useEffect(() => { cargar() }, [cargar])
 
-  // ── búsqueda ─────────────────────────────────────────────────────────────
+  // ── búsqueda (nombre, NIT o cédula) ────────────────────────────────────────
   const [busqueda, setBusqueda] = useState('')
   const empresasFiltradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     if (!q) return empresas
-    return empresas.filter((e) => e.name.toLowerCase().includes(q))
+    return empresas.filter((e) =>
+      e.name.toLowerCase().includes(q) ||
+      e.nit?.toLowerCase().includes(q) ||
+      e.cedulaRepresentante?.toLowerCase().includes(q)
+    )
   }, [empresas, busqueda])
+
+  const stats = useMemo(() => ({
+    total: empresas.length,
+    conDatos: empresas.filter((e) => e.nit).length,
+  }), [empresas])
 
   // ── crear empresa nueva (solo identidad, sin habilitar módulo todavía) ────
   const [nuevoNombre, setNuevoNombre] = useState('')
@@ -134,6 +143,25 @@ export default function EmpresasPage() {
     }
   }
 
+  // ── generar token DIAN ──────────────────────────────────────────────────────
+  // Abierto a cualquier autenticado (no solo admin/leader, ver empresasMaestro.js) — es una
+  // acción operativa del día a día, no algo que deba restringirse como crear/fusionar empresas.
+  const [generandoTokenId, setGenerandoTokenId] = useState(null)
+  const [resultadoToken, setResultadoToken] = useState(null) // { empresaId, success, mensaje } | null
+
+  const generarToken = async (empresaId) => {
+    setGenerandoTokenId(empresaId)
+    setResultadoToken(null)
+    try {
+      const resultado = await api.generarTokenDian(empresaId)
+      setResultadoToken({ empresaId, ...resultado })
+    } catch (err) {
+      setResultadoToken({ empresaId, success: false, mensaje: err.message || 'No se pudo generar el token' })
+    } finally {
+      setGenerandoTokenId(null)
+    }
+  }
+
   // ── fusionar duplicados sugeridos ──────────────────────────────────────────
   const [fusionando, setFusionando] = useState(null) // { empresaA, empresaB } | null
   const [fusionError, setFusionError] = useState('')
@@ -172,6 +200,21 @@ export default function EmpresasPage() {
           Todas las empresas del software en un solo lugar — Fondo Emprender, Empresas Externas,
           Nómina Electrónica y Contabilidad. {!puedeEditar && 'Solo un admin o leader puede editar esto.'}
         </p>
+        <div className="flex items-center gap-4 mt-3 text-xs">
+          <span className="text-[#6b7280] dark:text-[#8890b5]">
+            <b className="text-[#191c1e] dark:text-[#e4e6f0] text-sm">{stats.total}</b> empresas
+          </span>
+          <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>verified</span>
+            <b>{stats.conDatos}</b> con NIT/cédula
+          </span>
+          {stats.total - stats.conDatos > 0 && (
+            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>error</span>
+              <b>{stats.total - stats.conDatos}</b> sin datos
+            </span>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -195,7 +238,9 @@ export default function EmpresasPage() {
               <div key={`${d.empresaA.id}-${d.empresaB.id}`} className="flex items-center justify-between gap-3 bg-white dark:bg-[#1e2030] rounded-xl px-3.5 py-2.5 border border-amber-200 dark:border-amber-800">
                 <span className="text-sm text-[#191c1e] dark:text-[#e4e6f0] min-w-0 truncate">
                   <b>{d.empresaA.name}</b> ↔ <b>{d.empresaB.name}</b>
-                  <span className="text-xs text-[#9ca3af] ml-2">({d.palabrasCompartidas.join(', ')})</span>
+                  <span className="text-xs text-[#9ca3af] ml-2">
+                    ({d.motivo === 'nit' ? `mismo NIT: ${d.detalle}` : `nombre parecido: ${d.detalle}`})
+                  </span>
                 </span>
                 {puedeEditar && (
                   <button
@@ -218,7 +263,7 @@ export default function EmpresasPage() {
           <input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar empresa…"
+            placeholder="Buscar por nombre, NIT o cédula…"
             className="w-full pl-10 pr-3.5 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/30"
           />
         </div>
@@ -254,35 +299,81 @@ export default function EmpresasPage() {
               const expandido = expandidoId === empresa.id
               const modulosHabilitados = Object.entries(empresa.modulos).filter(([, v]) => v)
               const modulosSinHabilitar = Object.keys(MODULOS_INFO).filter((m) => !empresa.modulos[m])
+              const documento = !empresa.nit
+                ? null
+                : empresa.tipoContribuyente === 'natural'
+                  ? `C.C. ${empresa.nit}`
+                  : `NIT ${empresa.nit}${empresa.cedulaRepresentante ? ` · C.C. ${empresa.cedulaRepresentante} (rep. legal)` : ''}`
               return (
                 <div key={empresa.id}>
-                  <button
-                    onClick={() => toggleExpandir(empresa.id)}
-                    className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left hover:bg-[#f8f9ff] dark:hover:bg-[#181a2e] transition"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className={`material-symbols-outlined text-lg ${empresa.activa ? 'text-[#004ac6]' : 'text-[#c3c6d7]'}`}>business</span>
-                      <span className={`text-sm font-medium truncate ${empresa.activa ? 'text-[#191c1e] dark:text-[#e4e6f0]' : 'text-[#9ca3af] line-through'}`}>
-                        {empresa.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {Object.entries(MODULOS_INFO).map(([key, info]) => (
-                        <span
-                          key={key}
-                          title={empresa.modulos[key] ? info.label : `No habilitada en ${info.label}`}
-                          className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            empresa.modulos[key]
-                              ? 'bg-[#eef3ff] dark:bg-[#1a2540] text-[#004ac6] dark:text-[#7ba8f0]'
-                              : 'bg-[#f3f4f6] dark:bg-[#181a2e] text-[#c3c6d7] dark:text-[#3a3e5c]'
-                          }`}
+                  <div className="flex items-center justify-between gap-3 px-5 py-3.5 hover:bg-[#f8f9ff] dark:hover:bg-[#181a2e] transition">
+                    <button
+                      onClick={() => toggleExpandir(empresa.id)}
+                      className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                    >
+                      <span className={`material-symbols-outlined text-xl flex-shrink-0 ${empresa.activa ? 'text-[#004ac6]' : 'text-[#c3c6d7]'}`}>business</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-semibold truncate ${empresa.activa ? 'text-[#191c1e] dark:text-[#e4e6f0]' : 'text-[#9ca3af] line-through'}`}>
+                            {empresa.name}
+                          </span>
+                        </div>
+                        <p className="text-xs mt-0.5">
+                          {documento ? (
+                            <span className="text-[#6b7280] dark:text-[#8890b5] font-mono">{documento}</span>
+                          ) : (
+                            <span
+                              title="Falta NIT/cédula — no se puede generar el token DIAN todavía"
+                              className="flex items-center gap-1 text-amber-600 dark:text-amber-400 italic"
+                            >
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                              Sin NIT/cédula
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="hidden sm:flex items-center gap-1.5">
+                        {Object.entries(MODULOS_INFO).map(([key, info]) => (
+                          <span
+                            key={key}
+                            title={empresa.modulos[key] ? info.label : `No habilitada en ${info.label}`}
+                            className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                              empresa.modulos[key]
+                                ? 'bg-[#eef3ff] dark:bg-[#1a2540] text-[#004ac6] dark:text-[#7ba8f0]'
+                                : 'bg-[#f3f4f6] dark:bg-[#181a2e] text-[#c3c6d7] dark:text-[#3a3e5c]'
+                            }`}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{info.icon}</span>
+                          </span>
+                        ))}
+                      </div>
+                      {empresa.tipoContribuyente && (
+                        <button
+                          onClick={() => generarToken(empresa.id)}
+                          disabled={generandoTokenId === empresa.id}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white hover:opacity-90 transition active:scale-[0.97] disabled:opacity-50"
+                          style={{ background: '#004ac6' }}
                         >
-                          <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{info.icon}</span>
-                        </span>
-                      ))}
-                      <span className="material-symbols-outlined text-[#9ca3af] ml-1">{expandido ? 'expand_less' : 'expand_more'}</span>
+                          <span className="material-symbols-outlined" style={{ fontSize: 15 }}>vpn_key</span>
+                          <span className="hidden md:inline">{generandoTokenId === empresa.id ? 'Generando…' : 'Generar token'}</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => toggleExpandir(empresa.id)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg text-[#9ca3af] hover:bg-[#eef1fb] dark:hover:bg-[#252840]"
+                      >
+                        <span className="material-symbols-outlined">{expandido ? 'expand_less' : 'expand_more'}</span>
+                      </button>
                     </div>
-                  </button>
+                  </div>
+
+                  {resultadoToken?.empresaId === empresa.id && (
+                    <p className={`px-5 pb-2.5 -mt-1 text-xs ${resultadoToken.success ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-500'}`}>
+                      {resultadoToken.mensaje}
+                    </p>
+                  )}
 
                   {expandido && (
                     <div className="px-5 pb-4 bg-[#fafbff] dark:bg-[#181a2e]">
