@@ -9,6 +9,11 @@ const LATEST_YEAR = Math.max(...Object.keys(SALARY_CONSTANTS).map(Number))
 const SMMLV_ACTUAL   = SALARY_CONSTANTS[LATEST_YEAR].smmlv
 const AUXILIO_ACTUAL = SALARY_CONSTANTS[LATEST_YEAR].auxilioTransporte
 
+const MESES_ES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
 const fmt = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n ?? 0)
 
@@ -36,10 +41,15 @@ export default function DianExportacionPage() {
   const [errorCarga, setErrorCarga] = useState('')
   const [calculos,   setCalculos]   = useState(null)
   const [nomina,     setNomina]     = useState(null) // { empleados, meses, salario, tarifaArl, tasaAutorretencion } | null
+  const [empresaId, setEmpresaId]   = useState(null)
 
   const [status,   setStatus]   = useState('idle')   // idle | loading | done | error
   const [filename, setFilename] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
+  // Conflicto de guardado permanente: ya hay datos guardados para uno o más meses de esta
+  // empresa (ver dianController.js#guardarDocumentosPermanentes). null = sin conflicto.
+  const [conflictoGuardado, setConflictoGuardado] = useState(null) // { periodos } | null
+  const [aplicandoModo, setAplicandoModo] = useState(null) // 'actualizar' | 'reemplazar' | null
   // Blob del Excel ya generado, guardado en memoria para poder re-disparar la descarga
   // (p.ej. si el explorador de archivos del sistema se cierra o falla) sin volver a pedirle
   // el archivo al backend — el borrador se borra del servidor apenas se genera con éxito,
@@ -59,6 +69,7 @@ export default function DianExportacionPage() {
         if (cancelado) return
         setCalculos(data.calculos ?? null)
         setNomina(data.nomina ?? null)
+        setEmpresaId(data.empresaId ?? null)
       })
       .catch((err) => {
         if (cancelado) return
@@ -109,10 +120,15 @@ export default function DianExportacionPage() {
   }
 
   // ── Descarga ─────────────────────────────────────────────────────────────────
-  const handleDescargar = async () => {
+  // `modo` viaja solo cuando el usuario ya eligió actualizar/reemplazar en el diálogo de
+  // conflicto de abajo — la primera llamada siempre va sin modo, para que el backend avise
+  // si hace falta decidir algo antes de guardar (ver exportarDian en dianController.js).
+  const handleDescargar = async (modo) => {
     if (!borradorId) return
+    if (modo) setAplicandoModo(modo)
     setStatus('loading')
     setErrorMsg('')
+    setConflictoGuardado(null)
     try {
       const { blob, filename: fname } = await api.exportarDian(borradorId, {
         empleados: nomina?.empleados ?? 0,
@@ -120,14 +136,22 @@ export default function DianExportacionPage() {
         salario: nomina?.salario ?? SMMLV_ACTUAL,
         tarifaArl: nomina?.tarifaArl ?? null,
         tasaAutorretencion: nomina?.tasaAutorretencion ?? null,
+        modo,
       })
       dispararDescarga(blob, fname)
       setBlobDescargado(blob)
       setFilename(fname)
       setStatus('done')
     } catch (err) {
+      if (err.status === 409 && err.requiereConfirmacionGuardado) {
+        setConflictoGuardado({ periodos: err.periodos ?? [] })
+        setStatus('idle')
+        return
+      }
       setErrorMsg(err.message || 'No se pudo generar el Excel. Inténtalo de nuevo.')
       setStatus('error')
+    } finally {
+      setAplicandoModo(null)
     }
   }
 
@@ -236,12 +260,62 @@ export default function DianExportacionPage() {
 
         <div className="mt-3 pt-3 border-t border-[#f0f2f8] dark:border-[#2a2e45]">
           <p className="text-xs text-[#9ca3af] dark:text-[#6b7280]">
-            El Excel incluye <span className="font-semibold text-[#434655] dark:text-[#c4c8e8]">5 hojas</span>:
-            Resumen · Retenciones por Proveedor · Detalle Compras
+            El Excel incluye <span className="font-semibold text-[#434655] dark:text-[#c4c8e8]">varias hojas</span>:
+            Resumen · IVA · Retenciones por Proveedor · Detalle Compras
+            {empresaId ? ' · Conceptos' : ''}
             {tieneNomina ? ' · Nómina' : ''}{tieneAutorretencion ? ' · Autorretención' : ''} · Metadatos
+            {empresaId ? ' — y se guarda en la base de datos mensual de la empresa.' : ''}
           </p>
         </div>
       </div>
+
+      {/* ── Conflicto de guardado permanente ─────────────────────────────── */}
+      {conflictoGuardado && (
+        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl shadow-sm p-5 mb-5">
+          <div className="flex items-start gap-3">
+            <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">warning</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Ya hay datos guardados para {conflictoGuardado.periodos.length === 1 ? 'este mes' : 'estos meses'} de esta empresa
+              </p>
+              <div className="mt-2 space-y-1">
+                {conflictoGuardado.periodos.map((p) => (
+                  <p key={`${p.anio}-${p.mes}`} className="text-xs text-amber-700 dark:text-amber-400">
+                    {MESES_ES[p.mes - 1]} {p.anio}: {p.existentes} ya guardada{p.existentes !== 1 ? 's' : ''}, {p.enElReporte} en este reporte
+                  </p>
+                ))}
+              </div>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
+                <strong>Actualizar</strong> agrega lo nuevo y actualiza lo que cambió, conservando lo demás.{' '}
+                <strong>Reemplazar</strong> borra ese mes por completo y lo carga de nuevo con este reporte.
+              </p>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={() => handleDescargar('actualizar')}
+                  disabled={aplicandoModo != null}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#004ac6] text-white disabled:opacity-50"
+                >
+                  {aplicandoModo === 'actualizar' ? 'Actualizando…' : 'Actualizar'}
+                </button>
+                <button
+                  onClick={() => handleDescargar('reemplazar')}
+                  disabled={aplicandoModo != null}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 disabled:opacity-50"
+                >
+                  {aplicandoModo === 'reemplazar' ? 'Reemplazando…' : 'Reemplazar'}
+                </button>
+                <button
+                  onClick={() => setConflictoGuardado(null)}
+                  disabled={aplicandoModo != null}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Panel de descarga / estado ───────────────────────────────────── */}
       {status !== 'done' ? (
@@ -279,7 +353,7 @@ export default function DianExportacionPage() {
             )}
 
             <button
-              onClick={handleDescargar}
+              onClick={() => handleDescargar()}
               disabled={status === 'loading'}
               className="flex items-center gap-2.5 px-8 py-3 rounded-xl text-base font-bold text-white transition active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
               style={{ background: '#16a34a' }}

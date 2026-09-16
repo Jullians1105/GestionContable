@@ -28,6 +28,12 @@ const modules = [
   { id: 'fondo',   label: 'Fondo Emprender',      icon: 'rocket_launch' },
   { id: 'dian',    label: 'Gestión Tributaria',   icon: 'receipt_long' },
   { id: 'empresas', label: 'Empresas Externas',   icon: 'corporate_fare' },
+  // Directorio maestro que une los 4 catálogos de empresas (Fondo Emprender, Empresas
+  // Externas, Nómina Electrónica dentro de Gestión Tributaria, y Contabilidad) — ícono propio
+  // (no 'corporate_fare', ya usado arriba y en el sub-ítem "Empresas" de Fondo Emprender) para
+  // que se distinga a simple vista. Se ve sin importar en qué módulo se esté parado, a
+  // diferencia de Usuarios/Configuración (esos sí viven solo dentro de "Gestor de Tareas").
+  { id: 'empresas-directorio', label: 'Empresas', icon: 'domain' },
 ]
 
 const MODULE_TITLES = {
@@ -35,10 +41,12 @@ const MODULE_TITLES = {
   fondo:    'Fondo Emprender',
   dian:     'Gestión Tributaria',
   empresas: 'Empresas Externas',
+  'empresas-directorio': 'Empresas',
 }
 
 const DIAN_NAV = [
   { to: '/dian/upload',     label: 'Contabilidad',     icon: 'upload_file',   end: true },
+  { to: '/dian/consolidado', label: 'Consolidado',     icon: 'query_stats',   end: true },
   { to: '/exogenas/upload', label: 'Exógenas',          icon: 'request_quote', end: true },
   { to: '/dian/terceros',   label: 'Importar Terceros', icon: 'location_on',   end: true },
   { to: '/dian/consulta-tercero', label: 'Consulta Tercero', icon: 'person_search', end: true },
@@ -47,6 +55,10 @@ const DIAN_NAV = [
 
 const EXTERNAS_NAV = [
   { to: '/empresas-externas', label: 'Seguimiento mensual', icon: 'table_chart', end: true },
+]
+
+const EMPRESAS_MAESTRO_NAV = [
+  { to: '/empresas', label: 'Directorio', icon: 'domain', end: true },
 ]
 
 const FONDO_NAV = [
@@ -99,6 +111,7 @@ export default function Sidebar({ open, onClose }) {
     activeModule === 'fondo'    ? FONDO_NAV     :
     activeModule === 'dian'     ? DIAN_NAV      :
     activeModule === 'empresas' ? EXTERNAS_NAV  :
+    activeModule === 'empresas-directorio' ? EMPRESAS_MAESTRO_NAV :
     []
 
   const hasNav = navForModule.length > 0

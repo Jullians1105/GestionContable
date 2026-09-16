@@ -87,6 +87,17 @@ async function request(path, options = {}, retry = true) {
   return res.json();
 }
 
+// Arma la query string de {anio, mes} | {anio, cuatrimestre} | {anio} para el consolidado de
+// Contabilidad, sin incluir campos null/undefined (URLSearchParams los convertiría al string
+// literal "null", que el validador del backend rechazaría).
+function buildPeriodoParams(empresaId, periodo) {
+  const params = { empresaId };
+  for (const [k, v] of Object.entries(periodo ?? {})) {
+    if (v !== null && v !== undefined) params[k] = v;
+  }
+  return new URLSearchParams(params);
+}
+
 export const api = {
   // Auth
   register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
@@ -283,6 +294,24 @@ export const api = {
   updateExtEmpresa: (id, data) => request(`/externas/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteExtEmpresa: (id) => request(`/externas/empresas/${id}`, { method: 'DELETE' }),
 
+  // Contabilidad — Catálogo de empresas
+  getContabEmpresas: () => request('/contabilidad/empresas'),
+  getContabEmpresa: (id) => request(`/contabilidad/empresas/${id}`),
+  createContabEmpresa: (data) => request('/contabilidad/empresas', { method: 'POST', body: JSON.stringify(data) }),
+  updateContabEmpresa: (id, data) => request(`/contabilidad/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteContabEmpresa: (id) => request(`/contabilidad/empresas/${id}`, { method: 'DELETE' }),
+
+  // Directorio maestro de empresas — une fondo_empresas/ext_empresas/ne_empresas/contab_empresas
+  getEmpresasDirectorio: () => request('/empresas'),
+  getEmpresasDuplicados: () => request('/empresas/duplicados'),
+  createEmpresaMaestro: (data) => request('/empresas', { method: 'POST', body: JSON.stringify(data) }),
+  updateEmpresaMaestro: (id, data) => request(`/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  habilitarEmpresaModulo: (id, data) => request(`/empresas/${id}/habilitar`, { method: 'POST', body: JSON.stringify(data) }),
+  deshabilitarEmpresaModulo: (id, modulo) => request(`/empresas/${id}/habilitar/${modulo}`, { method: 'DELETE' }),
+  fusionarEmpresas: (empresaIdA, empresaIdB) => request('/empresas/fusionar', { method: 'POST', body: JSON.stringify({ empresaIdA, empresaIdB }) }),
+  descartarDuplicadoEmpresa: (empresaIdA, empresaIdB) => request('/empresas/duplicados/descartar', { method: 'POST', body: JSON.stringify({ empresaIdA, empresaIdB }) }),
+  generarTokenDian: (id) => request(`/empresas/${id}/generar-token-dian`, { method: 'POST' }),
+
   // Empresas Externas — Catálogo de procesos (checklist)
   getExtProcesos: (incluirInactivos) => {
     const qs = incluirInactivos ? '?incluirInactivos=true' : ''
@@ -337,6 +366,9 @@ export const api = {
         const body = await res.json().catch(() => ({ error: res.statusText }))
         const err = new Error(body.error || `Error ${res.status}`)
         err.status = res.status
+        // El 409 de NIT no coincidente trae nitEsperado/nitReporte/empresaNombre para que la
+        // pantalla de subida arme un mensaje específico en vez de solo el texto genérico.
+        Object.assign(err, body)
         throw err
       }
       return res.json()
@@ -349,19 +381,29 @@ export const api = {
   patchDianNomina: (id, data) =>
     request(`/dian/borradores/${id}/nomina`, { method: 'PATCH', body: JSON.stringify(data) }),
 
-  patchDianClasificacionRapida: (borradorId, { clasificacionRetencion, tasaRetencion }) =>
+  // `campo` es opcional — sin él, aplica sobre clasificacionRetencion (comportamiento
+  // original de este endpoint, antes de que existieran las clasificaciones de IVA/Concepto).
+  patchDianClasificacionRapida: (borradorId, { campo, clasificacionRetencion, tasaRetencion, clasificacionIva, concepto }) =>
     request(`/dian/borradores/${borradorId}/aplicar-clasificacion-rapida`, {
       method: 'PATCH',
-      body: JSON.stringify({ clasificacionRetencion, tasaRetencion }),
+      body: JSON.stringify({ campo, clasificacionRetencion, tasaRetencion, clasificacionIva, concepto }),
     }),
 
-  exportarDian: (borradorId, { empleados, meses, salario, tarifaArl, tasaAutorretencion }) => {
+  exportarDian: (borradorId, { empleados, meses, salario, tarifaArl, tasaAutorretencion, modo }) => {
     return fetchWithAuth(`/dian/borradores/${borradorId}/exportar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ empleados, meses, salario, tarifaArl, tasaAutorretencion }),
+      body: JSON.stringify({ empleados, meses, salario, tarifaArl, tasaAutorretencion, modo }),
     }).then((res) => {
-      if (!res.ok) return res.json().then((e) => { throw new Error(e.error || `Error ${res.status}`) })
+      if (!res.ok) return res.json().then((e) => {
+        const err = new Error(e.error || `Error ${res.status}`)
+        err.status = res.status
+        // El 409 de "ya hay datos guardados para este mes" trae requiereConfirmacionGuardado
+        // + periodos (ver dianController.js#guardarDocumentosPermanentes) para que la pantalla
+        // de exportación ofrezca actualizar/reemplazar en vez de solo mostrar el error.
+        Object.assign(err, e)
+        throw err
+      })
       // Extraer nombre sugerido del header Content-Disposition
       const cd = res.headers.get('content-disposition') ?? ''
       const match = cd.match(/filename="([^"]+)"/)
@@ -369,6 +411,25 @@ export const api = {
       return res.blob().then((blob) => ({ blob, filename }))
     })
   },
+
+  // Contabilidad — Consolidado (guardado permanente por empresa/mes)
+  getContabPeriodos: (empresaId) =>
+    request(`/contabilidad/periodos?${new URLSearchParams({ empresaId })}`),
+
+  // `periodo` es { anio, mes } | { anio, cuatrimestre } | { anio } (mensual/cuatrimestral/anual)
+  // — se filtran null/undefined para no mandar "mes=null" literal en la URL.
+  getContabConsolidado: (empresaId, periodo) =>
+    request(`/contabilidad/consolidado?${buildPeriodoParams(empresaId, periodo)}`),
+
+  exportarContabConsolidado: (empresaId, periodo) =>
+    fetchWithAuth(`/contabilidad/consolidado/exportar?${buildPeriodoParams(empresaId, periodo)}`)
+      .then((res) => {
+        if (!res.ok) return res.json().then((e) => { throw new Error(e.error || `Error ${res.status}`) })
+        const cd = res.headers.get('content-disposition') ?? ''
+        const match = cd.match(/filename="([^"]+)"/)
+        const filename = match ? match[1] : `Consolidado_${empresaId.slice(0, 8)}.xlsx`
+        return res.blob().then((blob) => ({ blob, filename }))
+      }),
 
   // Exógenas
   uploadExogenas: (formData) =>

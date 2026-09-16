@@ -40,3 +40,8 @@ env_backup*.txt
 # El catálogo con lo que importa de los anexos está en docs/dian-tipos-documento.md.
 docs/*.xlsx
 docs/*.pdf
+
+# Perfil real de Chrome para generar tokens de la DIAN (dianTokenService.js) — datos de sesión
+# reales (cookies, cache), no código; además pesa cientos de MB. A propósito fuera de backend/
+# (ver comentario en dianTokenService.js sobre por qué: nodemon lo vigilaba y se caía).
+/dian-perfil-real-chrome/

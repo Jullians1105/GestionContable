@@ -41,11 +41,13 @@ import DianClasificacionPage from './pages/DianClasificacionPage'
 import DianUploadPage from './pages/DianUploadPage'
 import DianNominaPage from './pages/DianNominaPage'
 import DianExportacionPage from './pages/DianExportacionPage'
+import ContabilidadConsolidadoPage from './pages/ContabilidadConsolidadoPage'
 import ExogenasUploadPage from './pages/ExogenasUploadPage'
 import TercerosPage from './pages/TercerosPage'
 import ConsultaTerceroPage from './pages/ConsultaTerceroPage'
 import RecurringTasksPage from './pages/RecurringTasksPage'
 import EmpresasExternasPage from './pages/EmpresasExternasPage'
+import EmpresasPage from './pages/EmpresasPage'
 import NominaElectronicaPage from './pages/NominaElectronicaPage'
 import NominaElectronicaEmpresasPage from './pages/NominaElectronicaEmpresasPage'
 
@@ -117,10 +119,12 @@ function Layout() {
             <Route path="/fondo-emprender/empresas/:empresaId" element={<FondoEmprenderEmpresaDetallePage />} />
             <Route path="/fondo-emprender/pagos" element={<FondoEmprenderPagosPage />} />
             <Route path="/empresas-externas" element={<EmpresasExternasPage />} />
+            <Route path="/empresas" element={<EmpresasPage />} />
             <Route path="/dian/upload"                       element={<DianUploadPage />} />
             <Route path="/dian/clasificacion/:borradorId"    element={<DianClasificacionPage />} />
             <Route path="/dian/nomina/:borradorId"           element={<DianNominaPage />} />
             <Route path="/dian/exportacion/:borradorId"      element={<DianExportacionPage />} />
+            <Route path="/dian/consolidado"                  element={<ContabilidadConsolidadoPage />} />
             <Route path="/exogenas/upload"                   element={<ExogenasUploadPage />} />
             <Route path="/dian/nomina-electronica"            element={<NominaElectronicaPage />} />
             <Route path="/dian/nomina-electronica/empresas"   element={<NominaElectronicaEmpresasPage />} />

@@ -20,6 +20,15 @@ const OPCIONES = [
   { label: 'Honorarios 11%',      clasificacion: 'Honorarios',     tasa: 11.00 },
 ]
 
+// Solo para compras (mismas filas que piden retención) — las ventas no se clasifican, solo
+// se guarda su IVA generado (ver backend). Mismo texto exacto que CLASES_IVA/CONCEPTOS en
+// dianController.js — si se desincronizan, el PATCH del backend rechaza el valor con 400.
+const CLASES_IVA = ['Mayor valor', 'Descontable', 'Activo fijo', 'No aplica']
+const CONCEPTOS = [
+  'Servicios', 'Compras', 'Activo fijo', 'Honorarios', 'Arriendos',
+  'Adecuaciones', 'Compras diversos', 'Diversos', 'No deducible', 'No aplica',
+]
+
 // ── helpers ────────────────────────────────────────────────────────────────────
 const formatFecha = (iso) => {
   if (!iso) return '—'
@@ -29,6 +38,13 @@ const formatFecha = (iso) => {
 
 const formatCOP = (n) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n ?? 0)
+
+// Mismo arreglo que MESES_ES en DianExportacionPage.jsx — se repite acá para no acoplar dos
+// páginas por un array de 12 strings.
+const MESES_ES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
 
 const truncate = (s, n) =>
   s && s.length > n ? s.slice(0, n) + '…' : (s || '—')
@@ -340,8 +356,57 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
   )
 }
 
+// ── autoguardado genérico para un campo plano de la fila (clasificacionIva / concepto) ──
+// A diferencia de la retención (que empareja clasificación + tasa en una sola opción), estos
+// dos campos son un valor de texto simple — mismo debounce de 1500ms y mismo indicador que
+// FilaClasificacion, factorizado acá para no duplicar la lógica de guardado dos veces.
+// El PATCH solo envía este campo (nunca los otros tres): el backend conserva lo demás tal
+// cual estaba (ver "provisto" en dianController.js#patchBorrador).
+function useClasificacionSimple({ borradorId, indice, campo, valorActual, onGuardado }) {
+  const [guardadoEstado, setGuardadoEstado] = useState(valorActual ? 'saved' : null)
+  const [error, setError] = useState(null)
+  const timerRef = useRef(null)
+
+  const handleChange = useCallback((e) => {
+    const valor = e.target.value || null
+    onGuardado(indice, valor)
+    setError(null)
+
+    if (!valor) {
+      setGuardadoEstado(null)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      return
+    }
+
+    setGuardadoEstado('saving')
+    if (timerRef.current) clearTimeout(timerRef.current)
+
+    timerRef.current = setTimeout(async () => {
+      try {
+        await api.patchDianBorrador(borradorId, { indice, [campo]: valor })
+        setGuardadoEstado('saved')
+        setTimeout(() => setGuardadoEstado(null), 2000)
+      } catch (err) {
+        setGuardadoEstado(null)
+        setError(err.message || 'Error al guardar. Intenta de nuevo.')
+      }
+    }, 1500)
+  }, [indice, borradorId, campo, onGuardado])
+
+  const handleRetry = useCallback(() => {
+    if (!valorActual) return
+    setError(null)
+    handleChange({ target: { value: valorActual } })
+  }, [valorActual, handleChange])
+
+  return { guardadoEstado, error, handleChange, handleRetry }
+}
+
 // ── fila de la tabla ───────────────────────────────────────────────────────────
-function FilaClasificacion({ fila, borradorId, valorActual, onClasificado, isEven, seleccionada, onToggleSeleccion }) {
+function FilaClasificacion({
+  fila, borradorId, valorActual, onClasificado, isEven, seleccionada, onToggleSeleccion,
+  empresaId, valorIvaActual, onClasificadoIva, valorConceptoActual, onClasificadoConcepto,
+}) {
   const [guardadoEstado, setGuardadoEstado] = useState(
     fila.clasificacionRetencion ? 'saved' : null
   )
@@ -385,6 +450,15 @@ function FilaClasificacion({ fila, borradorId, valorActual, onClasificado, isEve
     setError(null)
     handleChange({ target: { value: valorActual.label } })
   }
+
+  const iva = useClasificacionSimple({
+    borradorId, indice: fila.indice, campo: 'clasificacionIva',
+    valorActual: valorIvaActual, onGuardado: onClasificadoIva,
+  })
+  const concepto = useClasificacionSimple({
+    borradorId, indice: fila.indice, campo: 'concepto',
+    valorActual: valorConceptoActual, onGuardado: onClasificadoConcepto,
+  })
 
   const labelActual = valorActual?.label ?? ''
   const rowBg = isEven ? 'bg-[#fafbff] dark:bg-[#191b2e]' : ''
@@ -437,6 +511,56 @@ function FilaClasificacion({ fila, borradorId, valorActual, onClasificado, isEve
           </div>
         )}
       </td>
+      {empresaId && (
+        <>
+          <td className="px-4 py-3">
+            <div className="flex items-center gap-0">
+              <select
+                value={valorIvaActual ?? ''}
+                onChange={iva.handleChange}
+                className="text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-2.5 py-1.5 bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer min-w-[150px]"
+              >
+                <option value="">— Seleccionar —</option>
+                {CLASES_IVA.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+              <SaveIndicator estado={iva.guardadoEstado} />
+            </div>
+            {iva.error && (
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-[11px] text-red-500">{iva.error}</span>
+                <button onClick={iva.handleRetry} className="text-[11px] text-[#004ac6] underline hover:no-underline">
+                  Reintentar
+                </button>
+              </div>
+            )}
+          </td>
+          <td className="px-4 py-3">
+            <div className="flex items-center gap-0">
+              <select
+                value={valorConceptoActual ?? ''}
+                onChange={concepto.handleChange}
+                className="text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-2.5 py-1.5 bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer min-w-[170px]"
+              >
+                <option value="">— Seleccionar —</option>
+                {CONCEPTOS.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+              <SaveIndicator estado={concepto.guardadoEstado} />
+            </div>
+            {concepto.error && (
+              <div className="mt-1 flex items-center gap-2">
+                <span className="text-[11px] text-red-500">{concepto.error}</span>
+                <button onClick={concepto.handleRetry} className="text-[11px] text-[#004ac6] underline hover:no-underline">
+                  Reintentar
+                </button>
+              </div>
+            )}
+          </td>
+        </>
+      )}
     </tr>
   )
 }
@@ -454,6 +578,27 @@ export default function DianClasificacionPage() {
   const [cargando, setCargando]           = useState(true)
   const [errorCarga, setErrorCarga]       = useState('')
   const [filasParaClasificar, setFilasParaClasificar] = useState([])
+  // Con empresa asociada, el borrador exige clasificar también IVA y Concepto para poder
+  // exportar (ver dianController.js#exportarBorrador) — sin empresa, se comporta igual que
+  // antes de este cambio (solo retención).
+  const [empresaId, setEmpresaId]         = useState(null)
+  const [empresaNombre, setEmpresaNombre] = useState(null)
+  // Tipos de documento del reporte que NO están en TIPOS_CONTABILIZADOS ni en la lista de
+  // exclusiones conocidas (Application response / Nómina Individual) — antes esto solo se
+  // veía si alguien abría la hoja METADATOS del Excel exportado. Filtra a esConocido=false:
+  // los excluidos conocidos son esperados, no ameritan alarma en pantalla.
+  const [documentosNoReconocidos, setDocumentosNoReconocidos] = useState([])
+  // Meses de este reporte que ya tienen documentos guardados para esta empresa — mismo
+  // chequeo que dianController.js#guardarDocumentosPermanentes hace al exportar, expuesto acá
+  // temprano (apenas se abre esta pantalla) para no hacer clasificar un reporte entero antes
+  // de avisar que ese mes ya existía. Es solo informativo: la elección de actualizar/reemplazar
+  // sigue siendo al exportar, en DianExportacionPage.jsx.
+  const [periodosExistentes, setPeriodosExistentes] = useState([])
+  // Filas con relevancia contable pero sin fecha de emisión utilizable (ausente o en un formato
+  // que el backend no pudo convertir a ISO) — sin esto la fila no se puede ubicar en ningún mes
+  // calendario y queda fuera del guardado permanente en silencio (ver agruparFilasPorPeriodo en
+  // dianController.js). Pedido explícito del usuario (2026-09-12).
+  const [filasSinFecha, setFilasSinFecha] = useState([])
 
   useEffect(() => {
     let cancelado = false
@@ -463,6 +608,11 @@ export default function DianClasificacionPage() {
       .then((data) => {
         if (cancelado) return
         setFilasParaClasificar(data.filasParaClasificar ?? [])
+        setEmpresaId(data.empresaId ?? null)
+        setEmpresaNombre(data.empresaNombre ?? null)
+        setDocumentosNoReconocidos((data.documentosNoContabilizados ?? []).filter((d) => !d.esConocido))
+        setPeriodosExistentes(data.periodosExistentes ?? [])
+        setFilasSinFecha(data.filasSinFecha ?? [])
       })
       .catch((err) => {
         if (cancelado) return
@@ -619,6 +769,23 @@ export default function DianClasificacionPage() {
     )
   }, [filasRecibido])
 
+  // indice → valor de texto simple (o null) — mismo criterio que clasificaciones de arriba,
+  // pero sin el emparejamiento con tasa que sí necesita la retención.
+  const [clasificacionesIva, setClasificacionesIva] = useState({})
+  const [conceptos, setConceptos] = useState({})
+
+  useEffect(() => {
+    setClasificacionesIva(Object.fromEntries(filasRecibido.map((f) => [f.indice, f.clasificacionIva ?? null])))
+    setConceptos(Object.fromEntries(filasRecibido.map((f) => [f.indice, f.concepto ?? null])))
+  }, [filasRecibido])
+
+  const handleClasificadoIva = useCallback((indice, valor) => {
+    setClasificacionesIva((prev) => ({ ...prev, [indice]: valor }))
+  }, [])
+  const handleClasificadoConcepto = useCallback((indice, valor) => {
+    setConceptos((prev) => ({ ...prev, [indice]: valor }))
+  }, [])
+
   // ── clasificación rápida ───────────────────────────────────────────────────
   const [clasificacionRapida, setClasificacionRapida] = useState('')
   const [cargandoRapida,      setCargandoRapida]      = useState(false)
@@ -665,10 +832,74 @@ export default function DianClasificacionPage() {
     setClasificaciones((prev) => ({ ...prev, [indice]: opcion }))
   }, [])
 
-  // Contadores
+  // ── clasificación rápida — IVA y Concepto (mismo patrón que la de retención arriba,
+  // pero con valor de texto simple en vez de par clasificación+tasa) ─────────────────
+  const [clasificacionRapidaIva, setClasificacionRapidaIva] = useState('')
+  const [cargandoRapidaIva, setCargandoRapidaIva] = useState(false)
+  const sinIvaCount = filasRecibido.filter((f) => clasificacionesIva[f.indice] == null).length
+
+  const handleAplicarRapidaIva = useCallback(async () => {
+    if (!clasificacionRapidaIva) return
+    setCargandoRapidaIva(true)
+    setToastRapido(null)
+    try {
+      const { filasActualizadas } = await api.patchDianClasificacionRapida(borradorId, {
+        campo: 'clasificacionIva', clasificacionIva: clasificacionRapidaIva,
+      })
+      setClasificacionesIva((prev) => {
+        const next = { ...prev }
+        for (const [indice, val] of Object.entries(next)) if (val == null) next[indice] = clasificacionRapidaIva
+        return next
+      })
+      mostrarToast('exito', filasActualizadas > 0
+        ? `${filasActualizadas} ${filasActualizadas === 1 ? 'fila clasificada' : 'filas clasificadas'} (IVA)`
+        : 'No había filas sin clasificar')
+    } catch (err) {
+      mostrarToast('error', err.message || 'Error al aplicar clasificación de IVA')
+    } finally {
+      setCargandoRapidaIva(false)
+    }
+  }, [clasificacionRapidaIva, borradorId, mostrarToast])
+
+  const [clasificacionRapidaConcepto, setClasificacionRapidaConcepto] = useState('')
+  const [cargandoRapidaConcepto, setCargandoRapidaConcepto] = useState(false)
+  const sinConceptoCount = filasRecibido.filter((f) => conceptos[f.indice] == null).length
+
+  const handleAplicarRapidaConcepto = useCallback(async () => {
+    if (!clasificacionRapidaConcepto) return
+    setCargandoRapidaConcepto(true)
+    setToastRapido(null)
+    try {
+      const { filasActualizadas } = await api.patchDianClasificacionRapida(borradorId, {
+        campo: 'concepto', concepto: clasificacionRapidaConcepto,
+      })
+      setConceptos((prev) => {
+        const next = { ...prev }
+        for (const [indice, val] of Object.entries(next)) if (val == null) next[indice] = clasificacionRapidaConcepto
+        return next
+      })
+      mostrarToast('exito', filasActualizadas > 0
+        ? `${filasActualizadas} ${filasActualizadas === 1 ? 'fila clasificada' : 'filas clasificadas'} (Concepto)`
+        : 'No había filas sin clasificar')
+    } catch (err) {
+      mostrarToast('error', err.message || 'Error al aplicar concepto')
+    } finally {
+      setCargandoRapidaConcepto(false)
+    }
+  }, [clasificacionRapidaConcepto, borradorId, mostrarToast])
+
+  // Contadores — la retención por sí sola sigue gobernando la "Clasificación rápida" y el
+  // contador de esa tarjeta; filaCompleta (usada por el botón Continuar y la barra de
+  // progreso) exige además IVA y Concepto, pero solo cuando el borrador tiene empresa.
   const sinClasificarCount = filasRecibido.filter((f) => clasificaciones[f.indice] == null).length
-  const clasificadasCount  = filasRecibido.length - sinClasificarCount
-  const todasClasificadas  = filasRecibido.length > 0 && sinClasificarCount === 0
+
+  const filaCompleta = useCallback((f) =>
+    clasificaciones[f.indice] != null &&
+    (!empresaId || (clasificacionesIva[f.indice] != null && conceptos[f.indice] != null)),
+    [clasificaciones, clasificacionesIva, conceptos, empresaId]
+  )
+  const completasCount = filasRecibido.filter(filaCompleta).length
+  const todasClasificadas = filasRecibido.length > 0 && completasCount === filasRecibido.length
 
   // ── selección múltiple ───────────────────────────────────────────────────
   const [seleccionadas, setSeleccionadas] = useState(() => new Set())
@@ -782,16 +1013,105 @@ export default function DianClasificacionPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       {/* ── encabezado ─────────────────────────────────────────────────────── */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">
-          Clasificación de retención
-        </h1>
-        <p className="mt-1 text-sm text-[#6b7280] dark:text-[#8890b5]">
-          Selecciona el tipo de retención para cada compra recibida.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">
+            {empresaId ? 'Clasificación de compras' : 'Clasificación de retención'}
+          </h1>
+          <p className="mt-1 text-sm text-[#6b7280] dark:text-[#8890b5]">
+            {empresaId
+              ? 'Selecciona retención, IVA y concepto para cada compra recibida.'
+              : 'Selecciona el tipo de retención para cada compra recibida.'}
+          </p>
+        </div>
+        {empresaNombre && (
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#eef3ff] dark:bg-[#1a2540] border border-[#c7d9ff] dark:border-[#2e4470] flex-shrink-0">
+            <span className="material-symbols-outlined text-[#004ac6] text-lg">business</span>
+            <span className="text-sm font-semibold text-[#004ac6] dark:text-[#7ba8f0]">{empresaNombre}</span>
+          </div>
+        )}
       </div>
+
+      {/* ── Meses ya guardados para esta empresa — aviso temprano, antes de invertir tiempo
+          clasificando un reporte que de todos modos va a pedir elegir actualizar/reemplazar
+          al exportar (ver DianExportacionPage.jsx). No bloquea nada acá. ─────────────────── */}
+      {periodosExistentes.length > 0 && (
+        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">history</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              Ya hay datos guardados para {periodosExistentes.length === 1 ? 'este mes' : 'estos meses'} de esta empresa
+            </p>
+            <div className="mt-1 space-y-0.5">
+              {periodosExistentes.map((p) => (
+                <p key={`${p.anio}-${p.mes}`} className="text-xs text-amber-700 dark:text-amber-400">
+                  {MESES_ES[p.mes - 1]} {p.anio}: {p.existentes} ya guardada{p.existentes !== 1 ? 's' : ''}, {p.enElReporte} en este reporte
+                </p>
+              ))}
+            </div>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1.5">
+              Puedes seguir clasificando; al exportar podrás elegir actualizar o reemplazar esos meses.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Filas sin fecha de emisión utilizable — no se pueden ubicar en ningún mes
+          calendario, así que quedan fuera del guardado permanente en silencio si hay
+          empresa asociada. No bloquea nada, es solo para que se note antes de exportar. ── */}
+      {filasSinFecha.length > 0 && (
+        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">event_busy</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              {filasSinFecha.length === 1
+                ? 'Hay una fila sin fecha de emisión utilizable'
+                : `Hay ${filasSinFecha.length} filas sin fecha de emisión utilizable`}
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              {empresaId
+                ? 'No se puede determinar a qué mes pertenecen — no quedarán guardadas en el consolidado mensual de esta empresa.'
+                : 'No se puede determinar a qué mes pertenecen — revisa el archivo original si esperabas que se contabilizaran por mes.'}
+            </p>
+            <ul className="mt-2 flex flex-col gap-1">
+              {filasSinFecha.map((f, i) => (
+                <li key={i} className="text-xs text-amber-800 dark:text-amber-300">
+                  <b>{f.tipoDocumento ?? '(sin tipo)'}</b> {f.prefijo}{f.folio ?? ''} — fecha: {f.fechaEmisionCruda ? `"${f.fechaEmisionCruda}"` : '(vacía)'}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* ── Documentos con tipo no reconocido — antes solo se veía en la hoja METADATOS
+          del Excel exportado, fácil de no abrir nunca. No bloquea nada (esos documentos
+          ya quedaron fuera de todos los cálculos), es solo para que no pase desapercibido
+          un tipo de documento nuevo que la DIAN empezó a usar. ─────────────────────── */}
+      {documentosNoReconocidos.length > 0 && (
+        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+          <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">warning</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              {documentosNoReconocidos.length === 1
+                ? 'Este reporte trae un tipo de documento que no se reconoce'
+                : `Este reporte trae ${documentosNoReconocidos.length} tipos de documento que no se reconocen`}
+            </p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              No entraron en ningún cálculo (ni compras, ni ventas, ni notas) — revisar si hace falta clasificarlos aparte.
+            </p>
+            <ul className="mt-2 flex flex-col gap-1">
+              {documentosNoReconocidos.map((d) => (
+                <li key={d.tipo} className="text-xs text-amber-800 dark:text-amber-300">
+                  <b>{d.tipo}</b> — {d.cantidad} {d.cantidad === 1 ? 'documento' : 'documentos'}, {formatCOP(d.total)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       {filasRecibido.length === 0 ? (
         /* ── estado vacío ──────────────────────────────────────────────────── */
@@ -810,61 +1130,125 @@ export default function DianClasificacionPage() {
         </div>
       ) : (
         <>
-          {/* ── clasificación rápida ─────────────────────────────────────── */}
+          {/* ── clasificación rápida — una sola tarjeta, una fila por campo ── */}
           <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-5 mb-5">
-            <h2 className="text-xs font-bold text-[#8890b5] dark:text-[#6b7280] uppercase tracking-wide mb-3">
+            <h2 className="text-xs font-bold text-[#8890b5] dark:text-[#6b7280] uppercase tracking-wide mb-1">
               Clasificación rápida
             </h2>
+            <p className="text-xs text-[#9ca3af] dark:text-[#6b7280] mb-3">
+              Aplica un valor a todas las filas que aún no tengan ese campo asignado.
+            </p>
 
-            <div className="flex items-center gap-3 flex-wrap">
-              {/* Dropdown */}
-              <select
-                value={clasificacionRapida}
-                onChange={(e) => setClasificacionRapida(e.target.value)}
-                disabled={cargandoRapida || todasClasificadas}
-                className="text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-3 py-2 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed min-w-[220px]"
-              >
-                <option value="">— Seleccionar —</option>
-                {OPCIONES.map((o) => (
-                  <option key={o.label} value={o.label}>{o.label}</option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4">
+              {/* Retención */}
+              <div>
+                <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1.5">Retención</label>
+                <select
+                  value={clasificacionRapida}
+                  onChange={(e) => setClasificacionRapida(e.target.value)}
+                  disabled={cargandoRapida || sinClasificarCount === 0}
+                  className="w-full text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-3 py-2 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">— Seleccionar —</option>
+                  {OPCIONES.map((o) => (
+                    <option key={o.label} value={o.label}>{o.label}</option>
+                  ))}
+                </select>
+                <div className="flex items-center justify-between gap-2 mt-2.5">
+                  <button
+                    onClick={handleAplicarRapida}
+                    disabled={!clasificacionRapida || cargandoRapida || sinClasificarCount === 0}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{ background: '#004ac6' }}
+                  >
+                    {cargandoRapida ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <span>Aplicando…</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-base">bolt</span>
+                        <span>Aplicar</span>
+                      </>
+                    )}
+                  </button>
+                  <span className={`text-xs font-medium text-right ${sinClasificarCount === 0 ? 'text-green-600 dark:text-green-400' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
+                    {sinClasificarCount === 0 ? '✓ Todas clasificadas' : `${sinClasificarCount} sin asignar`}
+                  </span>
+                </div>
+              </div>
 
-              {/* Botón Aplicar */}
-              <button
-                onClick={handleAplicarRapida}
-                disabled={!clasificacionRapida || cargandoRapida || todasClasificadas}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: '#004ac6' }}
-              >
-                {cargandoRapida ? (
-                  <>
-                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    <span>Aplicando…</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-base">bolt</span>
-                    <span>Aplicar</span>
-                  </>
-                )}
-              </button>
+              {/* IVA y Concepto — solo si hay empresa asociada */}
+              {empresaId && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1.5">IVA</label>
+                    <select
+                      value={clasificacionRapidaIva}
+                      onChange={(e) => setClasificacionRapidaIva(e.target.value)}
+                      disabled={cargandoRapidaIva || sinIvaCount === 0}
+                      className="w-full text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-3 py-2 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">— Seleccionar —</option>
+                      {CLASES_IVA.map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
+                    <div className="flex items-center justify-between gap-2 mt-2.5">
+                      <button
+                        onClick={handleAplicarRapidaIva}
+                        disabled={!clasificacionRapidaIva || cargandoRapidaIva || sinIvaCount === 0}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: '#004ac6' }}
+                      >
+                        <span className="material-symbols-outlined text-base">bolt</span>
+                        {cargandoRapidaIva ? 'Aplicando…' : 'Aplicar'}
+                      </button>
+                      <span className={`text-xs font-medium text-right ${sinIvaCount === 0 ? 'text-green-600 dark:text-green-400' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
+                        {sinIvaCount === 0 ? '✓ Todas clasificadas' : `${sinIvaCount} sin asignar`}
+                      </span>
+                    </div>
+                  </div>
 
-              {/* Contador */}
-              <span className={`text-sm font-medium ml-1 ${sinClasificarCount === 0 ? 'text-green-600 dark:text-green-400' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
-                {sinClasificarCount === 0
-                  ? '✓ Todas las filas están clasificadas'
-                  : `${sinClasificarCount} ${sinClasificarCount === 1 ? 'fila sin asignar' : 'filas sin asignar'}`
-                }
-              </span>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1.5">Concepto</label>
+                    <select
+                      value={clasificacionRapidaConcepto}
+                      onChange={(e) => setClasificacionRapidaConcepto(e.target.value)}
+                      disabled={cargandoRapidaConcepto || sinConceptoCount === 0}
+                      className="w-full text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-3 py-2 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">— Seleccionar —</option>
+                      {CONCEPTOS.map((v) => (
+                        <option key={v} value={v}>{v}</option>
+                      ))}
+                    </select>
+                    <div className="flex items-center justify-between gap-2 mt-2.5">
+                      <button
+                        onClick={handleAplicarRapidaConcepto}
+                        disabled={!clasificacionRapidaConcepto || cargandoRapidaConcepto || sinConceptoCount === 0}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: '#004ac6' }}
+                      >
+                        <span className="material-symbols-outlined text-base">bolt</span>
+                        {cargandoRapidaConcepto ? 'Aplicando…' : 'Aplicar'}
+                      </button>
+                      <span className={`text-xs font-medium text-right ${sinConceptoCount === 0 ? 'text-green-600 dark:text-green-400' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
+                        {sinConceptoCount === 0 ? '✓ Todos asignados' : `${sinConceptoCount} sin asignar`}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Toast */}
+            {/* Toast — compartido por los tres campos */}
             {toastRapido && (
-              <div className={`mt-3 flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium
+              <div className={`mt-4 flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium
                 ${toastRapido.tipo === 'exito'
                   ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700'
                   : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-700'
@@ -934,15 +1318,15 @@ export default function DianClasificacionPage() {
           {/* ── progreso ─────────────────────────────────────────────────── */}
           <div className="mb-4 flex items-center justify-between">
             <span className="text-sm text-[#6b7280] dark:text-[#8890b5]">
-              <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{clasificadasCount}</span>
+              <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{completasCount}</span>
               {' '}de{' '}
               <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{filasRecibido.length}</span>
-              {' '}compras clasificadas
+              {' '}compras clasificadas{empresaId ? ' (retención + IVA + concepto)' : ''}
             </span>
             <div className="w-48 h-1.5 rounded-full bg-[#e5e7eb] dark:bg-[#2e3148] overflow-hidden">
               <div
                 className="h-full rounded-full bg-[#004ac6] transition-all duration-300"
-                style={{ width: `${filasRecibido.length ? (clasificadasCount / filasRecibido.length) * 100 : 0}%` }}
+                style={{ width: `${filasRecibido.length ? (completasCount / filasRecibido.length) * 100 : 0}%` }}
               />
             </div>
           </div>
@@ -1013,13 +1397,19 @@ export default function DianClasificacionPage() {
                       <span title="Total − IVA — base sobre la que se calcula la retención">Base</span>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#8890b5] uppercase tracking-wide">Clasificación</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[#8890b5] uppercase tracking-wide">Retención</th>
+                  {empresaId && (
+                    <>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#8890b5] uppercase tracking-wide">IVA</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-[#8890b5] uppercase tracking-wide">Concepto</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {filasOrdenadas.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-sm text-[#8890b5]">
+                    <td colSpan={empresaId ? 7 : 5} className="px-4 py-8 text-center text-sm text-[#8890b5]">
                       Ningún resultado coincide con los filtros.
                     </td>
                   </tr>
@@ -1033,6 +1423,11 @@ export default function DianClasificacionPage() {
                     isEven={i % 2 === 1}
                     seleccionada={seleccionadas.has(fila.indice)}
                     onToggleSeleccion={toggleSeleccion}
+                    empresaId={empresaId}
+                    valorIvaActual={clasificacionesIva[fila.indice]}
+                    onClasificadoIva={handleClasificadoIva}
+                    valorConceptoActual={conceptos[fila.indice]}
+                    onClasificadoConcepto={handleClasificadoConcepto}
                   />
                 ))}
               </tbody>
@@ -1076,7 +1471,9 @@ export default function DianClasificacionPage() {
               onClick={() => navigate(`/dian/nomina/${borradorId}`)}
               className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: '#004ac6' }}
-              title={!todasClasificadas ? 'Clasifica todas las compras antes de continuar' : ''}
+              title={!todasClasificadas
+                ? `Clasifica todas las compras${empresaId ? ' (retención, IVA y concepto)' : ''} antes de continuar`
+                : ''}
             >
               Continuar a nómina
               <span className="material-symbols-outlined text-base">arrow_forward</span>

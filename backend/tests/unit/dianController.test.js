@@ -6,6 +6,7 @@ const {
   uploadDian,
   calcularAnomalias,
   calcularDocumentosNoContabilizados,
+  calcularFilasSinFechaValida,
   exportarBorrador,
   aplicarClasificacionRapida,
   marcarAnomaliaRevisada,
@@ -319,6 +320,39 @@ describe('calcularDocumentosNoContabilizados', () => {
   });
 });
 
+describe('calcularFilasSinFechaValida', () => {
+  test('marca filas contabilizables sin fecha de emisión', () => {
+    const resultado = calcularFilasSinFechaValida([
+      { tipoDocumento: FACTURA, grupo: 'Recibido', folio: '1', prefijo: 'A', fechaEmision: null },
+      { tipoDocumento: FACTURA, grupo: 'Recibido', folio: '2', prefijo: 'A', fechaEmision: '2026-01-15' },
+    ]);
+
+    expect(resultado).toEqual([
+      expect.objectContaining({ folio: '1', prefijo: 'A', fechaEmisionCruda: null }),
+    ]);
+  });
+
+  test('marca filas con fecha en formato que parseDate no pudo convertir a ISO', () => {
+    // parseDate deja el texto crudo tal cual cuando no calza con "dd-MM-yyyy" — no es un ISO
+    // "YYYY-MM-DD" válido, así que agruparFilasPorPeriodo no la puede ubicar en un mes.
+    const resultado = calcularFilasSinFechaValida([
+      { tipoDocumento: FACTURA, grupo: 'Recibido', folio: '1', prefijo: 'A', fechaEmision: '15/01/2026 raro' },
+    ]);
+
+    expect(resultado).toEqual([
+      expect.objectContaining({ folio: '1', fechaEmisionCruda: '15/01/2026 raro' }),
+    ]);
+  });
+
+  test('un tipo de documento que no se contabiliza no cuenta, aunque no tenga fecha', () => {
+    const resultado = calcularFilasSinFechaValida([
+      { tipoDocumento: APPLICATION_RESPONSE, grupo: 'Recibido', fechaEmision: null },
+    ]);
+
+    expect(resultado).toEqual([]);
+  });
+});
+
 describe('calcularAnomalias', () => {
   // Una nota crédito con Total negativo es normal (revierte una operación). Si las notas de
   // ajuste no estuvieran contempladas acá, dispararían una anomalía falsa.
@@ -368,8 +402,8 @@ describe('calcularAnomalias', () => {
 
   test('un reporte limpio no produce anomalías', () => {
     const anomalias = calcularAnomalias([
-      { tipoDocumento: FACTURA, grupo: 'Recibido', total: 119000, iva: 19000, cufe: 'A' },
-      { tipoDocumento: FACTURA, grupo: 'Emitido',  total: 238000, iva: 38000, cufe: 'B' },
+      { tipoDocumento: FACTURA, grupo: 'Recibido', total: 119000, iva: 19000, cufe: 'A', fechaEmision: '2026-01-15' },
+      { tipoDocumento: FACTURA, grupo: 'Emitido',  total: 238000, iva: 38000, cufe: 'B', fechaEmision: '2026-01-20' },
     ]);
 
     expect(anomalias).toEqual([]);
