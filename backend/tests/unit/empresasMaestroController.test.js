@@ -3,7 +3,7 @@ jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
 
 const db = require('../../src/config/database');
 const {
-  getPosiblesDuplicados, createEmpresa, habilitarModulo, fusionar,
+  getPosiblesDuplicados, createEmpresa, habilitarModulo, fusionar, descartarDuplicado,
 } = require('../../src/controllers/empresasMaestroController');
 
 function mockRes() {
@@ -36,13 +36,15 @@ beforeEach(() => {
 
 describe('getPosiblesDuplicados', () => {
   test('sugiere dos empresas que comparten una palabra significativa', async () => {
-    db.query.mockResolvedValueOnce({
-      rows: [
-        { id: 'a', name: 'CATACAKES PASTELERIA', nit: null },
-        { id: 'b', name: 'CATACAKES', nit: null },
-        { id: 'c', name: 'ALGO TOTALMENTE DISTINTO', nit: null },
-      ],
-    });
+    db.query
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'a', name: 'CATACAKES PASTELERIA', nit: null },
+          { id: 'b', name: 'CATACAKES', nit: null },
+          { id: 'c', name: 'ALGO TOTALMENTE DISTINTO', nit: null },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // descartados
 
     const req = baseReq();
     const res = mockRes();
@@ -59,12 +61,14 @@ describe('getPosiblesDuplicados', () => {
   // como "SAS") no deben inundar de falsos positivos — a diferencia de nombresSeParecen
   // (pensada para "no bloquear"), acá la falta de señal en cualquiera de los dos NO sugiere.
   test('no sugiere cuando a alguna de las dos no le queda ninguna palabra significativa', async () => {
-    db.query.mockResolvedValueOnce({
-      rows: [
-        { id: 'a', name: 'GC', nit: null },
-        { id: 'b', name: 'CATACAKES PASTELERIA', nit: null },
-      ],
-    });
+    db.query
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'a', name: 'GC', nit: null },
+          { id: 'b', name: 'CATACAKES PASTELERIA', nit: null },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // descartados
 
     const req = baseReq();
     const res = mockRes();
@@ -74,12 +78,14 @@ describe('getPosiblesDuplicados', () => {
   });
 
   test('mismo NIT en dos empresas se sugiere aunque el nombre no se parezca en nada', async () => {
-    db.query.mockResolvedValueOnce({
-      rows: [
-        { id: 'a', name: 'RESTAURANTE ITALIANO PORTONOVO', nit: '900123456' },
-        { id: 'b', name: 'ALGO TOTALMENTE DISTINTO', nit: '900123456' },
-      ],
-    });
+    db.query
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'a', name: 'RESTAURANTE ITALIANO PORTONOVO', nit: '900123456' },
+          { id: 'b', name: 'ALGO TOTALMENTE DISTINTO', nit: '900123456' },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // descartados
 
     const req = baseReq();
     const res = mockRes();
@@ -94,18 +100,59 @@ describe('getPosiblesDuplicados', () => {
   // NIT distinto conocido en ambas es prueba de que NO son la misma empresa — descarta el
   // falso positivo por nombre en vez de solo ignorarlo.
   test('NIT distinto conocido en ambas descarta la sugerencia por nombre parecido', async () => {
-    db.query.mockResolvedValueOnce({
-      rows: [
-        { id: 'a', name: 'CATACAKES PASTELERIA', nit: '900111111' },
-        { id: 'b', name: 'CATACAKES EVENTOS', nit: '900222222' },
-      ],
-    });
+    db.query
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'a', name: 'CATACAKES PASTELERIA', nit: '900111111' },
+          { id: 'b', name: 'CATACAKES EVENTOS', nit: '900222222' },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [] }); // descartados
 
     const req = baseReq();
     const res = mockRes();
     await getPosiblesDuplicados(req, res, mockNext);
 
     expect(res.json.mock.calls[0][0]).toEqual([]);
+  });
+
+  test('un par ya descartado no se vuelve a sugerir', async () => {
+    db.query
+      .mockResolvedValueOnce({
+        rows: [
+          { id: 'a', name: 'CATACAKES PASTELERIA', nit: null },
+          { id: 'b', name: 'CATACAKES', nit: null },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ empresa_menor_id: 'a', empresa_mayor_id: 'b' }] });
+
+    const req = baseReq();
+    const res = mockRes();
+    await getPosiblesDuplicados(req, res, mockNext);
+
+    expect(res.json.mock.calls[0][0]).toEqual([]);
+  });
+});
+
+describe('descartarDuplicado', () => {
+  test('rechaza si falta un id o son iguales', async () => {
+    const req = baseReq({ body: { empresaIdA: 'a', empresaIdB: 'a' } });
+    const res = mockRes();
+    await descartarDuplicado(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('guarda el par ordenado (menor primero) y responde 204', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+
+    const req = baseReq({ body: { empresaIdA: 'b', empresaIdB: 'a' } });
+    const res = mockRes();
+    await descartarDuplicado(req, res, mockNext);
+
+    expect(db.query.mock.calls[0][1]).toEqual(['a', 'b', 'user-1']);
+    expect(res.status).toHaveBeenCalledWith(204);
   });
 });
 
