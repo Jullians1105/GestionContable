@@ -177,6 +177,20 @@ export default function EmpresasPage() {
     }
   }
 
+  const [descartandoId, setDescartandoId] = useState(null) // `${empresaA.id}-${empresaB.id}` en curso
+  const descartarSugerencia = async (empresaA, empresaB) => {
+    const key = `${empresaA.id}-${empresaB.id}`
+    setDescartandoId(key)
+    try {
+      await api.descartarDuplicadoEmpresa(empresaA.id, empresaB.id)
+      await cargar()
+    } catch (err) {
+      setFusionError(err.message || 'No se pudo descartar')
+    } finally {
+      setDescartandoId(null)
+    }
+  }
+
   if (cargando) {
     return (
       <div className="max-w-5xl mx-auto mt-20 text-center">
@@ -243,12 +257,21 @@ export default function EmpresasPage() {
                   </span>
                 </span>
                 {puedeEditar && (
-                  <button
-                    onClick={() => setFusionando({ empresaA: d.empresaA, empresaB: d.empresaB })}
-                    className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40"
-                  >
-                    Fusionar
-                  </button>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      onClick={() => descartarSugerencia(d.empresaA, d.empresaB)}
+                      disabled={descartandoId === `${d.empresaA.id}-${d.empresaB.id}`}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] border border-[#d1d5db] dark:border-[#3a3e5c] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] disabled:opacity-50"
+                    >
+                      No es duplicado
+                    </button>
+                    <button
+                      onClick={() => setFusionando({ empresaA: d.empresaA, empresaB: d.empresaB })}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                    >
+                      Fusionar
+                    </button>
+                  </div>
                 )}
               </div>
             ))}

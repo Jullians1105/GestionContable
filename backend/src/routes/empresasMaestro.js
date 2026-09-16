@@ -11,7 +11,7 @@ const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const {
   getDirectorio, getPosiblesDuplicados, createEmpresa, updateEmpresa,
-  habilitarModulo, deshabilitarModulo, fusionar, generarTokenDian, MODULOS,
+  habilitarModulo, deshabilitarModulo, fusionar, descartarDuplicado, generarTokenDian, MODULOS,
 } = require('../controllers/empresasMaestroController');
 
 const router = Router();
@@ -58,6 +58,13 @@ router.post('/fusionar',
   body('empresaIdB').isUUID().withMessage('empresaIdB debe ser un UUID válido'),
   validate,
   fusionar
+);
+
+router.post('/duplicados/descartar',
+  body('empresaIdA').isUUID().withMessage('empresaIdA debe ser un UUID válido'),
+  body('empresaIdB').isUUID().withMessage('empresaIdB debe ser un UUID válido'),
+  validate,
+  descartarDuplicado
 );
 
 module.exports = router;

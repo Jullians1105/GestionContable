@@ -116,13 +116,23 @@ const getDirectorio = async (req, res, next) => {
 // AMBOS nombres tengan señal real y la compartan.
 const getPosiblesDuplicados = async (req, res, next) => {
   try {
-    const { rows } = await db.query('SELECT id, name, nit FROM empresas ORDER BY name ASC');
+    const [{ rows }, { rows: descartados }] = await Promise.all([
+      db.query('SELECT id, name, nit FROM empresas ORDER BY name ASC'),
+      db.query('SELECT empresa_menor_id, empresa_mayor_id FROM empresas_duplicados_descartados'),
+    ]);
+    // Set de pares ya revisados y confirmados como "no es duplicado" (ver migración 056) — se
+    // descartan antes de sugerirlos de nuevo, para no repetir cada vez la misma revisión manual.
+    const descartadosSet = new Set(descartados.map((d) => `${d.empresa_menor_id}|${d.empresa_mayor_id}`));
+
     const empresas = rows.map((e) => ({ ...e, palabras: new Set(palabrasSignificativas(e.name)) }));
     const sugerencias = [];
     for (let i = 0; i < empresas.length; i++) {
       for (let j = i + 1; j < empresas.length; j++) {
         const a = empresas[i];
         const b = empresas[j];
+        const [menorId, mayorId] = [a.id, b.id].sort();
+        if (descartadosSet.has(`${menorId}|${mayorId}`)) continue;
+
         const par = { empresaA: { id: a.id, name: a.name }, empresaB: { id: b.id, name: b.name } };
 
         if (a.nit && b.nit) {
@@ -309,6 +319,26 @@ const fusionar = async (req, res, next) => {
   }
 };
 
+// Marca un par sugerido como "ya revisado, no es duplicado" (ver migración 056) — para que
+// getPosiblesDuplicados no lo vuelva a sugerir. No fusiona ni borra nada.
+const descartarDuplicado = async (req, res, next) => {
+  try {
+    const { empresaIdA, empresaIdB } = req.body;
+    if (!empresaIdA || !empresaIdB || empresaIdA === empresaIdB) {
+      return res.status(400).json({ error: 'empresaIdA y empresaIdB son requeridos y deben ser distintos' });
+    }
+    const [menorId, mayorId] = [empresaIdA, empresaIdB].sort();
+    await db.query(
+      `INSERT INTO empresas_duplicados_descartados (empresa_menor_id, empresa_mayor_id, descartado_por)
+       VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+      [menorId, mayorId, req.user.userId]
+    );
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+};
+
 // Genera el token de acceso a la DIAN para esta empresa (ver dianTokenService.js) — dispara el
 // envío del enlace al correo del RUT, no "entra" a ninguna cuenta. Requiere que la empresa ya
 // tenga tipo_contribuyente + los datos que ese tipo necesita (nit siempre; cedula_representante
@@ -345,5 +375,6 @@ module.exports = {
   habilitarModulo,
   deshabilitarModulo,
   fusionar,
+  descartarDuplicado,
   generarTokenDian,
 };
