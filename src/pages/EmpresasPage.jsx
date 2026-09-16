@@ -207,11 +207,7 @@ export default function EmpresasPage() {
           <span className="material-symbols-outlined text-3xl text-[#004ac6]">domain</span>
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Empresas</h1>
         </div>
-        <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
-          Todas las empresas del software en un solo lugar — Fondo Emprender, Empresas Externas,
-          Nómina Electrónica y Contabilidad. {!puedeEditar && 'Solo un admin o leader puede editar esto.'}
-        </p>
-        <div className="flex items-center gap-4 mt-3 text-xs">
+        <div className="flex items-center gap-4 mt-1 text-xs">
           <span className="text-[#6b7280] dark:text-[#8890b5]">
             <b className="text-[#191c1e] dark:text-[#e4e6f0] text-sm">{stats.total}</b> empresas
           </span>
