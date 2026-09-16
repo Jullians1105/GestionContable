@@ -47,10 +47,7 @@ export default function EmpresasPage() {
     )
   }, [empresas, busqueda])
 
-  const stats = useMemo(() => ({
-    total: empresas.length,
-    conDatos: empresas.filter((e) => e.nit).length,
-  }), [empresas])
+  const stats = useMemo(() => ({ total: empresas.length }), [empresas])
 
   // ── crear empresa nueva (solo identidad, sin habilitar módulo todavía) ────
   const [nuevoNombre, setNuevoNombre] = useState('')
@@ -218,16 +215,6 @@ export default function EmpresasPage() {
           <span className="text-[#6b7280] dark:text-[#8890b5]">
             <b className="text-[#191c1e] dark:text-[#e4e6f0] text-sm">{stats.total}</b> empresas
           </span>
-          <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>verified</span>
-            <b>{stats.conDatos}</b> con NIT/cédula
-          </span>
-          {stats.total - stats.conDatos > 0 && (
-            <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>error</span>
-              <b>{stats.total - stats.conDatos}</b> sin datos
-            </span>
-          )}
         </div>
       </div>
 
