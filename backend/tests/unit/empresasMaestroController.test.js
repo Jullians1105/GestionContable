@@ -1,9 +1,12 @@
 jest.mock('../../src/config/database');
 jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
+jest.mock('../../src/services/dianTokenService');
 
 const db = require('../../src/config/database');
+const dianTokenService = require('../../src/services/dianTokenService');
 const {
-  getPosiblesDuplicados, createEmpresa, habilitarModulo, fusionar, descartarDuplicado,
+  getDirectorio, getPosiblesDuplicados, createEmpresa, updateEmpresa, habilitarModulo,
+  deshabilitarModulo, fusionar, descartarDuplicado, generarTokenDian,
 } = require('../../src/controllers/empresasMaestroController');
 
 function mockRes() {
@@ -32,6 +35,31 @@ function mockClient() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+});
+
+describe('getDirectorio', () => {
+  test('arma el mapa de módulos habilitados a partir del join', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [
+        {
+          id: 'a', name: 'ACME', nit: '900123456', tipo_contribuyente: 'empresa', cedula_representante: '111',
+          activa: true, created_at: '2026-01-01', updated_at: '2026-01-01',
+          fondo_id: 'f1', fondo_categoria: 'contable', fondo_monthly_fee: '150000',
+          ext_id: null, ext_responsable_id: null,
+          ne_id: null, ne_responsable_id: null,
+          contab_id: null, contab_nit: null,
+        },
+      ],
+    });
+
+    const req = baseReq();
+    const res = mockRes();
+    await getDirectorio(req, res, mockNext);
+
+    const [empresa] = res.json.mock.calls[0][0];
+    expect(empresa.modulos.fondo).toEqual({ id: 'f1', categoria: 'contable', monthlyFee: 150000 });
+    expect(empresa.modulos.ext).toBeNull();
+  });
 });
 
 describe('getPosiblesDuplicados', () => {
@@ -153,6 +181,113 @@ describe('descartarDuplicado', () => {
 
     expect(db.query.mock.calls[0][1]).toEqual(['a', 'b', 'user-1']);
     expect(res.status).toHaveBeenCalledWith(204);
+  });
+});
+
+describe('updateEmpresa', () => {
+  test('renombrar cascada el nombre nuevo a las 4 tablas de módulo', async () => {
+    const client = mockClient();
+    client.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: 'empresa-1', name: 'ACME SAS', activa: true }] }) // UPDATE empresas
+      .mockResolvedValue({ rows: [] }); // UPDATE de cada tabla de módulo + COMMIT
+    db.getClient.mockResolvedValue(client);
+    db.query.mockResolvedValueOnce({ rows: [] }); // audit log
+
+    const req = baseReq({ params: { id: 'empresa-1' }, body: { name: 'acme sas' } });
+    const res = mockRes();
+    await updateEmpresa(req, res, mockNext);
+
+    const updatesDeModulo = client.query.mock.calls.filter(([sql]) => sql.includes('SET name = $1 WHERE empresa_id = $2'));
+    expect(updatesDeModulo).toHaveLength(4);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ name: 'ACME SAS' }));
+  });
+
+  test('empresa inexistente responde 404 y hace rollback', async () => {
+    const client = mockClient();
+    client.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // UPDATE no encontró nada
+      .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+    db.getClient.mockResolvedValue(client);
+
+    const req = baseReq({ params: { id: 'no-existe' }, body: { name: 'ACME' } });
+    const res = mockRes();
+    await updateEmpresa(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+});
+
+describe('deshabilitarModulo', () => {
+  test('módulo inválido devuelve 400', async () => {
+    const req = baseReq({ params: { id: 'empresa-1', modulo: 'inventado' } });
+    const res = mockRes();
+    await deshabilitarModulo(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('no habilitada en ese módulo devuelve 404', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+
+    const req = baseReq({ params: { id: 'empresa-1', modulo: 'fondo' } });
+    const res = mockRes();
+    await deshabilitarModulo(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  test('borra la fila del módulo y responde 204', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ id: 'fila-1' }] }) // ya habilitada
+      .mockResolvedValueOnce({ rows: [] }) // DELETE
+      .mockResolvedValueOnce({ rows: [] }); // audit log
+
+    const req = baseReq({ params: { id: 'empresa-1', modulo: 'fondo' } });
+    const res = mockRes();
+    await deshabilitarModulo(req, res, mockNext);
+
+    expect(db.query.mock.calls[1][0]).toContain('DELETE FROM fondo_empresas');
+    expect(res.status).toHaveBeenCalledWith(204);
+  });
+});
+
+describe('generarTokenDian', () => {
+  test('empresa inexistente responde 404', async () => {
+    db.query.mockResolvedValueOnce({ rows: [] });
+
+    const req = baseReq({ params: { id: 'no-existe' } });
+    const res = mockRes();
+    await generarTokenDian(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(dianTokenService.generarToken).not.toHaveBeenCalled();
+  });
+
+  test('sin tipo_contribuyente configurado responde 400', async () => {
+    db.query.mockResolvedValueOnce({ rows: [{ nit: '900123456', tipo_contribuyente: null, cedula_representante: null }] });
+
+    const req = baseReq({ params: { id: 'empresa-1' } });
+    const res = mockRes();
+    await generarTokenDian(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(dianTokenService.generarToken).not.toHaveBeenCalled();
+  });
+
+  test('con datos completos delega en dianTokenService y responde el resultado', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ nit: '900123456', tipo_contribuyente: 'empresa', cedula_representante: '123' }] })
+      .mockResolvedValueOnce({ rows: [] }); // audit log
+    dianTokenService.generarToken.mockResolvedValue({ success: true, mensaje: 'ok' });
+
+    const req = baseReq({ params: { id: 'empresa-1' } });
+    const res = mockRes();
+    await generarTokenDian(req, res, mockNext);
+
+    expect(dianTokenService.generarToken).toHaveBeenCalledWith({ tipo: 'empresa', nit: '900123456', cedulaRepresentante: '123' });
+    expect(res.json).toHaveBeenCalledWith({ success: true, mensaje: 'ok' });
   });
 });
 

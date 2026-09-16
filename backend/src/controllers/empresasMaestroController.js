@@ -10,13 +10,10 @@ const auditLog = require('../utils/auditLog');
 const { palabrasSignificativas } = require('../utils/nombresSeParecen');
 const dianTokenService = require('../services/dianTokenService');
 
-// Un módulo = una tabla + sus campos propios (los que SÍ importan para mostrarlos en el
-// directorio; no es la lista completa de columnas de cada tabla, solo lo identificable a
-// simple vista). `insertar` arma el INSERT de habilitación con lo mínimo de cada tabla.
+// Un módulo = una tabla de habilitación. `insertar` arma el INSERT con lo mínimo de cada una.
 const MODULOS = {
   fondo: {
     tabla: 'fondo_empresas',
-    campos: (row) => ({ categoria: row.categoria, monthlyFee: row.monthly_fee != null ? parseFloat(row.monthly_fee) : null }),
     insertar: async (client, { id, name, empresaId, extra }) => {
       await client.query(
         `INSERT INTO fondo_empresas (id, name, categoria, empresa_id) VALUES ($1, $2, $3, $4)`,
@@ -26,7 +23,6 @@ const MODULOS = {
   },
   ext: {
     tabla: 'ext_empresas',
-    campos: (row) => ({ responsableId: row.responsable_id ?? null }),
     insertar: async (client, { id, name, empresaId }) => {
       await client.query(
         `INSERT INTO ext_empresas (id, name, empresa_id) VALUES ($1, $2, $3)`,
@@ -36,7 +32,6 @@ const MODULOS = {
   },
   ne: {
     tabla: 'ne_empresas',
-    campos: (row) => ({ responsableId: row.responsable_id ?? null }),
     insertar: async (client, { id, name, empresaId }) => {
       await client.query(
         `INSERT INTO ne_empresas (id, name, empresa_id) VALUES ($1, $2, $3)`,
@@ -46,7 +41,6 @@ const MODULOS = {
   },
   contab: {
     tabla: 'contab_empresas',
-    campos: (row) => ({ nit: row.nit ?? null }),
     insertar: async (client, { id, name, empresaId }) => {
       await client.query(
         `INSERT INTO contab_empresas (id, name, empresa_id) VALUES ($1, $2, $3)`,
