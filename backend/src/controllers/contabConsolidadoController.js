@@ -137,6 +137,45 @@ const getPeriodos = async (req, res, next) => {
   }
 };
 
+// GET /api/contabilidad/consolidado/resumen-anual?empresaId&anio — base (subtotal sin IVA) de
+// compras/ventas por cada uno de los 12 meses del año, para las barras del selector mensual
+// (ContabilidadConsolidadoPage.jsx). Base, no total, a propósito: las tarjetas de abajo también
+// muestran la base como número principal (IVA aparte) — si acá sumáramos `total` (con IVA), la
+// misma "Compras" tendría dos cifras distintas según dónde se mire.
+// Consulta aparte de calcularConsolidado: esa agrupa TODOS los meses pedidos en un solo total, acá
+// se necesita el desglose mes a mes, incluso para meses fuera del período seleccionado.
+const getResumenAnual = async (req, res, next) => {
+  try {
+    const { empresaId } = req.query;
+    const anio = parseInt(req.query.anio, 10);
+    if (!empresaId || !anio) {
+      return res.status(400).json({ error: 'empresaId y anio son requeridos' });
+    }
+
+    const { rows } = await db.query(
+      `SELECT mes, grupo, COUNT(*)::int AS cantidad, COALESCE(SUM(subtotal), 0) AS base
+       FROM contab_documentos WHERE empresa_id = $1 AND anio = $2
+       GROUP BY mes, grupo`,
+      [empresaId, anio]
+    );
+
+    const porMes = Array.from({ length: 12 }, (_, i) => ({
+      mes: i + 1,
+      compras: { cantidad: 0, base: 0 },
+      ventas: { cantidad: 0, base: 0 },
+    }));
+    for (const r of rows) {
+      const clave = r.grupo === 'Recibido' ? 'compras' : r.grupo === 'Emitido' ? 'ventas' : null;
+      if (!clave) continue;
+      porMes[r.mes - 1][clave] = { cantidad: r.cantidad, base: round2(Number(r.base)) };
+    }
+
+    res.json(porMes);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET /api/contabilidad/consolidado?empresaId&anio&(mes|cuatrimestre|—)
 const getConsolidado = async (req, res, next) => {
   try {
@@ -341,4 +380,4 @@ const exportarConsolidado = async (req, res, next) => {
   }
 };
 
-module.exports = { getPeriodos, getConsolidado, exportarConsolidado };
+module.exports = { getPeriodos, getConsolidado, getResumenAnual, exportarConsolidado };

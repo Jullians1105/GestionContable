@@ -1,7 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
-import StatsCard from '../components/StatsCard'
+import EmpresaCombobox from '../components/EmpresaCombobox'
+
+// El teal/dorado de marca GESTCON (docs/Entrega.pdf) se probó en esta página y se revirtió:
+// junto al resto de la app (sidebar, botones, todo en azul #004ac6) se veía roto, no distinto —
+// un rebrand real necesita tocar las ~408 ocurrencias del azul en toda la app a la vez, no una
+// página suelta (ver docs/ESTADO_CONTABILIDAD_EMPRESAS.md si se retoma esa decisión más adelante).
+// Mismos colores que ya usa el resto de la app: azul para Compras, ámbar para Ventas.
+const AZUL = '#004ac6'
+const AZUL_OSCURO = '#00326b'
+const AMBAR = '#d97706'
 
 const MESES_ES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -74,11 +83,32 @@ export default function ContabilidadConsolidadoPage() {
     [periodosGuardados, anio]
   )
 
+  // ── Resumen anual (para las barras del selector de mes) ─────────────────
+  const [resumenAnual, setResumenAnual] = useState([])
+  useEffect(() => {
+    if (!empresaId) { setResumenAnual([]); return }
+    api.getContabResumenAnual(empresaId, anio).then(setResumenAnual).catch(() => setResumenAnual([]))
+  }, [empresaId, anio])
+
+  // Base (subtotal sin IVA), no total — mismo criterio que las tarjetas de abajo, donde la
+  // base es el número principal y el IVA va aparte. Si acá se sumara el total (con IVA), la
+  // misma "Compras" mostraría una cifra distinta según si se mira la barra o la tarjeta.
+  const maxMesBase = useMemo(
+    () => resumenAnual.reduce((max, m) => Math.max(max, m.compras.base + m.ventas.base), 0),
+    [resumenAnual]
+  )
+
   // ── Consolidado ──────────────────────────────────────────────────────────
   const [data, setData] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
 
+  // No se limpia `data` antes de que llegue la respuesta nueva (ni en éxito
+  // ni en error) — antes cada cambio de mes desmontaba tarjetas/tablas para
+  // mostrar un spinner y las volvía a montar al llegar la respuesta, lo que
+  // se sentía como un salto/temblor de la página. Ahora el contenido
+  // anterior se queda visible (atenuado, ver `cargando` en el render) hasta
+  // que el nuevo período reemplaza el mismo bloque en su lugar.
   useEffect(() => {
     if (!empresaId) { setData(null); return }
     let cancelado = false
@@ -87,7 +117,7 @@ export default function ContabilidadConsolidadoPage() {
     const periodo = tab === 'mensual' ? { anio, mes } : tab === 'cuatrimestral' ? { anio, cuatrimestre } : { anio }
     api.getContabConsolidado(empresaId, periodo)
       .then((res) => { if (!cancelado) setData(res) })
-      .catch((err) => { if (!cancelado) { setError(err.message || 'No se pudo cargar el consolidado'); setData(null) } })
+      .catch((err) => { if (!cancelado) setError(err.message || 'No se pudo cargar el consolidado') })
       .finally(() => { if (!cancelado) setCargando(false) })
     return () => { cancelado = true }
   }, [empresaId, tab, anio, mes, cuatrimestre])
@@ -122,7 +152,7 @@ export default function ContabilidadConsolidadoPage() {
       {/* ── Encabezado ─────────────────────────────────────────────────── */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#004ac6]">query_stats</span>
+          <span className="material-symbols-outlined text-3xl text-[#004ac6] dark:text-[#7ba8f0]">query_stats</span>
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Consolidado</h1>
         </div>
         <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
@@ -130,30 +160,17 @@ export default function ContabilidadConsolidadoPage() {
         </p>
       </div>
 
-      {/* ── Selector de empresa ────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-4 mb-5">
-        <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Empresa</label>
-        <select
-          value={empresaId}
-          onChange={(e) => setEmpresaId(e.target.value)}
-          className="w-full sm:w-96 px-3 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/30"
-        >
-          <option value="">— Selecciona una empresa —</option>
-          {empresas.map((e) => (
-            <option key={e.id} value={e.id}>{e.name}</option>
-          ))}
-        </select>
-      </div>
-
-      {!empresaId ? (
-        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] p-12 text-center shadow-sm">
-          <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">business</span>
-          <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">Elige una empresa para ver su información guardada.</p>
+      {/* ── Panel de controles: empresa + tabs + navegador, un solo panel ── */}
+      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-4 mb-5 flex flex-wrap items-center gap-4">
+        <div className="w-full sm:w-auto sm:flex-1 sm:min-w-[240px] sm:max-w-md">
+          <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Empresa</label>
+          <EmpresaCombobox empresas={empresas} value={empresaId} onChange={setEmpresaId} />
         </div>
-      ) : (
-        <>
-          {/* ── Tabs + navegador de período ──────────────────────────── */}
-          <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+
+        {empresaId && (
+          <div className="flex flex-wrap items-center gap-4 sm:ml-auto">
+            <div className="hidden sm:block w-px self-stretch bg-[#e2e4ef] dark:bg-[#2e3148]" />
+
             <div className="inline-flex bg-[#f0f2f8] dark:bg-[#181a2e] rounded-xl p-1">
               {TABS.map((t) => (
                 <button
@@ -161,7 +178,7 @@ export default function ContabilidadConsolidadoPage() {
                   onClick={() => setTab(t.id)}
                   className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
                     tab === t.id
-                      ? 'bg-white dark:bg-[#252840] shadow-sm text-[#004ac6]'
+                      ? 'bg-white dark:bg-[#252840] shadow-sm text-[#004ac6] dark:text-[#7ba8f0]'
                       : 'text-[#6b7280] dark:text-[#8890b5] hover:text-[#434655] dark:hover:text-[#c4c8e8]'
                   }`}
                 >
@@ -171,7 +188,7 @@ export default function ContabilidadConsolidadoPage() {
             </div>
 
             {tab === 'mensual' && (
-              <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2 shadow-sm">
+              <div className="flex items-center gap-1 border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2">
                 <button onClick={() => cambiarMes(-1)} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] text-[#8890b5]">
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
@@ -182,7 +199,7 @@ export default function ContabilidadConsolidadoPage() {
               </div>
             )}
             {tab === 'cuatrimestral' && (
-              <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2 shadow-sm">
+              <div className="flex items-center gap-1 border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2">
                 <button onClick={() => cambiarCuatrimestre(-1)} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] text-[#8890b5]">
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
@@ -193,7 +210,7 @@ export default function ContabilidadConsolidadoPage() {
               </div>
             )}
             {tab === 'anual' && (
-              <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2 shadow-sm">
+              <div className="flex items-center gap-1 border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2">
                 <button onClick={() => setAnio((a) => a - 1)} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] text-[#8890b5]">
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
@@ -204,50 +221,125 @@ export default function ContabilidadConsolidadoPage() {
               </div>
             )}
           </div>
+        )}
+      </div>
 
-          {/* ── Indicador de meses del año con datos (referencia rápida) ── */}
-          <div className="flex items-center gap-1.5 flex-wrap mb-5">
-            {MESES_ES.map((nombre, i) => {
-              const numMes = i + 1
-              const activo = tab === 'mensual' ? numMes === mes
-                : tab === 'cuatrimestral' ? CUATRIMESTRE_MESES[cuatrimestre].includes(numMes)
-                : true
-              const tieneDatos = mesesConDatos.has(numMes)
-              return (
-                <span
-                  key={nombre}
-                  title={`${nombre} ${anio}${tieneDatos ? ' — con datos guardados' : ' — sin datos'}`}
-                  className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold border ${
-                    activo
-                      ? tieneDatos ? 'bg-green-100 dark:bg-green-900/30 border-green-400 text-green-700 dark:text-green-400'
-                                   : 'bg-red-50 dark:bg-red-900/20 border-red-300 text-red-500'
-                      : tieneDatos ? 'bg-[#eef3ff] dark:bg-[#1a2540] border-[#c7d9ff] dark:border-[#2e4470] text-[#004ac6]'
-                                   : 'bg-[#f3f4f6] dark:bg-[#181a2e] border-[#e2e4ef] dark:border-[#2e3148] text-[#9ca3af]'
-                  }`}
-                >
-                  {nombre.slice(0, 1)}
+      {!empresaId ? (
+        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] p-12 text-center shadow-sm">
+          <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">business</span>
+          <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">Elige una empresa para ver su información guardada.</p>
+        </div>
+      ) : (
+        <>
+          {/* ── Barras del año: selector de mes y gráfico de compras/ventas en uno ── */}
+          <div className="bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-2xl p-4 mb-5">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+              <span className="text-[11px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide">
+                {anio} — clic en un mes para verlo
+              </span>
+              <div className="flex items-center gap-3 text-[11px] text-[#6b7280] dark:text-[#8890b5]">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: AZUL }} />Compras
                 </span>
-              )
-            })}
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: AMBAR }} />Ventas
+                </span>
+              </div>
+            </div>
+            <div className="flex items-end justify-center gap-4 h-24">
+              {MESES_ES.map((nombre, i) => {
+                const numMes = i + 1
+                const activo = tab === 'mensual' ? numMes === mes
+                  : tab === 'cuatrimestral' ? CUATRIMESTRE_MESES[cuatrimestre].includes(numMes)
+                  : false
+                const tieneDatos = mesesConDatos.has(numMes)
+                const resumenMes = resumenAnual[i]
+                const comprasBase = resumenMes?.compras.base ?? 0
+                const ventasBase = resumenMes?.ventas.base ?? 0
+                const baseMes = comprasBase + ventasBase
+                const alturaPct = maxMesBase > 0 ? Math.max((baseMes / maxMesBase) * 100, 8) : 8
+                const comprasPct = baseMes > 0 ? (comprasBase / baseMes) * 100 : 0
+                const ventasPct = baseMes > 0 ? (ventasBase / baseMes) * 100 : 0
+                const soloCompras = comprasPct > 0 && ventasPct === 0
+                const soloVentas = ventasPct > 0 && comprasPct === 0
+
+                return (
+                  <button
+                    key={nombre}
+                    onClick={() => { setTab('mensual'); setMes(numMes) }}
+                    className={`relative flex flex-col items-center justify-end gap-1.5 h-full rounded-lg px-1.5 pt-2 transition ${
+                      activo ? 'bg-[#eef3ff] dark:bg-[#1a2540] border border-[#c7d9ff] dark:border-[#2e4470]' : 'hover:bg-[#f3f4f6] dark:hover:bg-[#252840]'
+                    }`}
+                  >
+                    {tieneDatos ? (
+                      <div className="flex flex-col-reverse" style={{ width: 26, height: `${alturaPct}%` }}>
+                        {comprasPct > 0 && (
+                          <div
+                            className={`group relative ${soloCompras ? 'rounded-t-[3px] rounded-b-[2px]' : 'rounded-b-[2px]'}`}
+                            style={{ height: `${comprasPct}%`, background: AZUL }}
+                          >
+                            <span
+                              className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+6px)] whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[10.5px] font-semibold text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100 z-10"
+                              style={{ background: AZUL_OSCURO }}
+                            >
+                              Compras · Base <span className="tabular-nums">{fmt(comprasBase)}</span>
+                            </span>
+                          </div>
+                        )}
+                        {ventasPct > 0 && (
+                          <div
+                            className={`group relative ${soloVentas ? 'rounded-t-[3px] rounded-b-[2px]' : 'rounded-t-[3px]'}`}
+                            style={{ height: `${ventasPct}%`, background: AMBAR }}
+                          >
+                            <span
+                              className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+6px)] whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[10.5px] font-semibold text-white opacity-0 shadow-md transition-opacity group-hover:opacity-100 z-10"
+                              style={{ background: AZUL_OSCURO }}
+                            >
+                              Ventas · Base <span className="tabular-nums">{fmt(ventasBase)}</span>
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="group relative" style={{ width: 26 }}>
+                        <div className="h-[3px] rounded-full bg-[#e2e4ef] dark:bg-[#2e3148]" />
+                        <span
+                          className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-[calc(100%+6px)] whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[10.5px] font-medium text-white/80 opacity-0 shadow-md transition-opacity group-hover:opacity-100 z-10"
+                          style={{ background: AZUL_OSCURO }}
+                        >
+                          Sin datos guardados
+                        </span>
+                      </div>
+                    )}
+                    <span className={`text-[10px] font-bold ${activo ? 'text-[#004ac6] dark:text-[#7ba8f0]' : 'text-[#9ca3af] dark:text-[#5a5f7a]'}`}>
+                      {nombre.slice(0, 1)}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* ── Estados de carga / error ─────────────────────────────── */}
-          {cargando && (
+          {/* Spinner grande solo en la carga inicial (sin `data` todavía) —
+              un cambio de mes con datos ya en pantalla no vuelve a mostrar
+              esto, solo atenúa el bloque de abajo (ver `cargando` más abajo). */}
+          {cargando && !data && (
             <div className="text-center py-12">
-              <svg className="animate-spin h-8 w-8 text-[#004ac6] mx-auto" viewBox="0 0 24 24" fill="none">
+              <svg className="animate-spin h-8 w-8 text-[#004ac6] dark:text-[#7ba8f0] mx-auto" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             </div>
           )}
-          {error && !cargando && (
+          {error && (
             <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400 mb-5">
               {error}
             </div>
           )}
 
-          {!cargando && !error && data && (
-            <>
+          {data && (
+            <div className={`transition-opacity duration-150 ${cargando ? 'opacity-50' : 'opacity-100'}`}>
               {/* ── Aviso de meses faltantes ───────────────────────────── */}
               {data.mesesFaltantes.length > 0 && (
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 mb-5">
@@ -259,14 +351,46 @@ export default function ContabilidadConsolidadoPage() {
                 </div>
               )}
 
-              {/* ── Totales ────────────────────────────────────────────── */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
-                <StatsCard title="COMPRAS — # FACTURAS" value={data.totales.compras.cantidad} icon="receipt_long" />
-                <StatsCard title="COMPRAS — BASE" value={data.totales.compras.base} icon="payments" decimals={0} />
-                <StatsCard title="IVA DESCONTABLE" value={data.totales.compras.iva} icon="percent" borderColor="#16a34a" iconColor="#16a34a" />
-                <StatsCard title="VENTAS — BASE" value={data.totales.ventas.base} icon="trending_up" borderColor="#d97706" iconColor="#d97706" />
-                <StatsCard title="IVA GENERADO" value={data.totales.ventas.iva} icon="sell" borderColor="#d97706" iconColor="#d97706" />
-                <StatsCard title="INC GENERADO" value={data.totales.ventas.inc} icon="local_mall" borderColor="#d97706" iconColor="#d97706" />
+              {/* ── Totales: agrupados por Compras / Ventas, no 6 tarjetas sueltas ── */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide mb-1" style={{ color: AZUL }}>
+                    <span className="material-symbols-outlined text-base">payments</span>Compras
+                  </div>
+                  <p className="text-[9px] font-bold text-[#9ca3af] uppercase tracking-wide">Base (sin IVA)</p>
+                  <p className="text-2xl font-extrabold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">
+                    {fmt(data.totales.compras.base)}
+                  </p>
+                  <div className="flex gap-6 mt-3 pt-3 border-t border-dashed border-[#e2e4ef] dark:border-[#2e3148]">
+                    <div>
+                      <p className="text-[9px] font-bold text-[#9ca3af] uppercase tracking-wide"># Facturas</p>
+                      <p className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">{data.totales.compras.cantidad}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-[#9ca3af] uppercase tracking-wide">IVA descontable</p>
+                      <p className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">{fmt(data.totales.compras.iva)}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide mb-1" style={{ color: AMBAR }}>
+                    <span className="material-symbols-outlined text-base">trending_up</span>Ventas
+                  </div>
+                  <p className="text-[9px] font-bold text-[#9ca3af] uppercase tracking-wide">Base (sin IVA)</p>
+                  <p className="text-2xl font-extrabold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">
+                    {fmt(data.totales.ventas.base)}
+                  </p>
+                  <div className="flex gap-6 mt-3 pt-3 border-t border-dashed border-[#e2e4ef] dark:border-[#2e3148]">
+                    <div>
+                      <p className="text-[9px] font-bold text-[#9ca3af] uppercase tracking-wide">IVA generado</p>
+                      <p className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">{fmt(data.totales.ventas.iva)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-[#9ca3af] uppercase tracking-wide">INC generado</p>
+                      <p className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">{fmt(data.totales.ventas.inc)}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* ── Agrupados: Concepto / Clasificación IVA ─────────────── */}
@@ -374,10 +498,10 @@ export default function ContabilidadConsolidadoPage() {
                   </div>
                 )}
               </div>
-            </>
+            </div>
           )}
 
-          {!cargando && !error && data && data.documentos.length === 0 && data.mesesFaltantes.length === data.periodo.meses.length && (
+          {!cargando && data && data.documentos.length === 0 && data.mesesFaltantes.length === data.periodo.meses.length && (
             <p className="text-xs text-[#9ca3af] mt-2">
               {empresaNombre} no tiene ningún dato guardado para este período todavía.
             </p>

@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { query } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
-const { getPeriodos, getConsolidado, exportarConsolidado } = require('../controllers/contabConsolidadoController');
+const { getPeriodos, getConsolidado, getResumenAnual, exportarConsolidado } = require('../controllers/contabConsolidadoController');
 
 const router = Router();
 router.use(authMiddleware);
@@ -33,6 +33,28 @@ router.get('/periodos',
   query('empresaId').notEmpty().isUUID().withMessage('empresaId debe ser un UUID válido'),
   validate,
   getPeriodos
+);
+
+/**
+ * @openapi
+ * /api/contabilidad/consolidado/resumen-anual:
+ *   get:
+ *     tags: [ContabilidadConsolidado]
+ *     summary: Total de compras/ventas por cada uno de los 12 meses del año (para las barras del selector)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: empresaId, in: query, required: true, schema: { type: string, format: uuid } }
+ *       - { name: anio, in: query, required: true, schema: { type: integer } }
+ *     responses:
+ *       200:
+ *         description: Arreglo de 12 posiciones (una por mes) con totales de compras y ventas
+ */
+router.get('/consolidado/resumen-anual',
+  query('empresaId').notEmpty().withMessage('empresaId es requerido').isUUID().withMessage('empresaId debe ser un UUID válido'),
+  query('anio').notEmpty().withMessage('anio es requerido').isInt({ min: 2000, max: 2100 }).toInt(),
+  validate,
+  getResumenAnual
 );
 
 /**
