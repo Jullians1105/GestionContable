@@ -24,6 +24,9 @@ dist-ssr
 .claude/
 .claude.json
 CLAUDE.md
+# Skills instaladas — .claude/skills/* son symlinks hacia acá, no borrar
+.agents/
+skills-lock.json
 # Docker
 .env
 backups/
