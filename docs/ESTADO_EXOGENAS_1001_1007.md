@@ -185,10 +185,8 @@ falta ningún otro cambio de arquitectura para esto, solo:
 
 ## 5. Otros pendientes sueltos (no relacionados con 1001/1007)
 
-- `docs/ARQUITECTURA_DESCARGA_FACTURAS.md`, `docs/PLANEACION_EXTRACCION_DATOS_FACTURAS.md`,
-  `docs/tipoDocumentos.jpeg`: siguen sin trackear en git a propósito (el usuario pidió
-  explícitamente no commitearlos, son solo para que Claude los lea). Este mismo archivo
-  (`ESTADO_EXOGENAS_1001_1007.md`) sigue el mismo patrón — no commitear salvo que el usuario lo
-  pida.
+- `docs/ARQUITECTURA_DESCARGA_FACTURAS.md` y `docs/PLANEACION_EXTRACCION_DATOS_FACTURAS.md` ya
+  se commitearon (2026-09-17, limpieza general de `docs/`). `docs/tipoDocumentos.jpeg` se borró
+  en esa misma limpieza — ya no se necesitaba.
 - Automatización de descarga de PDFs desde el portal DIAN (reemplazar `GestorDocs`) y
   licenciamiento vía Postgres: ideas de la planeación original, sin retomar, no urgentes.
