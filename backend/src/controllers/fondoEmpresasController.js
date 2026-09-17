@@ -1,4 +1,3 @@
-const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 
@@ -385,28 +384,6 @@ const normalizeCodigoSiigo = (value) => {
   return trimmed === '' ? null : trimmed;
 };
 
-const createEmpresa = async (req, res, next) => {
-  try {
-    const { name, categoria = 'contable', monthlyFee = null } = req.body;
-    const codigoSiigo = normalizeCodigoSiigo(req.body.codigoSiigo);
-    if (codigoSiigo !== undefined && !puedeEditarCodigoSiigo(req)) {
-      return res.status(403).json({ error: 'Solo un administrador puede asignar el código Siigo' });
-    }
-    const id = uuidv4();
-    const result = await db.query(
-      `INSERT INTO fondo_empresas (id, name, categoria, monthly_fee, codigo_siigo)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [id, name.trim().toUpperCase(), categoria, monthlyFee, codigoSiigo ?? null]
-    );
-    await auditLog(req.user.userId, 'CREATE', 'fondo_empresas', id, { name, categoria, monthlyFee, codigoSiigo });
-    req.io.emit('empresa:updated', { empresaId: id, tipo: 'empresa' });
-    res.status(201).json(normalizeEmpresa(result.rows[0]));
-  } catch (err) {
-    next(err);
-  }
-};
-
 const updateEmpresa = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -462,4 +439,4 @@ const deleteEmpresa = async (req, res, next) => {
   }
 };
 
-module.exports = { getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa };
+module.exports = { getEmpresas, getEmpresa, updateEmpresa, deleteEmpresa };

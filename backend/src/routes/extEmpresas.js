@@ -5,7 +5,7 @@ const { requireExternasAdmin } = require('../middleware/externasAccess');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const {
-  getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa,
+  getEmpresas, getEmpresa, updateEmpresa, deleteEmpresa,
 } = require('../controllers/extEmpresasController');
 
 const router = Router();
@@ -43,39 +43,9 @@ router.get('/', getEmpresas);
  */
 router.get('/:id', ...validateUUIDParam('id'), getEmpresa);
 
-/**
- * @openapi
- * /api/externas/empresas:
- *   post:
- *     tags: [ExternasEmpresas]
- *     summary: Crear empresa externa
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name]
- *             properties:
- *               name:          { type: string, maxLength: 255 }
- *               responsableId: { type: string, format: uuid, nullable: true }
- *               contador:      { type: string, maxLength: 255, nullable: true }
- *     responses:
- *       201:
- *         description: Empresa creada
- *       403:
- *         description: Solo un administrador puede gestionar empresas
- */
-router.post('/',
-  requireExternasAdmin,
-  body('name').trim().notEmpty().withMessage('El nombre es obligatorio').isLength({ max: 255 }),
-  body('responsableId').optional({ nullable: true }).isUUID().withMessage('responsableId debe ser un UUID válido'),
-  body('contador').optional({ nullable: true }).trim().isLength({ max: 255 }).withMessage('contador debe tener máximo 255 caracteres'),
-  validate,
-  createEmpresa
-);
+// Crear una empresa nueva ya no vive acá — solo en el directorio maestro
+// (POST /api/empresas + habilitar módulo 'ext'), ver
+// docs/ESTADO_EMPRESAS_DIRECTORIO.md.
 
 /**
  * @openapi

@@ -261,7 +261,6 @@ export const api = {
     return request(`/fondo/empresas${qs}`);
   },
   getFondoEmpresa: (id) => request(`/fondo/empresas/${id}`),
-  createFondoEmpresa: (data) => request('/fondo/empresas', { method: 'POST', body: JSON.stringify(data) }),
   updateFondoEmpresa: (id, data) => request(`/fondo/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteFondoEmpresa: (id) => request(`/fondo/empresas/${id}`, { method: 'DELETE' }),
 
@@ -290,14 +289,12 @@ export const api = {
   // Empresas Externas — Empresas
   getExtEmpresas: () => request('/externas/empresas'),
   getExtEmpresa: (id) => request(`/externas/empresas/${id}`),
-  createExtEmpresa: (data) => request('/externas/empresas', { method: 'POST', body: JSON.stringify(data) }),
   updateExtEmpresa: (id, data) => request(`/externas/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteExtEmpresa: (id) => request(`/externas/empresas/${id}`, { method: 'DELETE' }),
 
   // Contabilidad — Catálogo de empresas
   getContabEmpresas: () => request('/contabilidad/empresas'),
   getContabEmpresa: (id) => request(`/contabilidad/empresas/${id}`),
-  createContabEmpresa: (data) => request('/contabilidad/empresas', { method: 'POST', body: JSON.stringify(data) }),
   updateContabEmpresa: (id, data) => request(`/contabilidad/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteContabEmpresa: (id) => request(`/contabilidad/empresas/${id}`, { method: 'DELETE' }),
 
@@ -339,7 +336,6 @@ export const api = {
   // Nómina Electrónica — Empresas (catálogo)
   getNEEmpresas: () => request('/nomina-electronica/empresas'),
   getNEEmpresa: (id) => request(`/nomina-electronica/empresas/${id}`),
-  createNEEmpresa: (data) => request('/nomina-electronica/empresas', { method: 'POST', body: JSON.stringify(data) }),
   updateNEEmpresa: (id, data) => request(`/nomina-electronica/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteNEEmpresa: (id) => request(`/nomina-electronica/empresas/${id}`, { method: 'DELETE' }),
 
@@ -415,6 +411,10 @@ export const api = {
   // Contabilidad — Consolidado (guardado permanente por empresa/mes)
   getContabPeriodos: (empresaId) =>
     request(`/contabilidad/periodos?${new URLSearchParams({ empresaId })}`),
+
+  // Total de compras/ventas por cada uno de los 12 meses del año — barras del selector mensual.
+  getContabResumenAnual: (empresaId, anio) =>
+    request(`/contabilidad/consolidado/resumen-anual?${new URLSearchParams({ empresaId, anio })}`),
 
   // `periodo` es { anio, mes } | { anio, cuatrimestre } | { anio } (mensual/cuatrimestral/anual)
   // — se filtran null/undefined para no mandar "mes=null" literal en la URL.

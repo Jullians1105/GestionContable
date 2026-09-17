@@ -5,7 +5,7 @@ const { requireNEView, requireNEAdmin } = require('../middleware/nominaElectroni
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const {
-  getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa,
+  getEmpresas, getEmpresa, updateEmpresa, deleteEmpresa,
 } = require('../controllers/neEmpresasController');
 
 const router = Router();
@@ -33,42 +33,9 @@ router.get('/', requireNEView, getEmpresas);
  */
 router.get('/:id', ...validateUUIDParam('id'), getEmpresa);
 
-/**
- * @openapi
- * /api/nomina-electronica/empresas:
- *   post:
- *     tags: [NominaElectronicaEmpresas]
- *     summary: Crear empresa (admin o permiso nominaElectronica.canGestionar)
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name]
- *             properties:
- *               name:           { type: string, maxLength: 255 }
- *               responsableId:  { type: string, format: uuid, nullable: true }
- *               fondoEmpresaId: { type: string, format: uuid, nullable: true }
- *               extEmpresaId:   { type: string, format: uuid, nullable: true }
- *     responses:
- *       201:
- *         description: Empresa creada
- *       409:
- *         description: La empresa de Fondo/Externas ya está enlazada a otra fila
- */
-router.post('/',
-  requireNEAdmin,
-  body('name').trim().notEmpty().withMessage('El nombre es obligatorio').isLength({ max: 255 }),
-  body('origen').optional({ nullable: true }).isIn(['maritza', 'diana', 'externas']),
-  body('responsableId').optional({ nullable: true }).isUUID(),
-  body('fondoEmpresaId').optional({ nullable: true }).isUUID(),
-  body('extEmpresaId').optional({ nullable: true }).isUUID(),
-  validate,
-  createEmpresa
-);
+// Crear una empresa nueva ya no vive acá — solo en el directorio maestro
+// (POST /api/empresas + habilitar módulo 'ne'), ver
+// docs/ESTADO_EMPRESAS_DIRECTORIO.md.
 
 /**
  * @openapi

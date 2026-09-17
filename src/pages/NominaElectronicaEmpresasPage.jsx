@@ -22,12 +22,12 @@ import { ORIGEN_LABELS, ORIGEN_ACCENTS } from '../data/nominaElectronica'
 // ver migración 047) — no tiene relación con responsableId.
 //
 // La lectura (ver el listado) es libre para cualquier autenticado — solo se
-// ocultan/deshabilitan los botones de crear/editar si no se tiene el permiso,
-// como refuerzo de UX; el backend ya lo exige igual aunque alguien fuerce el
-// botón desde las devtools.
+// oculta/deshabilita el botón de editar si no se tiene el permiso, como
+// refuerzo de UX; el backend ya lo exige igual aunque alguien fuerce el botón
+// desde las devtools. Crear una empresa nueva ya no vive acá — solo en el
+// directorio maestro (/empresas, ver docs/ESTADO_EMPRESAS_DIRECTORIO.md).
 
 const ORIGEN_ORDER = ['maritza', 'diana', 'externas']
-const emptyForm = { name: '', origen: '', responsableId: '', fondoEmpresaId: '', extEmpresaId: '', activa: true }
 
 export default function NominaElectronicaEmpresasPage() {
   const { allUsers } = useTeam()
@@ -41,9 +41,9 @@ export default function NominaElectronicaEmpresasPage() {
   const [error,     setError]     = useState(null)
   const [search,    setSearch]    = useState('')
 
-  // popup flotante — { mode: 'edit'|'create', empresaId, left, top }
+  // popup flotante de edición — { empresaId, left, top }
   const [popup,    setPopup]    = useState(null)
-  const [form,     setForm]     = useState(emptyForm)
+  const [form,     setForm]     = useState(null)
   const [saving,   setSaving]   = useState(false)
   const [formError, setFormError] = useState(null)
   const popupRef = useRef(null)
@@ -76,7 +76,7 @@ export default function NominaElectronicaEmpresasPage() {
     return () => document.removeEventListener('mousedown', onDown)
   }, [popup])
 
-  function openPopup(mode, emp, e) {
+  function openPopup(emp, e) {
     const rect = e.currentTarget.getBoundingClientRect()
     const PW = 260, PH = 420
     let left = rect.right - PW
@@ -86,16 +86,16 @@ export default function NominaElectronicaEmpresasPage() {
     if (top  + PH > window.innerHeight - 8) top  = rect.top - PH - 4
     if (top  < 8) top  = 8
 
-    setForm(emp ? {
+    setForm({
       name: emp.name,
       origen: emp.origen ?? '',
       responsableId: emp.responsableId ?? '',
       fondoEmpresaId: emp.fondoEmpresaId ?? '',
       extEmpresaId: emp.extEmpresaId ?? '',
       activa: emp.activa,
-    } : emptyForm)
+    })
     setFormError(null)
-    setPopup({ mode, empresaId: emp?.id ?? null, left, top })
+    setPopup({ empresaId: emp.id, left, top })
   }
 
   async function handleSubmit(e) {
@@ -112,8 +112,7 @@ export default function NominaElectronicaEmpresasPage() {
       activa: form.activa,
     }
     try {
-      if (popup.mode === 'edit') await api.updateNEEmpresa(popup.empresaId, body)
-      else await api.createNEEmpresa(body)
+      await api.updateNEEmpresa(popup.empresaId, body)
       setPopup(null)
       fetchAll()
     } catch (err) {
@@ -141,15 +140,6 @@ export default function NominaElectronicaEmpresasPage() {
           <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Editar empresas — Nómina Electrónica</h1>
           <p className="text-[13px] text-[#6b7280] dark:text-[#8890b5]">{empresas.length} empresas</p>
         </div>
-        {puedeGestionar && (
-          <button
-            onClick={(e) => openPopup('create', null, e)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#004ac6] text-white text-[13px] font-semibold hover:bg-[#003a9c] transition-colors shadow-sm"
-          >
-            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>add</span>
-            Nueva empresa
-          </button>
-        )}
       </div>
 
       <div className="relative w-64">
@@ -177,7 +167,7 @@ export default function NominaElectronicaEmpresasPage() {
               title={ORIGEN_LABELS[key]}
               accent={ORIGEN_ACCENTS[key]}
               empresas={grouped[key]}
-              onEdit={puedeGestionar ? (emp, e) => openPopup('edit', emp, e) : null}
+              onEdit={puedeGestionar ? openPopup : null}
             />
           ))}
           {grouped.otras.length > 0 && (
@@ -185,7 +175,7 @@ export default function NominaElectronicaEmpresasPage() {
               title="Otras"
               accent={ORIGEN_ACCENTS.otras}
               empresas={grouped.otras}
-              onEdit={puedeGestionar ? (emp, e) => openPopup('edit', emp, e) : null}
+              onEdit={puedeGestionar ? openPopup : null}
             />
           )}
         </div>
@@ -200,7 +190,7 @@ export default function NominaElectronicaEmpresasPage() {
           style={{ left: popup.left, top: popup.top }}
         >
           <p className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-3">
-            {popup.mode === 'edit' ? 'Editar empresa' : 'Nueva empresa'}
+            Editar empresa
           </p>
           <form onSubmit={handleSubmit} className="space-y-2.5">
             <div>

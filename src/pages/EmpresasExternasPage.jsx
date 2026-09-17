@@ -691,9 +691,6 @@ export default function EmpresasExternasPage() {
 
   // ── company actions (solo admin, desde "Editar estructura") ─────────────
 
-  function openCreateEmpresaModal() {
-    setEmpresaModal({ mode: 'create', id: null, name: '', responsableId: '', contador: '', activa: true })
-  }
   function openEditEmpresaModal(company) {
     setEmpresaModal({
       mode: 'edit', id: company.id, name: company.name,
@@ -709,16 +706,6 @@ export default function EmpresasExternasPage() {
     const name = modal?.name.trim()
     if (!modal || !name) return
     setEmpresaModal(null)
-
-    if (modal.mode === 'create') {
-      try {
-        await api.createExtEmpresa({ name, responsableId: modal.responsableId || null, contador: modal.contador?.trim() || null })
-        fetchGrid()
-      } catch (err) {
-        alert('Error al crear empresa: ' + err.message)
-      }
-      return
-    }
 
     try {
       // '' del <select>/input significa "sin asignar" — se manda null
@@ -926,23 +913,14 @@ export default function EmpresasExternasPage() {
             </button>
           )}
           {canEditStructure && (
-            <>
-              <button
-                onClick={openCreateEmpresaModal}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#004ac6] dark:text-[#7ba8f0] border border-[#004ac6] dark:border-[#7ba8f0] hover:bg-[#004ac6]/5 transition active:scale-[0.97]"
-              >
-                <span className="material-symbols-outlined text-lg">domain_add</span>
-                Nueva empresa
-              </button>
-              <button
-                onClick={openCreateProcesoModal}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-                style={{ background: '#004ac6' }}
-              >
-                <span className="material-symbols-outlined text-lg">add_column_right</span>
-                Nuevo proceso
-              </button>
-            </>
+            <button
+              onClick={openCreateProcesoModal}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
+              style={{ background: '#004ac6' }}
+            >
+              <span className="material-symbols-outlined text-lg">add_column_right</span>
+              Nuevo proceso
+            </button>
           )}
         </div>
       </div>
@@ -1383,7 +1361,7 @@ export default function EmpresasExternasPage() {
         </div>
       )}
 
-      {/* ── Crear / editar empresa ──────────────────────────────────────── */}
+      {/* ── Editar empresa (crear una nueva vive en el directorio maestro, /empresas) ── */}
       {empresaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={closeEmpresaModal}>
           <div
@@ -1391,7 +1369,7 @@ export default function EmpresasExternasPage() {
             onClick={e => e.stopPropagation()}
           >
             <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] mb-4">
-              {empresaModal.mode === 'create' ? 'Nueva empresa' : 'Editar empresa'}
+              Editar empresa
             </p>
 
             <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Nombre</label>
@@ -1429,24 +1407,20 @@ export default function EmpresasExternasPage() {
               {contadorOptions.filter(v => v !== SIN_ASIGNAR).map(v => <option key={v} value={v} />)}
             </datalist>
 
-            {empresaModal.mode === 'edit' && (
-              <>
-                <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Estado</label>
-                <button
-                  type="button"
-                  onClick={() => setEmpresaModal(m => ({ ...m, activa: !m.activa }))}
-                  className="flex items-center gap-1.5 px-3 py-1.5 mb-5 rounded-lg text-xs font-semibold border-2 transition-all"
-                  style={{
-                    borderColor: empresaModal.activa ? '#16a34a' : '#e2e4ef',
-                    background:  empresaModal.activa ? '#f0fdf4' : 'transparent',
-                    color:       empresaModal.activa ? '#16a34a' : '#6b7280',
-                  }}
-                >
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ background: empresaModal.activa ? '#16a34a' : '#d1d5db' }} />
-                  {empresaModal.activa ? 'Activa' : 'Inactiva'}
-                </button>
-              </>
-            )}
+            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Estado</label>
+            <button
+              type="button"
+              onClick={() => setEmpresaModal(m => ({ ...m, activa: !m.activa }))}
+              className="flex items-center gap-1.5 px-3 py-1.5 mb-5 rounded-lg text-xs font-semibold border-2 transition-all"
+              style={{
+                borderColor: empresaModal.activa ? '#16a34a' : '#e2e4ef',
+                background:  empresaModal.activa ? '#f0fdf4' : 'transparent',
+                color:       empresaModal.activa ? '#16a34a' : '#6b7280',
+              }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: empresaModal.activa ? '#16a34a' : '#d1d5db' }} />
+              {empresaModal.activa ? 'Activa' : 'Inactiva'}
+            </button>
 
             <div className="flex gap-2">
               <button
@@ -1461,7 +1435,7 @@ export default function EmpresasExternasPage() {
                 className="flex-1 py-2 text-xs font-semibold rounded-lg text-white transition disabled:opacity-40"
                 style={{ background: '#004ac6' }}
               >
-                {empresaModal.mode === 'create' ? 'Crear' : 'Guardar'}
+                Guardar
               </button>
             </div>
           </div>

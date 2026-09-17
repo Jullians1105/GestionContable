@@ -121,15 +121,6 @@ export default function FondoEmprenderEmpresasPage() {
     setAppliedMacroFilter(null)
   }
 
-  // ── add-company form state ────────────────────────────────────────────────
-  const [adding, setAdding]        = useState(false)
-  const [newName, setNewName]      = useState('')
-  const [newCategoria, setNewCat]  = useState('contable')
-  const [newMonthlyFee, setNewFee] = useState('')
-
-  function openForm()  { setAdding(true) }
-  function closeForm() { setAdding(false); setNewName(''); setNewCat('contable'); setNewFee('') }
-
   // ── inline edit state ─────────────────────────────────────────────────────
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm]   = useState({ name: '', categoria: 'contable', monthlyFee: '' })
@@ -172,27 +163,6 @@ export default function FondoEmprenderEmpresasPage() {
       if (socket) socket.off('empresa:updated', fetchEmpresas)
     }
   }, [fetchEmpresas, socket])
-
-  // ── create ────────────────────────────────────────────────────────────────
-  async function handleAddCompany() {
-    const name = newName.trim().toUpperCase()
-    if (!name) return
-    try {
-      const nuevaEmpresa = await api.createFondoEmpresa({
-        name,
-        categoria: newCategoria,
-        monthlyFee: newMonthlyFee !== '' ? parseFloat(newMonthlyFee) : null,
-      })
-      setEmpresas(prev => [...prev, nuevaEmpresa].sort((a, b) => a.name.localeCompare(b.name)))
-      closeForm()
-    } catch (err) {
-      if (err.status === 403) {
-        alert('No tienes permiso para crear empresas')
-      } else {
-        alert('Error: ' + err.message)
-      }
-    }
-  }
 
   // ── update ────────────────────────────────────────────────────────────────
   async function handleEditar(empresaId) {
@@ -321,105 +291,8 @@ export default function FondoEmprenderEmpresasPage() {
               <span className="material-symbols-outlined text-xl">chevron_right</span>
             </button>
           </div>
-          <button
-            onClick={openForm}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-            style={{ background: '#004ac6' }}
-          >
-            <span className="material-symbols-outlined text-lg">domain_add</span>
-            Crear empresa
-          </button>
         </div>
       </div>
-
-      {/* ── Add company form ──────────────────────────────────────────────── */}
-      {adding && (
-        <div className="bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl p-5 shadow-sm flex flex-col gap-4">
-
-          {/* Name */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
-              Nombre de la empresa
-            </label>
-            <input
-              autoFocus
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter')  handleAddCompany()
-                if (e.key === 'Escape') closeForm()
-              }}
-              placeholder="Ej. CAPROVIVA S.A.S"
-              className="px-3 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
-            />
-          </div>
-
-          {/* Category selector */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
-              Categoría <span className="text-[#ef4444]">*</span>
-            </label>
-            <div className="flex gap-2">
-              {CATEGORIAS.map(({ key, label }) => {
-                const active = newCategoria === key
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setNewCat(key)}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold border-2 transition-all duration-150"
-                    style={{
-                      borderColor: active ? '#004ac6' : '#e2e4ef',
-                      background:  active ? '#f0f4ff' : 'transparent',
-                      color:       active ? '#004ac6' : '#6b7280',
-                    }}
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0 transition-colors"
-                      style={{ background: active ? '#004ac6' : '#d1d5db' }}
-                    />
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Monthly fee */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
-              Mensualidad (opcional)
-            </label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={newMonthlyFee}
-              onChange={e => setNewFee(e.target.value)}
-              placeholder="Ej. 450000"
-              className="px-3 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
-            />
-          </div>
-
-          {/* Actions */}
-          <div className="flex gap-2 justify-end pt-1">
-            <button
-              onClick={closeForm}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleAddCompany}
-              disabled={!newName.trim()}
-              className="px-5 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 transition active:scale-[0.97]"
-              style={{ background: '#004ac6' }}
-            >
-              Agregar empresa
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── Summary cards ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">

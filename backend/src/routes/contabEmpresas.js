@@ -4,7 +4,7 @@ const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const {
-  getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa,
+  getEmpresas, getEmpresa, updateEmpresa, deleteEmpresa,
 } = require('../controllers/contabEmpresasController');
 
 const router = Router();
@@ -42,34 +42,9 @@ router.get('/', getEmpresas);
  */
 router.get('/:id', ...validateUUIDParam('id'), getEmpresa);
 
-/**
- * @openapi
- * /api/contabilidad/empresas:
- *   post:
- *     tags: [ContabilidadEmpresas]
- *     summary: Agregar una empresa nueva al catálogo (abierto a cualquier usuario autenticado)
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name]
- *             properties:
- *               name: { type: string, maxLength: 255 }
- *               nit:  { type: string, maxLength: 20, nullable: true }
- *     responses:
- *       201:
- *         description: Empresa creada
- */
-router.post('/',
-  body('name').trim().notEmpty().withMessage('El nombre es obligatorio').isLength({ max: 255 }),
-  body('nit').optional({ nullable: true }).trim().isLength({ max: 20 }).withMessage('nit debe tener máximo 20 caracteres'),
-  validate,
-  createEmpresa
-);
+// Crear una empresa nueva ya no vive acá — solo en el directorio maestro
+// (POST /api/empresas + habilitar módulo 'contab'), ver
+// docs/ESTADO_EMPRESAS_DIRECTORIO.md.
 
 /**
  * @openapi
