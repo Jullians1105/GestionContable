@@ -1,8 +1,9 @@
 # Estado — Exógenas 1001 y 1007
 
-> Documento de continuidad de sesión. Última actualización: 2026-08-31. Léelo completo antes de
-> tocar cualquier cosa relacionada con 1001/1007 en una sesión nueva — resume decisiones ya
-> tomadas para no volver a preguntarlas ni reabrirlas sin evidencia nueva.
+> Documento de continuidad de sesión. Última actualización: 2026-09-17 (notas de estado de git y
+> referencias a archivos borrados al día; el contenido de fondo sigue siendo el de 2026-08-31).
+> Léelo completo antes de tocar cualquier cosa relacionada con 1001/1007 en una sesión nueva —
+> resume decisiones ya tomadas para no volver a preguntarlas ni reabrirlas sin evidencia nueva.
 
 ---
 
@@ -109,8 +110,9 @@ en orden, estas piezas — cada una en su propia rama, con PR:
    (no una página aparte — se descartó esa idea a pedido del usuario). PR #52, mergeado.
 7. **Verificación de ingresos para el 1007** (`formato1007.js`): agrupa por tercero desde VENTAS
    (+ DEV VENTAS opcional) y calcula IBRU/DEV como "Total menos impuestos presentes". Mismo
-   patrón que 1001, generalizado para no duplicar código en `ExogenasUploadPage.jsx`. **Recién
-   commiteado, sin pushear todavía** — ver sección 3.
+   patrón que 1001, generalizado para no duplicar código en `ExogenasUploadPage.jsx`. **Actualización
+   2026-09-17**: esta rama (`feat/exogenas-1007-verificacion-ingresos`) ya se mergeó a `main` (PR
+   #53) — ya no está pendiente de push.
 
 ---
 
@@ -125,9 +127,18 @@ salvo que él lo mencione primero.
    etc.), no es un valor fijo como en 1005 (5555) o 1006 (6666). El usuario mencionó que su jefa
    propuso algo más grande: una base de datos mensual por empresa, alimentada desde el módulo
    "Contabilidad", sincronizada con Exógenas para que la info ya esté cargada al momento de
-   generar la exógena. **Esto está en discusión con el jefe, es una decisión de arquitectura
-   grande, independiente de todo lo demás — no bloquea nada de lo ya construido.** En el Excel que
-   ya genera el 1001 (ver sección 0), esta columna se deja en blanco a propósito.
+   generar la exógena.
+   **Actualización 2026-09-17**: esa "base de datos mensual por empresa" **ya se construyó** —
+   es el feature de `docs/ESTADO_CONTABILIDAD_EMPRESAS.md` (clasificación IVA/Concepto guardada
+   permanentemente por empresa/mes, ya en producción). Lo que **falta** es la parte de
+   sincronización con Exógenas: mapear el valor de `concepto` que ya se guarda ahí (Servicios/
+   Compras/Activo fijo/Honorarios/Arriendos/Adecuaciones/Compras diversos/Diversos/No deducible)
+   al código CPT real de la DIAN (visto en la guía oficial: 5002, 5004, 5005, 5007, 5008, 5010,
+   5011, 5012, 5016 — sin confirmar cuál es cuál) y leerlo desde `formato1001.js` en vez de
+   dejarlo en blanco. Sigue siendo la misma pregunta pendiente de siempre (la correspondencia
+   oficial Concepto→CPT), pero ya no falta construir nada de infraestructura para usarla — no
+   inventar la correspondencia sin la fuente oficial. En el Excel que ya genera el 1001 (ver
+   sección 0), esta columna se deja en blanco a propósito, todavía.
 2. **Concepto (CPT) del 1007**: también varía (visto en la guía oficial: 4001, 4002, 4003 — muy
    probablemente ingresos operacionales / no operacionales / rendimientos financieros, pero **sin
    confirmar por el usuario**, no asumir). En el Excel que ya genera el 1007 (ver sección 0), esta
@@ -176,8 +187,10 @@ falta ningún otro cambio de arquitectura para esto, solo:
 - `src/pages/ExogenasUploadPage.jsx` — `FORMATOS_DISPONIBLES` (ya no hay ningún
   `soloVerificacion`, se eliminó esa maquinaria por completo), `CONFIG_FORMATO` (campos `aviso` y
   `columnasExtra` — arreglo, no objeto — opcionales, usados por 1001 y 1007).
-- `docs/EXOGENA - GUIA FORMATOS.xlsx` — hojas "1001 OK"/"1007 OK", tiene ejemplos reales de
-  salida (incluye los CPT variables sin explicar la regla, y los headers reales de cada hoja).
+- `docs/EXOGENA - GUIA FORMATOS.xlsx` — **ya no existe** (se borró el 2026-09-17, limpieza general
+  de `docs/`; su contenido —headers reales de "1001 OK"/"1007 OK"— ya está transcrito en
+  `formato1001.js`/`formato1007.js`). Si hace falta ver un ejemplo real de nuevo, pedírselo al
+  usuario.
 - `docs/PLANEACION_EXTRACCION_DATOS_FACTURAS.md` — planeación original del módulo `terceros`
   (por qué existe, de dónde salió la necesidad del 1001 y ahora también del país del 1007).
 

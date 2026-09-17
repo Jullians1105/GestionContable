@@ -1,9 +1,19 @@
 # Estado — Contabilidad por empresa (clasificación IVA/Concepto + base de datos mensual)
 
-> Documento de continuidad de sesión. Última actualización: 2026-09-12. Léelo completo antes de
-> tocar cualquier cosa relacionada con este feature en una sesión nueva — resume decisiones ya
-> tomadas para no volver a preguntarlas ni reabrirlas sin evidencia nueva. No está commiteado a
-> propósito (mismo patrón que `ESTADO_EXOGENAS_1001_1007.md`): es solo para que Claude lo lea.
+> Documento de continuidad de sesión. Última actualización: 2026-09-17 (nota de estado de git al
+> día; el contenido de fondo sigue siendo el de 2026-09-12). Léelo completo antes de tocar
+> cualquier cosa relacionada con este feature en una sesión nueva — resume decisiones ya tomadas
+> para no volver a preguntarlas ni reabrirlas sin evidencia nueva.
+>
+> **Actualización 2026-09-17**: esta rama (`feat/contabilidad-empresas-clasificacion`) ya se
+> mergeó a `main` (PR #58) — todo lo de este documento está en producción, incluido el commit
+> `54ccb0b` de la sección 6. En la misma rama se construyó además el **directorio maestro de
+> empresas** (ver `docs/ESTADO_EMPRESAS_DIRECTORIO.md`, feature aparte): `contab_empresas` ahora
+> tiene `empresa_id` apuntando a una tabla `empresas` compartida con Fondo Emprender/Externas/
+> Nómina, que centraliza `nit`/`tipo_contribuyente`/`cedula_representante` — si algo de esto se
+> toca, revisar también ese documento. `docs/LISTADO EMPRESAS.xlsx` (mencionado en secciones 6/8
+> como fuente de las 52 empresas) **ya no existe** — se borró en una limpieza general de `docs/`
+> el 2026-09-17 porque su contenido ya estaba aplicado a la base de datos.
 
 ---
 
@@ -255,13 +265,13 @@ Ningún push, ningún PR todavía. El usuario dijo explícitamente (2026-09-12) 
 retomamos y **ahí sí se hace push y se abre PR** — ya no es "decide después", es el plan para la
 próxima sesión (después de probar el banner pendiente, punto 0 de la sección 7).
 
-`docs/LISTADO EMPRESAS.xlsx` y `docs/VENCIMIENTOS 2026.xlsx`: el primero sigue en `docs/` (fuente
-de las 52 empresas, por si hace falta releerlo); el segundo **ya se borró** después de usarlo para
-completar los NITs (a pedido explícito del usuario, mismo patrón que otros Excel de una sola vez).
+`docs/LISTADO EMPRESAS.xlsx` y `docs/VENCIMIENTOS 2026.xlsx`: ambos ya se borraron (el segundo
+tras completar los NITs; el primero el 2026-09-17, limpieza general de `docs/`) — su contenido ya
+está aplicado a la base de datos, no hace falta releerlos.
 
-Este archivo (`ESTADO_CONTABILIDAD_EMPRESAS.md`) sigue el mismo patrón que
-`ESTADO_EXOGENAS_1001_1007.md`: **no se commitea**, es solo para que Claude lo lea en la próxima
-sesión.
+**Estado de git actualizado 2026-09-17**: esta rama ya se mergeó a `main` (PR #58) junto con el
+feature del directorio maestro de empresas. Ya no aplica "ningún push, ningún PR todavía" — eso
+ya se hizo. Lo que sigue pendiente (sección 7) sigue pendiente igual, ahora sobre `main`.
 
 ---
 
@@ -314,5 +324,5 @@ En orden aproximado de probabilidad de que el usuario los traiga primero:
 - `backend/src/controllers/contabEmpresasController.js` — catálogo de empresas.
 - `src/pages/DianUploadPage.jsx`, `DianClasificacionPage.jsx`, `DianExportacionPage.jsx`,
   `ContabilidadConsolidadoPage.jsx` — todo el frontend del feature.
-- `docs/LISTADO EMPRESAS.xlsx` — fuente de las 52 empresas (nombres).
 - `docs/ESTADO_EXOGENAS_1001_1007.md` — por qué nació este feature (el CPT en blanco de la exógena).
+- `docs/ESTADO_EMPRESAS_DIRECTORIO.md` — el directorio maestro que ahora vincula `contab_empresas`.
