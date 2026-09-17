@@ -52,6 +52,10 @@ services:
       # sola vez con una verificación real de Cloudflare, ver ESTADO_EMPRESAS_DIRECTORIO.md).
       # Ruta dentro del contenedor; el volumen de abajo la hace sobrevivir a cada rebuild.
       DIAN_CHROME_PROFILE_DIR: /app/dian-perfil
+      # Probado en vivo con 3 y con 5 generaciones simultaneas (ver ESTADO_EMPRESAS_DIRECTORIO.md):
+      # el CPU del servidor (2 nucleos) ya se satura igual con 3, asi que subir a 5 no lo sobrecarga
+      # mas, solo reparte los mismos nucleos entre mas solicitudes (cada una tarda ~10-15s mas).
+      DIAN_TOKEN_MAX_CONCURRENTE: '5'
     ports:
       - "${PORT:-3000}:3000"
     volumes:
