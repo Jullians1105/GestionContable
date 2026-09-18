@@ -60,15 +60,23 @@ const getBase = (f) =>
   (f.total ?? 0) - CAMPOS_IMPUESTOS_BASE.reduce((acc, campo) => acc + (f[campo] ?? 0), 0)
 
 // ── indicador de autoguardado ──────────────────────────────────────────────────
+// Antes era texto ("guardando…" / "✓") que aparecía y desaparecía al lado del <select> — como
+// la celda no tiene ancho fijo, cada vez que el texto aparecía la columna entera se ensanchaba
+// (y con ella la fila, "se agranda todo feo"), y al desaparecer volvía a angostarse: un salto
+// visual en cada clasificación. Ahora es un ícono dentro de una caja de ancho fijo (`w-5`) que
+// siempre ocupa el mismo espacio exista o no exista estado — solo cambia el ícono de adentro
+// (spinner mientras guarda, check al terminar), la fila ya no se mueve.
 function SaveIndicator({ estado }) {
-  if (!estado) return null
-  if (estado === 'saving') return (
-    <span className="text-[11px] text-amber-500 font-medium ml-1.5 animate-pulse">guardando…</span>
+  return (
+    <span className="w-5 h-5 flex items-center justify-center flex-shrink-0 ml-1">
+      {estado === 'saving' && (
+        <span className="material-symbols-outlined text-[16px] text-amber-500 animate-spin">progress_activity</span>
+      )}
+      {estado === 'saved' && (
+        <span className="material-symbols-outlined text-[16px] text-green-600">check_circle</span>
+      )}
+    </span>
   )
-  if (estado === 'saved') return (
-    <span className="text-[11px] text-green-600 font-semibold ml-1.5">✓</span>
-  )
-  return null
 }
 
 // Espacio mínimo que se deja siempre libre respecto al borde de la ventana.
@@ -675,6 +683,21 @@ export default function DianClasificacionPage() {
     [filasParaClasificar]
   )
 
+  // Mes(es) que cubre este reporte (compras + ventas, no solo lo que pide clasificación) —
+  // pedido del usuario: apenas se sube el Excel y se entra a esta pantalla, saber de un
+  // vistazo en qué mes se está trabajando, o si el reporte mezcla varios.
+  const mesesDelReporte = useMemo(() => {
+    const vistos = new Set()
+    for (const f of filasParaClasificar) {
+      if (!f.fechaEmision) continue
+      vistos.add(f.fechaEmision.slice(0, 7)) // "YYYY-MM"
+    }
+    return Array.from(vistos).sort().map((ym) => {
+      const [anio, mes] = ym.split('-').map(Number)
+      return { anio, mes }
+    })
+  }, [filasParaClasificar])
+
   // ── filtros estilo Excel (checklist de valores por columna) ─────────────────
   // null = sin filtro (se muestran todas); Set = solo se muestran los valores marcados
   const [filtroFecha,  setFiltroFecha]  = useState(null)
@@ -1076,6 +1099,29 @@ export default function DianClasificacionPage() {
           </div>
         )}
       </div>
+
+      {/* ── Mes(es) de este reporte — informativo, no es una alerta (por eso el mismo azul
+          que el resto de la app, no ámbar). Antes no había forma de saber de un vistazo en
+          qué mes se estaba trabajando al entrar acá recién subido el Excel. ─────────────── */}
+      {mesesDelReporte.length > 0 && (
+        <div className="mb-5 flex items-center gap-3 px-4 py-3 rounded-xl bg-[#eef3ff] dark:bg-[#1a2540] border border-[#c7d9ff] dark:border-[#2e4470]">
+          <span className="material-symbols-outlined text-[#004ac6] dark:text-[#7ba8f0] text-xl flex-shrink-0">calendar_month</span>
+          <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0]">
+            {mesesDelReporte.length === 1 ? (
+              <>Estás trabajando en <span className="font-semibold">{MESES_ES[mesesDelReporte[0].mes - 1]} {mesesDelReporte[0].anio}</span></>
+            ) : (
+              <>
+                Este reporte abarca <span className="font-semibold">{mesesDelReporte.length} meses</span>:{' '}
+                {mesesDelReporte.map((p, i) => (
+                  <span key={`${p.anio}-${p.mes}`} className="font-semibold">
+                    {MESES_ES[p.mes - 1]} {p.anio}{i < mesesDelReporte.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
+              </>
+            )}
+          </p>
+        </div>
+      )}
 
       {/* ── Meses ya guardados para esta empresa — aviso temprano, antes de invertir tiempo
           clasificando un reporte que de todos modos va a pedir elegir actualizar/reemplazar
