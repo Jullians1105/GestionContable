@@ -2,7 +2,7 @@ jest.mock('../../src/config/database');
 jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
 
 const db = require('../../src/config/database');
-const { createEmpresa, updateEmpresa } = require('../../src/controllers/fondoEmpresasController');
+const { updateEmpresa } = require('../../src/controllers/fondoEmpresasController');
 
 function mockRes() {
   const res = {};
@@ -61,18 +61,6 @@ describe('codigo Siigo — solo el admin lo edita', () => {
     expect(res.status).not.toHaveBeenCalledWith(403);
     // [name, categoria, monthlyFee, codigoSiigoProvided, codigoSiigo, id]
     expect(db.query.mock.calls[1][1][3]).toBe(false);
-  });
-
-  test('createEmpresa también bloquea codigoSiigo a un no-admin', async () => {
-    const req = baseReq({
-      body: { name: 'nueva', codigoSiigo: '0042' },
-      user: { userId: 'user-2', role: 'user' },
-    });
-    const res = mockRes();
-    await createEmpresa(req, res, mockNext);
-
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(db.query).not.toHaveBeenCalled();
   });
 });
 

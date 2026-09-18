@@ -204,7 +204,7 @@ export default function EmpresasPage() {
     <div className="max-w-5xl mx-auto">
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#004ac6]">domain</span>
+          <span className="material-symbols-outlined text-3xl text-[#004ac6]">contacts</span>
           <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Empresas</h1>
         </div>
         <div className="flex items-center gap-4 mt-1 text-xs">

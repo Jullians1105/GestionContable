@@ -2,7 +2,7 @@ jest.mock('../../src/config/database');
 jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
 
 const db = require('../../src/config/database');
-const { createEmpresa, updateEmpresa } = require('../../src/controllers/extEmpresasController');
+const { updateEmpresa } = require('../../src/controllers/extEmpresasController');
 
 function mockRes() {
   const res = {};
@@ -86,35 +86,5 @@ describe('updateEmpresa — manejo de responsableId', () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(db.query).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('createEmpresa', () => {
-  test('normaliza el nombre a mayúsculas sin espacios sobrantes', async () => {
-    db.query
-      .mockResolvedValueOnce({ rows: [{ id: 'empresa-1', name: 'NUEVA EMPRESA' }] }) // insert
-      .mockResolvedValueOnce({ rows: [] }); // audit
-
-    const req = baseReq({ body: { name: '  nueva empresa  ' } });
-    const res = mockRes();
-    await createEmpresa(req, res, mockNext);
-
-    const params = db.query.mock.calls[0][1];
-    // [id, name, responsableId]
-    expect(params[1]).toBe('NUEVA EMPRESA');
-    expect(res.status).toHaveBeenCalledWith(201);
-  });
-
-  test('sin responsableId en el body, se crea sin asignar (null)', async () => {
-    db.query
-      .mockResolvedValueOnce({ rows: [{ id: 'empresa-1', name: 'NUEVA' }] })
-      .mockResolvedValueOnce({ rows: [] });
-
-    const req = baseReq({ body: { name: 'nueva' } });
-    const res = mockRes();
-    await createEmpresa(req, res, mockNext);
-
-    const params = db.query.mock.calls[0][1];
-    expect(params[2]).toBeNull();
   });
 });

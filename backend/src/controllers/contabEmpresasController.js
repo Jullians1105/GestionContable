@@ -1,7 +1,6 @@
 // Catálogo de empresas del módulo Contabilidad — mismo patrón que extEmpresasController.js,
 // adaptado: acá no hay responsable/contador, pero sí `nit` (se completa solo con el primer
 // reporte DIAN que se sube para esa empresa, ver dianController.js#uploadDian).
-const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 
@@ -28,26 +27,6 @@ const getEmpresa = async (req, res, next) => {
     const result = await db.query('SELECT * FROM contab_empresas WHERE id = $1', [req.params.id]);
     if (!result.rows[0]) return res.status(404).json({ error: 'Empresa no encontrada' });
     res.json(normalizeEmpresa(result.rows[0]));
-  } catch (err) {
-    next(err);
-  }
-};
-
-// Abierto a cualquier autenticado (no solo admin): el equipo necesita poder agregar una
-// empresa nueva de las 52 en pleno flujo de subida, sin depender de un admin disponible.
-const createEmpresa = async (req, res, next) => {
-  try {
-    const { name, nit = null } = req.body;
-    const id = uuidv4();
-    const result = await db.query(
-      `INSERT INTO contab_empresas (id, name, nit)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [id, name.trim().toUpperCase(), nit ? nit.trim() : null]
-    );
-    await auditLog(req.user.userId, 'CREATE', 'contab_empresas', id, { name, nit });
-    req.io.emit('contabilidad:updated', { empresaId: id, tipo: 'empresa' });
-    res.status(201).json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
     next(err);
   }
@@ -102,4 +81,4 @@ const deleteEmpresa = async (req, res, next) => {
   }
 };
 
-module.exports = { getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa };
+module.exports = { getEmpresas, getEmpresa, updateEmpresa, deleteEmpresa };

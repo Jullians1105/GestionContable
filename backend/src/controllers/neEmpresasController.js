@@ -1,4 +1,3 @@
-const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 
@@ -49,27 +48,6 @@ const getEmpresa = async (req, res, next) => {
     if (!result.rows[0]) return res.status(404).json({ error: 'Empresa no encontrada' });
     res.json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
-    next(err);
-  }
-};
-
-const createEmpresa = async (req, res, next) => {
-  try {
-    const { name, origen = null, responsableId = null, fondoEmpresaId = null, extEmpresaId = null } = req.body;
-    const id = uuidv4();
-    const result = await db.query(
-      `INSERT INTO ne_empresas (id, name, origen, responsable_id, fondo_empresa_id, ext_empresa_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING *`,
-      [id, name.trim().toUpperCase(), origen, responsableId, fondoEmpresaId, extEmpresaId]
-    );
-    await auditLog(req.user.userId, 'CREATE', 'ne_empresas', id, { name, origen, responsableId, fondoEmpresaId, extEmpresaId });
-    req.io.emit('nominaElectronica:updated', { empresaId: id, tipo: 'empresa' });
-    res.status(201).json(await reload(id));
-  } catch (err) {
-    if (err.code === '23505') {
-      return res.status(409).json({ error: 'Esa empresa de Fondo Emprender o Empresas Externas ya está enlazada a otra fila de Nómina Electrónica' });
-    }
     next(err);
   }
 };
@@ -142,4 +120,4 @@ async function reload(id) {
   return normalizeEmpresa(result.rows[0]);
 }
 
-module.exports = { getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa };
+module.exports = { getEmpresas, getEmpresa, updateEmpresa, deleteEmpresa };

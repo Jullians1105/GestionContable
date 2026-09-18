@@ -56,12 +56,6 @@ export default function DianUploadPage() {
     api.getContabEmpresas().then(setEmpresas).catch(() => {})
   }, [])
 
-  const crearEmpresa = useCallback(async (nombre) => {
-    const nueva = await api.createContabEmpresa({ name: nombre })
-    setEmpresas((prev) => [...prev, nueva].sort((a, b) => a.name.localeCompare(b.name)))
-    return nueva
-  }, [])
-
   const cambiarModo = useCallback((nuevoModo) => {
     setModo(nuevoModo)
     if (nuevoModo === 'sin_empresa') setEmpresaId(SIN_EMPRESA)
@@ -219,7 +213,7 @@ export default function DianUploadPage() {
 
               {modo === 'empresa' ? (
                 <>
-                  <EmpresaCombobox empresas={empresas} value={empresaId} onChange={setEmpresaId} onCrear={crearEmpresa} />
+                  <EmpresaCombobox empresas={empresas} value={empresaId} onChange={setEmpresaId} />
                   <p className="text-xs text-[#9ca3af] dark:text-[#6b7280] mt-1.5">
                     Se guarda mensualmente para esta empresa — exige clasificar retención, IVA y concepto.
                   </p>

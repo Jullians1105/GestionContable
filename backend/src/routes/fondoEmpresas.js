@@ -5,7 +5,7 @@ const { requireFondoAccess } = require('../middleware/fondoAccess');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const {
-  getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa,
+  getEmpresas, getEmpresa, updateEmpresa, deleteEmpresa,
 } = require('../controllers/fondoEmpresasController');
 
 const router = Router();
@@ -49,41 +49,9 @@ router.get('/',
  */
 router.get('/:id', validateUUIDParam('id'), getEmpresa);
 
-/**
- * @openapi
- * /api/fondo/empresas:
- *   post:
- *     tags: [FondoEmpresas]
- *     summary: Crear nueva empresa
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [name]
- *             properties:
- *               name:        { type: string, maxLength: 255 }
- *               categoria:   { type: string, enum: [contable, tributario] }
- *               monthlyFee:  { type: number, minimum: 0 }
- *               codigoSiigo: { type: string, maxLength: 20, nullable: true, description: Solo admin }
- *     responses:
- *       201:
- *         description: Empresa creada
- *       403:
- *         description: Sin permiso de edición, o codigoSiigo enviado por un no-admin
- */
-router.post('/',
-  requireFondoAccess,
-  body('name').trim().notEmpty().withMessage('El nombre es obligatorio').isLength({ max: 255 }),
-  body('categoria').optional().isIn(['contable', 'tributario']),
-  body('monthlyFee').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('monthlyFee debe ser un número >= 0'),
-  body('codigoSiigo').optional({ nullable: true }).trim().isLength({ max: 20 }).withMessage('El código Siigo no puede superar 20 caracteres'),
-  validate,
-  createEmpresa
-);
+// Crear una empresa nueva ya no vive acá — solo en el directorio maestro
+// (POST /api/empresas + habilitar módulo 'fondo'), ver
+// docs/ESTADO_EMPRESAS_DIRECTORIO.md.
 
 /**
  * @openapi

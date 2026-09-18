@@ -1,4 +1,3 @@
-const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 
@@ -38,24 +37,6 @@ const getEmpresa = async (req, res, next) => {
     );
     if (!result.rows[0]) return res.status(404).json({ error: 'Empresa no encontrada' });
     res.json(normalizeEmpresa(result.rows[0]));
-  } catch (err) {
-    next(err);
-  }
-};
-
-const createEmpresa = async (req, res, next) => {
-  try {
-    const { name, responsableId = null, contador = null } = req.body;
-    const id = uuidv4();
-    const result = await db.query(
-      `INSERT INTO ext_empresas (id, name, responsable_id, contador)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [id, name.trim().toUpperCase(), responsableId, contador ? contador.trim() : null]
-    );
-    await auditLog(req.user.userId, 'CREATE', 'ext_empresas', id, { name, responsableId, contador });
-    req.io.emit('externas:updated', { empresaId: id, tipo: 'empresa' });
-    res.status(201).json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
     next(err);
   }
@@ -114,4 +95,4 @@ const deleteEmpresa = async (req, res, next) => {
   }
 };
 
-module.exports = { getEmpresas, getEmpresa, createEmpresa, updateEmpresa, deleteEmpresa };
+module.exports = { getEmpresas, getEmpresa, updateEmpresa, deleteEmpresa };

@@ -24,6 +24,9 @@ dist-ssr
 .claude/
 .claude.json
 CLAUDE.md
+# Skills instaladas — .claude/skills/* son symlinks hacia acá, no borrar
+.agents/
+skills-lock.json
 # Docker
 .env
 backups/
@@ -45,3 +48,8 @@ docs/*.pdf
 # reales (cookies, cache), no código; además pesa cientos de MB. A propósito fuera de backend/
 # (ver comentario en dianTokenService.js sobre por qué: nodemon lo vigilaba y se caía).
 /dian-perfil-real-chrome/
+
+# Reporte de cobertura de Jest (`npm run test:coverage`) — se regenera desde cero en cada
+# corrida, quedó trackeado por error y cada test run lo mostraba como "modificado" sin que
+# nadie hubiera tocado nada.
+backend/coverage/
