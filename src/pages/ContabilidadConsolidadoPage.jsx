@@ -109,14 +109,17 @@ function TendenciaChart({ resumenAnual, tab, mes, cuatrimestre }) {
   const col = {
     base: dark ? '#2e3148' : '#e2e4ef',
     banda: dark ? '#7ba8f0' : '#004ac6',
-    bandaOp: dark ? 0.14 : 0.06,
     compras: dark ? '#7ba8f0' : '#004ac6',
     ventas: dark ? '#f0c04a' : '#E5A70C',
     lbl: dark ? '#5a5f7a' : '#9ca3af',
     lblOn: dark ? '#7ba8f0' : '#004ac6',
     halo: dark ? '#1e2030' : '#ffffff',
   }
-  const gradId = { compras: `tc-grad-compras-${dark ? 'd' : 'l'}`, ventas: `tc-grad-ventas-${dark ? 'd' : 'l'}` }
+  const gradId = {
+    compras: `tc-grad-compras-${dark ? 'd' : 'l'}`,
+    ventas: `tc-grad-ventas-${dark ? 'd' : 'l'}`,
+    banda: `tc-grad-banda-${dark ? 'd' : 'l'}`,
+  }
 
   return (
     <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-5 flex-1 min-w-0">
@@ -143,6 +146,12 @@ function TendenciaChart({ resumenAnual, tab, mes, cuatrimestre }) {
               <stop offset="0%" stopColor={col.ventas} stopOpacity={dark ? 0.34 : 0.24} />
               <stop offset="100%" stopColor={col.ventas} stopOpacity="0" />
             </linearGradient>
+            {/* Franja de selección: más marcada arriba, se disuelve hacia la base — igual que
+                las áreas de Compras/Ventas, en vez del tono plano que tenía antes. */}
+            <linearGradient id={gradId.banda} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={col.banda} stopOpacity={dark ? 0.30 : 0.16} />
+              <stop offset="100%" stopColor={col.banda} stopOpacity="0" />
+            </linearGradient>
             {/* Sombra suave bajo cada línea — le da un poco de relieve en vez de quedar
                 perfectamente plana sobre el fondo. */}
             <filter id="tc-line-shadow" x="-20%" y="-20%" width="140%" height="140%">
@@ -150,7 +159,7 @@ function TendenciaChart({ resumenAnual, tab, mes, cuatrimestre }) {
             </filter>
           </defs>
           <line x1="0" y1={H} x2={W} y2={H} stroke={col.base} strokeWidth="1" />
-          {banda && <rect x={banda.x} y="0" width={banda.w} height={H} rx="4" fill={col.banda} opacity={col.bandaOp} />}
+          {banda && <rect x={banda.x} y="0" width={banda.w} height={H} rx="4" fill={`url(#${gradId.banda})`} />}
           <path d={toArea(comprasPts)} fill={`url(#${gradId.compras})`} />
           <path d={toArea(ventasPts)} fill={`url(#${gradId.ventas})`} />
           <g filter="url(#tc-line-shadow)">
@@ -189,7 +198,15 @@ function TendenciaChart({ resumenAnual, tab, mes, cuatrimestre }) {
               </g>
             )
           })}
-          {MESES_ES.map((nombre, i) => (
+          {MESES_ES.map((nombre, i) => {
+            // Mismo criterio de "mes activo" que la franja resaltada (`banda`) de arriba —
+            // antes solo se aplicaba en mensual, dejando las etiquetas de cuatrimestral y
+            // anual siempre en gris aunque esos meses también estuvieran "dentro" del período.
+            const numMes = i + 1
+            const activo = tab === 'mensual' ? numMes === mes
+              : tab === 'cuatrimestral' ? CUATRIMESTRE_MESES[cuatrimestre].includes(numMes)
+              : true
+            return (
             <text
               key={nombre}
               x={STEP * i + STEP / 2}
@@ -198,12 +215,13 @@ function TendenciaChart({ resumenAnual, tab, mes, cuatrimestre }) {
               fontSize="12.5"
               letterSpacing="0.01em"
               textAnchor="middle"
-              fill={tab === 'mensual' && i + 1 === mes ? col.lblOn : col.lbl}
-              fontWeight={tab === 'mensual' && i + 1 === mes ? '700' : '500'}
+              fill={activo ? col.lblOn : col.lbl}
+              fontWeight={activo ? '700' : '500'}
             >
               {nombre.slice(0, 3)}
             </text>
-          ))}
+            )
+          })}
           {hover && (() => {
             const p = (hover.serie === 'compras' ? comprasPts : ventasPts)[hover.i]
             const valor = resumenAnual[hover.i] ? resumenAnual[hover.i][hover.serie].base : 0
@@ -455,14 +473,17 @@ export default function ContabilidadConsolidadoPage() {
             </div>
           )}
 
-          {data && (
-            <div className={`transition-opacity duration-150 ${cargando ? 'opacity-50' : 'opacity-100'}`}>
-              {/* ── Tendencia + Totales, en la misma fila ── el gráfico ya no ocupa todo el
-                  ancho de la página: comparte fila con el panel de totales (angosto, lista
-                  vertical) para no perder la proporción y no dejar espacio muerto. ── */}
-              <div className="flex flex-col lg:flex-row gap-5 mb-6 items-stretch">
-                <TendenciaChart resumenAnual={resumenAnual} tab={tab} mes={mes} cuatrimestre={cuatrimestre} />
-                <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden lg:w-72 flex-shrink-0">
+          {resumenAnual.length > 0 && (
+            <div className="flex flex-col lg:flex-row gap-5 mb-6 items-stretch">
+              {/* TendenciaChart NO se atenúa ni depende de `cargando` — antes vivía adentro del
+                  mismo bloque que se opaca en cada cambio de período (mensual/cuatrimestral con
+                  la flechita), pero sus datos (`resumenAnual`) no salen de esa consulta: vienen
+                  de un endpoint aparte, filtrado solo por año. Apagar y volver a encender la
+                  gráfica en cada clic de flecha era un parpadeo/"temblor" sin ninguna razón real
+                  — el año completo no se estaba recargando, solo la franja resaltada del mes. */}
+              <TendenciaChart resumenAnual={resumenAnual} tab={tab} mes={mes} cuatrimestre={cuatrimestre} />
+              {data && (
+                <div className={`bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden lg:w-72 flex-shrink-0 transition-opacity duration-150 ${cargando ? 'opacity-50' : 'opacity-100'}`}>
                   <TotalGroupHeader label="Compras" color="#004ac6" />
                   <div className="divide-y divide-[#e2e4ef] dark:divide-[#2e3148] border-b border-[#e2e4ef] dark:border-[#2e3148]">
                     <TotalRow icon="payments" label="Base (sin IVA)" value={fmt(data.totales.compras.base)} grande />
@@ -476,8 +497,12 @@ export default function ContabilidadConsolidadoPage() {
                     <TotalRow icon="local_mall" label="INC generado" value={fmt(data.totales.ventas.inc)} />
                   </div>
                 </div>
-              </div>
+              )}
+            </div>
+          )}
 
+          {data && (
+            <div className={`transition-opacity duration-150 ${cargando ? 'opacity-50' : 'opacity-100'}`}>
               {/* ── Agrupados: Concepto / Clasificación IVA ─────────────── */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
                 {[
