@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
+import { useState, useRef, useCallback, useMemo, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import { api } from '../services/api'
@@ -71,6 +71,45 @@ function SaveIndicator({ estado }) {
   return null
 }
 
+// Espacio mínimo que se deja siempre libre respecto al borde de la ventana.
+const MARGEN_VIEWPORT = 12
+
+// Ambos menús de filtro (columna y total) se posicionan `fixed` según el rect del botón que
+// los abre, solo con `top: rect.bottom + 4` — sin revisar si había espacio hacia abajo. Con
+// muchas filas (ej. muchos emisores distintos en la clasificación de retención), el menú se
+// salía por debajo del viewport y el pie con "Cancelar"/"Aceptar" quedaba inalcanzable — el bug
+// reportado: no se podía guardar el filtro. `usePosicionVertical` mide la altura ya renderizada
+// (con el `max-h-48` normal de la lista, o sea el peor caso "de diseño") una sola vez al abrir y
+// decide: si cabe abajo se queda igual que antes; si no cabe abajo pero sí arriba, abre hacia
+// arriba; si no cabe en ningún lado (viewport muy bajo), se queda del lado con más espacio y le
+// pone un tope a su propia altura — solo la lista de valores hace scroll interno, el pie con los
+// botones nunca queda fuera de pantalla.
+function usePosicionVertical(rect, contenedorRef) {
+  const [pos, setPos] = useState({ top: rect.bottom + 4, maxHeight: null })
+  const alturaNaturalRef = useRef(null)
+
+  useLayoutEffect(() => {
+    const el = contenedorRef.current
+    if (!el) return
+    if (alturaNaturalRef.current == null) alturaNaturalRef.current = el.offsetHeight
+    const alto = alturaNaturalRef.current
+    const espacioAbajo = window.innerHeight - rect.bottom - MARGEN_VIEWPORT
+    const espacioArriba = rect.top - MARGEN_VIEWPORT
+
+    if (alto <= espacioAbajo) {
+      setPos({ top: rect.bottom + 4, maxHeight: null })
+    } else if (alto <= espacioArriba) {
+      setPos({ bottom: window.innerHeight - rect.top + 4, maxHeight: null })
+    } else if (espacioAbajo >= espacioArriba) {
+      setPos({ top: rect.bottom + 4, maxHeight: Math.max(espacioAbajo, 120) })
+    } else {
+      setPos({ bottom: MARGEN_VIEWPORT, maxHeight: Math.max(espacioArriba, 120) })
+    }
+  }, [rect, contenedorRef])
+
+  return pos
+}
+
 // ── menú de filtro por columna (checklist estilo Excel) ─────────────────────────
 // Se renderiza en un portal a document.body y se posiciona con `fixed` según el
 // rect del botón que lo abrió, para no quedar recortado por el overflow-hidden
@@ -79,6 +118,7 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
   const [busqueda, setBusqueda] = useState('')
   const [borrador, setBorrador] = useState(() => new Set(seleccion ?? valores.map((v) => v.value)))
   const ref = useRef(null)
+  const posVertical = usePosicionVertical(rect, ref)
 
   useEffect(() => {
     const onClickFuera = (e) => {
@@ -118,7 +158,8 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
 
   const style = {
     position: 'fixed',
-    top: rect.bottom + 4,
+    ...(posVertical.top != null ? { top: posVertical.top } : { bottom: posVertical.bottom }),
+    ...(posVertical.maxHeight != null ? { maxHeight: posVertical.maxHeight } : {}),
     ...(align === 'right' ? { right: window.innerWidth - rect.right } : { left: rect.left }),
   }
 
@@ -137,9 +178,9 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
     <div
       ref={ref}
       style={style}
-      className="w-64 normal-case font-normal tracking-normal bg-white dark:bg-[#1e2030] border border-[#d1d5db] dark:border-[#3a3e5c] rounded-xl shadow-lg p-3 z-50"
+      className="w-64 normal-case font-normal tracking-normal bg-white dark:bg-[#1e2030] border border-[#d1d5db] dark:border-[#3a3e5c] rounded-xl shadow-lg p-3 z-50 flex flex-col overflow-hidden"
     >
-      <div className="relative mb-2">
+      <div className="relative mb-2 flex-shrink-0">
         <span className="material-symbols-outlined text-base text-[#8890b5] absolute left-2 top-1/2 -translate-y-1/2">search</span>
         <input
           type="text"
@@ -151,7 +192,7 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
         />
       </div>
 
-      <label className="flex items-center gap-2 px-1 py-1.5 border-b border-[#f0f2f8] dark:border-[#2e3148] mb-1 cursor-pointer">
+      <label className="flex items-center gap-2 px-1 py-1.5 border-b border-[#f0f2f8] dark:border-[#2e3148] mb-1 cursor-pointer flex-shrink-0">
         <input
           type="checkbox"
           checked={todasVisiblesMarcadas}
@@ -161,7 +202,7 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
         <span className="text-sm font-medium text-[#191c1e] dark:text-[#e4e6f0]">(Seleccionar todo)</span>
       </label>
 
-      <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5">
+      <div className="max-h-48 flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5">
         {visibles.length === 0 ? (
           <p className="text-xs text-[#8890b5] px-1 py-2">Sin resultados</p>
         ) : visibles.map((v) => (
@@ -180,7 +221,7 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
         ))}
       </div>
 
-      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-[#f0f2f8] dark:border-[#2e3148]">
+      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-[#f0f2f8] dark:border-[#2e3148] flex-shrink-0">
         <button
           onClick={onCerrar}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f0f2f8] dark:hover:bg-[#252840]"
@@ -210,6 +251,7 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
   const [hasta, setHasta] = useState('')
   const [borrador, setBorrador] = useState(() => new Set(seleccion ?? valores.map((v) => v.value)))
   const ref = useRef(null)
+  const posVertical = usePosicionVertical(rect, ref)
 
   useEffect(() => {
     const onClickFuera = (e) => {
@@ -256,7 +298,8 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
 
   const style = {
     position: 'fixed',
-    top: rect.bottom + 4,
+    ...(posVertical.top != null ? { top: posVertical.top } : { bottom: posVertical.bottom }),
+    ...(posVertical.maxHeight != null ? { maxHeight: posVertical.maxHeight } : {}),
     ...(align === 'right' ? { right: window.innerWidth - rect.right } : { left: rect.left }),
   }
 
@@ -275,9 +318,9 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
     <div
       ref={ref}
       style={style}
-      className="w-64 normal-case font-normal tracking-normal bg-white dark:bg-[#1e2030] border border-[#d1d5db] dark:border-[#3a3e5c] rounded-xl shadow-lg p-3 z-50"
+      className="w-64 normal-case font-normal tracking-normal bg-white dark:bg-[#1e2030] border border-[#d1d5db] dark:border-[#3a3e5c] rounded-xl shadow-lg p-3 z-50 flex flex-col overflow-hidden"
     >
-      <div className="relative mb-2">
+      <div className="relative mb-2 flex-shrink-0">
         <span className="material-symbols-outlined text-base text-[#8890b5] absolute left-2 top-1/2 -translate-y-1/2">search</span>
         <input
           type="text"
@@ -289,7 +332,7 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
         />
       </div>
 
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-2 flex-shrink-0">
         <input
           type="number"
           value={desde}
@@ -307,7 +350,7 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
         />
       </div>
 
-      <label className="flex items-center gap-2 px-1 py-1.5 border-b border-[#f0f2f8] dark:border-[#2e3148] mb-1 cursor-pointer">
+      <label className="flex items-center gap-2 px-1 py-1.5 border-b border-[#f0f2f8] dark:border-[#2e3148] mb-1 cursor-pointer flex-shrink-0">
         <input
           type="checkbox"
           checked={todasVisiblesMarcadas}
@@ -317,7 +360,7 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
         <span className="text-sm font-medium text-[#191c1e] dark:text-[#e4e6f0]">(Seleccionar todo)</span>
       </label>
 
-      <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5">
+      <div className="max-h-48 flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5">
         {visibles.length === 0 ? (
           <p className="text-xs text-[#8890b5] px-1 py-2">Sin resultados</p>
         ) : visibles.map((v) => (
@@ -336,7 +379,7 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
         ))}
       </div>
 
-      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-[#f0f2f8] dark:border-[#2e3148]">
+      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-[#f0f2f8] dark:border-[#2e3148] flex-shrink-0">
         <button
           onClick={onCerrar}
           className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f0f2f8] dark:hover:bg-[#252840]"

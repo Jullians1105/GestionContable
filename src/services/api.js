@@ -412,7 +412,7 @@ export const api = {
   getContabPeriodos: (empresaId) =>
     request(`/contabilidad/periodos?${new URLSearchParams({ empresaId })}`),
 
-  // Total de compras/ventas por cada uno de los 12 meses del año — barras del selector mensual.
+  // Base de compras/ventas por cada uno de los 12 meses del año — gráfico de tendencia.
   getContabResumenAnual: (empresaId, anio) =>
     request(`/contabilidad/consolidado/resumen-anual?${new URLSearchParams({ empresaId, anio })}`),
 
