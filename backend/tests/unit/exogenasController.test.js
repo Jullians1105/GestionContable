@@ -232,6 +232,7 @@ describe('uploadExogenas — 1001', () => {
     ]);
     const plantilla = await construirPlantilla1001();
     db.query
+      .mockResolvedValueOnce({ rows: [{ id: 'empresa-contab-1' }] }) // SELECT contab_empresas (existe)
       .mockResolvedValueOnce({
         rows: [{
           nit: '900123456', direccion: 'CL 1 2 3', codigo_municipio_dane: '11001',
@@ -241,7 +242,7 @@ describe('uploadExogenas — 1001', () => {
       .mockResolvedValueOnce({ rows: [{ id: 'borrador-1001' }] }); // INSERT
 
     const req = {
-      body: { formato: '1001' },
+      body: { formato: '1001', contabEmpresaId: 'empresa-contab-1', anio: '2025' },
       user: { userId: 'usuario-1' },
       files: {
         token: [{ buffer: token, originalname: 't.xlsx' }],
@@ -261,6 +262,41 @@ describe('uploadExogenas — 1001', () => {
     expect(conDatos).toMatchObject({ tieneDatosCompletos: true, direccion: 'CL 1 2 3', codigoPaisDian: '169' });
     const sinDatos = body.registros.find((r) => r.identificacion === '800654321');
     expect(sinDatos).toMatchObject({ tieneDatosCompletos: false, tieneTercero: false, direccion: null });
+  });
+
+  test('400 si falta contabEmpresaId o anio — no llega a consultar la base', async () => {
+    const token = await construirTokenCompras([{ nit: '900123456', nombre: 'CON DATOS SAS' }]);
+    const plantilla = await construirPlantilla1001();
+    const req = {
+      body: { formato: '1001' }, // sin contabEmpresaId ni anio
+      user: { userId: 'usuario-1' },
+      files: {
+        token: [{ buffer: token, originalname: 't.xlsx' }],
+        plantilla: [{ buffer: plantilla, originalname: 'p.xlsx' }],
+      },
+    };
+    const res = mockRes();
+    await uploadExogenas(req, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('400 si la empresa de Contabilidad seleccionada no existe', async () => {
+    const token = await construirTokenCompras([{ nit: '900123456', nombre: 'CON DATOS SAS' }]);
+    const plantilla = await construirPlantilla1001();
+    db.query.mockResolvedValueOnce({ rows: [] }); // SELECT contab_empresas — no existe
+
+    const req = {
+      body: { formato: '1001', contabEmpresaId: 'empresa-inexistente', anio: '2025' },
+      user: { userId: 'usuario-1' },
+      files: {
+        token: [{ buffer: token, originalname: 't.xlsx' }],
+        plantilla: [{ buffer: plantilla, originalname: 'p.xlsx' }],
+      },
+    };
+    const res = mockRes();
+    await uploadExogenas(req, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(400);
   });
 });
 

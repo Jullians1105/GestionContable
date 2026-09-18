@@ -45,6 +45,28 @@ const uploadExogenas = async (req, res, next) => {
       return res.status(400).json({ error: 'Se requiere la plantilla SIIGO.' });
     }
 
+    // El 1001 necesita saber a qué empresa de Contabilidad y a qué año corresponde este
+    // reporte, para más adelante poder ir a buscar en `contab_documentos` el Concepto y la
+    // Base ya clasificados por factura (ver docs/ESTADO_EXOGENAS_1001_1007.md) — el TOKEN por
+    // sí solo no trae esa clasificación. Se guarda en `opciones` (JSONB libre, no usado por
+    // ningún otro formato todavía) en vez de agregar columnas nuevas a la tabla.
+    let opciones = {};
+    if (formato === '1001') {
+      const { contabEmpresaId, anio } = req.body;
+      if (!contabEmpresaId || !anio) {
+        return res.status(400).json({ error: 'Selecciona la empresa (de Contabilidad) y el año antes de analizar el 1001.' });
+      }
+      const anioNum = parseInt(anio, 10);
+      if (Number.isNaN(anioNum)) {
+        return res.status(400).json({ error: 'Año inválido.' });
+      }
+      const { rows: empresaRows } = await db.query('SELECT id FROM contab_empresas WHERE id = $1', [contabEmpresaId]);
+      if (empresaRows.length === 0) {
+        return res.status(400).json({ error: 'La empresa de Contabilidad seleccionada no existe.' });
+      }
+      opciones = { contabEmpresaId, anio: anioNum };
+    }
+
     const estrategia = getEstrategia(formato);
 
     let registros;
@@ -67,14 +89,15 @@ const uploadExogenas = async (req, res, next) => {
 
     const { rows } = await db.query(
       `INSERT INTO exogenas_borradores
-         (formato, nombre_token, nombre_plantilla, creado_por, registros, token_original, plantilla_original)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (formato, nombre_token, nombre_plantilla, creado_por, opciones, registros, token_original, plantilla_original)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, created_at`,
       [
         formato,
         tokenFile.originalname,
         plantillaFile.originalname,
         req.user.userId,
+        JSON.stringify(opciones),
         JSON.stringify(registros),
         tokenFile.buffer,
         plantillaFile.buffer,
@@ -84,6 +107,7 @@ const uploadExogenas = async (req, res, next) => {
     res.status(201).json({
       id: rows[0].id,
       formato,
+      opciones,
       totalTerceros: registros.length,
       ...calcularTotales(formato, registros),
       registros,
@@ -97,7 +121,7 @@ const getExogenasBorrador = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { rows } = await db.query(
-      `SELECT id, formato, nombre_token, nombre_plantilla, registros, created_at
+      `SELECT id, formato, nombre_token, nombre_plantilla, opciones, registros, created_at
        FROM exogenas_borradores WHERE id = $1 AND creado_por = $2`,
       [id, req.user.userId]
     );

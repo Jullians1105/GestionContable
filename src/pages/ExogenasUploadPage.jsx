@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import StatsCard from '../components/StatsCard'
+import EmpresaCombobox from '../components/EmpresaCombobox'
 import { api } from '../services/api'
 
 const VALID_EXTS  = ['.xlsx', '.xls']
@@ -214,6 +215,18 @@ export default function ExogenasUploadPage() {
   const [formatos, setFormatos]           = useState(['1005'])
   const [tokenFile, setTokenFile]         = useState(null)
   const [plantillaFile, setPlantillaFile] = useState(null)
+
+  // Solo para el 1001: a qué empresa de Contabilidad y a qué año corresponde este reporte —
+  // se necesita para más adelante ir a buscar en `contab_documentos` el Concepto y la Base ya
+  // clasificados por factura (ver ESTADO_EXOGENAS_1001_1007.md). El TOKEN no trae esa
+  // clasificación, así que sin esto no hay cómo saber de dónde traerla.
+  const [contabEmpresas, setContabEmpresas] = useState([])
+  const [contabEmpresaId, setContabEmpresaId] = useState('')
+  const [anioExogena, setAnioExogena] = useState(new Date().getFullYear())
+
+  useEffect(() => {
+    api.getContabEmpresas().then(setContabEmpresas).catch(() => {})
+  }, [])
   // Un borrador por formato analizado — el backend procesa un formato a la vez, así que
   // "Analizar" llama el endpoint una vez por cada formato marcado y guarda cada resultado acá,
   // indexado por formato, para poder cambiar de pestaña sin volver a subir los archivos.
@@ -285,6 +298,11 @@ export default function ExogenasUploadPage() {
       const recuperados = {}
       resultados.forEach((data) => { if (data) recuperados[data.formato] = data })
 
+      if (recuperados['1001']?.opciones?.contabEmpresaId) {
+        setContabEmpresaId(recuperados['1001'].opciones.contabEmpresaId)
+        setAnioExogena(recuperados['1001'].opciones.anio)
+      }
+
       if (Object.keys(recuperados).length > 0) {
         setBorradores(recuperados)
         setTabActivo(Object.keys(recuperados)[0])
@@ -312,6 +330,11 @@ export default function ExogenasUploadPage() {
       setErrorMsg('Selecciona ambos archivos en formato Excel (.xlsx, .xls)')
       return
     }
+    if (formatos.includes('1001') && (!contabEmpresaId || !anioExogena)) {
+      setEstado('error')
+      setErrorMsg('Selecciona la empresa (de Contabilidad) y el año para el 1001')
+      return
+    }
     setEstado('analizando')
     setErrorMsg('')
 
@@ -325,6 +348,10 @@ export default function ExogenasUploadPage() {
         formData.append('formato', formatoId)
         formData.append('token', tokenFile)
         formData.append('plantilla', plantillaFile)
+        if (formatoId === '1001') {
+          formData.append('contabEmpresaId', contabEmpresaId)
+          formData.append('anio', String(anioExogena))
+        }
         nuevosBorradores[formatoId] = await api.uploadExogenas(formData)
       }
       setBorradores(nuevosBorradores)
@@ -335,7 +362,7 @@ export default function ExogenasUploadPage() {
       setEstado('error')
       setErrorMsg(err.message || 'Error al procesar los archivos')
     }
-  }, [formatos, tokenFile, plantillaFile, actualizarUrlBorradores])
+  }, [formatos, tokenFile, plantillaFile, contabEmpresaId, anioExogena, actualizarUrlBorradores])
 
   // Un solo Excel con todos los formatos analizados, cada uno en su propia hoja — no depende
   // de cuál pestaña esté activa, esa solo controla qué se está previsualizando.
@@ -373,10 +400,12 @@ export default function ExogenasUploadPage() {
     setBorradores({})
     setTabActivo(null)
     setDescargaCombinada(null)
+    setContabEmpresaId('')
     actualizarUrlBorradores({})
   }, [actualizarUrlBorradores])
 
   const puedeAnalizar = formatos.length > 0 && tokenFile && plantillaFile && estado !== 'analizando'
+    && (!formatos.includes('1001') || (contabEmpresaId && anioExogena))
   const borrador = borradores[tabActivo] ?? null
   const camposFormato = CONFIG_FORMATO[tabActivo]?.campos ?? []
   const avisoFormato = CONFIG_FORMATO[tabActivo]?.aviso ?? null
@@ -425,6 +454,28 @@ export default function ExogenasUploadPage() {
               <FormatoCard key={f.id} formato={f} checked={formatos.includes(f.id)} onToggle={toggleFormato} />
             ))}
           </div>
+
+          {/* Solo para el 1001 — a qué empresa/año corresponde, para poder cruzar más adelante
+              con el Concepto ya clasificado en Contabilidad (ver ESTADO_EXOGENAS_1001_1007.md). */}
+          {formatos.includes('1001') && (
+            <div className="mt-4 pt-4 border-t border-[#f0f2f8] dark:border-[#2e3148] flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">
+                  Empresa (Contabilidad) — para el 1001
+                </label>
+                <EmpresaCombobox empresas={contabEmpresas} value={contabEmpresaId} onChange={setContabEmpresaId} />
+              </div>
+              <div className="w-full sm:w-32">
+                <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Año</label>
+                <input
+                  type="number"
+                  value={anioExogena}
+                  onChange={(e) => setAnioExogena(parseInt(e.target.value, 10) || '')}
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
