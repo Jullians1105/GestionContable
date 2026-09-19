@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import StatsCard from '../components/StatsCard'
+import EmpresaCombobox from '../components/EmpresaCombobox'
 import { api } from '../services/api'
 
 const VALID_EXTS  = ['.xlsx', '.xls']
@@ -47,9 +48,12 @@ const badge = (color, texto) => <span className={BADGE_ESTILOS[color]}>{texto}</
 const CONFIG_FORMATO = {
   '1001': {
     hojaToken: 'COMPRAS',
-    aviso: 'El concepto (CPT) y las columnas de dinero (PAGO, PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM) todavía no están definidos — esas columnas quedan vacías en el Excel generado. La dirección/DPTO/MUN/PAIS se toman de los terceros ya guardados en "Importar Terceros"; si un tercero no está ahí, esas columnas también quedan vacías. Antes de generar cada exógena, sube ahí las facturas de los proveedores de este TOKEN para completarlo.',
-    campos: [],
+    aviso: 'CPT (Concepto) y PAGO salen de lo ya clasificado en Contabilidad para la empresa/año elegidos — si un tercero no tiene compras clasificadas ahí, esas dos columnas quedan vacías para él. El resto de columnas de dinero (PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM) todavía no están definidas y siempre quedan vacías. La dirección/DPTO/MUN/PAIS se toman de los terceros ya guardados en "Importar Terceros"; si un tercero no está ahí, esas también quedan vacías.',
+    campos: [
+      { key: 'pago', totalKey: 'totalPago', label: 'PAGO', statTitle: 'Total pagado', statSub: 'Suma de la Base clasificada en Contabilidad' },
+    ],
     columnasExtra: [
+      { label: 'CPT (Concepto)', width: 'w-32', render: (r) => r.concepto || '—' },
       { label: 'Dirección', width: 'w-40', render: (r) => r.direccion || '—' },
       {
         label: 'Estado',
@@ -214,6 +218,18 @@ export default function ExogenasUploadPage() {
   const [formatos, setFormatos]           = useState(['1005'])
   const [tokenFile, setTokenFile]         = useState(null)
   const [plantillaFile, setPlantillaFile] = useState(null)
+
+  // Solo para el 1001: a qué empresa de Contabilidad y a qué año corresponde este reporte —
+  // se necesita para más adelante ir a buscar en `contab_documentos` el Concepto y la Base ya
+  // clasificados por factura (ver ESTADO_EXOGENAS_1001_1007.md). El TOKEN no trae esa
+  // clasificación, así que sin esto no hay cómo saber de dónde traerla.
+  const [contabEmpresas, setContabEmpresas] = useState([])
+  const [contabEmpresaId, setContabEmpresaId] = useState('')
+  const [anioExogena, setAnioExogena] = useState(new Date().getFullYear())
+
+  useEffect(() => {
+    api.getContabEmpresas().then(setContabEmpresas).catch(() => {})
+  }, [])
   // Un borrador por formato analizado — el backend procesa un formato a la vez, así que
   // "Analizar" llama el endpoint una vez por cada formato marcado y guarda cada resultado acá,
   // indexado por formato, para poder cambiar de pestaña sin volver a subir los archivos.
@@ -285,6 +301,11 @@ export default function ExogenasUploadPage() {
       const recuperados = {}
       resultados.forEach((data) => { if (data) recuperados[data.formato] = data })
 
+      if (recuperados['1001']?.opciones?.contabEmpresaId) {
+        setContabEmpresaId(recuperados['1001'].opciones.contabEmpresaId)
+        setAnioExogena(recuperados['1001'].opciones.anio)
+      }
+
       if (Object.keys(recuperados).length > 0) {
         setBorradores(recuperados)
         setTabActivo(Object.keys(recuperados)[0])
@@ -312,6 +333,11 @@ export default function ExogenasUploadPage() {
       setErrorMsg('Selecciona ambos archivos en formato Excel (.xlsx, .xls)')
       return
     }
+    if (formatos.includes('1001') && (!contabEmpresaId || !anioExogena)) {
+      setEstado('error')
+      setErrorMsg('Selecciona la empresa (de Contabilidad) y el año para el 1001')
+      return
+    }
     setEstado('analizando')
     setErrorMsg('')
 
@@ -325,6 +351,10 @@ export default function ExogenasUploadPage() {
         formData.append('formato', formatoId)
         formData.append('token', tokenFile)
         formData.append('plantilla', plantillaFile)
+        if (formatoId === '1001') {
+          formData.append('contabEmpresaId', contabEmpresaId)
+          formData.append('anio', String(anioExogena))
+        }
         nuevosBorradores[formatoId] = await api.uploadExogenas(formData)
       }
       setBorradores(nuevosBorradores)
@@ -335,7 +365,7 @@ export default function ExogenasUploadPage() {
       setEstado('error')
       setErrorMsg(err.message || 'Error al procesar los archivos')
     }
-  }, [formatos, tokenFile, plantillaFile, actualizarUrlBorradores])
+  }, [formatos, tokenFile, plantillaFile, contabEmpresaId, anioExogena, actualizarUrlBorradores])
 
   // Un solo Excel con todos los formatos analizados, cada uno en su propia hoja — no depende
   // de cuál pestaña esté activa, esa solo controla qué se está previsualizando.
@@ -373,10 +403,12 @@ export default function ExogenasUploadPage() {
     setBorradores({})
     setTabActivo(null)
     setDescargaCombinada(null)
+    setContabEmpresaId('')
     actualizarUrlBorradores({})
   }, [actualizarUrlBorradores])
 
   const puedeAnalizar = formatos.length > 0 && tokenFile && plantillaFile && estado !== 'analizando'
+    && (!formatos.includes('1001') || (contabEmpresaId && anioExogena))
   const borrador = borradores[tabActivo] ?? null
   const camposFormato = CONFIG_FORMATO[tabActivo]?.campos ?? []
   const avisoFormato = CONFIG_FORMATO[tabActivo]?.aviso ?? null
@@ -425,6 +457,28 @@ export default function ExogenasUploadPage() {
               <FormatoCard key={f.id} formato={f} checked={formatos.includes(f.id)} onToggle={toggleFormato} />
             ))}
           </div>
+
+          {/* Solo para el 1001 — a qué empresa/año corresponde, para poder cruzar más adelante
+              con el Concepto ya clasificado en Contabilidad (ver ESTADO_EXOGENAS_1001_1007.md). */}
+          {formatos.includes('1001') && (
+            <div className="mt-4 pt-4 border-t border-[#f0f2f8] dark:border-[#2e3148] flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">
+                  Empresa (Contabilidad) — para el 1001
+                </label>
+                <EmpresaCombobox empresas={contabEmpresas} value={contabEmpresaId} onChange={setContabEmpresaId} />
+              </div>
+              <div className="w-full sm:w-32">
+                <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Año</label>
+                <input
+                  type="number"
+                  value={anioExogena}
+                  onChange={(e) => setAnioExogena(parseInt(e.target.value, 10) || '')}
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -542,7 +596,7 @@ export default function ExogenasUploadPage() {
           <div className="flex flex-wrap sm:flex-nowrap gap-4 mb-6">
             <div className="w-full sm:w-36 flex-shrink-0">
               <StatsCard
-                title="Terceros agrupados"
+                title={tabActivo === '1001' ? 'Filas (tercero × concepto)' : 'Terceros agrupados'}
                 value={borrador.totalTerceros}
                 icon="groups"
                 borderColor="#004ac6"
@@ -588,7 +642,9 @@ export default function ExogenasUploadPage() {
               </thead>
               <tbody>
                 {borrador.registros.map((r, idx) => (
-                  <tr key={`${r.tipoDocumento}-${r.identificacion}`} className={idx % 2 === 1 ? 'bg-[#fafbff] dark:bg-[#1a1c2e]' : ''}>
+                  // El 1001 puede repetir el mismo tercero una vez por cada concepto distinto
+                  // (ver enriquecerConConceptos en el backend) — `idx` en la key evita choques.
+                  <tr key={`${r.tipoDocumento}-${r.identificacion}-${idx}`} className={idx % 2 === 1 ? 'bg-[#fafbff] dark:bg-[#1a1c2e]' : ''}>
                     <td className="px-3 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] break-words">{r.razonSocial}</td>
                     <td className="px-2 py-2 text-center border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8]">{r.tipoDocumento}</td>
                     <td className="px-2 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] break-words">{r.identificacion}</td>
@@ -605,7 +661,7 @@ export default function ExogenasUploadPage() {
               <tfoot>
                 <tr>
                   <td className="px-3 py-2.5 bg-[#f8f9fe] dark:bg-[#252840] border-t-2 border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-bold">
-                    Total ({borrador.totalTerceros} terceros)
+                    Total ({borrador.totalTerceros} {tabActivo === '1001' ? 'filas' : 'terceros'})
                   </td>
                   <td className="bg-[#f8f9fe] dark:bg-[#252840] border-t-2 border-[#e2e4ef] dark:border-[#2e3148]" colSpan={3 + columnasExtra.length} />
                   {camposFormato.map((c) => (

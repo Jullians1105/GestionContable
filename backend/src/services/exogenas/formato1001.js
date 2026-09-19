@@ -1,16 +1,20 @@
 // Formato 1001 — Pagos o abonos en cuenta y retenciones practicadas. Identifica los terceros
 // involucrados, cruza su ubicación (dirección/municipio/departamento/país) contra la tabla
 // `terceros` (ver docs/PLANEACION_EXTRACCION_DATOS_FACTURAS.md) y ya genera la hoja "1001" de
-// la plantilla con todo lo confirmado. Dos cosas quedan pendientes de definir con el usuario —
-// no se inventan, así que esas columnas se dejan en blanco en el Excel generado:
-// - CPT (concepto): depende de qué se compró en cada factura (servicios, arrendamientos,
-//   honorarios...), pendiente de definir con el usuario.
-// - Columnas de dinero (PAGO, PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM): fuente sin
-//   confirmar todavía (hoy es un cálculo manual, según el usuario).
+// la plantilla con todo lo confirmado.
+// - CPT (concepto) y PAGO: se resolvieron sin inventar ningún código DIAN — el usuario
+//   confirmó (2026-09-18) que a su equipo le basta con el nombre del Concepto tal cual (no el
+//   código CPT numérico; ellos lo asocian a mano al presentar). `enriquecerConConceptos` los
+//   trae de `contab_documentos` (lo ya clasificado en el módulo Contabilidad para esa
+//   empresa/año), agrupado por tercero+concepto, sumando la Base como PAGO. Si el usuario no
+//   pasa `contabEmpresaId`/`anio`, o un tercero no tiene documentos clasificados ahí, esas dos
+//   columnas quedan en blanco para él — igual que antes.
+// - El resto de columnas de dinero (PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM): fuente sin
+//   confirmar todavía (hoy es un cálculo manual, según el usuario) — siguen en blanco.
 const ExcelJS = require('exceljs');
 const db = require('../../config/database');
 const { normalizeXlsxBuffer } = require('./utils/normalizeXlsx');
-const { normalizarTexto, limpiarIdentificacion, calcularDV, inferirTipoDocumento, separarNombrePersona } = require('./utils/dian');
+const { normalizarTexto, limpiarIdentificacion, calcularDV, inferirTipoDocumento, separarNombrePersona, round2 } = require('./utils/dian');
 const { getCellText, encontrarFilaYColumnas, copiarEstiloFila } = require('./utils/plantillaExcel');
 
 const HOJA_TOKEN = 'COMPRAS';
@@ -162,12 +166,53 @@ async function enriquecerConTerceros(registros) {
   });
 }
 
+// Agrupa las compras ya clasificadas en Contabilidad (contab_documentos) por tercero+concepto
+// y expande cada registro del TOKEN en una fila por cada concepto distinto que ese tercero
+// tuvo — igual a como se ve en un 1001 real (mismo tercero puede aparecer varias veces, una
+// por concepto). Un tercero sin ningún documento clasificado ahí (porque no se subió nada a
+// Contabilidad para esa empresa/año, o porque no tenía compras ese año) se deja tal cual, con
+// concepto/pago en null — no se inventa ni se excluye, sigue apareciendo para que el chequeo
+// de dirección/DPTO/MUN de arriba lo siga cubriendo.
+async function enriquecerConConceptos(registros, { contabEmpresaId, anio }) {
+  if (registros.length === 0 || !contabEmpresaId || !anio) return registros;
+
+  // `nit_tercero` se guarda tal cual venía en el Excel de la DIAN (solo trim, ver
+  // dianController.js#getStr) — puede traer puntos/guiones. `identificacion` acá ya viene
+  // limpia a solo dígitos (limpiarIdentificacion, en leerYAgrupar). Si se comparara tal cual,
+  // un NIT con formato distinto entre el reporte DIAN y el TOKEN de Exógenas no haría match y
+  // ese tercero quedaría "sin clasificar" en silencio aunque sí hubiera datos — por eso se
+  // limpia también `nit_tercero` acá, a ambos lados de la comparación.
+  const nits = registros.map((r) => r.identificacion);
+  const { rows } = await db.query(
+    `SELECT regexp_replace(nit_tercero, '[^0-9]', '', 'g') AS nit, concepto, COALESCE(SUM(subtotal), 0) AS pago
+     FROM contab_documentos
+     WHERE empresa_id = $1 AND anio = $2 AND grupo = 'Recibido'
+       AND regexp_replace(nit_tercero, '[^0-9]', '', 'g') = ANY($3)
+     GROUP BY regexp_replace(nit_tercero, '[^0-9]', '', 'g'), concepto`,
+    [contabEmpresaId, anio, nits]
+  );
+
+  const gruposPorNit = new Map();
+  for (const r of rows) {
+    const grupos = gruposPorNit.get(r.nit) ?? [];
+    grupos.push({ concepto: r.concepto, pago: round2(Number(r.pago)) });
+    gruposPorNit.set(r.nit, grupos);
+  }
+
+  return registros.flatMap((registro) => {
+    const grupos = gruposPorNit.get(registro.identificacion);
+    if (!grupos || grupos.length === 0) return [{ ...registro, concepto: null, pago: null }];
+    return grupos.map((g) => ({ ...registro, concepto: g.concepto, pago: g.pago }));
+  });
+}
+
 // Llena la hoja "1001" de un workbook ya cargado en memoria — mismo patrón que 1007 (ver
-// services/exogenas/index.js#llenarPlantillaCombinada). CPT y las columnas de dinero no se
-// escriben (ver cabecera del archivo): la limpieza de esas columnas sí corre, así que quedan en
-// blanco y no con un valor de una corrida anterior. DIR/DPTO/MUN/PAIS solo se escriben si
-// `enriquecerConTerceros` ya los encontró en `terceros` — si no, quedan en blanco hasta que se
-// suba la factura de ese tercero.
+// services/exogenas/index.js#llenarPlantillaCombinada). CPT/PAGO solo se escriben si
+// `enriquecerConConceptos` los encontró en `contab_documentos`; el resto de columnas de dinero
+// (ver cabecera del archivo) nunca se escriben todavía. La limpieza de todas estas columnas sí
+// corre siempre, así que quedan en blanco y no con un valor de una corrida anterior.
+// DIR/DPTO/MUN/PAIS solo se escriben si `enriquecerConTerceros` ya los encontró en `terceros`
+// — si no, quedan en blanco hasta que se suba la factura de ese tercero.
 function llenarHoja(workbook, registros) {
   const ws = encontrarHoja(workbook, HOJA_PLANTILLA);
   if (!ws) {
@@ -206,6 +251,8 @@ function llenarHoja(workbook, registros) {
       row.getCell(col.APL2).value = apl2;
     }
 
+    if (registro.concepto) row.getCell(col.CPT).value = registro.concepto;
+    if (registro.pago != null) row.getCell(col.PAGO).value = registro.pago;
     if (registro.direccion) row.getCell(col.DIR).value = registro.direccion;
     if (registro.codigoDepartamentoDane) row.getCell(col.DPTO).value = registro.codigoDepartamentoDane;
     // MUN pide solo los 3 dígitos de municipio dentro del departamento (no el código DANE
@@ -227,6 +274,6 @@ async function llenarPlantilla(bufferPlantilla, registros) {
 }
 
 module.exports = {
-  leerYAgrupar, enriquecerConTerceros, llenarHoja, llenarPlantilla,
+  leerYAgrupar, enriquecerConTerceros, enriquecerConConceptos, llenarHoja, llenarPlantilla,
   HOJA_TOKEN, COLUMNAS_TOKEN_REQUERIDAS,
 };

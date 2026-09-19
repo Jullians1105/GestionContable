@@ -3,17 +3,19 @@ const { getEstrategia, llenarPlantillaCombinada } = require('../services/exogena
 const formato1001 = require('../services/exogenas/formato1001');
 const formato1007 = require('../services/exogenas/formato1007');
 
-// 1001 y 1007 generan Excel con lo confirmado y dejan CPT (y en el caso de 1001, además las
-// columnas de dinero) en blanco cuando falten — ver formato1001.js / formato1007.js.
+// 1001 y 1007 generan Excel con lo confirmado. El 1001 llena CPT/PAGO desde `contab_documentos`
+// cuando hay empresa/año seleccionados y datos clasificados ahí; si no, quedan en blanco, igual
+// que el resto de sus columnas de dinero y que el CPT del 1007 (ver formato1001.js/1007.js).
 const FORMATOS_SOPORTADOS = ['1001', '1005', '1006', '1007'];
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 // Cada formato tiene sus propios campos monetarios en el registro agrupado — acá solo se
 // listan para poder sumarlos genéricamente sin acoplar el controller a un formato específico.
-// 1001 no tiene entrada: sus columnas de dinero (PAGO, PNDED, etc.) siguen sin definir, así que
-// no hay nada que sumar todavía.
+// 1001 solo suma PAGO (viene de `contab_documentos` vía enriquecerConConceptos) — el resto de
+// sus columnas de dinero (PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM) siguen sin definir.
 const CAMPOS_MONETARIOS_POR_FORMATO = {
+  1001: ['pago'],
   1005: ['vimp', 'ivade'],
   1006: ['imp', 'iva', 'icon'],
   1007: ['ibru', 'dev'],
@@ -45,6 +47,28 @@ const uploadExogenas = async (req, res, next) => {
       return res.status(400).json({ error: 'Se requiere la plantilla SIIGO.' });
     }
 
+    // El 1001 necesita saber a qué empresa de Contabilidad y a qué año corresponde este
+    // reporte, para más adelante poder ir a buscar en `contab_documentos` el Concepto y la
+    // Base ya clasificados por factura (ver docs/ESTADO_EXOGENAS_1001_1007.md) — el TOKEN por
+    // sí solo no trae esa clasificación. Se guarda en `opciones` (JSONB libre, no usado por
+    // ningún otro formato todavía) en vez de agregar columnas nuevas a la tabla.
+    let opciones = {};
+    if (formato === '1001') {
+      const { contabEmpresaId, anio } = req.body;
+      if (!contabEmpresaId || !anio) {
+        return res.status(400).json({ error: 'Selecciona la empresa (de Contabilidad) y el año antes de analizar el 1001.' });
+      }
+      const anioNum = parseInt(anio, 10);
+      if (Number.isNaN(anioNum)) {
+        return res.status(400).json({ error: 'Año inválido.' });
+      }
+      const { rows: empresaRows } = await db.query('SELECT id FROM contab_empresas WHERE id = $1', [contabEmpresaId]);
+      if (empresaRows.length === 0) {
+        return res.status(400).json({ error: 'La empresa de Contabilidad seleccionada no existe.' });
+      }
+      opciones = { contabEmpresaId, anio: anioNum };
+    }
+
     const estrategia = getEstrategia(formato);
 
     let registros;
@@ -53,7 +77,10 @@ const uploadExogenas = async (req, res, next) => {
       // La ubicación del 1001 y el país del 1007 salen de `terceros`, no del TOKEN — se
       // enriquecen acá, antes de guardar el borrador, para que tanto la previsualización como
       // el Excel generado (llenarHoja) ya los tengan disponibles sin volver a consultar la base.
-      if (formato === '1001') registros = await formato1001.enriquecerConTerceros(registros);
+      if (formato === '1001') {
+        registros = await formato1001.enriquecerConTerceros(registros);
+        registros = await formato1001.enriquecerConConceptos(registros, opciones);
+      }
       if (formato === '1007') registros = await formato1007.enriquecerConPais(registros);
     } catch (err) {
       return res.status(400).json({ error: err.message });
@@ -67,14 +94,15 @@ const uploadExogenas = async (req, res, next) => {
 
     const { rows } = await db.query(
       `INSERT INTO exogenas_borradores
-         (formato, nombre_token, nombre_plantilla, creado_por, registros, token_original, plantilla_original)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (formato, nombre_token, nombre_plantilla, creado_por, opciones, registros, token_original, plantilla_original)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING id, created_at`,
       [
         formato,
         tokenFile.originalname,
         plantillaFile.originalname,
         req.user.userId,
+        JSON.stringify(opciones),
         JSON.stringify(registros),
         tokenFile.buffer,
         plantillaFile.buffer,
@@ -84,6 +112,7 @@ const uploadExogenas = async (req, res, next) => {
     res.status(201).json({
       id: rows[0].id,
       formato,
+      opciones,
       totalTerceros: registros.length,
       ...calcularTotales(formato, registros),
       registros,
@@ -97,7 +126,7 @@ const getExogenasBorrador = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { rows } = await db.query(
-      `SELECT id, formato, nombre_token, nombre_plantilla, registros, created_at
+      `SELECT id, formato, nombre_token, nombre_plantilla, opciones, registros, created_at
        FROM exogenas_borradores WHERE id = $1 AND creado_por = $2`,
       [id, req.user.userId]
     );
