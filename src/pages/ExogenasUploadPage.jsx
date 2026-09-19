@@ -48,9 +48,12 @@ const badge = (color, texto) => <span className={BADGE_ESTILOS[color]}>{texto}</
 const CONFIG_FORMATO = {
   '1001': {
     hojaToken: 'COMPRAS',
-    aviso: 'El concepto (CPT) y las columnas de dinero (PAGO, PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM) todavía no están definidos — esas columnas quedan vacías en el Excel generado. La dirección/DPTO/MUN/PAIS se toman de los terceros ya guardados en "Importar Terceros"; si un tercero no está ahí, esas columnas también quedan vacías. Antes de generar cada exógena, sube ahí las facturas de los proveedores de este TOKEN para completarlo.',
-    campos: [],
+    aviso: 'CPT (Concepto) y PAGO salen de lo ya clasificado en Contabilidad para la empresa/año elegidos — si un tercero no tiene compras clasificadas ahí, esas dos columnas quedan vacías para él. El resto de columnas de dinero (PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM) todavía no están definidas y siempre quedan vacías. La dirección/DPTO/MUN/PAIS se toman de los terceros ya guardados en "Importar Terceros"; si un tercero no está ahí, esas también quedan vacías.',
+    campos: [
+      { key: 'pago', totalKey: 'totalPago', label: 'PAGO', statTitle: 'Total pagado', statSub: 'Suma de la Base clasificada en Contabilidad' },
+    ],
     columnasExtra: [
+      { label: 'CPT (Concepto)', width: 'w-32', render: (r) => r.concepto || '—' },
       { label: 'Dirección', width: 'w-40', render: (r) => r.direccion || '—' },
       {
         label: 'Estado',
@@ -593,7 +596,7 @@ export default function ExogenasUploadPage() {
           <div className="flex flex-wrap sm:flex-nowrap gap-4 mb-6">
             <div className="w-full sm:w-36 flex-shrink-0">
               <StatsCard
-                title="Terceros agrupados"
+                title={tabActivo === '1001' ? 'Filas (tercero × concepto)' : 'Terceros agrupados'}
                 value={borrador.totalTerceros}
                 icon="groups"
                 borderColor="#004ac6"
@@ -639,7 +642,9 @@ export default function ExogenasUploadPage() {
               </thead>
               <tbody>
                 {borrador.registros.map((r, idx) => (
-                  <tr key={`${r.tipoDocumento}-${r.identificacion}`} className={idx % 2 === 1 ? 'bg-[#fafbff] dark:bg-[#1a1c2e]' : ''}>
+                  // El 1001 puede repetir el mismo tercero una vez por cada concepto distinto
+                  // (ver enriquecerConConceptos en el backend) — `idx` en la key evita choques.
+                  <tr key={`${r.tipoDocumento}-${r.identificacion}-${idx}`} className={idx % 2 === 1 ? 'bg-[#fafbff] dark:bg-[#1a1c2e]' : ''}>
                     <td className="px-3 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] break-words">{r.razonSocial}</td>
                     <td className="px-2 py-2 text-center border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8]">{r.tipoDocumento}</td>
                     <td className="px-2 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] break-words">{r.identificacion}</td>
@@ -656,7 +661,7 @@ export default function ExogenasUploadPage() {
               <tfoot>
                 <tr>
                   <td className="px-3 py-2.5 bg-[#f8f9fe] dark:bg-[#252840] border-t-2 border-[#e2e4ef] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] font-bold">
-                    Total ({borrador.totalTerceros} terceros)
+                    Total ({borrador.totalTerceros} {tabActivo === '1001' ? 'filas' : 'terceros'})
                   </td>
                   <td className="bg-[#f8f9fe] dark:bg-[#252840] border-t-2 border-[#e2e4ef] dark:border-[#2e3148]" colSpan={3 + columnasExtra.length} />
                   {camposFormato.map((c) => (

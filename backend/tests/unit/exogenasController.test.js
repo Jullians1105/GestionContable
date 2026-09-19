@@ -239,6 +239,7 @@ describe('uploadExogenas — 1001', () => {
           codigo_departamento_dane: '11', pais: 'COLOMBIA', codigo_pais_dian: '169',
         }],
       }) // enriquecerConTerceros
+      .mockResolvedValueOnce({ rows: [] }) // enriquecerConConceptos (sin documentos clasificados aún)
       .mockResolvedValueOnce({ rows: [{ id: 'borrador-1001' }] }); // INSERT
 
     const req = {

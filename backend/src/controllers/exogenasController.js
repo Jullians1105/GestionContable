@@ -3,17 +3,19 @@ const { getEstrategia, llenarPlantillaCombinada } = require('../services/exogena
 const formato1001 = require('../services/exogenas/formato1001');
 const formato1007 = require('../services/exogenas/formato1007');
 
-// 1001 y 1007 generan Excel con lo confirmado y dejan CPT (y en el caso de 1001, además las
-// columnas de dinero) en blanco cuando falten — ver formato1001.js / formato1007.js.
+// 1001 y 1007 generan Excel con lo confirmado. El 1001 llena CPT/PAGO desde `contab_documentos`
+// cuando hay empresa/año seleccionados y datos clasificados ahí; si no, quedan en blanco, igual
+// que el resto de sus columnas de dinero y que el CPT del 1007 (ver formato1001.js/1007.js).
 const FORMATOS_SOPORTADOS = ['1001', '1005', '1006', '1007'];
 
 const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 // Cada formato tiene sus propios campos monetarios en el registro agrupado — acá solo se
 // listan para poder sumarlos genéricamente sin acoplar el controller a un formato específico.
-// 1001 no tiene entrada: sus columnas de dinero (PAGO, PNDED, etc.) siguen sin definir, así que
-// no hay nada que sumar todavía.
+// 1001 solo suma PAGO (viene de `contab_documentos` vía enriquecerConConceptos) — el resto de
+// sus columnas de dinero (PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM) siguen sin definir.
 const CAMPOS_MONETARIOS_POR_FORMATO = {
+  1001: ['pago'],
   1005: ['vimp', 'ivade'],
   1006: ['imp', 'iva', 'icon'],
   1007: ['ibru', 'dev'],
@@ -75,7 +77,10 @@ const uploadExogenas = async (req, res, next) => {
       // La ubicación del 1001 y el país del 1007 salen de `terceros`, no del TOKEN — se
       // enriquecen acá, antes de guardar el borrador, para que tanto la previsualización como
       // el Excel generado (llenarHoja) ya los tengan disponibles sin volver a consultar la base.
-      if (formato === '1001') registros = await formato1001.enriquecerConTerceros(registros);
+      if (formato === '1001') {
+        registros = await formato1001.enriquecerConTerceros(registros);
+        registros = await formato1001.enriquecerConConceptos(registros, opciones);
+      }
       if (formato === '1007') registros = await formato1007.enriquecerConPais(registros);
     } catch (err) {
       return res.status(400).json({ error: err.message });

@@ -3,7 +3,7 @@ jest.mock('../../src/config/database');
 const ExcelJS = require('exceljs');
 const db = require('../../src/config/database');
 const { calcularDV } = require('../../src/services/exogenas/utils/dian');
-const { leerYAgrupar, enriquecerConTerceros, llenarPlantilla } = require('../../src/services/exogenas/formato1001');
+const { leerYAgrupar, enriquecerConTerceros, enriquecerConConceptos, llenarPlantilla } = require('../../src/services/exogenas/formato1001');
 
 const COLUMNAS_TOKEN = ['Tipo de documento', 'NIT Emisor', 'Nombre Emisor', 'Grupo'];
 
@@ -101,6 +101,115 @@ describe('formato1001 — enriquecerConTerceros', () => {
   });
 });
 
+// Datos inventados a propósito (no las 208 compras reales de FE ROOM) — esto valida que el
+// mecanismo de agrupar/sumar funciona, no que la clasificación real de una empresa sea
+// correcta (eso depende del criterio de quien clasifica, no es algo que se pueda testear).
+describe('formato1001 — enriquecerConConceptos', () => {
+  beforeEach(() => db.query.mockReset());
+
+  test('sin contabEmpresaId ni anio, devuelve los registros tal cual y no consulta la base', async () => {
+    const registros = [{ tipoDocumento: 31, identificacion: '900123456', razonSocial: 'X' }];
+    const resultado = await enriquecerConConceptos(registros, {});
+    expect(resultado).toBe(registros);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('sin registros no consulta la base', async () => {
+    const resultado = await enriquecerConConceptos([], { contabEmpresaId: 'e1', anio: 2025 });
+    expect(resultado).toEqual([]);
+    expect(db.query).not.toHaveBeenCalled();
+  });
+
+  test('expande un tercero con dos conceptos distintos en dos filas, sumando la Base de cada uno', async () => {
+    db.query.mockResolvedValue({
+      rows: [
+        { nit: '900123456', concepto: 'Arrendamientos', pago: '5000000' },
+        { nit: '900123456', concepto: 'Honorarios', pago: '1200000.5' },
+      ],
+    });
+    const registros = [{ tipoDocumento: 31, identificacion: '900123456', razonSocial: 'ACME SAS' }];
+
+    const resultado = await enriquecerConConceptos(registros, { contabEmpresaId: 'e1', anio: 2025 });
+
+    expect(resultado).toHaveLength(2);
+    expect(resultado).toEqual(expect.arrayContaining([
+      expect.objectContaining({ identificacion: '900123456', concepto: 'Arrendamientos', pago: 5000000 }),
+      expect.objectContaining({ identificacion: '900123456', concepto: 'Honorarios', pago: 1200000.5 }),
+    ]));
+    // La consulta va filtrada por la empresa/año elegidos y solo compras (Recibido) — no se
+    // mezclan ventas ni otras empresas.
+    expect(db.query).toHaveBeenCalledWith(expect.stringContaining("grupo = 'Recibido'"), ['e1', 2025, ['900123456']]);
+  });
+
+  test('un tercero sin documentos clasificados queda con concepto y pago en null — no se excluye ni se inventa', async () => {
+    db.query.mockResolvedValue({ rows: [] });
+    const registros = [{ tipoDocumento: 31, identificacion: '900999999', razonSocial: 'SIN CLASIFICAR SAS' }];
+
+    const resultado = await enriquecerConConceptos(registros, { contabEmpresaId: 'e1', anio: 2025 });
+
+    expect(resultado).toEqual([
+      expect.objectContaining({ identificacion: '900999999', concepto: null, pago: null }),
+    ]);
+  });
+
+  test('cruza el NIT aunque en `contab_documentos` esté guardado con puntos/guion — se limpia a ambos lados', async () => {
+    // `nit_tercero` se guarda tal cual vino del Excel de la DIAN (dianController.js#getStr solo
+    // hace trim, no quita puntuación) — acá simula ese caso real: mismo NIT, con guion del
+    // dígito de verificación, distinto de como llega ya limpio desde el TOKEN de Exógenas.
+    db.query.mockResolvedValue({
+      rows: [{ nit: '900123456', concepto: 'Compras', pago: '250000' }], // la query ya lo devuelve limpio
+    });
+    const registros = [{ tipoDocumento: 31, identificacion: '900123456', razonSocial: 'ACME SAS' }];
+
+    const resultado = await enriquecerConConceptos(registros, { contabEmpresaId: 'e1', anio: 2025 });
+
+    expect(resultado).toEqual([
+      expect.objectContaining({ identificacion: '900123456', concepto: 'Compras', pago: 250000 }),
+    ]);
+    // La limpieza va en la query misma (regexp_replace a ambos lados), no solo en JS.
+    const sql = db.query.mock.calls[0][0];
+    expect(sql).toEqual(expect.stringContaining("regexp_replace(nit_tercero, '[^0-9]', '', 'g')"));
+  });
+
+  test('un tercero con compras clasificadas y sin clasificar a la vez — cada bolsa queda en su propia fila', async () => {
+    // Dos facturas del mismo tercero: una ya clasificada como "Servicios", otra todavía sin
+    // concepto (concepto NULL) — Postgres agrupa los NULL entre sí, así que sale como un grupo
+    // aparte con concepto null y su propia suma (no se pierde esa plata ni se mezcla con la
+    // clasificada).
+    db.query.mockResolvedValue({
+      rows: [
+        { nit: '900123456', concepto: 'Servicios', pago: '400000' },
+        { nit: '900123456', concepto: null, pago: '150000' },
+      ],
+    });
+    const registros = [{ tipoDocumento: 31, identificacion: '900123456', razonSocial: 'ACME SAS' }];
+
+    const resultado = await enriquecerConConceptos(registros, { contabEmpresaId: 'e1', anio: 2025 });
+
+    expect(resultado).toHaveLength(2);
+    expect(resultado).toEqual(expect.arrayContaining([
+      expect.objectContaining({ concepto: 'Servicios', pago: 400000 }),
+      expect.objectContaining({ concepto: null, pago: 150000 }),
+    ]));
+  });
+
+  test('dos terceros: uno con un solo concepto, otro sin clasificar — cada uno se resuelve independiente', async () => {
+    db.query.mockResolvedValue({
+      rows: [{ nit: '900123456', concepto: 'Servicios', pago: '300000' }],
+    });
+    const registros = [
+      { tipoDocumento: 31, identificacion: '900123456', razonSocial: 'CON CONCEPTO SAS' },
+      { tipoDocumento: 31, identificacion: '800654321', razonSocial: 'SIN CONCEPTO SAS' },
+    ];
+
+    const resultado = await enriquecerConConceptos(registros, { contabEmpresaId: 'e1', anio: 2025 });
+
+    expect(resultado).toHaveLength(2);
+    expect(resultado.find((r) => r.identificacion === '900123456')).toMatchObject({ concepto: 'Servicios', pago: 300000 });
+    expect(resultado.find((r) => r.identificacion === '800654321')).toMatchObject({ concepto: null, pago: null });
+  });
+});
+
 const HEADERS_1001 = [
   'Concepto (CPT)', 'Tipo de Documento (TDOC)', 'Número de Identificacion (NID)',
   'Primer Apellido del informado (APL1)', 'Segundo Apellido del informado (APL2)',
@@ -145,6 +254,21 @@ describe('formato1001.llenarPlantilla', () => {
     expect(fila.getCell(11).value).toBe('001');     // MUN: últimos 3 dígitos del código DANE completo
     expect(fila.getCell(12).value).toBe(169);       // PAIS
     expect(fila.getCell(13).value).toBeNull();      // PAGO en blanco (columnas de dinero sin definir)
+  });
+
+  test('CPT y PAGO se escriben cuando el registro ya trae concepto/pago (vía enriquecerConConceptos)', async () => {
+    const wb = await construirPlantilla();
+    const registros = [{
+      tipoDocumento: 31, identificacion: '900123456', digitoVerificacion: calcularDV('900123456'),
+      razonSocial: 'ACME SAS', concepto: 'Arrendamientos', pago: 5000000,
+    }];
+    const buffer = await llenarPlantilla(Buffer.from(await wb.xlsx.writeBuffer()), registros);
+
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(buffer);
+    const fila = wb2.getWorksheet('1001').getRow(8);
+    expect(fila.getCell(1).value).toBe('Arrendamientos'); // CPT — el nombre tal cual, sin mapear a código DIAN
+    expect(fila.getCell(13).value).toBe(5000000);          // PAGO
   });
 
   test('sin datos de terceros (NIT no está en `terceros`), DIR/DPTO/MUN/PAIS quedan en blanco', async () => {
