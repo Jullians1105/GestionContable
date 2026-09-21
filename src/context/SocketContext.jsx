@@ -26,12 +26,26 @@ export function SocketProvider({ children }) {
       if (socketRef.current) socketRef.current.disconnect()
 
       const apiUrl = import.meta.env.VITE_API_URL || ''
+      // reconnectionAttempts sin límite (default real de Socket.IO, Infinity) — con un tope
+      // bajo (antes 5, ~5s de reintentos), cualquier corte más largo que eso (un deploy
+      // reiniciando el backend, un blip de Cloudflare, un WiFi que se cae un momento) hacía
+      // que el socket se rindiera para siempre: quedaba "Sin conexión" aunque el servidor ya
+      // estuviera disponible de nuevo, hasta recargar la página a mano.
+      //
+      // `auth` como función (no `{ token }` fijo) — api.js refresca el access token en
+      // localStorage por su cuenta (fetchWithAuth) SIN pasar por este `token` de AuthContext,
+      // que solo se fija al hacer login y nunca se actualiza. Con `{ token }` fijo, cada
+      // reintento de reconexión (tras un reinicio del backend, un rato largo de sesión
+      // abierta) volvía a mandar el token viejo — si ya había expirado, el servidor lo
+      // rechazaba una y otra vez y el socket quedaba en "Sin conexión" para siempre, aunque el
+      // servidor estuviera perfectamente sano. Como función, Socket.IO la llama de nuevo en
+      // cada intento y siempre manda el token vigente.
       const s = io(apiUrl, {
-        auth: { token },
+        auth: (cb) => cb({ token: localStorage.getItem('auth_token') || token }),
         autoConnect: true,
         reconnection: true,
-        reconnectionAttempts: 5,
         reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
       })
 
       s.on('connect', () => { console.debug('[Socket] Connected:', s.id); setConnected(true) })

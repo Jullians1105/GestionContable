@@ -67,6 +67,8 @@ const { initRecurringCron } = require('./services/recurringTaskService');
 initRecurringCron(io);
 const { initReminderCron } = require('./services/reminderService');
 initReminderCron(io);
+const { initNEPlazoCron } = require('./services/nePlazoReminderService');
+initNEPlazoCron(io);
 
 // Inyectar io en todas las requests
 app.use((req, _res, next) => { req.io = io; next(); });

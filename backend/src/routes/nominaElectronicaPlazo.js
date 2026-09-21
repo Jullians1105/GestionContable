@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
-const { requireNEView, requireNEAdmin } = require('../middleware/nominaElectronicaAccess');
+const { requireNEView, requireNEPlazoAdmin } = require('../middleware/nominaElectronicaAccess');
 const { validate } = require('../middleware/validation');
 const { getPlazo, updatePlazo } = require('../controllers/nePlazoController');
 
@@ -24,7 +24,7 @@ router.get('/', requireNEView, getPlazo);
  * /api/nomina-electronica/plazo:
  *   put:
  *     tags: [NominaElectronicaPlazo]
- *     summary: Actualizar la fecha límite (admin o permiso canGestionar)
+ *     summary: Actualizar la fecha límite (solo la cuenta responsable, ver requireNEPlazoAdmin)
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -36,7 +36,7 @@ router.get('/', requireNEView, getPlazo);
  *               fechaLimite: { type: string, format: date, nullable: true }
  */
 router.put('/',
-  requireNEAdmin,
+  requireNEPlazoAdmin,
   body('fechaLimite').optional({ nullable: true }).isISO8601().withMessage('fechaLimite debe ser una fecha válida (YYYY-MM-DD)'),
   validate,
   updatePlazo

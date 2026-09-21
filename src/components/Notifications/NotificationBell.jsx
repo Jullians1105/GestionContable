@@ -20,7 +20,12 @@ const TYPE_ICONS = {
   delete_request:          'report',
   delete_request_approved: 'delete',
   delete_request_rejected: 'block',
+  ne_mes_habilitado: 'event_available',
+  ne_plazo_proximo:  'schedule',
+  ne_plazo_vencido:  'warning',
 }
+
+const NE_NOTIF_TYPES = new Set(['ne_mes_habilitado', 'ne_plazo_proximo', 'ne_plazo_vencido'])
 
 function timeAgo(str) {
   try { return formatDistanceToNow(parseISO(str), { addSuffix: true, locale: es }) } catch { return '' }
@@ -41,6 +46,8 @@ export default function NotificationBell() {
     setOpen(false)
     if (n.type === 'personal_task_reminder') {
       navigate('/pendientes')
+    } else if (NE_NOTIF_TYPES.has(n.type)) {
+      navigate('/dian/nomina-electronica')
     } else if (n.taskId) {
       const params = new URLSearchParams({ openTask: n.taskId })
       if (n.extra?.commentId) params.set('comment', n.extra.commentId)

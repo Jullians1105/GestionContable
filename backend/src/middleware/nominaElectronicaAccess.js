@@ -85,4 +85,24 @@ const requireNEAdmin = async (req, res, next) => {
   }
 };
 
-module.exports = { requireNEAccess, requireNEView, requireNEAdmin };
+// Fecha límite de Nómina Electrónica (ne_plazo): a diferencia del resto del módulo, esto NO es
+// un permiso general — el usuario pidió explícitamente (2026-09-21) que solo una persona
+// puntual la edite, ni siquiera otros admin, porque es un campo manual (los primeros 10 días
+// hábiles del mes, sin sábados/domingos/festivos) y prefiere que una sola persona de confianza
+// sea la responsable de mantenerla correcta en vez de repartir esa responsabilidad. Por eso
+// compara el id directo en vez de un rol/permiso — si el día de mañana cambia quién la
+// mantiene, hay que actualizar este id a mano.
+const ID_RESPONSABLE_PLAZO = 'f2a82148-64d0-44a2-a0ac-37462ed43138'; // julliansadmin@gmail.com
+
+const requireNEPlazoAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ error: 'No autenticado' });
+  if (req.user.userId === ID_RESPONSABLE_PLAZO) return next();
+
+  logger.warn(
+    { userId: req.user.userId, path: req.path, method: req.method },
+    'requireNEPlazoAdmin — no es la cuenta autorizada para editar la fecha límite'
+  );
+  return res.status(403).json({ error: 'Solo la cuenta responsable puede editar la fecha límite' });
+};
+
+module.exports = { requireNEAccess, requireNEView, requireNEAdmin, requireNEPlazoAdmin };

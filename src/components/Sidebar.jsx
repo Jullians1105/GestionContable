@@ -5,77 +5,7 @@ import { useToast } from '../context/ToastContext'
 import { useNotifications } from '../context/NotificationContext'
 import TaskModal from './TaskModal'
 import logoBlanco from '../assets/logo-icono-blanco.png'
-
-const navItems = [
-  { to: '/', label: 'Dashboard', icon: 'dashboard', end: true },
-  { to: '/tasks', label: 'Mis Tareas', icon: 'task_alt' },
-  { to: '/pendientes', label: 'Mis Pendientes', icon: 'checklist' },
-  { to: '/notas', label: 'Mis Notas', icon: 'edit_note' },
-  { to: '/kanban', label: 'Kanban', icon: 'view_kanban' },
-  { to: '/calendar', label: 'Calendario', icon: 'calendar_month' },
-  { to: '/tasks/recurrentes', label: 'Recurrentes', icon: 'repeat', leaderOnly: true },
-  { to: '/team', label: 'Equipo', icon: 'group' },
-  { to: '/groups', label: 'Grupos', icon: 'group_work' },
-  { to: '/reports', label: 'Reportes', icon: 'bar_chart' },
-  { to: '/workload', label: 'Carga de trabajo', icon: 'balance' },
-  { to: '/usuarios', label: 'Usuarios', icon: 'manage_accounts' },
-  { to: '/notifications', label: 'Notificaciones', icon: 'notifications' },
-  { to: '/settings', label: 'Configuración', icon: 'settings' },
-]
-
-const modules = [
-  { id: 'tasks',   label: 'Gestor de Tareas',    icon: 'task_alt' },
-  { id: 'fondo',   label: 'Fondo Emprender',      icon: 'rocket_launch' },
-  { id: 'dian',    label: 'Gestión Tributaria',   icon: 'account_balance' },
-  // Directorio maestro que une los 4 catálogos de empresas (Fondo Emprender; Empresas
-  // Externas y Nómina Electrónica, ambos anidados dentro de Gestión Tributaria; y
-  // Contabilidad) — ícono propio ('contacts', no 'corporate_fare'/'domain' — esos dos son
-  // siluetas de edificio casi iguales a este tamaño) para que se distinga a simple vista. Se
-  // ve sin importar en qué módulo se esté parado, a diferencia de Usuarios/Configuración
-  // (esos sí viven solo dentro de "Gestor de Tareas").
-  { id: 'empresas-directorio', label: 'Empresas', icon: 'contacts' },
-]
-
-const MODULE_TITLES = {
-  tasks:    'Gestor de Tareas',
-  fondo:    'Fondo Emprender',
-  dian:     'Gestión Tributaria',
-  'empresas-directorio': 'Empresas',
-}
-
-const DIAN_NAV = [
-  { to: '/dian/upload',     label: 'Contabilidad',     icon: 'upload_file',   end: true },
-  { to: '/dian/consolidado', label: 'Consolidado',     icon: 'query_stats',   end: true },
-  { to: '/exogenas/upload', label: 'Exógenas',          icon: 'request_quote', end: true },
-  { to: '/dian/terceros',   label: 'Importar Terceros', icon: 'location_on',   end: true },
-  { to: '/dian/consulta-tercero', label: 'Consulta Tercero', icon: 'person_search', end: true },
-  { to: '/empresas-externas', label: 'Empresas Externas', icon: 'table_chart', end: true },
-  { to: '/dian/nomina-electronica', label: 'Seguimiento Nómina', icon: 'badge', end: true },
-]
-
-const EMPRESAS_MAESTRO_NAV = [
-  { to: '/empresas', label: 'Directorio', icon: 'contacts', end: true },
-]
-
-const FONDO_NAV = [
-  { to: '/fondo-emprender',          label: 'Seguimiento mensual', icon: 'table_chart',    end: true },
-  { to: '/fondo-emprender/empresas', label: 'Empresas',            icon: 'corporate_fare' },
-  { to: '/fondo-emprender/pagos',    label: 'Pagos',               icon: 'payments' },
-]
-
-// Deriva qué módulo del sidebar corresponde a la ruta actual — así el panel
-// activo (y su sub-nav) coincide con la página real tras un F5, un link
-// externo al sidebar, o "atrás/adelante" del navegador, no solo con el
-// último ícono clickeado (bug real: recargar en /dian/consolidado dejaba la
-// página correcta pero el sidebar saltaba a "Gestor de Tareas"). El orden
-// importa poco acá porque los prefijos no se pisan entre sí, salvo
-// '/empresas' vs '/empresas-externas' — por eso ese caso usa === exacto.
-function moduleForPath(pathname) {
-  if (pathname.startsWith('/fondo-emprender')) return 'fondo'
-  if (pathname.startsWith('/dian') || pathname.startsWith('/exogenas') || pathname === '/empresas-externas') return 'dian'
-  if (pathname === '/empresas') return 'empresas-directorio'
-  return 'tasks'
-}
+import { navItems, modules, MODULE_TITLES, DIAN_NAV, EMPRESAS_MAESTRO_NAV, FONDO_NAV, moduleForPath } from '../config/navigation'
 
 function setSidebarCssVar(pinned) {
   document.documentElement.style.setProperty(
