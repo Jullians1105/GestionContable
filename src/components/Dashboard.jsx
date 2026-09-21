@@ -9,41 +9,8 @@ import { useTasks } from "../hooks/useTasks"
 import { useTeam } from "../hooks/useTeam"
 import { useAuth } from "../context/AuthContext"
 import { useTheme } from "../context/ThemeContext"
-import { DIAN_NAV, FONDO_NAV, EMPRESAS_MAESTRO_NAV, MODULE_TITLES } from "../config/navigation"
+import StatsCard from "./StatsCard"
 import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from "../utils/helpers"
-
-// Grupos de accesos directos — mismos datos que ya usan Sidebar.jsx y el buscador del Header
-// (config/navigation.js), no una lista aparte que se pueda desincronizar.
-const GRUPOS_ACCESOS = [
-  { id: "dian", items: DIAN_NAV },
-  { id: "fondo", items: FONDO_NAV },
-  { id: "empresas-directorio", items: EMPRESAS_MAESTRO_NAV },
-]
-
-function AccesosDirectos() {
-  return (
-    <div className="card">
-      <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-4">Accesos directos</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-        {GRUPOS_ACCESOS.flatMap((g) => g.items.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            className="flex items-center gap-3 p-3 rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] hover:border-[#004ac6] hover:bg-[#f8f9ff] dark:hover:bg-[#1a2040] transition-colors"
-          >
-            <span className="w-9 h-9 rounded-lg bg-[#eef3ff] dark:bg-[#1a2550] flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-[#004ac6] dark:text-[#7ba8f0] text-lg">{item.icon}</span>
-            </span>
-            <span className="min-w-0">
-              <span className="block text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">{item.label}</span>
-              <span className="block text-[11px] text-[#8890b5] truncate">{MODULE_TITLES[g.id]}</span>
-            </span>
-          </Link>
-        )))}
-      </div>
-    </div>
-  )
-}
 
 const STATUS_COLORS = {
   pending: "#737686",
@@ -106,37 +73,11 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <AccesosDirectos />
-
-      {/* Antes eran 4 StatsCard grandes (Total/Completadas/En Progreso/Pendientes) ocupando la
-          fila más prominente del dashboard — el mismo peso visual que los accesos directos de
-          arriba, para un módulo (Tareas) que hoy casi no se usa. Se queda la misma info, pero en
-          una sola tira compacta en vez de 4 tarjetas grandes. */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-bold text-[#8890b5] uppercase tracking-wide">Tus tareas</h2>
-          <Link to="/tasks" className="text-xs font-semibold text-[#004ac6] hover:text-[#2563eb] flex items-center gap-1 transition-colors">
-            Ver todas
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
-          </Link>
-        </div>
-        <div className="flex flex-wrap gap-x-6 gap-y-2">
-          {[
-            { label: "Total", value: stats.total, color: "#004ac6" },
-            { label: "Completadas", value: stats.completed, color: "#10B981" },
-            { label: "En progreso", value: stats.inProgress, color: "#FBBF24" },
-            { label: "Pendientes", value: stats.pending, color: "#EF4444" },
-          ].map((s) => (
-            <div key={s.label} className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-              <span className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0]">{s.value}</span>
-              <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">{s.label}</span>
-            </div>
-          ))}
-          {stats.total > 0 && (
-            <span className="text-xs text-[#8890b5] self-center">({completionPct}% completadas)</span>
-          )}
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatsCard title="Total de Tareas" value={stats.total} icon="analytics" borderColor="#004ac6" iconColor="#004ac6" sub={`${completionPct}% completadas`} />
+        <StatsCard title="Completadas" value={stats.completed} icon="check_circle" borderColor="#10B981" iconColor="#10B981" sub={stats.total > 0 ? `${completionPct}% del total` : "Sin tareas"} subColor="#434655" />
+        <StatsCard title="En Progreso" value={stats.inProgress} icon="pending" borderColor="#FBBF24" iconColor="#FBBF24" sub="Tareas activas" subColor="#434655" />
+        <StatsCard title="Pendientes" value={stats.pending} icon="priority_high" borderColor="#EF4444" iconColor="#EF4444" sub={stats.pending > 0 ? "Por iniciar" : "Todo al dia"} subColor={stats.pending > 0 ? "#EF4444" : "#10B981"} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
