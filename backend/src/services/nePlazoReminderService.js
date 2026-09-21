@@ -15,6 +15,32 @@ const MESES_ES = [
   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
 ];
 
+// `pg` parsea una columna DATE a un objeto Date de JS anclado a medianoche UTC (mismo detalle
+// que ya documenta nePlazoController.js#toDateOnlyString) — convertir eso con
+// `.toLocaleDateString()` o comparar contra un `new Date()` "de hoy" (que sí vive en la hora
+// LOCAL del servidor) corre la fecha un día para adelante o atrás según el huso horario donde
+// corra el proceso. Estas 3 funciones trabajan siempre con "YYYY-MM-DD" puro para no toque
+// ninguna zona horaria real.
+function toISODateOnly(value) {
+  if (!value) return null;
+  if (typeof value === 'string') return value.slice(0, 10);
+  return value.toISOString().slice(0, 10);
+}
+
+// "Hoy" según el reloj del servidor (no UTC) — el cron corre a una hora fija del día local.
+function hoyISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Diferencia en días entre dos "YYYY-MM-DD" — Date.UTC acá es solo aritmética de calendario
+// sobre 3 números, no un instante real, así que no hay huso horario que pueda correrla.
+function diasEntre(desdeISO, hastaISO) {
+  const [ay, am, ad] = desdeISO.split('-').map(Number);
+  const [by, bm, bd] = hastaISO.split('-').map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+}
+
 async function notificarUsuarios(io, userIds, type, message) {
   for (const userId of userIds) {
     const notifId = uuidv4();
@@ -73,8 +99,12 @@ async function avisarMesHabilitado(io) {
 
     const { anio, mes } = getMesHabilitado(hoy);
     const fechaLimite = await getFechaLimite();
-    const fechaStr = fechaLimite
-      ? new Date(fechaLimite).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
+    const fechaLimiteISO = toISODateOnly(fechaLimite);
+    const fechaStr = fechaLimiteISO
+      ? (() => {
+          const [y, m, d] = fechaLimiteISO.split('-').map(Number);
+          return `${d} de ${MESES_ES[m - 1]} de ${y}`;
+        })()
       : 'sin configurar todavía';
 
     const { rows: userRows } = await db.query(`
@@ -97,15 +127,14 @@ async function avisarMesHabilitado(io) {
 async function avisarPlazoProximo(io) {
   try {
     const fechaLimite = await getFechaLimite();
-    if (!fechaLimite) return;
+    const fechaLimiteISO = toISODateOnly(fechaLimite);
+    if (!fechaLimiteISO) return;
 
-    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-    const limite = new Date(fechaLimite); limite.setHours(0, 0, 0, 0);
-    const diasFaltantes = Math.round((limite - hoy) / 86400000);
+    const diasFaltantes = diasEntre(hoyISO(), fechaLimiteISO);
     if (diasFaltantes !== 5) return;
     if (await yaSeEnvioHoy('ne_plazo_proximo')) return;
 
-    const { anio, mes } = getMesHabilitado(hoy);
+    const { anio, mes } = getMesHabilitado(new Date());
     const responsables = await contarPorResponsable(anio, mes);
     for (const r of responsables) {
       const mensaje = `Quedan 5 días para el plazo de Nómina Electrónica. Tienes ${r.pendientes} pendiente${r.pendientes === 1 ? '' : 's'} y ${r.porRevisar} por revisar.`;
@@ -121,14 +150,12 @@ async function avisarPlazoProximo(io) {
 async function avisarPlazoVencido(io) {
   try {
     const fechaLimite = await getFechaLimite();
-    if (!fechaLimite) return;
-
-    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-    const limite = new Date(fechaLimite); limite.setHours(0, 0, 0, 0);
-    if (hoy.getTime() !== limite.getTime()) return;
+    const fechaLimiteISO = toISODateOnly(fechaLimite);
+    if (!fechaLimiteISO) return;
+    if (hoyISO() !== fechaLimiteISO) return;
     if (await yaSeEnvioHoy('ne_plazo_vencido')) return;
 
-    const { anio, mes } = getMesHabilitado(hoy);
+    const { anio, mes } = getMesHabilitado(new Date());
     const responsables = await contarPorResponsable(anio, mes);
     for (const r of responsables) {
       const mensaje = `Hoy vence el plazo de Nómina Electrónica. Tienes ${r.pendientes} pendiente${r.pendientes === 1 ? '' : 's'} y ${r.porRevisar} por revisar.`;
