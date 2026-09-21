@@ -20,6 +20,15 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
   const canSeeAll = isLeader()
   const [filters, setFilters] = useState({ ...EMPTY_FILTERS, ...initialFilters })
   const [modalOpen, setModalOpen] = useState(false)
+  // `initialFilters` (via ?search=... en la URL) solo se aplicaba una vez, al montar — si ya se
+  // estaba en /tasks y se buscaba de nuevo desde el buscador del Header, React Router no vuelve
+  // a montar este componente (misma ruta, solo cambia el query string), así que el término
+  // nuevo nunca llegaba a `filters.search`: la búsqueda parecía no hacer nada. Se sincroniza acá
+  // cada vez que cambia el término en la URL, sin pisar los demás filtros que el usuario ya
+  // tenga elegidos en pantalla.
+  useEffect(() => {
+    if (initialFilters.search) setFilters((f) => ({ ...f, search: initialFilters.search }))
+  }, [initialFilters.search])
   const [editingTask, setEditingTask] = useState(null)
   const [detailTask, setDetailTask] = useState(null)
   const [detailCommentId, setDetailCommentId] = useState(null)

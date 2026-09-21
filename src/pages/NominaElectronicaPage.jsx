@@ -45,9 +45,17 @@ const PLAZO_ZONE_CLASS = {
   rojo:     'text-red-600 dark:text-red-400',
 }
 
+// Misma cuenta hardcodeada que requireNEPlazoAdmin en el backend — la fecha límite es un campo
+// manual y el usuario pidió que solo esta cuenta puntual la edite, ni siquiera otros admin (ver
+// el comentario en middleware/nominaElectronicaAccess.js). Si el backend rechaza (403) porque
+// esto se desincroniza, igual no deja guardar — esto es solo para no mostrarle a nadie más un
+// botón "Editar" que le va a fallar.
+const ID_RESPONSABLE_PLAZO = 'f2a82148-64d0-44a2-a0ac-37462ed43138'
+
 export default function NominaElectronicaPage() {
   const { isAdmin, user } = useAuth()
   const puedeGestionarCatalogo = isAdmin() || user?.permissions?.modulos?.nominaElectronica?.canGestionar === true
+  const puedeEditarPlazo = user?.id === ID_RESPONSABLE_PLAZO
   const { socket } = useSocket()
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -488,7 +496,7 @@ export default function NominaElectronicaPage() {
             </p>
           )}
         </div>
-        {puedeGestionarCatalogo && !editandoPlazo && (
+        {puedeEditarPlazo && !editandoPlazo && (
           <button
             onClick={startEditPlazo}
             title="Editar plazo"
