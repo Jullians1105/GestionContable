@@ -1,59 +1,142 @@
-﻿import { useMemo } from "react"
-import { normalizeAssignedTo } from "../utils/helpers"
+import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid,
-} from "recharts"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import { normalizeAssignedTo } from "../utils/helpers"
 import { useTasks } from "../hooks/useTasks"
-import { useTeam } from "../hooks/useTeam"
 import { useAuth } from "../context/AuthContext"
 import { useTheme } from "../context/ThemeContext"
-import StatsCard from "./StatsCard"
-import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from "../utils/helpers"
+import { useToast } from "../context/ToastContext"
+import { api } from "../services/api"
+import { DIAN_NAV, FONDO_NAV } from "../config/navigation"
+import TaskModal from "./TaskModal"
 
-const STATUS_COLORS = {
-  pending: "#737686",
-  in_progress: "#004ac6",
-  completed: "#10B981",
-}
+const PRIORITY_COLORS = { high: "#EF4444", medium: "#FBBF24", low: "#10B981" }
+const MONO = { fontFamily: "'IBM Plex Mono', monospace" }
 
-const PRIORITY_COLORS = {
-  high: "#EF4444",
-  medium: "#FBBF24",
-  low: "#10B981",
+const PROGRESS_SEGMENTS = [
+  { key: "pending", label: "Pendientes" },
+  { key: "in_progress", label: "En progreso" },
+  { key: "completed", label: "Completadas" },
+]
+
+// Accesos curados — no la lista completa de rutas (esa vive en el buscador del Header). Texto
+// en verbo de acción ("Sube...", "Revisa...", "Registra..."), no solo el nombre del módulo —
+// referencia: pantalla de bienvenida de Siigo (docs/guiaSiigo.png), donde cada acceso dice qué
+// hacer, no dónde está. Todos con exactamente el mismo tamaño/tratamiento.
+// Orden pedido explícitamente (2 columnas): fila por fila, Fondo | Externas, Sube reporte |
+// Token, Nómina | Consolidado.
+const ACCESOS = [
+  { to: FONDO_NAV[0].to, icon: "table_chart", label: "Seguimiento mensual Fondo", desc: "Fondo Emprender · procesos contables", bg: "#fef3e2", bgDark: "#3a2c14", accent: "#b45309", accentDark: "#f2a445" },
+  { to: DIAN_NAV[5].to, icon: "domain", label: "Seguimiento mensual Externas", desc: "Empresas Externas · procesos contables", bg: "#eef3ff", bgDark: "#1a2550", accent: "#004ac6", accentDark: "#7ba8f0" },
+  { to: DIAN_NAV[0].to, icon: "upload_file", label: "Sube tu reporte DIAN", desc: "Contabilidad · clasifica movimientos", bg: "#eef3ff", bgDark: "#1a2550", accent: "#004ac6", accentDark: "#7ba8f0" },
+  { to: "/empresas", icon: "vpn_key", label: "Generar token Dian", desc: "Listado empresas", bg: "#e6f6f6", bgDark: "#123334", accent: "#0e7490", accentDark: "#5eead4" },
+  { to: DIAN_NAV[6].to, icon: "badge", label: "Seguimiento Nómina Electrónica", desc: "Plazos y presentación mensual", bg: "#eef3ff", bgDark: "#1a2550", accent: "#004ac6", accentDark: "#7ba8f0" },
+  { to: DIAN_NAV[1].to, icon: "query_stats", label: "Consulta el consolidado", desc: "Contabilidad · resumen mensual de ventas y gastos", bg: "#eef3ff", bgDark: "#1a2550", accent: "#004ac6", accentDark: "#7ba8f0" },
+  { to: FONDO_NAV[2].to, icon: "payments", label: "Seguimiento pagos", desc: "Fondo Emprender · pagos a la fiduciaria", bg: "#fef3e2", bgDark: "#3a2c14", accent: "#b45309", accentDark: "#f2a445" },
+  { to: DIAN_NAV[4].to, icon: "person_search", label: "Consulta Tercero", desc: "Contabilidad · busca información por NIT", bg: "#eef3ff", bgDark: "#1a2550", accent: "#004ac6", accentDark: "#7ba8f0" },
+]
+
+// Encabezado de tarjeta — sentence-case bold normal, igual que el resto de la app.
+function LedgerHeading({ children, action }) {
+  return (
+    <div className="flex items-center justify-between mb-3">
+      <h2 className="text-base font-bold text-[#191c1e] dark:text-[#e4e6f0]">{children}</h2>
+      {action}
+    </div>
+  )
 }
 
 export default function Dashboard() {
   const { tasks } = useTasks()
-  const { getMemberById } = useTeam()
-  const { user, isAdmin, isLeader } = useAuth()
+  const { user, isAdmin, isLeader, hasPermission } = useAuth()
   const { theme } = useTheme()
-  const visibleTasks = (isAdmin() || isLeader()) ? tasks : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id) || t.createdBy === user?.id)
-  const isDark = theme === 'dark'
-  const axisColor = isDark ? '#c4c8e8' : '#434655'
-  const gridColor = isDark ? '#2e3148' : '#edeef0'
-  const tooltipStyle = {
-    borderRadius: 8,
-    border: `1px solid ${isDark ? '#2e3148' : '#c3c6d7'}`,
-    background: isDark ? '#1e2030' : '#ffffff',
-    color: isDark ? '#e4e6f0' : '#191c1e',
-    fontSize: 12,
+  const { addToast } = useToast()
+  const isDark = theme === "dark"
+
+  // Mismo modal que ya usa Sidebar.jsx para "Nueva Tarea" — no uno nuevo. Mismo chequeo de
+  // permiso (canCreateTask) y mismo mensaje de error si no lo tiene.
+  const [showTaskModal, setShowTaskModal] = useState(false)
+  const handleNewTask = () => {
+    if (hasPermission("canCreateTask")) setShowTaskModal(true)
+    else addToast("No tienes permiso para crear tareas", "error")
   }
 
-  const stats = useMemo(() => {
-    const total = visibleTasks.length
-    const completed = visibleTasks.filter((t) => t.status === "completed").length
-    const inProgress = visibleTasks.filter((t) => t.status === "in_progress").length
-    const pending = visibleTasks.filter((t) => t.status === "pending").length
-    return { total, completed, inProgress, pending }
-  }, [visibleTasks])
+  const [quickNote, setQuickNote] = useState("")
+  const [savingNote, setSavingNote] = useState(false)
 
-  const pieData = useMemo(() => [
-    { name: "Pendientes", value: stats.pending, color: STATUS_COLORS.pending },
-    { name: "En Progreso", value: stats.inProgress, color: STATUS_COLORS.in_progress },
-    { name: "Completadas", value: stats.completed, color: STATUS_COLORS.completed },
-  ].filter((d) => d.value > 0), [stats])
+  const handleQuickNote = async () => {
+    const text = quickNote.trim()
+    if (!text || savingNote) return
+    setSavingNote(true)
+    try {
+      // createPersonalNote solo acepta title (POST /personal-notes ignora content en el
+      // backend) — el cuerpo de la nota se setea en un segundo paso con updatePersonalNote,
+      // igual que hace el editor real al guardar el primer cambio.
+      const created = await api.createPersonalNote({
+        title: text.length > 60 ? `${text.slice(0, 60)}…` : text,
+      })
+      await api.updatePersonalNote(created.id, {
+        content: [{ type: "paragraph", content: text }],
+      })
+      setQuickNote("")
+      addToast("Nota guardada en Mis Notas", "success")
+    } catch {
+      addToast("No se pudo guardar la nota", "error")
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  const [quickPending, setQuickPending] = useState("")
+  const [savingPending, setSavingPending] = useState(false)
+  const [pendingTasks, setPendingTasks] = useState([])
+
+  useEffect(() => {
+    api.getPersonalTasks()
+      .then((data) => setPendingTasks(Array.isArray(data) ? data.slice(0, 5) : []))
+      .catch(() => {})
+  }, [])
+
+  const handleQuickPending = async () => {
+    const text = quickPending.trim()
+    if (!text || savingPending) return
+    setSavingPending(true)
+    try {
+      const created = await api.createPersonalTask({ title: text })
+      setPendingTasks((prev) => [created, ...prev].slice(0, 5))
+      setQuickPending("")
+      addToast("Pendiente guardado en Mis Pendientes", "success")
+    } catch {
+      addToast("No se pudo guardar el pendiente", "error")
+    } finally {
+      setSavingPending(false)
+    }
+  }
+
+  const handleTogglePending = async (task) => {
+    const nextCompleted = !task.completed
+    setPendingTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, completed: nextCompleted } : t)))
+    try {
+      await api.updatePersonalTask(task.id, { completed: nextCompleted })
+    } catch {
+      setPendingTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, completed: !nextCompleted } : t)))
+      addToast("No se pudo actualizar el pendiente", "error")
+    }
+  }
+
+  const visibleTasks = (isAdmin() || isLeader())
+    ? tasks
+    : tasks.filter((t) => normalizeAssignedTo(t.assignedTo).includes(user?.id) || t.createdBy === user?.id)
+
+  const stats = useMemo(() => ({
+    total: visibleTasks.length,
+    pending: visibleTasks.filter((t) => t.status === "pending").length,
+    in_progress: visibleTasks.filter((t) => t.status === "in_progress").length,
+    completed: visibleTasks.filter((t) => t.status === "completed").length,
+  }), [visibleTasks])
+
+  const completionPct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0
 
   const barData = useMemo(() => [
     { name: "Alta", value: visibleTasks.filter((t) => t.priority === "high").length, fill: PRIORITY_COLORS.high },
@@ -61,127 +144,265 @@ export default function Dashboard() {
     { name: "Baja", value: visibleTasks.filter((t) => t.priority === "low").length, fill: PRIORITY_COLORS.low },
   ], [visibleTasks])
 
-  const urgentTasks = useMemo(() =>
-    visibleTasks
-      .filter((t) => t.status !== "completed" && t.dueDate && (isDueDateOverdue(t.dueDate, t.dueTime) || isDueDateSoon(t.dueDate, t.dueTime)))
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-      .slice(0, 5),
-    [visibleTasks]
-  )
-
-  const completionPct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0
+  const primerNombre = user?.name?.split(" ")[0] || user?.name || ""
+  const fechaHoy = (() => {
+    const s = format(new Date(), "EEEE, d 'de' MMMM", { locale: es })
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  })()
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatsCard title="Total de Tareas" value={stats.total} icon="analytics" borderColor="#004ac6" iconColor="#004ac6" sub={`${completionPct}% completadas`} />
-        <StatsCard title="Completadas" value={stats.completed} icon="check_circle" borderColor="#10B981" iconColor="#10B981" sub={stats.total > 0 ? `${completionPct}% del total` : "Sin tareas"} subColor="#434655" />
-        <StatsCard title="En Progreso" value={stats.inProgress} icon="pending" borderColor="#FBBF24" iconColor="#FBBF24" sub="Tareas activas" subColor="#434655" />
-        <StatsCard title="Pendientes" value={stats.pending} icon="priority_high" borderColor="#EF4444" iconColor="#EF4444" sub={stats.pending > 0 ? "Por iniciar" : "Todo al dia"} subColor={stats.pending > 0 ? "#EF4444" : "#10B981"} />
+      <div>
+        <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">
+          {primerNombre ? `Hola, ${primerNombre}` : "Hola"}
+        </h1>
+        <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-1">{fechaHoy}</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="card lg:col-span-1">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">Distribucion por Estado</h2>
-            <span className="material-symbols-outlined text-[#434655] dark:text-[#c4c8e8]" style={{ fontSize: 20 }}>more_vert</span>
-          </div>
-          {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
-                  {pieData.map((entry, index) => (
-                    <Cell key={index} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(value, name) => [value, name]} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[220px] flex items-center justify-center">
-              <p className="text-[14px] text-[#434655] dark:text-[#c4c8e8]">No hay tareas</p>
-            </div>
-          )}
-          <div className="grid grid-cols-3 gap-2 mt-4">
-            {[
-              { label: "Pendientes", color: STATUS_COLORS.pending },
-              { label: "En Progreso", color: STATUS_COLORS.in_progress },
-              { label: "Completadas", color: STATUS_COLORS.completed },
-            ].map(({ label, color }) => (
-              <div key={label} className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-                <span className="text-[11px] text-[#434655] dark:text-[#c4c8e8] leading-tight">{label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card lg:col-span-2">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">Tareas por Prioridad</h2>
-            <span className="material-symbols-outlined text-[#434655] dark:text-[#c4c8e8]" style={{ fontSize: 20 }}>filter_list</span>
-          </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={barData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-              <CartesianGrid vertical={false} stroke={gridColor} />
-              <XAxis dataKey="name" tick={{ fontSize: 12, fill: axisColor }} />
-              <YAxis tick={{ fontSize: 12, fill: axisColor }} allowDecimals={false} />
-              <Tooltip contentStyle={tooltipStyle} cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }} />
-              <Bar dataKey="value" name="Tareas" radius={[4, 4, 0, 0]}>
-                {barData.map((entry, index) => (
-                  <Cell key={index} fill={entry.fill} />
+      {/* Mismo lenguaje visual que el resto de la app (rounded-2xl, texto sentence-case). Quedan
+          los números en IBM Plex Mono y el efecto de tarjetas apiladas + animación de entrada. */}
+      <style>{`
+        @keyframes dashCardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .dash-stack { animation: dashCardIn 480ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .dash-stack-shadow { transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1); }
+        .dash-stack:hover .dash-stack-shadow { transform: translate(0.875rem, 0.875rem); }
+        .dash-stack-front { transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1); }
+        .dash-stack:hover .dash-stack-front { transform: translateY(-2px); }
+      `}</style>
+      <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_0.85fr_260px] gap-5 items-start">
+        <div className="flex flex-col gap-5">
+          {/* ── Accesos directos ── */}
+          <div className="dash-stack relative" style={{ animationDelay: "0ms" }}>
+            <div
+              className="dash-stack-shadow absolute inset-0 translate-x-2.5 translate-y-2.5 rounded-2xl"
+              style={{ background: isDark ? "#16302e" : "#a9c9c3" }}
+              aria-hidden="true"
+            />
+            <div className="dash-stack-front relative bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] p-5">
+              <LedgerHeading>Accesos directos</LedgerHeading>
+              {/* Filas tipo "índice", sin tarjeta ni ícono flotante. El número de referencia se
+                  cambió por una flecha — el número no comunicaba nada (no hay un orden real
+                  entre los accesos), la flecha sí dice "ir a". Aparece siempre, no solo en
+                  hover, para no perder la pista visual de que la fila es clickeable. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2">
+                {ACCESOS.map((item) => (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className="group flex items-center gap-3.5 py-6 border-b border-[#e2e4ef] dark:border-[#2e3148] sm:odd:pr-4 sm:even:pl-4 sm:odd:border-r sm:[&:nth-last-child(-n+2)]:border-b-0 hover:bg-[#f8f9ff] dark:hover:bg-[#1a2040] transition-colors"
+                  >
+                    <span className="w-11 h-11 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: isDark ? item.bgDark : item.bg }}>
+                      <span className="material-symbols-outlined text-xl" style={{ color: isDark ? item.accentDark : item.accent }}>{item.icon}</span>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-bold leading-snug text-[#191c1e] dark:text-[#e4e6f0]">{item.label}</span>
+                      <span className="block text-xs text-[#6b7280] dark:text-[#8890b5] mt-0.5 leading-snug">{item.desc}</span>
+                    </span>
+                    <span
+                      className="material-symbols-outlined flex-shrink-0 transition-transform group-hover:translate-x-0.5"
+                      style={{ fontSize: 18, color: isDark ? item.accentDark : item.accent }}
+                    >
+                      arrow_forward
+                    </span>
+                  </Link>
                 ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-5">
+          {/* ── Nueva tarea ── mismo modal que ya abre el "+" del Sidebar (TaskModal), no uno
+              nuevo — mismo chequeo de permiso canCreateTask. Arriba de "Tu progreso", más alta
+              para que tenga presencia propia y no se sienta como un botón perdido. */}
+          <div className="dash-stack relative" style={{ animationDelay: "90ms" }}>
+            <div
+              className="dash-stack-shadow absolute inset-0 translate-x-2.5 translate-y-2.5 rounded-2xl"
+              style={{ background: isDark ? "#232c47" : "#b7c0d4" }}
+              aria-hidden="true"
+            />
+            <button
+              onClick={handleNewTask}
+              className="dash-stack-front relative w-full flex items-center justify-center gap-3 bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] py-8 hover:bg-[#f8f9ff] dark:hover:bg-[#1a2040] transition-colors"
+            >
+              <span className="material-symbols-outlined text-2xl" style={{ color: isDark ? "#7ba8f0" : "#004ac6" }}>add_circle</span>
+              <span className="text-base font-bold text-[#191c1e] dark:text-[#e4e6f0]">Nueva tarea</span>
+            </button>
+          </div>
+
+          {/* ── Tu progreso ── fusionada con "Por prioridad" en una sola tarjeta. */}
+          <div className="dash-stack relative" style={{ animationDelay: "150ms" }}>
+            <div
+              className="dash-stack-shadow absolute inset-0 translate-x-2.5 translate-y-2.5 rounded-2xl"
+              style={{ background: isDark ? "#16305e" : "#a8bcdb" }}
+              aria-hidden="true"
+            />
+            <div className="dash-stack-front relative bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] p-6">
+              <LedgerHeading
+                action={
+                  <Link to="/tasks" className="text-xs font-semibold text-[#004ac6] dark:text-[#7ba8f0] hover:opacity-80 flex items-center gap-1 transition-opacity">
+                    Ver tareas
+                    <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+                  </Link>
+                }
+              >
+                Tu progreso
+              </LedgerHeading>
+
+              <div className="flex items-baseline gap-2.5">
+                <span className="text-[42px] font-bold leading-none text-[#191c1e] dark:text-[#e4e6f0]" style={MONO}>
+                  {completionPct}%
+                </span>
+                <span className="text-sm text-[#6b7280] dark:text-[#8890b5]">
+                  {stats.total > 0 ? `${stats.completed} de ${stats.total} tareas completadas` : "Sin tareas todavía"}
+                </span>
+              </div>
+              <div className="h-2 rounded-sm bg-[#f0f2f8] dark:bg-[#252840] overflow-hidden mt-3">
+                <div className="h-full rounded-sm transition-all" style={{ width: `${completionPct}%`, background: isDark ? "#7ba8f0" : "#004ac6" }} />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5 mt-4">
+                {PROGRESS_SEGMENTS.map((seg) => (
+                  <div key={seg.key} className="rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9ff] dark:bg-[#181a2e] px-3 py-2.5">
+                    <span className="block text-lg font-bold leading-tight text-[#191c1e] dark:text-[#e4e6f0]" style={MONO}>
+                      {stats[seg.key]}
+                    </span>
+                    <span className="block text-[11px] text-[#6b7280] dark:text-[#8890b5] truncate">{seg.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs font-semibold text-[#8890b5] uppercase tracking-wide mt-5 mb-2">Por prioridad</p>
+              <div className="space-y-3">
+                {barData.map((entry) => {
+                  const max = Math.max(...barData.map((d) => d.value), 1)
+                  const pct = (entry.value / max) * 100
+                  return (
+                    <div key={entry.name} className="flex items-center gap-3">
+                      <span className="text-xs text-[#434655] dark:text-[#c4c8e8] w-12 flex-shrink-0">{entry.name}</span>
+                      <span className="flex-1 h-1.5 rounded-sm bg-[#f0f2f8] dark:bg-[#252840] overflow-hidden">
+                        <span className="block h-full rounded-sm" style={{ width: `${pct}%`, background: entry.fill }} />
+                      </span>
+                      <span className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] w-5 text-right flex-shrink-0" style={MONO}>
+                        {entry.value}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-5">
+          {/* ── Notas rápidas ── */}
+          <div className="dash-stack relative" style={{ animationDelay: "160ms" }}>
+            <div
+              className="dash-stack-shadow absolute inset-0 translate-x-2.5 translate-y-2.5 rounded-2xl"
+              style={{ background: isDark ? "#3a2f18" : "#cdb787" }}
+              aria-hidden="true"
+            />
+            <div className="dash-stack-front relative bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] p-5">
+              <LedgerHeading>Notas rápidas</LedgerHeading>
+              <textarea
+                value={quickNote}
+                onChange={(e) => setQuickNote(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleQuickNote()
+                  }
+                }}
+                placeholder="Escribe algo para guardarlo en Mis Notas…"
+                rows={3}
+                className="w-full resize-none rounded-lg bg-[#eef0f7] dark:bg-[#20233c] border border-[#e2e4ef] dark:border-[#2e3148] focus:border-[#8890b5] dark:focus:border-[#5a5f7a] outline-none p-3 text-sm text-[#191c1e] dark:text-[#e4e6f0] placeholder:text-[#8890b5] transition-colors"
+              />
+              <div className="flex items-center justify-between mt-3">
+                <Link to="/notas" className="text-xs font-semibold text-[#004ac6] dark:text-[#7ba8f0] hover:opacity-80 flex items-center gap-1 transition-opacity">
+                  Ver Mis Notas
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+                </Link>
+                <button
+                  onClick={handleQuickNote}
+                  disabled={!quickNote.trim() || savingNote}
+                  className="h-8 px-3.5 rounded-lg text-xs font-semibold text-white transition disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+                  style={{ background: "#004ac6" }}
+                >
+                  {savingNote ? "Guardando…" : "Guardar"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Pendientes rápidos ── mismo patrón exacto que "Notas rápidas", pero crea una
+              tarea personal (api.createPersonalTask) en vez de una nota — acá sí en un solo
+              paso, el backend de personal-tasks ya acepta el título directo en el POST. */}
+          <div className="dash-stack relative" style={{ animationDelay: "230ms" }}>
+            <div
+              className="dash-stack-shadow absolute inset-0 translate-x-2.5 translate-y-2.5 rounded-2xl"
+              style={{ background: isDark ? "#16305e" : "#a8bcdb" }}
+              aria-hidden="true"
+            />
+            <div className="dash-stack-front relative bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] p-5">
+              <LedgerHeading>Pendientes rápidos</LedgerHeading>
+              <textarea
+                value={quickPending}
+                onChange={(e) => setQuickPending(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault()
+                    handleQuickPending()
+                  }
+                }}
+                placeholder="Escribe un pendiente para guardarlo en Mis Pendientes…"
+                rows={3}
+                className="w-full resize-none rounded-lg bg-[#eef0f7] dark:bg-[#20233c] border border-[#e2e4ef] dark:border-[#2e3148] focus:border-[#8890b5] dark:focus:border-[#5a5f7a] outline-none p-3 text-sm text-[#191c1e] dark:text-[#e4e6f0] placeholder:text-[#8890b5] transition-colors"
+              />
+
+              {/* Si ya hay pendientes guardados, se listan acá mismo — con checkbox para
+                  marcarlos sin salir del Dashboard. */}
+              {pendingTasks.length > 0 && (
+                <div className="mt-3">
+                  {pendingTasks.map((task) => (
+                    <button
+                      key={task.id}
+                      onClick={() => handleTogglePending(task)}
+                      className="w-full flex items-center gap-2.5 py-2 border-b border-[#e2e4ef] dark:border-[#2e3148] last:border-b-0 text-left"
+                    >
+                      <span
+                        className="material-symbols-outlined flex-shrink-0"
+                        style={{ fontSize: 18, color: task.completed ? "#0f9d6e" : (isDark ? "#3e4260" : "#c3c6d7") }}
+                      >
+                        {task.completed ? "check_circle" : "radio_button_unchecked"}
+                      </span>
+                      <span className={`text-sm min-w-0 flex-1 truncate ${task.completed ? "line-through text-[#8890b5]" : "text-[#191c1e] dark:text-[#e4e6f0]"}`}>
+                        {task.title}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between mt-3">
+                <Link to="/pendientes" className="text-xs font-semibold text-[#004ac6] dark:text-[#7ba8f0] hover:opacity-80 flex items-center gap-1 transition-opacity">
+                  Ver Mis Pendientes
+                  <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
+                </Link>
+                <button
+                  onClick={handleQuickPending}
+                  disabled={!quickPending.trim() || savingPending}
+                  className="h-8 px-3.5 rounded-lg text-xs font-semibold text-white transition disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+                  style={{ background: "#004ac6" }}
+                >
+                  {savingPending ? "Guardando…" : "Guardar"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="card">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">Proximas a Vencer</h2>
-          <Link to="/tasks" className="text-[12px] font-semibold text-[#004ac6] hover:text-[#2563eb] flex items-center gap-1 transition-colors">
-            Ver todas
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>arrow_forward</span>
-          </Link>
-        </div>
-        {urgentTasks.length > 0 ? (
-          <div className="space-y-3">
-            {urgentTasks.map((task) => {
-              const overdue = isDueDateOverdue(task.dueDate, task.dueTime)
-              const firstId = normalizeAssignedTo(task.assignedTo)[0]
-              const member = firstId ? getMemberById(firstId) : null
-              return (
-                <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border ${overdue ? "border-[#ffdad6] bg-[#fff5f5] dark:border-[#5c1a1a] dark:bg-[#2a1718]" : "border-yellow-200 bg-yellow-50 dark:border-[#5c4a1a] dark:bg-[#2a2417]"}`}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">{task.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[12px] font-semibold flex items-center gap-1 ${overdue ? "text-[#93000a] dark:text-[#ff8a80]" : "text-yellow-700 dark:text-yellow-400"}`}>
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>{overdue ? "warning" : "schedule"}</span>
-                        {overdue ? "Vencida" : "Proxima"} · {formatDate(task.dueDate, task.dueTime)}
-                      </span>
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${task.priority === "high" ? "bg-[#ffdad6] text-[#93000a] dark:bg-[#5c1a1a] dark:text-[#ff8a80]" : task.priority === "medium" ? "bg-yellow-100 text-yellow-800 dark:bg-[#5c4a1a] dark:text-yellow-300" : "bg-green-100 text-green-800 dark:bg-[#16412c] dark:text-green-300"}`}>
-                        {PRIORITY_LABELS[task.priority]}
-                      </span>
-                    </div>
-                  </div>
-                  {member && (
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold shrink-0 ${getAvatarColor(member.name)}`}>
-                      {getInitials(member.name)}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <span className="material-symbols-outlined block mb-2 mx-auto" style={{ fontSize: 40, color: "#c3c6d7" }}>check_circle</span>
-            <p className="text-[14px] font-semibold text-[#434655] dark:text-[#c4c8e8]">Todo al dia</p>
-            <p className="text-[12px] mt-1 text-[#434655] dark:text-[#c4c8e8]">No hay tareas urgentes por el momento</p>
-          </div>
-        )}
-      </div>
+      {showTaskModal && <TaskModal onClose={() => setShowTaskModal(false)} />}
     </div>
   )
 }
