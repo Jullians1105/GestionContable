@@ -33,7 +33,7 @@ const ACCESOS = [
   { to: "/empresas", icon: "vpn_key", label: "Generar token Dian", desc: "Listado empresas", bg: "#e6f6f6", bgDark: "#123334", accent: "#0e7490", accentDark: "#5eead4" },
   { to: DIAN_NAV[6].to, icon: "badge", label: "Seguimiento Nómina Electrónica", desc: "Plazos y presentación mensual", bg: "#eef3ff", bgDark: "#1a2550", accent: "#004ac6", accentDark: "#7ba8f0" },
   { to: DIAN_NAV[1].to, icon: "query_stats", label: "Consulta el consolidado", desc: "Contabilidad · resumen mensual de ventas y gastos", bg: "#eef3ff", bgDark: "#1a2550", accent: "#004ac6", accentDark: "#7ba8f0" },
-  { to: FONDO_NAV[2].to, icon: "payments", label: "Seguimiento pagos", desc: "Fondo Emprender · pagos a la fiduciaria", bg: "#fef3e2", bgDark: "#3a2c14", accent: "#b45309", accentDark: "#f2a445" },
+  { to: FONDO_NAV[2].to, icon: "payments", label: "Seguimiento pagos", desc: "Fondo Emprender · Pagos contador", bg: "#fef3e2", bgDark: "#3a2c14", accent: "#b45309", accentDark: "#f2a445" },
   { to: DIAN_NAV[4].to, icon: "person_search", label: "Consulta Tercero", desc: "Contabilidad · busca información por NIT", bg: "#eef3ff", bgDark: "#1a2550", accent: "#004ac6", accentDark: "#7ba8f0" },
 ]
 
