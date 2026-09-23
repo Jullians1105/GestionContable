@@ -86,6 +86,12 @@ const RESPONSABLE_FILTER_KEY = '__responsable'
 const CONTADOR_FILTER_KEY = '__contador'
 const SIN_ASIGNAR = '(Sin asignar)'
 
+// Utilidad/Pérdida arrancó a pedido del equipo en septiembre de 2026 — meses
+// anteriores nunca lo tuvieron, así que el toggle ni se ofrece ahí (no tiene
+// sentido cargar un dato que no se pedía todavía). Mismo formato anio*100+mes
+// que ya usa el resto del archivo (ver atMesHabilitado) para comparar.
+const RESULTADO_HABILITADO_DESDE_YM = 2026 * 100 + 9
+
 // Vista "Utilidad/Pérdida" — reemplaza las columnas de Proceso por estas 2, misma tabla y
 // mismas 3 columnas fijas (Empresa/Responsable/Contador) de siempre. Ambas con ancho fijo
 // angosto — sin esto la columna Valor (era la última, sin <col width>) se estiraba a lo que
@@ -690,6 +696,15 @@ export default function EmpresasExternasPage() {
   const mesHabilitado = getMesVencidoHabilitado()
   const habilitadoYM = mesHabilitado.anio * 100 + mesHabilitado.mes
   const atMesHabilitado = (year * 100 + (month + 1)) >= habilitadoYM
+  const resultadoHabilitado = (year * 100 + (month + 1)) >= RESULTADO_HABILITADO_DESDE_YM
+
+  // Si el usuario estaba viendo Utilidad/Pérdida y navega a un mes anterior
+  // a septiembre de 2026, vuelve solo a Checklist — ese toggle no debería
+  // ni mostrarse ahí (ver el .filter() en el render), mucho menos quedar
+  // "trabado" en la vista que ya no se ofrece.
+  useEffect(() => {
+    if (!resultadoHabilitado && view === 'resultado') setView('checklist')
+  }, [resultadoHabilitado, view])
 
   function goToMonth(newMonth, newYear) {
     setMonth(newMonth)
@@ -1388,7 +1403,9 @@ export default function EmpresasExternasPage() {
         <div className="flex items-center bg-[#f0f2f8] dark:bg-[#252840] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl p-1 gap-0.5 shadow-sm flex-shrink-0">
           {[
             { key: 'checklist', label: 'Checklist' },
-            { key: 'resultado', label: 'Utilidad/Pérdida' },
+            // Solo desde septiembre de 2026 (ver RESULTADO_HABILITADO_DESDE_YM) — meses
+            // anteriores no tenían este dato, ni tiene sentido ofrecer cargarlo ahí.
+            ...(resultadoHabilitado ? [{ key: 'resultado', label: 'Utilidad/Pérdida' }] : []),
           ].map(({ key, label }) => {
             const active = view === key
             return (
