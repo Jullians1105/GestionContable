@@ -522,6 +522,8 @@ export default function EmpresasExternasPage() {
           responsableNombre: e.responsableNombre,
           contador: e.contador,
           activa: e.activa,
+          vigenteHastaAnio: e.vigenteHastaAnio ?? null,
+          vigenteHastaMes: e.vigenteHastaMes ?? null,
           cells,
           resultado: chk.resultado ?? { tipo: null, valor: null },
         }
@@ -1100,6 +1102,12 @@ export default function EmpresasExternasPage() {
     // o borrarlas de verdad) — en la vista normal quedan fuera, igual que un
     // proceso desactivado no aparece en meses nuevos.
     if (!canEditStructure && c.activa === false) return false
+    // "vigente hasta" a nivel de empresa (se configura desde el directorio maestro,
+    // EmpresasPage.jsx) — igual que arriba con `activa`, solo se respeta fuera del modo
+    // edición, para que un admin pueda seguir viendo/corrigiendo meses pasados de una
+    // empresa ya vencida si hace falta.
+    if (!canEditStructure && c.vigenteHastaAnio
+        && (year * 12 + (month + 1)) > (c.vigenteHastaAnio * 12 + c.vigenteHastaMes)) return false
     // Solo empresa: Responsable/Contador ya tienen su propio filtro por
     // columna, no hace falta que el buscador también los cubra.
     const matchSearch = !q || c.name.toLowerCase().includes(q)
