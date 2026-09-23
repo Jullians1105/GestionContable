@@ -38,7 +38,12 @@ const getMesTodasEmpresas = async (req, res, next) => {
        FROM ne_empresas e
        LEFT JOIN users u ON u.id = e.responsable_id
        LEFT JOIN ne_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
-       WHERE e.activa = true ${own ? 'AND e.responsable_id = $3' : ''}
+       WHERE e.activa = true
+         -- Empresa con vigente_hasta_* puesto (ver migración 059): solo aparece en
+         -- los meses hasta ese límite inclusive — el mes pedido ($1,$2) no puede
+         -- ser posterior. NULL en ambos = sin límite, se comporta como siempre.
+         AND (e.vigente_hasta_anio IS NULL OR (e.vigente_hasta_anio * 100 + e.vigente_hasta_mes) >= ($1::int * 100 + $2::int))
+         ${own ? 'AND e.responsable_id = $3' : ''}
        ORDER BY e.name ASC`,
       own ? [anio, mes, req.user.userId] : [anio, mes]
     );

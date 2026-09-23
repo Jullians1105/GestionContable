@@ -13,6 +13,8 @@ const normalizeEmpresa = (row) => ({
   macrosInProgress: row.macros_in_progress ?? 0,
   macroEstados:     row.macro_estados     ?? {},
   confirmed:        row.confirmed         ?? false,
+  vigenteHastaAnio: row.vigente_hasta_anio ?? null,
+  vigenteHastaMes:  row.vigente_hasta_mes  ?? null,
   createdAt:        row.created_at,
   updatedAt:        row.updated_at,
 });
@@ -398,13 +400,19 @@ const updateEmpresa = async (req, res, next) => {
     // codigo_siigo no puede usar COALESCE como los demás: borrarlo (dejar la
     // celda vacía) es una edición válida, y con COALESCE un NULL explícito se
     // leería como "no lo toques". El flag $4 distingue "no vino en el body"
-    // de "vino en null".
+    // de "vino en null". Mismo criterio para vigenteHasta* (par $7): quitar la
+    // vigencia (volver a "sin límite") es una edición válida, distinta de no
+    // haberla mandado — viajan siempre juntos (ver constraint _pair_check de
+    // la migración 059), así que un solo flag alcanza para los dos campos.
+    const vigenciaEnBody = req.body.vigenteHastaAnio !== undefined || req.body.vigenteHastaMes !== undefined;
     const result = await db.query(
       `UPDATE fondo_empresas SET
         name         = COALESCE($1, name),
         categoria    = COALESCE($2, categoria),
         monthly_fee  = COALESCE($3, monthly_fee),
-        codigo_siigo = CASE WHEN $4 THEN $5 ELSE codigo_siigo END
+        codigo_siigo = CASE WHEN $4 THEN $5 ELSE codigo_siigo END,
+        vigente_hasta_anio = CASE WHEN $7 THEN $8 ELSE vigente_hasta_anio END,
+        vigente_hasta_mes  = CASE WHEN $7 THEN $9 ELSE vigente_hasta_mes END
        WHERE id = $6
        RETURNING *`,
       [
@@ -414,9 +422,12 @@ const updateEmpresa = async (req, res, next) => {
         codigoSiigo !== undefined,
         codigoSiigo ?? null,
         id,
+        vigenciaEnBody,
+        req.body.vigenteHastaAnio ?? null,
+        req.body.vigenteHastaMes ?? null,
       ]
     );
-    await auditLog(req.user.userId, 'UPDATE', 'fondo_empresas', id, { name, categoria, monthlyFee, codigoSiigo });
+    await auditLog(req.user.userId, 'UPDATE', 'fondo_empresas', id, { name, categoria, monthlyFee, codigoSiigo, vigenteHastaAnio: req.body.vigenteHastaAnio, vigenteHastaMes: req.body.vigenteHastaMes });
     req.io.emit('empresa:updated', { empresaId: id, tipo: 'empresa' });
     res.json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
