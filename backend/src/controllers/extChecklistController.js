@@ -20,7 +20,8 @@ const getChecklistMes = async (req, res, next) => {
       `SELECT p.id, p.name, p.orden, p.activo,
               COALESCE(i.estado, 'pending') AS estado,
               i.nota,
-              ne.id AS ne_empresa_id, nm.estado AS ne_estado, nm.nota AS ne_nota
+              ne.id AS ne_empresa_id, nm.estado AS ne_estado, nm.nota AS ne_nota,
+              m.resultado_tipo, m.resultado_valor
        FROM ext_procesos p
        LEFT JOIN ext_checklist_meses m
               ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
@@ -35,7 +36,15 @@ const getChecklistMes = async (req, res, next) => {
       [empresaId, anio, mes]
     );
 
+    // resultado_tipo/valor viven en la fila de ext_checklist_meses, no por proceso — igual en
+    // todas las filas devueltas (o ausentes si esa fila del mes todavía no existe). Se leen de
+    // la primera, si hay.
+    const first = result.rows[0];
     res.json({
+      resultado: {
+        tipo:  first?.resultado_tipo  ?? null,
+        valor: first?.resultado_valor ?? null,
+      },
       items: result.rows.map(row => {
         const linkedNE = esProcesoNominaElectronica(row.name) && row.ne_empresa_id;
         return {
@@ -69,7 +78,8 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
               p.id, p.name, p.orden, p.activo,
               COALESCE(i.estado, 'pending') AS estado,
               i.nota,
-              ne.id AS ne_empresa_id, nm.estado AS ne_estado, nm.nota AS ne_nota
+              ne.id AS ne_empresa_id, nm.estado AS ne_estado, nm.nota AS ne_nota,
+              m.resultado_tipo, m.resultado_valor
        FROM ext_empresas e
        CROSS JOIN ext_procesos p
        LEFT JOIN ext_checklist_meses m
@@ -89,7 +99,11 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
     for (const row of result.rows) {
       let entry = porEmpresa.get(row.empresa_id);
       if (!entry) {
-        entry = { empresaId: row.empresa_id, items: [] };
+        entry = {
+          empresaId: row.empresa_id,
+          resultado: { tipo: row.resultado_tipo ?? null, valor: row.resultado_valor ?? null },
+          items: [],
+        };
         porEmpresa.set(row.empresa_id, entry);
       }
       const linkedNE = esProcesoNominaElectronica(row.name) && row.ne_empresa_id;
@@ -185,4 +199,57 @@ const updateChecklistItem = async (req, res, next) => {
   }
 };
 
-module.exports = { getChecklistMes, getChecklistMesTodasEmpresas, updateChecklistItem };
+// Utilidad/Pérdida del mes — un dato por empresa × mes, no por proceso, así que va directo
+// sobre la fila de ext_checklist_meses (mismo INSERT ... ON CONFLICT DO NOTHING que
+// updateChecklistItem para crearla si todavía no existe ese mes). tipo y valor se guardan
+// juntos: una empresa solo puede tener uno de los dos (nunca "utilidad Y pérdida" a la vez),
+// por eso viajan en el mismo request en vez de 2 endpoints separados.
+const updateResultado = async (req, res, next) => {
+  try {
+    const { empresaId } = req.params;
+    const anio = parseInt(req.query.anio, 10);
+    const mes  = parseInt(req.query.mes, 10);
+    const { tipo, valor } = req.body;
+
+    if (!isMesHabilitado(anio, mes)) {
+      return res.status(403).json({ error: 'Ese mes aún no está habilitado (mes vencido)' });
+    }
+    if (tipo !== null && tipo !== 'utilidad' && tipo !== 'perdida') {
+      return res.status(400).json({ error: 'tipo debe ser "utilidad", "perdida" o null' });
+    }
+    if (valor !== null && (typeof valor !== 'number' || Number.isNaN(valor))) {
+      return res.status(400).json({ error: 'valor debe ser numérico o null' });
+    }
+
+    await db.query(
+      `INSERT INTO ext_checklist_meses (id, empresa_id, anio, mes)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (empresa_id, anio, mes) DO NOTHING`,
+      [uuidv4(), empresaId, anio, mes]
+    );
+
+    const result = await db.query(
+      `UPDATE ext_checklist_meses
+       SET resultado_tipo = $1, resultado_valor = $2
+       WHERE empresa_id = $3 AND anio = $4 AND mes = $5
+       RETURNING resultado_tipo, resultado_valor, updated_at`,
+      [tipo ?? null, valor ?? null, empresaId, anio, mes]
+    );
+
+    await auditLog(req.user.userId, 'UPDATE', 'ext_checklist_meses', empresaId, {
+      empresaId, anio, mes, resultadoTipo: tipo, resultadoValor: valor,
+    });
+
+    req.io.emit('externas:updated', { empresaId, anio, mes, tipo: 'resultado' });
+
+    res.json({
+      tipo:      result.rows[0].resultado_tipo,
+      valor:     result.rows[0].resultado_valor,
+      updatedAt: result.rows[0].updated_at,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getChecklistMes, getChecklistMesTodasEmpresas, updateChecklistItem, updateResultado };

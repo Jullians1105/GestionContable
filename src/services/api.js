@@ -317,6 +317,12 @@ export const api = {
   createExtProceso: (data) => request('/externas/procesos', { method: 'POST', body: JSON.stringify(data) }),
   updateExtProceso: (id, data) => request(`/externas/procesos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
+  // Empresas Externas — Grupos de procesos (agrupar columnas del checklist)
+  getExtProcesoGrupos: () => request('/externas/proceso-grupos'),
+  createExtProcesoGrupo: (data) => request('/externas/proceso-grupos', { method: 'POST', body: JSON.stringify(data) }),
+  updateExtProcesoGrupo: (id, data) => request(`/externas/proceso-grupos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteExtProcesoGrupo: (id) => request(`/externas/proceso-grupos/${id}`, { method: 'DELETE' }),
+
   // Empresas Externas — Checklist mensual
   getExtChecklist: (empresaId, anio, mes) => {
     const qs = new URLSearchParams({ anio, mes }).toString();
@@ -330,6 +336,12 @@ export const api = {
   updateExtChecklistItem: (empresaId, procesoId, anio, mes, data) => {
     const qs = new URLSearchParams({ anio, mes }).toString();
     return request(`/externas/checklist/${empresaId}/item/${procesoId}?${qs}`,
+      { method: 'PUT', body: JSON.stringify(data) });
+  },
+  // data: { tipo: 'utilidad' | 'perdida' | null, valor: number | null }
+  updateExtResultado: (empresaId, anio, mes, data) => {
+    const qs = new URLSearchParams({ anio, mes }).toString();
+    return request(`/externas/checklist/${empresaId}/resultado?${qs}`,
       { method: 'PUT', body: JSON.stringify(data) });
   },
 

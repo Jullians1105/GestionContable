@@ -1,40 +1,34 @@
 const { Router } = require('express');
-const { body, query } = require('express-validator');
+const { body } = require('express-validator');
 const { authMiddleware } = require('../middleware/auth');
 const { requireExternasAdmin } = require('../middleware/externasAccess');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
-const { getProcesos, createProceso, updateProceso } = require('../controllers/extProcesosController');
+const { getGrupos, createGrupo, updateGrupo, deleteGrupo } = require('../controllers/extProcesoGruposController');
 
 const router = Router();
 router.use(authMiddleware);
 
 /**
  * @openapi
- * /api/externas/procesos:
+ * /api/externas/proceso-grupos:
  *   get:
- *     tags: [ExternasProcesos]
- *     summary: Listar procesos del catálogo de Empresas Externas
+ *     tags: [ExternasProcesoGrupos]
+ *     summary: Listar grupos de procesos del Seguimiento Mensual
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - { name: incluirInactivos, in: query, schema: { type: boolean } }
  *     responses:
  *       200:
- *         description: Lista de procesos ordenada por `orden`
+ *         description: Lista de grupos ordenada por `orden`
  */
-router.get('/',
-  query('incluirInactivos').optional().isBoolean(),
-  validate,
-  getProcesos
-);
+router.get('/', getGrupos);
 
 /**
  * @openapi
- * /api/externas/procesos:
+ * /api/externas/proceso-grupos:
  *   post:
- *     tags: [ExternasProcesos]
- *     summary: Crear proceso en el catálogo (solo admin)
+ *     tags: [ExternasProcesoGrupos]
+ *     summary: Crear un grupo de procesos (solo admin)
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -49,7 +43,7 @@ router.get('/',
  *               orden: { type: integer, minimum: 0 }
  *     responses:
  *       201:
- *         description: Proceso creado
+ *         description: Grupo creado
  *       403:
  *         description: Solo un administrador puede modificar la estructura de columnas
  */
@@ -57,17 +51,16 @@ router.post('/',
   requireExternasAdmin,
   body('name').trim().notEmpty().withMessage('El nombre es obligatorio').isLength({ max: 255 }),
   body('orden').optional({ nullable: true }).isInt({ min: 0 }).withMessage('orden debe ser un entero >= 0'),
-  body('grupoId').optional({ nullable: true }).isUUID().withMessage('grupoId debe ser un UUID'),
   validate,
-  createProceso
+  createGrupo
 );
 
 /**
  * @openapi
- * /api/externas/procesos/{id}:
+ * /api/externas/proceso-grupos/{id}:
  *   put:
- *     tags: [ExternasProcesos]
- *     summary: Actualizar proceso (nombre, orden o activar/desactivar), solo admin
+ *     tags: [ExternasProcesoGrupos]
+ *     summary: Renombrar o reordenar un grupo
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -78,24 +71,43 @@ router.post('/',
  *           schema:
  *             type: object
  *             properties:
- *               name:   { type: string, maxLength: 255 }
- *               orden:  { type: integer, minimum: 0 }
- *               activo: { type: boolean }
+ *               name:  { type: string, maxLength: 255 }
+ *               orden: { type: integer, minimum: 0 }
  *     responses:
  *       200:
- *         description: Proceso actualizado
+ *         description: Grupo actualizado
  *       404:
- *         description: Proceso no encontrado
+ *         description: Grupo no encontrado
  */
 router.put('/:id',
   ...validateUUIDParam('id'),
   requireExternasAdmin,
   body('name').optional().trim().notEmpty().isLength({ max: 255 }),
   body('orden').optional({ nullable: true }).isInt({ min: 0 }).withMessage('orden debe ser un entero >= 0'),
-  body('activo').optional().isBoolean().withMessage('activo debe ser boolean'),
-  body('grupoId').optional({ nullable: true }).isUUID().withMessage('grupoId debe ser un UUID'),
   validate,
-  updateProceso
+  updateGrupo
+);
+
+/**
+ * @openapi
+ * /api/externas/proceso-grupos/{id}:
+ *   delete:
+ *     tags: [ExternasProcesoGrupos]
+ *     summary: Eliminar un grupo (sus procesos quedan sin grupo, no se borran)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       204:
+ *         description: Grupo eliminado
+ *       404:
+ *         description: Grupo no encontrado
+ */
+router.delete('/:id',
+  ...validateUUIDParam('id'),
+  requireExternasAdmin,
+  deleteGrupo
 );
 
 module.exports = router;
