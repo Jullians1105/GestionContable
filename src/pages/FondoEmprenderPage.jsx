@@ -1262,19 +1262,31 @@ export default function FondoEmprenderPage() {
 
   // ── filters: category tabs + search ──────────────────────────────────────
 
+  // "vigente hasta" a nivel de EMPRESA (distinto de isVigente de arriba, que es por
+  // PROCESO) — si el mes que se está viendo (year/month, month ya 0-indexado) es
+  // posterior al mes/año de corte, la empresa deja de aparecer en la grilla desde ahí en
+  // adelante, sin tocar los meses anteriores (ver EmpresasPage.jsx, donde se configura).
+  // canEditStructure (admin + "Editar estructura") sigue viendo la empresa vencida — igual
+  // que EmpresasExternasPage.jsx con `activa` — para poder corregir meses pasados. Se
+  // calcula una sola vez acá para que tanto los contadores de las pestañas como la grilla
+  // (filteredCompanies, abajo) cuenten/muestren exactamente las mismas empresas.
+  const companiesVigentes = companies.filter(c =>
+    canEditStructure || !c.vigenteHastaAnio || (year * 12 + (month + 1)) <= (c.vigenteHastaAnio * 12 + c.vigenteHastaMes)
+  )
+
   const catCounts = {
-    contable:   companies.filter(c => (c.categoria ?? 'contable') === 'contable').length,
-    tributario: companies.filter(c => (c.categoria ?? 'contable') === 'tributario').length,
+    contable:   companiesVigentes.filter(c => (c.categoria ?? 'contable') === 'contable').length,
+    tributario: companiesVigentes.filter(c => (c.categoria ?? 'contable') === 'tributario').length,
   }
 
   const tabs = [
-    { key: 'todas',      label: 'Todas',      count: companies.length },
+    { key: 'todas',      label: 'Todas',      count: companiesVigentes.length },
     { key: 'contable',   label: 'Contable',   count: catCounts.contable },
     { key: 'tributario', label: 'Tributario', count: catCounts.tributario },
   ]
 
   const q = search.toLowerCase()
-  const filteredCompanies = companies.filter(c => {
+  const filteredCompanies = companiesVigentes.filter(c => {
     // La búsqueda también entra por código Siigo: es el identificador con el
     // que llega media consulta desde el software contable.
     const matchSearch = !q
@@ -1285,21 +1297,14 @@ export default function FondoEmprenderPage() {
       const status = c.cells[procId]?.status ?? 'pending'
       return allowed.has(status)
     })
-    // "vigente hasta" a nivel de EMPRESA (distinto de isVigente de arriba, que es por
-    // PROCESO) — si el mes que se está viendo (year/month, month ya 0-indexado) es
-    // posterior al mes/año de corte, la empresa deja de aparecer en la grilla desde ahí en
-    // adelante, sin tocar los meses anteriores (ver EmpresasPage.jsx, donde se configura).
-    // canEditStructure (admin + "Editar estructura") sigue viendo la empresa vencida — igual
-    // que EmpresasExternasPage.jsx con `activa` — para poder corregir meses pasados.
-    const matchVigencia = canEditStructure || !c.vigenteHastaAnio || (year * 12 + (month + 1)) <= (c.vigenteHastaAnio * 12 + c.vigenteHastaMes)
-    return matchSearch && matchCat && matchColumnFilters && matchVigencia
+    return matchSearch && matchCat && matchColumnFilters
   })
 
   // ── stats — scoped to the active category tab, same as Empresas ─────────
 
   const scopedCompanies = activeTab === 'todas'
-    ? companies
-    : companies.filter(c => (c.categoria ?? 'contable') === activeTab)
+    ? companiesVigentes
+    : companiesVigentes.filter(c => (c.categoria ?? 'contable') === activeTab)
 
   const totalCells = scopedCompanies.length * visibleProcesses.length
   // 'na' cuenta como completada — mismo criterio que el resto del sistema
