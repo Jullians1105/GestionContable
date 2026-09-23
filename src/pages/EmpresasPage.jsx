@@ -685,7 +685,8 @@ export default function EmpresasPage() {
                                             </select>
                                             <button
                                               onClick={() => guardarVigencia(empresa, modulo)}
-                                              disabled={guardandoVigenciaModulo === modulo}
+                                              disabled={guardandoVigenciaModulo === modulo || !draft.mes || !draft.anio}
+                                              title={!draft.mes || !draft.anio ? 'Elige mes y año' : undefined}
                                               className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white disabled:opacity-50"
                                               style={{ background: '#004ac6' }}
                                             >

@@ -15,6 +15,9 @@ const errorHandler = (err, req, res, next) => {
   if (err.code === '23503') {
     return res.status(400).json({ error: 'Referencia inválida' });
   }
+  if (err.code === '23514') {
+    return res.status(400).json({ error: 'El dato no cumple una restricción del sistema (revisa que estén todos los campos requeridos)' });
+  }
 
   const status = err.status || 500;
   const message = process.env.NODE_ENV === 'production' ? 'Error interno del servidor' : err.message;
