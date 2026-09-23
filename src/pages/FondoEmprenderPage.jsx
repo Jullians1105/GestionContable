@@ -564,6 +564,8 @@ export default function FondoEmprenderPage() {
           name: e.name,
           categoria: e.categoria,
           codigoSiigo: e.codigoSiigo ?? null,
+          vigenteHastaAnio: e.vigenteHastaAnio ?? null,
+          vigenteHastaMes: e.vigenteHastaMes ?? null,
           cells,
           confirmedNomina: chk.confirmedNomina
             ? { date: (chk.confirmedNominaAt ?? new Date().toISOString()).slice(0, 10) }
@@ -1283,7 +1285,14 @@ export default function FondoEmprenderPage() {
       const status = c.cells[procId]?.status ?? 'pending'
       return allowed.has(status)
     })
-    return matchSearch && matchCat && matchColumnFilters
+    // "vigente hasta" a nivel de EMPRESA (distinto de isVigente de arriba, que es por
+    // PROCESO) — si el mes que se está viendo (year/month, month ya 0-indexado) es
+    // posterior al mes/año de corte, la empresa deja de aparecer en la grilla desde ahí en
+    // adelante, sin tocar los meses anteriores (ver EmpresasPage.jsx, donde se configura).
+    // canEditStructure (admin + "Editar estructura") sigue viendo la empresa vencida — igual
+    // que EmpresasExternasPage.jsx con `activa` — para poder corregir meses pasados.
+    const matchVigencia = canEditStructure || !c.vigenteHastaAnio || (year * 12 + (month + 1)) <= (c.vigenteHastaAnio * 12 + c.vigenteHastaMes)
+    return matchSearch && matchCat && matchColumnFilters && matchVigencia
   })
 
   // ── stats — scoped to the active category tab, same as Empresas ─────────
