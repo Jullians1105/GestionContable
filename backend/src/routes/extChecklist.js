@@ -8,6 +8,7 @@ const {
   getChecklistMes,
   getChecklistMesTodasEmpresas,
   updateChecklistItem,
+  updateResultado,
 } = require('../controllers/extChecklistController');
 
 const router = Router();
@@ -104,6 +105,45 @@ router.put('/:empresaId/item/:procesoId',
   body('nota').optional({ nullable: true }).isString(),
   validate,
   updateChecklistItem
+);
+
+/**
+ * @openapi
+ * /api/externas/checklist/{empresaId}/resultado:
+ *   put:
+ *     tags: [ExternasChecklist]
+ *     summary: Guardar Utilidad/Pérdida del mes para una empresa
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { name: empresaId, in: path, required: true, schema: { type: string, format: uuid } }
+ *       - { name: anio, in: query, required: true, schema: { type: integer } }
+ *       - { name: mes,  in: query, required: true, schema: { type: integer, minimum: 1, maximum: 12 } }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tipo:  { type: string, enum: [utilidad, perdida], nullable: true }
+ *               valor: { type: number, nullable: true }
+ *     responses:
+ *       200:
+ *         description: Resultado guardado. Crea ext_checklist_meses si el mes no existía.
+ *       403:
+ *         description: Sin permiso de edición en Empresas Externas, o mes vencido
+ */
+router.put('/:empresaId/resultado',
+  ...validateUUIDParam('empresaId'),
+  ...validateAnioMes,
+  requireExternasAccess,
+  body('tipo').optional({ nullable: true }).isIn(['utilidad', 'perdida'])
+    .withMessage('tipo debe ser utilidad o perdida'),
+  body('valor').optional({ nullable: true }).isFloat()
+    .withMessage('valor debe ser numérico')
+    .toFloat(),
+  validate,
+  updateResultado
 );
 
 module.exports = router;

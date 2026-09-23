@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { STATUS, MONTHS, getMesVencidoHabilitado, resolveMesInicial, firstName } from '../data/empresasExternas'
 import { api } from '../services/api'
@@ -9,22 +9,26 @@ import { useTeam } from '../context/TeamContext'
 // ─── page-level constants ─────────────────────────────────────────────────────
 // Mismos valores/patrones que FondoEmprenderPage.jsx (Seguimiento Mensual de
 // Fondo Emprender) — ver los comentarios de ese archivo para el porqué de
-// cada uno. Acá no hay grupos de columnas ni macroprocesos, así que el header
-// es de una sola fila y no hace falta dnd-kit.
+// cada uno. Sí hay grupos de columnas (ver GROUP_PALETTE/GroupHeaderCell,
+// igual patrón que Fondo Emprender), pero sin drag-and-drop entre grupos —
+// acá se asignan desde un <select> en el modal de proceso, no hace falta
+// meter dnd-kit; tampoco hay macroprocesos (eso es "Confirmar Nómina/
+// Contabilidad", negocio propio de Fondo Emprender).
 
 const BORDER     = '1px solid #e2e4ef'
 const BORDER_COL = '1px solid #d5d9ea'
 
-// Franjas de color arriba y abajo de todo el header (mismo azul de acento
-// que el resto de la app), con el propio fondo del header teñido del mismo
-// tono muy tenue (bg-[#f0f4ff], el mismo hex que usa el grupo 0 de
-// FondoEmprenderPage.jsx) en vez de gris neutro — así las franjas se leen
-// como el borde de un bloque de ese color, no como dos líneas sueltas
-// flotando sobre un fondo que no tiene nada que ver con ellas. No hay grupos
-// acá, así que es una sola franja continua para toda la fila de headers
-// (no una por macroproceso como en Fondo Emprender).
+// Mismo criterio que FondoEmprenderPage.jsx: fondo del header gris neutro
+// muy tenue (bg-[#f8f9fc], NO un tinte azul — eso se probó y se veía como
+// que toda la fila tenía color) para las columnas fijas (Empresa/Responsable/
+// Contador). Las columnas de dato (Proceso, o Tipo/Valor en la vista
+// Utilidad/Pérdida) llevan además una sola línea de acento abajo — ahí sí,
+// igual que el filo de color que conecta cada columna con su grupo en Fondo
+// Emprender — nunca arriba Y abajo a la vez (eso se veía como un sándwich
+// grueso de 3px+3px en vez de un simple subrayado).
 const HEADER_ACCENT = '#004ac6'
 const HEADER_ACCENT_BORDER = `3px solid ${HEADER_ACCENT}`
+const HEADER_BG = 'bg-[#f8f9fc] dark:bg-[#1a1d2e]'
 
 // A diferencia de Fondo Emprender (23+ procesos, columnas angostas de 48px
 // con texto rotado para que todos quepan), acá son solo 11 — hay espacio de
@@ -56,6 +60,23 @@ const EMPRESA_COL_WIDTH = 210
 const RESPONSABLE_COL_WIDTH = 100
 const CONTADOR_COL_WIDTH = 80
 
+// Ancho de un grupo sin procesos todavía (una sola celda con el nombre, en
+// vez de columnas que no existen) — se resta del pool repartible junto a
+// las 3 fijas, igual que ellas, para que el resto de las columnas de
+// Proceso sigan llenando el 100% sin scroll horizontal (ver procColWidth
+// más abajo).
+const EMPTY_GROUP_WIDTH = 150
+// Alto de la franja de color de un grupo (fila 1 del header).
+const GROUP_ROW_HEIGHT = 30
+
+// Paleta por grupo, mismos 2 colores ya establecidos en el resto de la app
+// (ver memoria de colores del sistema) — ciclada por índice como en Fondo
+// Emprender, acá solo hacen falta 2 (Nómina/Contabilidad).
+const GROUP_PALETTE = [
+  { bg: 'bg-[#f0f4ff] dark:bg-[#182544]', text: 'text-[#004ac6] dark:text-[#7ba8f0]', accent: '#004ac6' },
+  { bg: 'bg-[#f0fdf4] dark:bg-[#0d2e1a]', text: 'text-[#16a34a] dark:text-[#4ade80]', accent: '#16a34a' },
+]
+
 // Claves sintéticas para filtrar por Responsable/Contador dentro del mismo
 // `columnFilters` que ya usan los procesos (por estado) — el shape (Set de
 // valores permitidos) es idéntico, solo cambia qué campo del company se
@@ -65,20 +86,41 @@ const RESPONSABLE_FILTER_KEY = '__responsable'
 const CONTADOR_FILTER_KEY = '__contador'
 const SIN_ASIGNAR = '(Sin asignar)'
 
-// El ícono de filtro vive SIEMPRE en la esquina superior-derecha de su
-// header (position:absolute), como una chapita fija — no en una franja
-// propia de ancho completo (eso dejaba, en columnas angostas, un renglón
-// vacío con el ícono flotando solo). HEADER_TOP_CLEARANCE es el padding-top
-// que le reserva ese rincón al ícono ANTES de que empiece el texto: al ser
-// espacio vertical (no horizontal), el título sigue centrado/alineado en
-// todo el ancho de la columna — nunca compite de lado a lado con el ícono
-// como pasaba antes, que es lo que lo cortaba o lo corría del centro.
-const FILTER_BTN_SIZE = 14
-// Separado de la franja azul superior (HEADER_ACCENT_BORDER, 3px) por un
-// margen propio — a top:2 quedaba pisando ese borde, y el hover del botón se
-// veía cortado/superpuesto con la franja.
-const FILTER_BTN_OFFSET = 6
-const HEADER_TOP_CLEARANCE = 22
+// Vista "Utilidad/Pérdida" — reemplaza las columnas de Proceso por estas 2, misma tabla y
+// mismas 3 columnas fijas (Empresa/Responsable/Contador) de siempre. Ambas con ancho fijo
+// angosto — sin esto la columna Valor (era la última, sin <col width>) se estiraba a lo que
+// sobrara de ancho de página, un campo de texto gigante sin sentido.
+const RESULTADO_TIPO_WIDTH = 150
+const RESULTADO_VALOR_WIDTH = 130
+const RESULTADO_TIPOS = [
+  { key: 'utilidad', label: 'Utilidad', color: '#16a34a', icon: 'trending_up' },
+  { key: 'perdida', label: 'Pérdida', color: '#ef4444', icon: 'trending_down' },
+]
+// Filtro de columna por Tipo (mismo `columnFilters` que Responsable/Contador/procesos,
+// ver RESPONSABLE_FILTER_KEY más arriba) — "sin_dato" cubre las empresas sin utilidad
+// ni pérdida cargada todavía, para poder aislarlas igual que un valor real.
+const RESULTADO_FILTER_KEY = '__resultado'
+const RESULTADO_FILTER_OPTIONS = [
+  ...RESULTADO_TIPOS,
+  { key: 'sin_dato', label: 'Sin dato', color: '#8890b5', icon: 'remove' },
+]
+
+const formatCOP = (n) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n ?? 0)
+
+// El ícono de filtro vive centrado cerca del borde superior del header
+// (position:absolute, no adentro del flujo del texto) — más grande que la
+// chapita original (20x14 en vez de 14x14, mismo tamaño que usa
+// FondoEmprenderPage.jsx) para que se note que es clickeable. El texto de
+// abajo sigue bottom-aligned como siempre y NO se mueve: HEADER_TOP_CLEARANCE
+// es el padding-top que le reserva a el ícono su propio espacio arriba,
+// para que nunca se pisen.
+const FILTER_BTN_WIDTH = 20
+const FILTER_BTN_HEIGHT = 14
+// No pegado del todo al borde (top: 0 se veía demasiado ajustado) — un
+// pequeño respiro propio.
+const FILTER_BTN_TOP = 3
+const HEADER_TOP_CLEARANCE = FILTER_BTN_HEIGHT + FILTER_BTN_TOP + 8
 
 const emptyCell = { status: 'pending', note: '', readonly: false, fuente: null }
 
@@ -107,52 +149,62 @@ function headerBoxShadow({ top, bottom, left, right }) {
 
 // ─── header sub-components ─────────────────────────────────────────────────
 
-// Ícono de filtro anclado en la esquina superior-derecha del header (que
-// debe reservarle el espacio con padding-top: HEADER_TOP_CLEARANCE) — una
-// chapita fija en el rincón, no una franja de ancho completo. El título
-// nunca comparte línea horizontal con él (por eso no le hace falta padding
-// lateral ni se descentra), solo le cede un poco de alto arriba.
+// Solo el botón — quien lo usa lo posiciona (position:absolute, centrado,
+// ver FILTER_BTN_TOP más arriba), no queda posicionado por sí mismo.
 function FilterButton({ onClick, hasFilter, title }) {
   return (
     <button
       onClick={onClick}
-      className={`absolute flex items-center justify-center rounded transition-colors ${
+      className={`flex items-center justify-center rounded transition-colors ${
         hasFilter
           ? 'text-[#004ac6] dark:text-[#7ba8f0] bg-[#e8eefc] dark:bg-[#1a2444]'
           : 'text-[#b0b4c8] dark:text-[#4b5170] hover:text-[#6b7280] dark:hover:text-[#8890b5] hover:bg-[#edeef0] dark:hover:bg-[#252840]'
       }`}
-      style={{ width: FILTER_BTN_SIZE, height: FILTER_BTN_SIZE, top: FILTER_BTN_OFFSET, right: 4 }}
+      style={{ width: FILTER_BTN_WIDTH, height: FILTER_BTN_HEIGHT }}
       title={title}
     >
-      <span className="material-symbols-outlined" style={{ fontSize: 10 }}>filter_alt</span>
+      <span className="material-symbols-outlined" style={{ fontSize: 12 }}>filter_alt</span>
     </button>
   )
 }
 
 // Sin uppercase: en mayúsculas cada palabra ocupa más ancho y fuerza cortes a
 // mitad de palabra en nombres largos como "Autorretención".
-function ProcessHeaderCell({ proc, editable, isFirst, isLast, onMoveLeft, onMoveRight, startEditProcess, setDeleteConfirm, onFilterClick, hasFilter }) {
+// groupColor: opcional — si el proceso pertenece a un grupo, el filo de
+// abajo se pinta del color de ESE grupo (conecta visualmente la columna con
+// su franja de arriba, igual que en Fondo Emprender). Un proceso suelto
+// (sin grupo) sigue con el azul plano de siempre.
+function ProcessHeaderCell({ proc, editable, isFirst, isLast, onMoveLeft, onMoveRight, startEditProcess, setDeleteConfirm, onFilterClick, hasFilter, groupColor, rowSpan = 1 }) {
   return (
     <th
       title={proc.name}
-      className="bg-[#f0f4ff] dark:bg-[#182544] text-[#6b7280] dark:text-[#8890b5]"
+      rowSpan={rowSpan}
+      className={`${HEADER_BG} text-[#6b7280] dark:text-[#8890b5]`}
       style={{
         // Sin `width`: columna proporcional al largo de su nombre (ver
         // procColWidth), calculada en el <col> del colgroup. minWidth es el
-        // único piso acá. position:relative acá es seguro (este th NO es
-        // sticky) — es lo que ancla el FilterButton absolute a la esquina.
+        // único piso acá. El texto sigue bottom-aligned como siempre (nunca
+        // se movió) — el filtro va aparte, position:absolute pegado al
+        // borde superior (padding-top le reserva el hueco para que no se
+        // pisen), no adentro del flujo del texto.
         minWidth: MIN_COL_WIDTH, verticalAlign: 'bottom', position: 'relative',
-        padding: !editable ? `${HEADER_TOP_CLEARANCE}px 4px 6px` : '2px 4px 6px',
-        boxShadow: headerBoxShadow({ top: HEADER_ACCENT_BORDER, bottom: HEADER_ACCENT_BORDER, right: BORDER_COL }),
+        padding: `${HEADER_TOP_CLEARANCE}px 4px 6px`,
+        boxShadow: headerBoxShadow({
+          top: BORDER,
+          bottom: groupColor ? `3px solid ${groupColor.accent}` : HEADER_ACCENT_BORDER,
+          right: BORDER_COL,
+        }),
       }}
     >
       {!editable ? (
         <>
-          <FilterButton
-            onClick={(e) => onFilterClick('status', proc.id, proc.name, e)}
-            hasFilter={hasFilter}
-            title={hasFilter ? `Filtro activo — ${proc.name}` : `Filtrar "${proc.name}" por estado`}
-          />
+          <div className="absolute left-0 right-0 flex items-center justify-center" style={{ top: FILTER_BTN_TOP }}>
+            <FilterButton
+              onClick={(e) => onFilterClick('status', proc.id, proc.name, e)}
+              hasFilter={hasFilter}
+              title={hasFilter ? `Filtro activo — ${proc.name}` : `Filtrar "${proc.name}" por estado`}
+            />
+          </div>
           <div className="text-[10.5px] font-semibold leading-snug text-center" style={{ overflowWrap: 'break-word' }}>
             {proc.name}
           </div>
@@ -202,6 +254,132 @@ function ProcessHeaderCell({ proc, editable, isFirst, isLast, onMoveLeft, onMove
   )
 }
 
+// Cabecera de fila 1 para un grupo (ej. "Nómina") — colSpan sobre sus
+// columnas hijas, o una sola celda angosta si todavía no tiene procesos.
+// Mismo patrón que GroupHeaderCell de Fondo Emprender, pero sin
+// useDroppable (no hay drag-and-drop acá, ver constantes de arriba), sin
+// opción de colapsar (con solo 2 grupos no aportaba) y sin texto rotado —
+// con nombres cortos entra horizontal sin problema.
+function GroupHeaderCell({ grupo, procesos, editable, palette, editingGroup, setEditingGroup, editGroupName, setEditGroupName, saveEditGroup, startEditGroup, setDeleteConfirm }) {
+  const isEditing = editingGroup?.id === grupo.id
+  // La única razón que le queda a "una sola celda angosta" es un grupo
+  // recién creado que todavía no tiene ningún proceso asignado.
+  const showAsSingleCell = procesos.length === 0
+
+  return (
+    <th
+      colSpan={showAsSingleCell ? 1 : procesos.length}
+      rowSpan={showAsSingleCell ? 2 : 1}
+      className={`overflow-hidden ${palette.bg}`}
+      style={{
+        width: showAsSingleCell ? EMPTY_GROUP_WIDTH : undefined,
+        // El acento de color va solo arriba (igual que Fondo Emprender) —
+        // el resto de los bordes son los grises normales de la tabla, para
+        // que el grupo se lea como parte de la misma grilla, no como un
+        // bloque plantado encima.
+        boxShadow: headerBoxShadow({ top: `4px solid ${palette.accent}`, bottom: BORDER, right: BORDER_COL }),
+        padding: 0, verticalAlign: 'bottom',
+      }}
+    >
+      {isEditing ? (
+        <div style={{ height: GROUP_ROW_HEIGHT, display: 'flex', alignItems: 'center', padding: '0 6px' }}>
+          <input
+            autoFocus
+            value={editGroupName}
+            onChange={e => setEditGroupName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') saveEditGroup()
+              if (e.key === 'Escape') setEditingGroup(null)
+            }}
+            onBlur={saveEditGroup}
+            className="w-full px-1.5 py-0.5 text-[11px] rounded border border-[#004ac6] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+          />
+        </div>
+      ) : showAsSingleCell ? (
+        <div
+          className={`w-full flex items-center justify-center ${palette.text}`}
+          style={{ height: GROUP_ROW_HEIGHT }}
+          title={`${grupo.name} (sin procesos)`}
+        >
+          <span className="text-[11px] font-bold truncate">{grupo.name}</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1 px-2" style={{ height: GROUP_ROW_HEIGHT }}>
+          <span className={`text-[12px] font-bold flex-1 min-w-0 truncate text-center ${palette.text}`} title={grupo.name}>{grupo.name}</span>
+          {editable && (
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              <button
+                onClick={() => startEditGroup(grupo)}
+                className={`p-0.5 rounded hover:bg-white/60 dark:hover:bg-black/20 transition ${palette.text}`}
+                title="Renombrar grupo"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
+              </button>
+              <button
+                onClick={() => setDeleteConfirm({ type: 'grupo', id: grupo.id, name: grupo.name })}
+                className="p-0.5 rounded hover:bg-white/60 dark:hover:bg-black/20 text-red-500 transition"
+                title="Eliminar grupo (los procesos quedan sin grupo)"
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </th>
+  )
+}
+
+// Celda de Valor en la vista Utilidad/Pérdida — en reposo muestra el número
+// formateado en pesos (mismo formato que el resto de la app, ver formatCOP),
+// clic para entrar en modo edición (input de texto) y blur/Enter para volver
+// a mostrarlo formateado. Componente propio (no inline) porque necesita su
+// propio estado de "¿estoy editando?" por celda — definido a nivel de módulo
+// para que su identidad no cambie en cada render de la fila (eso reiniciaría
+// el estado de edición en cada tecla si viviera dentro de renderResultadoCells).
+function ResultadoValorCell({ tipo, valor, onInput, onCommit }) {
+  const [editing, setEditing] = useState(false)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  if (!tipo) {
+    return (
+      <div className="flex items-center justify-center h-full text-xs text-[#c3c6d7] dark:text-[#4b5170]">—</div>
+    )
+  }
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="decimal"
+        value={valor ?? ''}
+        onChange={(e) => onInput(e.target.value)}
+        onBlur={() => { onCommit(); setEditing(false) }}
+        onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+        placeholder="0"
+        className="w-full px-2 py-1.5 text-xs text-right font-semibold rounded-lg border border-[#004ac6]/50 bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+      />
+    )
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      title="Clic para editar"
+      className="w-full px-2 py-1.5 text-xs text-right rounded-lg transition hover:bg-black/[0.04] dark:hover:bg-white/[0.06] truncate"
+    >
+      {valor !== null && valor !== undefined && valor !== ''
+        ? <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{formatCOP(valor)}</span>
+        : <span className="text-[#8890b5]">Agregar valor</span>}
+    </button>
+  )
+}
+
 // Header de Responsable/Contador — mismo th sticky que ya tenían, con el
 // mismo FilterButton en la esquina que ProcessHeaderCell para que las tres
 // columnas filtrables se vean consistentes. NO lleva position:'relative' —
@@ -211,22 +389,25 @@ function ProcessHeaderCell({ proc, editable, isFirst, isLast, onMoveLeft, onMove
 // convertía el `left` (pensado como umbral de sticky) en un offset relativo
 // real, corriendo todo el header fuera de su columna — ver el ancho fijo en
 // EMPRESA/RESPONSABLE/CONTADOR_COL_WIDTH.
-function NameFilterHeaderCell({ label, width, left, onFilterClick, hasFilter, filterKey }) {
+function NameFilterHeaderCell({ label, width, left, rowSpan = 1, onFilterClick, hasFilter, filterKey }) {
   return (
     <th
-      className="sticky top-0 z-30 bg-[#f0f4ff] dark:bg-[#182544] text-[#6b7280] dark:text-[#8890b5]"
+      rowSpan={rowSpan}
+      className={`sticky top-0 z-30 ${HEADER_BG} text-[#6b7280] dark:text-[#8890b5]`}
       style={{
         left,
         width, minWidth: width, verticalAlign: 'bottom',
         padding: `${HEADER_TOP_CLEARANCE}px 8px 6px`,
-        boxShadow: headerBoxShadow({ top: HEADER_ACCENT_BORDER, bottom: HEADER_ACCENT_BORDER, right: BORDER_COL }),
+        boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, right: BORDER_COL }),
       }}
     >
-      <FilterButton
-        onClick={(e) => onFilterClick('name', filterKey, label, e)}
-        hasFilter={hasFilter}
-        title={hasFilter ? `Filtro activo — ${label}` : `Filtrar por ${label}`}
-      />
+      <div className="absolute left-0 right-0 flex items-center justify-center" style={{ top: FILTER_BTN_TOP }}>
+        <FilterButton
+          onClick={(e) => onFilterClick('name', filterKey, label, e)}
+          hasFilter={hasFilter}
+          title={hasFilter ? `Filtro activo — ${label}` : `Filtrar por ${label}`}
+        />
+      </div>
       <div className="text-[10px] font-bold uppercase tracking-wide text-left leading-snug whitespace-nowrap" style={{ overflowWrap: 'break-word' }}>
         {label}
       </div>
@@ -249,6 +430,11 @@ export default function EmpresasExternasPage() {
   const [month, setMonth]           = useState(mesInicial.month)
   const [year, setYear]             = useState(mesInicial.year)
   const [processes, setProcesses]   = useState([])
+  const [grupos, setGrupos]         = useState([])
+  const [editingGroup, setEditingGroup] = useState(null) // { id, oldName }
+  const [editGroupName, setEditGroupName] = useState('')
+  const [addingGroup, setAddingGroup] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
   const [companies, setCompanies]   = useState([])
   const companiesRef = useRef(companies)
   companiesRef.current = companies
@@ -280,10 +466,15 @@ export default function EmpresasExternasPage() {
   // Crear/editar empresa (nombre + responsable + activa) — solo admin, desde
   // "Editar estructura" (no hay página aparte de Empresas).
   const [empresaModal, setEmpresaModal] = useState(null) // { mode: 'create'|'edit', id, name, responsableId, activa }
-  const [deleteConfirm, setDeleteConfirm] = useState(null) // { type: 'proceso' | 'empresa', id, name }
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // { type: 'proceso' | 'empresa' | 'grupo', id, name }
 
   const [search, setSearch]       = useState('')
   const [columnFilters, setColumnFilters] = useState({})
+  // Toggle segmentado: checklist de siempre vs. Utilidad/Pérdida del mes. Vista aparte en vez
+  // de una columna más — la grilla de procesos ya reparte el 100% del ancho disponible entre
+  // sus columnas (ver procColWidth), agregar cualquier columna fija rompe el "sin scroll
+  // horizontal" que hoy funciona.
+  const [view, setView] = useState('checklist')
   const [openFilter, setOpenFilter] = useState(null)
   const filterDropdownRef = useRef(null)
 
@@ -294,10 +485,11 @@ export default function EmpresasExternasPage() {
   const fetchGrid = useCallback(async () => {
     try {
       setError(null)
-      const [empresas, procesos, checklistsPorEmpresa] = await Promise.all([
+      const [empresas, procesos, checklistsPorEmpresa, gruposData] = await Promise.all([
         api.getExtEmpresas(),
         api.getExtProcesos(),
         api.getExtChecklistMes(year, month + 1),
+        api.getExtProcesoGrupos(),
       ])
 
       const checklistPorEmpresaId = new Map(
@@ -325,10 +517,12 @@ export default function EmpresasExternasPage() {
           contador: e.contador,
           activa: e.activa,
           cells,
+          resultado: chk.resultado ?? { tipo: null, valor: null },
         }
       })
 
       setProcesses(procesos)
+      setGrupos(gruposData)
       setCompanies(built)
     } catch (err) {
       setError(err.message || 'Error al cargar el seguimiento mensual')
@@ -369,7 +563,7 @@ export default function EmpresasExternasPage() {
   useEffect(() => {
     if (!socket) return
     const handler = (payload) => {
-      if (payload?.tipo === 'checklist' && (payload.anio !== year || payload.mes !== month + 1)) return
+      if ((payload?.tipo === 'checklist' || payload?.tipo === 'resultado') && (payload.anio !== year || payload.mes !== month + 1)) return
       clearTimeout(refetchTimerRef.current)
       refetchTimerRef.current = setTimeout(() => { flushPendingNote().then(fetchGrid) }, 1200)
     }
@@ -425,6 +619,7 @@ export default function EmpresasExternasPage() {
   function optionsForFilterKey(key) {
     if (key === RESPONSABLE_FILTER_KEY) return responsableOptions
     if (key === CONTADOR_FILTER_KEY) return contadorOptions
+    if (key === RESULTADO_FILTER_KEY) return RESULTADO_FILTER_OPTIONS.map(o => o.key)
     return Object.keys(STATUS)
   }
 
@@ -552,6 +747,69 @@ export default function EmpresasExternasPage() {
     }
   }
 
+  // ── Utilidad/Pérdida del mes ─────────────────────────────────────────────
+  // Mismo patrón optimista que el resto de la página: se actualiza local
+  // primero, la llamada a la API va en segundo plano, y si falla se refresca
+  // toda la grilla (rollback simple, no hace falta guardar el valor previo).
+
+  function updateResultadoLocal(companyId, updates) {
+    setCompanies(prev =>
+      prev.map(c =>
+        c.id === companyId
+          ? { ...c, resultado: { ...(c.resultado ?? { tipo: null, valor: null }), ...updates } }
+          : c
+      )
+    )
+  }
+
+  async function saveResultado(companyId, tipo, valor) {
+    try {
+      await api.updateExtResultado(companyId, year, month + 1, { tipo, valor })
+    } catch (err) {
+      console.error('Error al guardar utilidad/pérdida:', err.message)
+      fetchGrid()
+    }
+  }
+
+  // Click en la opción ya activa la desmarca (vuelve a "sin dato") — una
+  // empresa puede no tener ninguna cargada todavía, no está obligada a
+  // elegir una. Cambiar de Utilidad a Pérdida (o viceversa) conserva el
+  // valor tipeado; el usuario decide si también lo cambia.
+  function handleResultadoTipoClick(companyId, tipo) {
+    const current = companies.find(c => c.id === companyId)?.resultado ?? { tipo: null, valor: null }
+    const nextTipo = current.tipo === tipo ? null : tipo
+    const nextValor = nextTipo === null ? null : parseResultadoValor(current.valor)
+    updateResultadoLocal(companyId, { tipo: nextTipo, valor: nextValor })
+    saveResultado(companyId, nextTipo, nextValor)
+  }
+
+  function parseResultadoValor(v) {
+    if (v === '' || v === null || v === undefined) return null
+    const n = Number(v)
+    return Number.isNaN(n) ? null : n
+  }
+
+  // El input guarda el string tal como se está tipeando (no un Number) — si se
+  // convirtiera a Number en cada tecla, un input controlado con value={numero}
+  // borra el "." final apenas se tipea (Number("1500.") === 1500), haciendo
+  // imposible escribir decimales. Se limpia a dígitos + un solo punto acá, y
+  // recién se normaliza a número al perder el foco (handleResultadoValorBlur).
+  function handleResultadoValorInput(companyId, raw) {
+    const digitsAndDots = raw.replace(/[^0-9.]/g, '')
+    const firstDot = digitsAndDots.indexOf('.')
+    const sanitized = firstDot === -1
+      ? digitsAndDots
+      : digitsAndDots.slice(0, firstDot + 1) + digitsAndDots.slice(firstDot + 1).replace(/\./g, '')
+    updateResultadoLocal(companyId, { valor: sanitized })
+  }
+
+  function handleResultadoValorBlur(companyId) {
+    const { tipo, valor } = companies.find(c => c.id === companyId)?.resultado ?? { tipo: null, valor: null }
+    const normalized = parseResultadoValor(valor)
+    updateResultadoLocal(companyId, { valor: normalized })
+    saveResultado(companyId, tipo, normalized)
+  }
+
   function handleNoteChange(note) {
     noteDirtyRef.current = true
     setNoteDraft(note)
@@ -630,10 +888,10 @@ export default function EmpresasExternasPage() {
   // ── process (column) actions ─────────────────────────────────────────────
 
   function openCreateProcesoModal() {
-    setProcesoModal({ mode: 'create', id: null, name: '' })
+    setProcesoModal({ mode: 'create', id: null, name: '', grupoId: '' })
   }
   function openEditProcesoModal(proc) {
-    setProcesoModal({ mode: 'edit', id: proc.id, name: proc.name })
+    setProcesoModal({ mode: 'edit', id: proc.id, name: proc.name, grupoId: proc.grupoId ?? '' })
   }
   function closeProcesoModal() {
     setProcesoModal(null)
@@ -644,10 +902,11 @@ export default function EmpresasExternasPage() {
     const name = modal?.name.trim()
     if (!modal || !name) return
     setProcesoModal(null)
+    const grupoId = modal.grupoId || null
 
     if (modal.mode === 'create') {
       try {
-        const created = await api.createExtProceso({ name })
+        const created = await api.createExtProceso({ name, grupoId })
         setProcesses(prev => [...prev, created])
       } catch (err) {
         alert('Error al crear proceso: ' + err.message)
@@ -657,9 +916,9 @@ export default function EmpresasExternasPage() {
 
     const previous = processes.find(p => p.id === modal.id)
     if (!previous) return
-    setProcesses(prev => prev.map(p => p.id === modal.id ? { ...p, name } : p))
+    setProcesses(prev => prev.map(p => p.id === modal.id ? { ...p, name, grupoId } : p))
     try {
-      await api.updateExtProceso(modal.id, { name })
+      await api.updateExtProceso(modal.id, { name, grupoId })
     } catch (err) {
       setProcesses(prev => prev.map(p => p.id === modal.id ? previous : p))
       alert('Error al editar proceso: ' + err.message)
@@ -679,6 +938,18 @@ export default function EmpresasExternasPage() {
       }
       return
     }
+    if (type === 'grupo') {
+      try {
+        // Un grupo no tiene historial propio — se borra de verdad. Sus
+        // procesos quedan sin grupo (el backend hace el ON DELETE SET NULL).
+        await api.deleteExtProcesoGrupo(id)
+        setGrupos(prev => prev.filter(g => g.id !== id))
+        setProcesses(prev => prev.map(p => p.grupoId === id ? { ...p, grupoId: null } : p))
+      } catch (err) {
+        alert('Error al eliminar grupo: ' + err.message)
+      }
+      return
+    }
     try {
       // Procesos con historial no se pueden borrar de verdad — se desactivan
       // para dejar de ofrecerlos en meses nuevos sin perder lo ya registrado.
@@ -686,6 +957,40 @@ export default function EmpresasExternasPage() {
       setProcesses(prev => prev.filter(p => p.id !== id))
     } catch (err) {
       alert('Error al eliminar proceso: ' + err.message)
+    }
+  }
+
+  // ── grupos de proceso (color de columnas, ver GROUP_PALETTE) ────────────
+
+  function startEditGroup(grupo) {
+    setEditingGroup({ id: grupo.id, oldName: grupo.name })
+    setEditGroupName(grupo.name)
+  }
+
+  async function saveEditGroup() {
+    const newName = editGroupName.trim()
+    const editing = editingGroup
+    setEditingGroup(null)
+    if (!newName || !editing || newName === editing.oldName) return
+    setGrupos(prev => prev.map(g => g.id === editing.id ? { ...g, name: newName } : g))
+    try {
+      await api.updateExtProcesoGrupo(editing.id, { name: newName })
+    } catch (err) {
+      setGrupos(prev => prev.map(g => g.id === editing.id ? { ...g, name: editing.oldName } : g))
+      alert('Error al renombrar grupo: ' + err.message)
+    }
+  }
+
+  async function handleAddGroup() {
+    const name = newGroupName.trim()
+    setNewGroupName('')
+    setAddingGroup(false)
+    if (!name) return
+    try {
+      const created = await api.createExtProcesoGrupo({ name })
+      setGrupos(prev => [...prev, created])
+    } catch (err) {
+      alert('Error al crear grupo: ' + err.message)
     }
   }
 
@@ -723,13 +1028,18 @@ export default function EmpresasExternasPage() {
 
   // Reordenar por intercambio de `orden` con el vecino — no hace falta
   // recalcular toda la secuencia, solo swapear el valor de los dos
-  // involucrados (ORDER BY orden ASC hace el resto).
+  // involucrados (ORDER BY orden ASC hace el resto). El vecino se busca
+  // dentro del mismo "balde" (mismo grupo, o sueltos) — nunca cruza a otro
+  // grupo, eso se hace desde el selector "Grupo" del modal de proceso.
   async function moveProceso(procId, direction) {
-    const idx = visibleProcesses.findIndex(p => p.id === procId)
+    const proc = processes.find(p => p.id === procId)
+    if (!proc) return
+    const bucket = visibleProcesses.filter(p => (p.grupoId ?? null) === (proc.grupoId ?? null))
+    const idx = bucket.findIndex(p => p.id === procId)
     const swapIdx = direction === 'left' ? idx - 1 : idx + 1
-    if (idx === -1 || swapIdx < 0 || swapIdx >= visibleProcesses.length) return
-    const a = visibleProcesses[idx]
-    const b = visibleProcesses[swapIdx]
+    if (idx === -1 || swapIdx < 0 || swapIdx >= bucket.length) return
+    const a = bucket[idx]
+    const b = bucket[swapIdx]
     setProcesses(prev => prev.map(p => {
       if (p.id === a.id) return { ...p, orden: b.orden }
       if (p.id === b.id) return { ...p, orden: a.orden }
@@ -746,10 +1056,26 @@ export default function EmpresasExternasPage() {
     }
   }
 
-  // Ordenado por `orden` en el cliente — el reorden persiste el campo pero no
-  // reacomoda el array, así que sin este sort la posición visual queda
-  // "pegada" al orden de inserción hasta el próximo fetch.
-  const visibleProcesses = [...processes].sort((a, b) => a.orden - b.orden)
+  // Grupos ordenados por su propio `orden`, y el "orden visible" de
+  // procesos ya no es el `orden` global plano: primero los hijos de cada
+  // grupo (ordenados por SU orden local), luego los sueltos. Es el mismo
+  // array que ya usa todo el archivo (colgroup, headers, celdas, filtros),
+  // así que cambiarlo acá una sola vez alcanza — ver comentario de
+  // GROUP_PALETTE más arriba sobre por qué no hace falta dnd-kit para esto.
+  const sortedGrupos = [...grupos].sort((a, b) => a.orden - b.orden)
+  const sueltos = [...processes].filter(p => !p.grupoId).sort((a, b) => a.orden - b.orden)
+  const visibleProcesses = [
+    ...sortedGrupos.flatMap(g => processes.filter(p => p.grupoId === g.id).sort((a, b) => a.orden - b.orden)),
+    ...sueltos,
+  ]
+  // Segunda fila del header (los procesos hijos, debajo de la franja de
+  // color) solo hace falta si algún grupo tiene hijos — un grupo recién
+  // creado sin procesos todavía no aporta nada que mostrar debajo.
+  const hasExpandedGroupRow = sortedGrupos.some(g => visibleProcesses.some(p => p.grupoId === g.id))
+  // Empresa/Responsable/Contador cubren las 2 filas del header cuando existe
+  // una segunda fila que cubrir — en la vista `resultado` (sin grupos) sigue
+  // siendo una sola fila de siempre.
+  const headerRowSpan = view === 'checklist' && hasExpandedGroupRow ? 2 : 1
 
   // ── filters: search + column filter ───────────────────────────────────────
 
@@ -765,6 +1091,7 @@ export default function EmpresasExternasPage() {
     const matchColumnFilters = Object.entries(columnFilters).every(([key, allowed]) => {
       if (key === RESPONSABLE_FILTER_KEY) return allowed.has(firstName(c.responsableNombre) || SIN_ASIGNAR)
       if (key === CONTADOR_FILTER_KEY) return allowed.has(c.contador?.trim() || SIN_ASIGNAR)
+      if (key === RESULTADO_FILTER_KEY) return allowed.has(c.resultado?.tipo || 'sin_dato')
       const status = c.cells[key]?.status ?? 'pending'
       return allowed.has(status)
     })
@@ -785,13 +1112,23 @@ export default function EmpresasExternasPage() {
   // partes iguales — así "Caja" no ocupa lo mismo que "Pago seguridad
   // social". calc() resuelve el % real recién en el navegador contra el
   // ancho verdadero del contenedor, así sigue siendo responsive.
+  //
+  // Un grupo sin procesos todavía (recién creado) no reparte ese % entre
+  // hijos que no tiene — pasa a ser una columna más, de ancho FIJO
+  // (EMPTY_GROUP_WIDTH), igual que Empresa/Responsable/Contador. Por eso
+  // sale del pool repartible (se suma a totalFixedWidth).
   const fixedColWidths = [EMPRESA_COL_WIDTH, RESPONSABLE_COL_WIDTH, CONTADOR_COL_WIDTH]
-  const totalFixedWidth = fixedColWidths.reduce((a, b) => a + b, 0)
-  const procWeights = visibleProcesses.map(p => Math.max(p.name.length, PROC_MIN_WEIGHT))
-  const totalProcWeight = procWeights.reduce((a, b) => a + b, 0) || 1
+  const singleCellGroupIds = new Set(
+    sortedGrupos
+      .filter(g => !visibleProcesses.some(p => p.grupoId === g.id))
+      .map(g => g.id)
+  )
+  const expandedProcesses = visibleProcesses.filter(p => !p.grupoId || !singleCellGroupIds.has(p.grupoId))
+  const totalFixedWidth = fixedColWidths.reduce((a, b) => a + b, 0) + singleCellGroupIds.size * EMPTY_GROUP_WIDTH
+  const procWeight = (p) => Math.max(p.name.length, PROC_MIN_WEIGHT)
+  const totalProcWeight = expandedProcesses.reduce((sum, p) => sum + procWeight(p), 0) || 1
   const procColWidth = (weight) =>
     `calc((100% - ${totalFixedWidth}px) * ${(weight / totalProcWeight).toFixed(4)})`
-  const totalLeafColumns = fixedColWidths.length + visibleProcesses.length
 
   function renderProcessCell(company, proc, rowBg) {
     const cell = company.cells[proc.id] ?? emptyCell
@@ -837,6 +1174,87 @@ export default function EmpresasExternasPage() {
           )}
         </button>
       </td>
+    )
+  }
+
+  // Celdas de un grupo en el body de una fila — una celda por proceso
+  // (renderProcessCell de siempre), o una celda vacía si el grupo todavía
+  // no tiene ningún proceso asignado.
+  function renderGroupCells(company, grupo, rowBg) {
+    const children = visibleProcesses.filter(p => p.grupoId === grupo.id)
+    if (children.length === 0) {
+      return (
+        <td
+          key={grupo.id}
+          style={{
+            width: EMPTY_GROUP_WIDTH, padding: 2, background: rowBg,
+            borderTop: BORDER, borderBottom: BORDER, borderLeft: BORDER_COL, borderRight: BORDER_COL,
+          }}
+        />
+      )
+    }
+    return <Fragment key={grupo.id}>{children.map(proc => renderProcessCell(company, proc, rowBg))}</Fragment>
+  }
+
+  // Celdas de "Tipo" y "Valor" para la vista Utilidad/Pérdida — mismas <td> (mismo borde,
+  // mismo alto, mismo fondo por fila) que renderProcessCell, para que la fila se vea igual sin
+  // importar qué columnas traiga detrás. Tipo reusa el mismo patrón de toggle segmentado con
+  // fondo (bg-[#f0f2f8] rounded p-1, activo bg-white+shadow) que ya usa esta app en otras
+  // partes (ver feedback_ui_patterns) — un <select> nativo o píldoras sin fondo no se leían
+  // como "esto se puede cambiar". Solo íconos (trending_up/down) por el ancho angosto de la
+  // celda; el título trae el texto para accesibilidad/tooltip.
+  function renderResultadoCells(company, rowBg) {
+    const resultado = company.resultado ?? { tipo: null, valor: null }
+    const tipoMeta = RESULTADO_TIPOS.find(o => o.key === resultado.tipo)
+    // Con un tipo elegido, toda la celda se tiñe del color de ese tipo (mismo
+    // criterio que el resto de la app: "la celda de estado se colorea entera",
+    // no solo un ícono chiquito) — el tinte se aplica sobre el rowBg (alpha
+    // bajo en vez de un color plano) para que las filas pares/impares se
+    // sigan notando debajo.
+    const cellBg = tipoMeta ? `${tipoMeta.color}1f` : rowBg
+    return (
+      <>
+        <td
+          key="tipo"
+          style={{
+            width: RESULTADO_TIPO_WIDTH, padding: '2px 8px', background: cellBg,
+            borderTop: BORDER, borderBottom: BORDER, borderLeft: BORDER_COL, borderRight: BORDER_COL,
+          }}
+        >
+          <div className="flex items-center gap-0.5 bg-[#f0f2f8] dark:bg-[#252840] border border-[#e2e4ef] dark:border-[#2e3148] rounded-lg p-1">
+            {RESULTADO_TIPOS.map((opt) => {
+              const active = resultado.tipo === opt.key
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => handleResultadoTipoClick(company.id, opt.key)}
+                  title={active ? `Quitar ${opt.label.toLowerCase()}` : `Marcar como ${opt.label.toLowerCase()}`}
+                  className={`flex-1 py-1 rounded-md text-[10px] font-bold whitespace-nowrap transition-all duration-150 ${
+                    active ? 'text-white shadow-sm' : 'text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0] hover:bg-white/60 dark:hover:bg-white/5'
+                  }`}
+                  style={active ? { background: opt.color } : undefined}
+                >
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
+        </td>
+        <td
+          key="valor"
+          style={{
+            width: RESULTADO_VALOR_WIDTH, padding: '2px 8px', background: cellBg,
+            borderTop: BORDER, borderBottom: BORDER, borderRight: BORDER_COL,
+          }}
+        >
+          <ResultadoValorCell
+            tipo={resultado.tipo}
+            valor={resultado.valor}
+            onInput={(raw) => handleResultadoValorInput(company.id, raw)}
+            onCommit={() => handleResultadoValorBlur(company.id)}
+          />
+        </td>
+      </>
     )
   }
 
@@ -913,14 +1331,39 @@ export default function EmpresasExternasPage() {
             </button>
           )}
           {canEditStructure && (
-            <button
-              onClick={openCreateProcesoModal}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-              style={{ background: '#004ac6' }}
-            >
-              <span className="material-symbols-outlined text-lg">add_column_right</span>
-              Nuevo proceso
-            </button>
+            <>
+              {addingGroup ? (
+                <input
+                  autoFocus
+                  value={newGroupName}
+                  onChange={e => setNewGroupName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleAddGroup()
+                    if (e.key === 'Escape') { setAddingGroup(false); setNewGroupName('') }
+                  }}
+                  onBlur={() => { if (!newGroupName.trim()) setAddingGroup(false); else handleAddGroup() }}
+                  placeholder="Nombre del grupo..."
+                  className="px-3 py-2 text-sm rounded-xl border border-[#004ac6] outline-none bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0]"
+                />
+              ) : (
+                <button
+                  onClick={() => setAddingGroup(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#004ac6] dark:text-[#7ba8f0] border border-[#004ac6] dark:border-[#7ba8f0] hover:bg-[#004ac6]/5 transition active:scale-[0.97]"
+                  title="Agrupar procesos relacionados en una sola columna con sub-columnas"
+                >
+                  <span className="material-symbols-outlined text-lg">create_new_folder</span>
+                  Nuevo grupo
+                </button>
+              )}
+              <button
+                onClick={openCreateProcesoModal}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
+                style={{ background: '#004ac6' }}
+              >
+                <span className="material-symbols-outlined text-lg">add_column_right</span>
+                Nuevo proceso
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -939,6 +1382,31 @@ export default function EmpresasExternasPage() {
           />
         </div>
 
+        {/* Mismo patrón de píldoras segmentadas que ya usa esta app (ver
+            FondoEmprenderEmpresasPage.jsx) para elegir entre 2 modos excluyentes. Con borde +
+            sombra encima del fondo — solo el fondo gris muy claro se perdía contra la página. */}
+        <div className="flex items-center bg-[#f0f2f8] dark:bg-[#252840] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl p-1 gap-0.5 shadow-sm flex-shrink-0">
+          {[
+            { key: 'checklist', label: 'Checklist' },
+            { key: 'resultado', label: 'Utilidad/Pérdida' },
+          ].map(({ key, label }) => {
+            const active = view === key
+            return (
+              <button
+                key={key}
+                onClick={() => setView(key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
+                  active
+                    ? 'bg-white dark:bg-[#1e2030] text-[#004ac6] dark:text-[#7ba8f0] shadow-sm'
+                    : 'text-[#6b7280] dark:text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0]'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+
         {activeColumnFilterCount > 0 && (
           <button
             onClick={() => setColumnFilters({})}
@@ -952,7 +1420,7 @@ export default function EmpresasExternasPage() {
         )}
       </div>
 
-      {/* ── Progress bar ─────────────────────────────────────────────────── */}
+      {/* ── Progress bar ── visible en las 2 vistas (no solo checklist). */}
       <div className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] p-4 shadow-sm flex items-center gap-4">
         <div className="flex-1">
           <div className="flex justify-between mb-1.5">
@@ -968,29 +1436,43 @@ export default function EmpresasExternasPage() {
         </span>
       </div>
 
-      {/* ── Table ────────────────────────────────────────────────────────── */}
+      {/* ── Table ── SIEMPRE la misma tabla (mismo encabezado, mismas 3 columnas
+          fijas/sticky, mismo alto de fila) — el toggle solo cambia qué va
+          después de Contador: las columnas de Proceso, o Tipo/Valor. Así la
+          vista de Utilidad/Pérdida no se ve "distinta", es la misma grilla. */}
       <div
         className="overflow-auto rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm scrollbar-styled"
-        style={{ maxHeight: 'calc(100vh - 6rem)' }}
+        style={{ maxHeight: 'calc(100vh - 6rem)', width: view === 'checklist' ? '100%' : 'fit-content', maxWidth: '100%' }}
       >
-        {/* width:100% (no un ancho fijo en px) es lo que hace la grilla
-            responsive: ocupa siempre el ancho real del contenedor. Cada
-            columna de Proceso pesa proporcional al largo de su nombre (ver
-            procColWidth) — si la ventana se achica más allá de lo que dan
-            los MIN_COL_WIDTH de cada una, recién ahí aparece el scroll
-            horizontal del contenedor de arriba, como último recurso. */}
-        <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: '100%' }}>
+        {/* width:100% en checklist (procColWidth reparte el sobrante entre las columnas de
+            Proceso). En Utilidad/Pérdida, width:auto — solo 2 columnas angostas de ancho fijo,
+            que la tabla NO se estire a lo ancho de la página dejando la última columna gigante. */}
+        <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', width: view === 'checklist' ? '100%' : 'auto' }}>
           <colgroup>
             {fixedColWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
-            {visibleProcesses.map((p, i) => <col key={p.id} style={{ width: procColWidth(procWeights[i]) }} />)}
+            {view === 'checklist'
+              ? <>
+                  {sortedGrupos.flatMap(g => {
+                    const children = visibleProcesses.filter(p => p.grupoId === g.id)
+                    return singleCellGroupIds.has(g.id)
+                      ? [<col key={g.id} style={{ width: EMPTY_GROUP_WIDTH }} />]
+                      : children.map(p => <col key={p.id} style={{ width: procColWidth(procWeight(p)) }} />)
+                  })}
+                  {sueltos.map(p => <col key={p.id} style={{ width: procColWidth(procWeight(p)) }} />)}
+                </>
+              : <>
+                  <col key="tipo" style={{ width: RESULTADO_TIPO_WIDTH }} />
+                  <col key="valor" style={{ width: RESULTADO_VALOR_WIDTH }} />
+                </>}
           </colgroup>
           <thead className="sticky top-0 z-20">
             <tr>
               <th
-                className="sticky left-0 top-0 z-30 bg-[#f0f4ff] dark:bg-[#182544] text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
+                rowSpan={headerRowSpan}
+                className={`sticky left-0 top-0 z-30 ${HEADER_BG} text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide`}
                 style={{
                   width: EMPRESA_COL_WIDTH, minWidth: EMPRESA_COL_WIDTH, verticalAlign: 'bottom', padding: '6px 8px 8px',
-                  boxShadow: headerBoxShadow({ top: HEADER_ACCENT_BORDER, bottom: HEADER_ACCENT_BORDER, left: BORDER, right: BORDER_COL }),
+                  boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, left: BORDER, right: BORDER_COL }),
                 }}
               >
                 Empresa
@@ -999,6 +1481,7 @@ export default function EmpresasExternasPage() {
                 label="Responsable"
                 width={RESPONSABLE_COL_WIDTH}
                 left={EMPRESA_COL_WIDTH}
+                rowSpan={headerRowSpan}
                 onFilterClick={handleFilterIconClick}
                 hasFilter={Boolean(columnFilters[RESPONSABLE_FILTER_KEY])}
                 filterKey={RESPONSABLE_FILTER_KEY}
@@ -1007,32 +1490,121 @@ export default function EmpresasExternasPage() {
                 label="Contador"
                 width={CONTADOR_COL_WIDTH}
                 left={EMPRESA_COL_WIDTH + RESPONSABLE_COL_WIDTH}
+                rowSpan={headerRowSpan}
                 onFilterClick={handleFilterIconClick}
                 hasFilter={Boolean(columnFilters[CONTADOR_FILTER_KEY])}
                 filterKey={CONTADOR_FILTER_KEY}
               />
-              {visibleProcesses.map((proc, idx) => (
-                <ProcessHeaderCell
-                  key={proc.id}
-                  proc={proc}
-                  editable={canEditStructure}
-                  isFirst={idx === 0}
-                  isLast={idx === visibleProcesses.length - 1}
-                  onMoveLeft={() => moveProceso(proc.id, 'left')}
-                  onMoveRight={() => moveProceso(proc.id, 'right')}
-                  startEditProcess={openEditProcesoModal}
-                  setDeleteConfirm={setDeleteConfirm}
-                  onFilterClick={handleFilterIconClick}
-                  hasFilter={Boolean(columnFilters[proc.id])}
-                />
-              ))}
+              {view === 'checklist'
+                ? (
+                    <>
+                      {sortedGrupos.map((g, gi) => {
+                        const children = visibleProcesses.filter(p => p.grupoId === g.id)
+                        return (
+                          <GroupHeaderCell
+                            key={g.id}
+                            grupo={g}
+                            procesos={children}
+                            editable={canEditStructure}
+                            palette={GROUP_PALETTE[gi % GROUP_PALETTE.length]}
+                            editingGroup={editingGroup}
+                            setEditingGroup={setEditingGroup}
+                            editGroupName={editGroupName}
+                            setEditGroupName={setEditGroupName}
+                            saveEditGroup={saveEditGroup}
+                            startEditGroup={startEditGroup}
+                            setDeleteConfirm={setDeleteConfirm}
+                          />
+                        )
+                      })}
+                      {sueltos.map((proc, idx) => (
+                        <ProcessHeaderCell
+                          key={proc.id}
+                          proc={proc}
+                          editable={canEditStructure}
+                          rowSpan={headerRowSpan}
+                          isFirst={idx === 0}
+                          isLast={idx === sueltos.length - 1}
+                          onMoveLeft={() => moveProceso(proc.id, 'left')}
+                          onMoveRight={() => moveProceso(proc.id, 'right')}
+                          startEditProcess={openEditProcesoModal}
+                          setDeleteConfirm={setDeleteConfirm}
+                          onFilterClick={handleFilterIconClick}
+                          hasFilter={Boolean(columnFilters[proc.id])}
+                        />
+                      ))}
+                    </>
+                  )
+                : (
+                    <>
+                      <th
+                        key="tipo"
+                        className={`${HEADER_BG} text-[#6b7280] dark:text-[#8890b5] text-center text-[10.5px] font-semibold`}
+                        style={{
+                          minWidth: RESULTADO_TIPO_WIDTH, verticalAlign: 'bottom', position: 'relative',
+                          padding: `${HEADER_TOP_CLEARANCE}px 4px 6px`,
+                          boxShadow: headerBoxShadow({ top: BORDER, bottom: HEADER_ACCENT_BORDER, right: BORDER_COL }),
+                        }}
+                      >
+                        <div className="absolute left-0 right-0 flex items-center justify-center" style={{ top: FILTER_BTN_TOP }}>
+                          <FilterButton
+                            onClick={(e) => handleFilterIconClick('resultado', RESULTADO_FILTER_KEY, 'Utilidad/Pérdida', e)}
+                            hasFilter={Boolean(columnFilters[RESULTADO_FILTER_KEY])}
+                            title={columnFilters[RESULTADO_FILTER_KEY] ? 'Filtro activo — Utilidad/Pérdida' : 'Filtrar por Utilidad/Pérdida'}
+                          />
+                        </div>
+                        Tipo
+                      </th>
+                      <th
+                        key="valor"
+                        className={`${HEADER_BG} text-[#6b7280] dark:text-[#8890b5] text-center text-[10.5px] font-semibold`}
+                        style={{
+                          minWidth: RESULTADO_VALOR_WIDTH, verticalAlign: 'bottom', padding: `${HEADER_TOP_CLEARANCE}px 4px 6px`,
+                          boxShadow: headerBoxShadow({ top: BORDER, bottom: HEADER_ACCENT_BORDER, right: BORDER_COL }),
+                        }}
+                      >
+                        Valor
+                      </th>
+                    </>
+                  )}
             </tr>
+            {/* Fila 2 del header: hijos de cada grupo, debajo de la franja de
+                color de fila 1. Solo existe si hay al menos un grupo con
+                procesos (hasExpandedGroupRow) — un grupo recién creado sin
+                procesos todavía no tiene nada que mostrar debajo. */}
+            {view === 'checklist' && hasExpandedGroupRow && (
+              <tr>
+                {sortedGrupos.flatMap((g, gi) => {
+                  const children = visibleProcesses.filter(p => p.grupoId === g.id)
+                  if (children.length === 0) return []
+                  return children.map((proc, ci) => (
+                    <ProcessHeaderCell
+                      key={proc.id}
+                      proc={proc}
+                      editable={canEditStructure}
+                      groupColor={GROUP_PALETTE[gi % GROUP_PALETTE.length]}
+                      isFirst={ci === 0}
+                      isLast={ci === children.length - 1}
+                      onMoveLeft={() => moveProceso(proc.id, 'left')}
+                      onMoveRight={() => moveProceso(proc.id, 'right')}
+                      startEditProcess={openEditProcesoModal}
+                      setDeleteConfirm={setDeleteConfirm}
+                      onFilterClick={handleFilterIconClick}
+                      hasFilter={Boolean(columnFilters[proc.id])}
+                    />
+                  ))
+                })}
+              </tr>
+            )}
           </thead>
 
           <tbody>
             {filteredCompanies.length === 0 && (
               <tr>
-                <td colSpan={totalLeafColumns} className="text-center py-10 text-xs text-[#8890b5] dark:text-[#5a5f7a]">
+                <td
+                  colSpan={fixedColWidths.length + (view === 'checklist' ? singleCellGroupIds.size + expandedProcesses.length : 2)}
+                  className="text-center py-10 text-xs text-[#8890b5] dark:text-[#5a5f7a]"
+                >
                   {search || activeColumnFilterCount > 0
                     ? 'No hay empresas que coincidan con el filtro'
                     : 'No se encontraron empresas'}
@@ -1113,7 +1685,14 @@ export default function EmpresasExternasPage() {
                       </span>
                     </div>
                   </td>
-                  {visibleProcesses.map(proc => renderProcessCell(company, proc, rowBg))}
+                  {view === 'checklist'
+                    ? (
+                        <>
+                          {sortedGrupos.map(g => renderGroupCells(company, g, rowBg))}
+                          {sueltos.map(proc => renderProcessCell(company, proc, rowBg))}
+                        </>
+                      )
+                    : renderResultadoCells(company, rowBg)}
                 </tr>
               )
             })}
@@ -1121,19 +1700,21 @@ export default function EmpresasExternasPage() {
         </table>
       </div>
 
-      {/* ── Legend ───────────────────────────────────────────────────────── */}
-      <div className="flex gap-5 flex-wrap items-center">
-        {Object.entries(STATUS).map(([key, cfg]) => (
-          <div key={key} className="flex items-center gap-1.5">
-            <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 16 }}>{cfg.icon}</span>
-            <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">{cfg.label}</span>
+      {/* ── Legend ── solo checklist (íconos de estado que no aplican a Utilidad/Pérdida). */}
+      {view === 'checklist' && (
+        <div className="flex gap-5 flex-wrap items-center">
+          {Object.entries(STATUS).map(([key, cfg]) => (
+            <div key={key} className="flex items-center gap-1.5">
+              <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 16 }}>{cfg.icon}</span>
+              <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">{cfg.label}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
+            <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">Tiene nota</span>
           </div>
-        ))}
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
-          <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">Tiene nota</span>
         </div>
-      </div>
+      )}
 
       {/* ── Cell popup ───────────────────────────────────────────────────── */}
       {openCell && openProcess && (
@@ -1293,6 +1874,30 @@ export default function EmpresasExternasPage() {
                 </button>
               )
             })}
+            {openFilter.kind === 'resultado' && RESULTADO_FILTER_OPTIONS.map(opt => {
+              const checked = isOptionChecked(openFilter.key, opt.key)
+              return (
+                <button
+                  key={opt.key}
+                  onClick={() => toggleOptionFilter(openFilter.key, opt.key)}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
+                >
+                  <span
+                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7] dark:border-[#3e4260]' : ''}`}
+                    style={{
+                      width: 15, height: 15,
+                      borderWidth: 1.5, borderStyle: 'solid',
+                      borderColor: checked ? opt.color : undefined,
+                      background: checked ? opt.color : 'transparent',
+                    }}
+                  >
+                    {checked && <span className="material-symbols-outlined text-white" style={{ fontSize: 11 }}>check</span>}
+                  </span>
+                  <span className="material-symbols-outlined flex-shrink-0" style={{ color: opt.color, fontSize: 14 }}>{opt.icon}</span>
+                  <span className="font-medium text-[#191c1e] dark:text-[#e4e6f0]">{opt.label}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
@@ -1339,8 +1944,19 @@ export default function EmpresasExternasPage() {
               value={procesoModal.name}
               onChange={e => setProcesoModal(m => ({ ...m, name: e.target.value }))}
               onKeyDown={e => { if (e.key === 'Enter') submitProcesoModal() }}
-              className="w-full px-3 py-2 mb-5 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
             />
+            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Grupo</label>
+            <select
+              value={procesoModal.grupoId}
+              onChange={e => setProcesoModal(m => ({ ...m, grupoId: e.target.value }))}
+              className="w-full px-3 py-2 mb-5 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+            >
+              <option value="">Sin grupo</option>
+              {grupos.map(g => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
             <div className="flex gap-2">
               <button
                 onClick={closeProcesoModal}
@@ -1452,15 +2068,20 @@ export default function EmpresasExternasPage() {
             <div className="flex items-center gap-3 mb-3">
               <span className="material-symbols-outlined text-red-500 text-2xl">warning</span>
               <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
-                ¿Eliminar {deleteConfirm.type === 'empresa' ? 'empresa' : 'proceso'}?
+                ¿Eliminar {deleteConfirm.type === 'empresa' ? 'empresa' : deleteConfirm.type === 'grupo' ? 'grupo' : 'proceso'}?
               </p>
             </div>
-            <p className={`text-xs text-[#6b7280] dark:text-[#8890b5] truncate ${deleteConfirm.type === 'empresa' ? 'mb-1' : 'mb-4'}`}>
+            <p className={`text-xs text-[#6b7280] dark:text-[#8890b5] truncate ${deleteConfirm.type === 'empresa' ? 'mb-1' : deleteConfirm.type === 'grupo' ? 'mb-1' : 'mb-4'}`}>
               &ldquo;{deleteConfirm.name}&rdquo;
             </p>
             {deleteConfirm.type === 'empresa' && (
               <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-3">
                 Esta acción borra también su historial de checklist.
+              </p>
+            )}
+            {deleteConfirm.type === 'grupo' && (
+              <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-3">
+                Sus procesos no se borran, quedan sin grupo.
               </p>
             )}
             <div className="flex gap-2">
