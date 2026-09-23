@@ -86,11 +86,11 @@ const RESPONSABLE_FILTER_KEY = '__responsable'
 const CONTADOR_FILTER_KEY = '__contador'
 const SIN_ASIGNAR = '(Sin asignar)'
 
-// Utilidad/Pérdida arrancó a pedido del equipo en septiembre de 2026 — meses
+// Utilidad/Pérdida arrancó a pedido del equipo en agosto de 2026 — meses
 // anteriores nunca lo tuvieron, así que el toggle ni se ofrece ahí (no tiene
 // sentido cargar un dato que no se pedía todavía). Mismo formato anio*100+mes
 // que ya usa el resto del archivo (ver atMesHabilitado) para comparar.
-const RESULTADO_HABILITADO_DESDE_YM = 2026 * 100 + 9
+const RESULTADO_HABILITADO_DESDE_YM = 2026 * 100 + 8
 
 // Vista "Utilidad/Pérdida" — reemplaza las columnas de Proceso por estas 2, misma tabla y
 // mismas 3 columnas fijas (Empresa/Responsable/Contador) de siempre. Ambas con ancho fijo
@@ -1403,7 +1403,7 @@ export default function EmpresasExternasPage() {
         <div className="flex items-center bg-[#f0f2f8] dark:bg-[#252840] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl p-1 gap-0.5 shadow-sm flex-shrink-0">
           {[
             { key: 'checklist', label: 'Checklist' },
-            // Solo desde septiembre de 2026 (ver RESULTADO_HABILITADO_DESDE_YM) — meses
+            // Solo desde agosto de 2026 (ver RESULTADO_HABILITADO_DESDE_YM) — meses
             // anteriores no tenían este dato, ni tiene sentido ofrecer cargarlo ahí.
             ...(resultadoHabilitado ? [{ key: 'resultado', label: 'Utilidad/Pérdida' }] : []),
           ].map(({ key, label }) => {
