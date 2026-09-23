@@ -57,7 +57,7 @@ describe('getDirectorio', () => {
     await getDirectorio(req, res, mockNext);
 
     const [empresa] = res.json.mock.calls[0][0];
-    expect(empresa.modulos.fondo).toEqual({ id: 'f1', categoria: 'contable', monthlyFee: 150000 });
+    expect(empresa.modulos.fondo).toEqual({ id: 'f1', categoria: 'contable', monthlyFee: 150000, vigenteHastaAnio: null, vigenteHastaMes: null });
     expect(empresa.modulos.ext).toBeNull();
   });
 });
@@ -310,7 +310,7 @@ describe('createEmpresa', () => {
     const res = mockRes();
     await createEmpresa(req, res, mockNext);
 
-    expect(db.query.mock.calls[0][1]).toEqual(['mock-uuid', 'ACME']);
+    expect(db.query.mock.calls[0][1]).toEqual(['mock-uuid', 'ACME', null, null, null]);
     expect(res.status).toHaveBeenCalledWith(201);
   });
 });
