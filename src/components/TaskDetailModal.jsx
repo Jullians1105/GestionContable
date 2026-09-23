@@ -93,12 +93,12 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
       <div className="absolute inset-0 bg-black/60" />
 
       <div className="absolute inset-0 overflow-y-auto flex items-start justify-center p-4 py-8">
-      <div className="relative bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col border border-[#c3c6d7] dark:border-[#2e3148] animate-in my-auto">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col border border-[#c3c6d7] animate-in my-auto">
 
         {/* Header */}
-        <div className="flex items-start justify-between px-6 py-5 border-b border-[#edeef0] dark:border-[#2e3148]">
+        <div className="flex items-start justify-between px-6 py-5 border-b border-[#edeef0]">
           <div className="flex-1 pr-4">
-            <h2 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-snug mb-2">
+            <h2 className="text-lg font-bold text-[#191c1e] leading-snug mb-2">
               {liveTask.title}
             </h2>
             <div className="flex flex-wrap gap-1.5">
@@ -121,7 +121,7 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
                 if (canEdit) { onClose(); onEdit(liveTask) }
                 else addToast('No tienes permiso para editar tareas', 'error')
               }}
-              className="flex items-center gap-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+              className="flex items-center gap-1 h-9 px-3 rounded-lg border border-[#c3c6d7] text-xs font-semibold text-[#434655] hover:bg-[#edeef0] transition"
             >
               <span className="material-symbols-outlined text-base">edit</span>
               Editar
@@ -136,7 +136,7 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
                 Solicitar eliminación
               </button>
             )}
-            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-[#434655] dark:text-[#c4c8e8]">
+            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] transition text-[#434655]">
               <span className="material-symbols-outlined text-xl">close</span>
             </button>
           </div>
@@ -147,15 +147,15 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
 
           {/* Solicitud de eliminación pendiente */}
           {liveTask.pendingDeleteRequest && (
-            <div className="rounded-xl border border-[#EF4444] bg-[#ffdad6]/40 dark:bg-[#3a1a1a] p-4">
+            <div className="rounded-xl border border-[#EF4444] bg-[#ffdad6]/40 p-4">
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="material-symbols-outlined text-[#93000a]" style={{ fontSize: 18 }}>report</span>
-                <p className="text-sm font-bold text-[#93000a] dark:text-[#ff9b93]">Solicitud de eliminación pendiente</p>
+                <p className="text-sm font-bold text-[#93000a]">Solicitud de eliminación pendiente</p>
               </div>
-              <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-1">
+              <p className="text-sm text-[#434655] mb-1">
                 <strong>{liveTask.pendingDeleteRequest.requestedByName}</strong> pidió eliminar esta tarea:
               </p>
-              <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0] italic bg-white/60 dark:bg-black/20 rounded-lg px-3 py-2 mb-3">
+              <p className="text-sm text-[#191c1e] italic bg-white/60 rounded-lg px-3 py-2 mb-3">
                 “{liveTask.pendingDeleteRequest.reason}”
               </p>
               {hasPermission('canDeleteTask') ? (
@@ -171,7 +171,7 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
                   <button
                     onClick={() => handleResolveRequest('reject')}
                     disabled={resolvingRequest}
-                    className="flex-1 h-9 rounded-lg text-xs font-semibold border border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] disabled:opacity-40 hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+                    className="flex-1 h-9 rounded-lg text-xs font-semibold border border-[#c3c6d7] text-[#434655] disabled:opacity-40 hover:bg-[#edeef0] transition"
                   >
                     Rechazar
                   </button>
@@ -189,16 +189,16 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
           {/* Meta row */}
           <div className="grid grid-cols-2 gap-4">
             {liveTask.createdByName && (
-              <div className="col-span-2 flex items-center gap-2 px-3 py-2 bg-[#f3f4f6] dark:bg-[#252840] rounded-xl">
+              <div className="col-span-2 flex items-center gap-2 px-3 py-2 bg-[#f3f4f6] rounded-xl">
                 <span className="material-symbols-outlined text-[#888]" style={{ fontSize: 15 }}>person</span>
                 <span className="text-[10px] font-semibold text-[#888] uppercase tracking-wide">Creado por</span>
                 <div className={`w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold flex-shrink-0 ${getAvatarColor(liveTask.createdByName)}`}>
                   {getInitials(liveTask.createdByName)}
                 </div>
-                <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{liveTask.createdByName}</span>
+                <span className="text-sm font-semibold text-[#191c1e]">{liveTask.createdByName}</span>
               </div>
             )}
-            <div className="bg-[#f3f4f6] dark:bg-[#252840] rounded-xl p-3">
+            <div className="bg-[#f3f4f6] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide mb-1">Asignado a</p>
               {assignedMembers.length > 0 ? (
                 <div className="flex flex-col gap-1.5">
@@ -209,7 +209,7 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold flex-shrink-0 ${getAvatarColor(m.name)}`}>
                           {getInitials(m.name)}
                         </div>
-                        <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] flex-1">{m.name}</span>
+                        <span className="text-sm font-semibold text-[#191c1e] flex-1">{m.name}</span>
                         {showAssigneeProgress && assignee && (
                           <span
                             className="px-1.5 py-0.5 rounded-full text-[9px] font-bold text-white"
@@ -226,10 +226,10 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
                 <span className="text-sm text-[#888] italic">Sin asignar</span>
               )}
             </div>
-            <div className="bg-[#f3f4f6] dark:bg-[#252840] rounded-xl p-3">
+            <div className="bg-[#f3f4f6] rounded-xl p-3">
               <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide mb-1">Fecha límite</p>
               {liveTask.dueDate ? (
-                <span className={`text-sm font-semibold flex items-center gap-1 ${overdue ? 'text-[#EF4444]' : soon ? 'text-[#FBBF24]' : 'text-[#191c1e] dark:text-[#e4e6f0]'}`}>
+                <span className={`text-sm font-semibold flex items-center gap-1 ${overdue ? 'text-[#EF4444]' : soon ? 'text-[#FBBF24]' : 'text-[#191c1e]'}`}>
                   {overdue && <span className="material-symbols-outlined text-sm">warning</span>}
                   {soon && !overdue && <span className="material-symbols-outlined text-sm">schedule</span>}
                   {formatDate(liveTask.dueDate, liveTask.dueTime)}
@@ -242,7 +242,7 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
           </div>
 
           {/* Cambiar estado */}
-          <div className="bg-[#f3f4f6] dark:bg-[#252840] rounded-xl p-3">
+          <div className="bg-[#f3f4f6] rounded-xl p-3">
             <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide mb-2">Cambiar estado</p>
             <div className="flex gap-2">
               {STATUS_OPTIONS.map((opt) => (
@@ -269,12 +269,12 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
 
           {/* Progreso por asignados (tareas con 2+ personas) */}
           {showAssigneeProgress && (
-            <div className="bg-[#f3f4f6] dark:bg-[#252840] rounded-xl p-3">
+            <div className="bg-[#f3f4f6] rounded-xl p-3">
               <div className="flex items-center justify-between mb-1.5">
                 <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide">Progreso del equipo</p>
-                <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{progress.completed}/{progress.total} completaron</span>
+                <span className="text-xs font-semibold text-[#191c1e]">{progress.completed}/{progress.total} completaron</span>
               </div>
-              <div className="h-1.5 bg-[#edeef0] dark:bg-[#1e2030] rounded-full overflow-hidden mb-3">
+              <div className="h-1.5 bg-[#edeef0] rounded-full overflow-hidden mb-3">
                 <div className="h-full rounded-full transition-all" style={{ width: `${progress.pct}%`, background: '#10B981' }} />
               </div>
 
@@ -306,21 +306,21 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
           {liveTask.description && (
             <div>
               <p className="text-[10px] font-semibold text-[#888] uppercase tracking-wide mb-1.5">Descripción</p>
-              <p className="text-sm text-[#434655] dark:text-[#c4c8e8] leading-relaxed bg-[#f3f4f6] dark:bg-[#252840] rounded-xl p-3">
+              <p className="text-sm text-[#434655] leading-relaxed bg-[#f3f4f6] rounded-xl p-3">
                 {liveTask.description}
               </p>
             </div>
           )}
 
           {/* Subtareas */}
-          <div className="border-t border-[#edeef0] dark:border-[#2e3148] pt-4">
+          <div className="border-t border-[#edeef0] pt-4">
             <SubtaskList task={liveTask} />
           </div>
 
           {/* Comentarios */}
-          <div className="border-t border-[#edeef0] dark:border-[#2e3148] pt-4">
+          <div className="border-t border-[#edeef0] pt-4">
             {!canComment && (
-              <p className="text-xs text-[#888] italic bg-[#f3f4f6] dark:bg-[#252840] rounded-lg px-3 py-2 mb-3 flex items-center gap-1.5">
+              <p className="text-xs text-[#888] italic bg-[#f3f4f6] rounded-lg px-3 py-2 mb-3 flex items-center gap-1.5">
                 <span className="material-symbols-outlined text-sm">lock</span>
                 No tienes permiso para agregar comentarios
               </p>

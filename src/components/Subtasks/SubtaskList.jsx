@@ -23,28 +23,28 @@ export default function SubtaskList({ task }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] flex items-center gap-1.5">
+        <h3 className="text-sm font-semibold text-[#191c1e] flex items-center gap-1.5">
           <span className="material-symbols-outlined text-base text-[#004ac6]">checklist</span>
           Subtareas
-          {total > 0 && <span className="text-xs text-[#434655] dark:text-[#c4c8e8] font-normal">({completed}/{total})</span>}
+          {total > 0 && <span className="text-xs text-[#434655] font-normal">({completed}/{total})</span>}
         </h3>
       </div>
 
       {total > 0 && (
         <div className="mb-3">
-          <div className="h-1.5 bg-[#edeef0] dark:bg-[#252840] rounded-full overflow-hidden">
+          <div className="h-1.5 bg-[#edeef0] rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-300"
-              style={{ width: `${pct}%`, background: '#004ac6' }}
+              style={{ width: `${pct}%`, background: '#2563eb' }}
             />
           </div>
-          <p className="text-xs text-[#434655] dark:text-[#c4c8e8] mt-0.5">{pct}% completado</p>
+          <p className="text-xs text-[#434655] mt-0.5">{pct}% completado</p>
         </div>
       )}
 
       <div className="space-y-1 mb-3">
         {subtasks.map((s) => (
-          <div key={s.id} className="flex items-center gap-2 group px-2 py-1 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition">
+          <div key={s.id} className="flex items-center gap-2 group px-2 py-1 rounded-lg hover:bg-[#edeef0] transition">
             <input
               type="checkbox"
               checked={s.completed}
@@ -52,11 +52,11 @@ export default function SubtaskList({ task }) {
               className="accent-[#004ac6] cursor-pointer"
             />
             <span className="flex-1 min-w-0">
-              <span className={`block text-sm ${s.completed ? 'line-through text-[#888]' : 'text-[#191c1e] dark:text-[#e4e6f0]'}`}>
+              <span className={`block text-sm ${s.completed ? 'line-through text-[#888]' : 'text-[#191c1e]'}`}>
                 {s.title}
               </span>
               {s.completed && s.completedByName && (
-                <span className="block text-xs text-[#434655] dark:text-[#c4c8e8]">
+                <span className="block text-xs text-[#434655]">
                   Completado por {s.completedByName}
                 </span>
               )}
@@ -76,13 +76,13 @@ export default function SubtaskList({ task }) {
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder="Agregar subtarea..."
-          className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+          className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
         />
         <button
           type="submit"
           disabled={!newTitle.trim()}
           className="h-9 px-3 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition hover:opacity-90"
-          style={{ background: '#004ac6' }}
+          style={{ background: '#2563eb' }}
         >
           <span className="material-symbols-outlined text-base">add</span>
         </button>

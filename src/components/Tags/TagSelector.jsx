@@ -42,7 +42,7 @@ export default function TagSelector({ selectedIds = [], onChange }) {
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border border-dashed border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] hover:border-[#004ac6] hover:text-[#004ac6] transition"
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border border-dashed border-[#c3c6d7] text-[#434655] hover:border-[#004ac6] hover:text-[#004ac6] transition"
         >
           <span className="material-symbols-outlined text-xs">add</span>
           Etiqueta
@@ -50,10 +50,10 @@ export default function TagSelector({ selectedIds = [], onChange }) {
       </div>
 
       {open && (
-        <div className="bg-[#edeef0] dark:bg-[#252840] rounded-xl p-3 space-y-2">
+        <div className="bg-[#edeef0] rounded-xl p-3 space-y-2">
           <div className="space-y-1 max-h-32 overflow-y-auto">
             {tags.map((t) => (
-              <label key={t.id} className="flex items-center gap-2 cursor-pointer hover:bg-white dark:hover:bg-[#1e2030] rounded-lg px-2 py-1 transition">
+              <label key={t.id} className="flex items-center gap-2 cursor-pointer hover:bg-white rounded-lg px-2 py-1 transition">
                 <input
                   type="checkbox"
                   checked={selectedIds.includes(t.id)}
@@ -61,12 +61,12 @@ export default function TagSelector({ selectedIds = [], onChange }) {
                   className="accent-[#004ac6]"
                 />
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: t.color }} />
-                <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{t.name}</span>
+                <span className="text-xs text-[#191c1e]">{t.name}</span>
               </label>
             ))}
           </div>
-          <div className="border-t border-[#c3c6d7] dark:border-[#2e3148] pt-2">
-            <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Nueva etiqueta</p>
+          <div className="border-t border-[#c3c6d7] pt-2">
+            <p className="text-xs font-semibold text-[#434655] mb-1.5">Nueva etiqueta</p>
             <div className="flex gap-2 items-center">
               <div className="flex gap-1">
                 {PRESET_COLORS.map((c) => (
@@ -84,9 +84,9 @@ export default function TagSelector({ selectedIds = [], onChange }) {
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(e) }}
                 placeholder="nombre..."
-                className="flex-1 h-7 px-2 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-xs text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-1 focus:ring-[#004ac6]"
+                className="flex-1 h-7 px-2 rounded-lg border border-[#c3c6d7] bg-white text-xs text-[#191c1e] focus:outline-none focus:ring-1 focus:ring-[#004ac6]"
               />
-              <button type="button" onClick={handleCreate} disabled={!newName.trim()} className="h-7 px-2 rounded-lg text-xs text-white font-semibold disabled:opacity-40" style={{ background: '#004ac6' }}>
+              <button type="button" onClick={handleCreate} disabled={!newName.trim()} className="h-7 px-2 rounded-lg text-xs text-white font-semibold disabled:opacity-40" style={{ background: '#2563eb' }}>
                 +
               </button>
             </div>

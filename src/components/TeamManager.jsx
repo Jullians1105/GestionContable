@@ -9,12 +9,12 @@ import { useSocket } from "../context/SocketContext"
 
 const ROLE_BADGE = {
   admin: "bg-[#ffdad6] text-[#93000a]",
-  leader: "bg-[#dbe1ff] text-[#003ea8]",
+  leader: "bg-[#dbe1ff] text-[#2563eb]",
   member: "bg-green-100 text-green-800",
   viewer: "bg-[#edeef0] text-[#434655]",
 }
 
-const inputCls = "w-full border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg pl-9 pr-3 h-10 text-[14px] text-[#191c1e] dark:text-[#e4e6f0] bg-white dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+const inputCls = "w-full border border-[#c3c6d7] rounded-lg pl-9 pr-3 h-10 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
 
 function MemberPicker({ allUsers, members, onAdd, onClose }) {
   const [search, setSearch] = useState("")
@@ -50,18 +50,18 @@ function MemberPicker({ allUsers, members, onAdd, onClose }) {
             : "No se encontraron usuarios"}
         </p>
       ) : (
-        <ul className="max-h-72 overflow-y-auto divide-y divide-[#edeef0] dark:divide-[#2e3148]">
+        <ul className="max-h-72 overflow-y-auto divide-y divide-[#edeef0]">
           {available.map(u => (
             <li
               key={u.id}
               onClick={() => onAdd(u)}
-              className="flex items-center gap-3 py-3 px-1 rounded-lg hover:bg-[#f3f4f6] dark:hover:bg-[#252840] cursor-pointer transition-colors"
+              className="flex items-center gap-3 py-3 px-1 rounded-lg hover:bg-[#f3f4f6] cursor-pointer transition-colors"
             >
               <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-[13px] font-bold flex-shrink-0 ${getAvatarColor(u.name)}`}>
                 {getInitials(u.name)}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[14px] font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">{u.name}</p>
+                <p className="text-[14px] font-semibold text-[#191c1e] truncate">{u.name}</p>
                 <p className="text-[12px] text-[#888] truncate">{u.email}</p>
               </div>
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${ROLE_BADGE[u.role] ?? ROLE_BADGE.member}`}>
@@ -132,8 +132,8 @@ export default function TeamManager() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <p className="text-[14px] text-[#434655] dark:text-[#c4c8e8]">
-          <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{members.length}</span> miembros en el equipo
+        <p className="text-[14px] text-[#434655]">
+          <span className="font-semibold text-[#191c1e]">{members.length}</span> miembros en el equipo
         </p>
         <button onClick={openCreate} className="btn-primary">
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>person_add</span>
@@ -147,33 +147,33 @@ export default function TeamManager() {
             const taskCount = getTasksByMember(m.id).length
             const isOnline = onlineUserIds.has(m.id)
             return (
-              <div key={m.id} className="bg-white dark:bg-[#1e2030] p-4 rounded-xl shadow-sm border border-[#c3c6d7] dark:border-[#2e3148] hover:shadow-md transition-shadow flex flex-col items-center text-center">
+              <div key={m.id} className="bg-white p-4 rounded-xl shadow-sm border border-[#c3c6d7] hover:shadow-md transition-shadow flex flex-col items-center text-center">
                 <div className="relative mb-3">
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold border-4 border-white dark:border-[#1e2030] shadow-sm ${getAvatarColor(m.name)}`}>
+                  <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold border-4 border-white shadow-sm ${getAvatarColor(m.name)}`}>
                     {getInitials(m.name)}
                   </div>
                   <div
-                    className="absolute bottom-0 right-0 w-4 h-4 border-2 border-white dark:border-[#1e2030] rounded-full transition-colors"
+                    className="absolute bottom-0 right-0 w-4 h-4 border-2 border-white rounded-full transition-colors"
                     style={{ background: isOnline ? '#22e07a' : '#9ca3af' }}
                     title={isOnline ? 'En línea' : 'Desconectado'}
                   />
                 </div>
-                <h3 className="text-[15px] font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">{m.name}</h3>
-                <p className="text-[12px] text-[#434655] dark:text-[#c4c8e8] mb-2 truncate w-full">{m.email}</p>
+                <h3 className="text-[15px] font-bold text-[#191c1e] leading-tight">{m.name}</h3>
+                <p className="text-[12px] text-[#434655] mb-2 truncate w-full">{m.email}</p>
                 <span className={`text-[11px] font-semibold px-3 py-0.5 rounded-full mb-3 ${ROLE_BADGE[m.role]}`}>
                   {ROLE_LABELS[m.role]}
                 </span>
-                <div className="w-full flex justify-around items-center border-t border-[#edeef0] dark:border-[#2e3148] pt-3 mb-3">
+                <div className="w-full flex justify-around items-center border-t border-[#edeef0] pt-3 mb-3">
                   <div className="text-center">
                     <span className="block text-[16px] font-bold text-[#004ac6]">{taskCount}</span>
-                    <span className="text-[11px] text-[#434655] dark:text-[#c4c8e8]">Tareas</span>
+                    <span className="text-[11px] text-[#434655]">Tareas</span>
                   </div>
                 </div>
                 {isAdmin() && (
                   <div className="flex w-full gap-2">
                     <button
                       onClick={() => openEdit(m)}
-                      className="flex-1 h-10 border border-[#c3c6d7] dark:border-[#2e3148] text-[#191c1e] dark:text-[#e4e6f0] rounded-lg text-[12px] font-semibold hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition-colors flex items-center justify-center gap-1"
+                      className="flex-1 h-10 border border-[#c3c6d7] text-[#191c1e] rounded-lg text-[12px] font-semibold hover:bg-[#f3f4f6] transition-colors flex items-center justify-center gap-1"
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>edit</span>
                       Editar
@@ -181,7 +181,7 @@ export default function TeamManager() {
                     <button
                       onClick={() => setDeleteConfirm(m.id)}
                       title={useRealBackend ? "Remover del equipo" : "Eliminar"}
-                      className="w-10 h-10 border border-[#c3c6d7] dark:border-[#2e3148] text-[#93000a] rounded-lg hover:bg-[#ffdad6] hover:border-[#EF4444] transition-colors flex items-center justify-center"
+                      className="w-10 h-10 border border-[#c3c6d7] text-[#93000a] rounded-lg hover:bg-[#ffdad6] hover:border-[#EF4444] transition-colors flex items-center justify-center"
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
                         {useRealBackend ? "person_remove" : "delete"}
@@ -194,7 +194,7 @@ export default function TeamManager() {
           })}
         </div>
       ) : (
-        <div className="text-center py-16 text-[#434655] dark:text-[#c4c8e8]">
+        <div className="text-center py-16 text-[#434655]">
           <span className="material-symbols-outlined block mb-3 mx-auto" style={{ fontSize: 48, color: "#c3c6d7" }}>group</span>
           <p className="text-[14px] font-semibold">No hay miembros en el equipo</p>
           <p className="text-[12px] mt-1">
@@ -207,10 +207,10 @@ export default function TeamManager() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={closeModal} />
-          <div className="relative bg-white dark:bg-[#1e2030] rounded-xl shadow-xl w-full max-w-md border border-[#c3c6d7] dark:border-[#2e3148]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#edeef0] dark:border-[#2e3148]">
-              <h2 className="text-[18px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">{modalTitle}</h2>
-              <button onClick={closeModal} className="p-2 text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] rounded-lg transition-colors">
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md border border-[#c3c6d7]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#edeef0]">
+              <h2 className="text-[18px] font-bold text-[#191c1e]">{modalTitle}</h2>
+              <button onClick={closeModal} className="p-2 text-[#434655] hover:bg-[#edeef0] rounded-lg transition-colors">
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>close</span>
               </button>
             </div>
@@ -232,11 +232,11 @@ export default function TeamManager() {
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/50" onClick={() => setDeleteConfirm(null)} />
-            <div className="relative bg-white dark:bg-[#1e2030] rounded-xl shadow-xl w-full max-w-sm border border-[#c3c6d7] dark:border-[#2e3148] p-6">
-              <h3 className="text-base font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-2">
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm border border-[#c3c6d7] p-6">
+              <h3 className="text-base font-bold text-[#191c1e] mb-2">
                 {useRealBackend ? "Remover del equipo" : "Eliminar miembro"}
               </h3>
-              <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-4">
+              <p className="text-sm text-[#434655] mb-4">
                 {useRealBackend
                   ? <>¿Remover a <strong>{m?.name}</strong> del equipo? Su cuenta no será eliminada.</>
                   : <>¿Eliminar a <strong>{m?.name}</strong>?</>}

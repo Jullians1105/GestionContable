@@ -85,10 +85,10 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
 
   return (
     <div>
-      <h3 className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] flex items-center gap-1.5 mb-3">
+      <h3 className="text-sm font-semibold text-[#191c1e] flex items-center gap-1.5 mb-3">
         <span className="material-symbols-outlined text-base text-[#004ac6]">chat</span>
         Comentarios
-        {comments.length > 0 && <span className="text-xs text-[#434655] dark:text-[#c4c8e8] font-normal">({comments.length})</span>}
+        {comments.length > 0 && <span className="text-xs text-[#434655] font-normal">({comments.length})</span>}
       </h3>
 
       <div className="space-y-3 mb-4">
@@ -101,12 +101,12 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
             <div
               key={c.id}
               ref={(el) => { commentRefs.current[c.id] = el }}
-              className={`flex gap-2.5 rounded-xl transition-colors duration-700 ${highlighted === c.id ? 'bg-[#dbeafe] dark:bg-[#1e3a5f] px-2 -mx-2' : ''}`}
+              className={`flex gap-2.5 rounded-xl transition-colors duration-700 ${highlighted === c.id ? 'bg-[#dbeafe] px-2 -mx-2' : ''}`}
             >
               <Avatar name={authorName} />
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{authorName}</span>
+                  <span className="text-xs font-semibold text-[#191c1e]">{authorName}</span>
                   <span className="text-xs text-[#888]">{timeAgo(c.createdAt)}</span>
                 </div>
                 {editId === c.id ? (
@@ -114,14 +114,14 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
                     <input
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
-                      className="flex-1 h-8 px-2 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+                      className="flex-1 h-8 px-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
                       autoFocus
                     />
-                    <button type="submit" className="text-xs px-2 py-1 rounded-lg text-white font-semibold hover:opacity-90" style={{ background: '#004ac6' }}>Guardar</button>
-                    <button type="button" onClick={() => setEditId(null)} className="text-xs px-2 py-1 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840]">Cancelar</button>
+                    <button type="submit" className="text-xs px-2 py-1 rounded-lg text-white font-semibold hover:opacity-90" style={{ background: '#2563eb' }}>Guardar</button>
+                    <button type="button" onClick={() => setEditId(null)} className="text-xs px-2 py-1 rounded-lg border border-[#c3c6d7] text-[#434655] hover:bg-[#edeef0]">Cancelar</button>
                   </form>
                 ) : (
-                  <p className="text-sm text-[#434655] dark:text-[#c4c8e8] bg-[#edeef0] dark:bg-[#252840] rounded-xl px-3 py-2 inline-block max-w-full">{c.text}</p>
+                  <p className="text-sm text-[#434655] bg-[#edeef0] rounded-xl px-3 py-2 inline-block max-w-full">{c.text}</p>
                 )}
                 {isOwn && editId !== c.id && (
                   <div className="flex gap-2 mt-1">
@@ -145,13 +145,13 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Escribe un comentario..."
-              className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3248] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+              className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
             />
             <button
               type="submit"
               disabled={!text.trim()}
               className="h-9 px-3 rounded-lg text-sm font-semibold text-white disabled:opacity-40 hover:opacity-90 transition"
-              style={{ background: '#004ac6' }}
+              style={{ background: '#2563eb' }}
             >
               <span className="material-symbols-outlined text-base">send</span>
             </button>

@@ -25,13 +25,13 @@ export default function Toast() {
         return (
           <div
             key={t.id}
-            className="pointer-events-auto flex items-center gap-3 bg-white dark:bg-[#1e2030] rounded-xl shadow-xl px-4 py-3 min-w-[260px] max-w-sm border"
+            className="pointer-events-auto flex items-center gap-3 bg-white rounded-xl shadow-xl px-4 py-3 min-w-[260px] max-w-sm border"
             style={{ borderColor: c.ring }}
           >
             <span className="material-symbols-outlined text-xl flex-shrink-0" style={{ color: c.bg }}>
               {ICONS[t.type] || 'info'}
             </span>
-            <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0] flex-1">{t.message}</p>
+            <p className="text-sm text-[#191c1e] flex-1">{t.message}</p>
             {t.action && (
               <button
                 onClick={() => { t.action.onClick(); removeToast(t.id) }}

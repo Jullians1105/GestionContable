@@ -106,8 +106,7 @@ export default function Sidebar({ open, onClose }) {
       >
         {/* Column 1 – module icons (always 64 px) */}
         <div
-          className="w-16 h-full flex flex-col items-center py-4 gap-1 flex-shrink-0 overflow-hidden"
-          style={{ background: '#004ac6' }}
+          className="w-16 h-full flex flex-col items-center py-4 gap-1 flex-shrink-0 overflow-hidden bg-[#06272E]"
         >
           {/* Logo — navega al inicio */}
           <NavLink to="/" className="w-10 h-10 flex items-center justify-center mb-3 flex-shrink-0">
@@ -124,8 +123,8 @@ export default function Sidebar({ open, onClose }) {
               title={label}
               className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
                 activeModule === id
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/60 hover:bg-white/10 hover:text-white'
+                  ? 'bg-[#E5A70C] text-[#20160A]'
+                  : 'text-[#9fb4b3] hover:bg-[#0e3a42] hover:text-[#f3f1ea]'
               }`}
             >
               <span className="material-symbols-outlined text-xl">{icon}</span>
@@ -135,12 +134,12 @@ export default function Sidebar({ open, onClose }) {
 
         {/* Column 2 – nav content (collapses to 48 px, expands on hover/pin) */}
         <div
-          className={`group/nav h-full bg-white dark:bg-[#1e2030] border-r border-[#c3c6d7] dark:border-[#2e3148] flex flex-col overflow-hidden shadow-[2px_0_12px_rgba(0,0,0,0.07)] transition-[width] duration-200 ease-in-out ${
+          className={`group/nav h-full bg-white border-r border-[#e3e0d8] flex flex-col overflow-hidden shadow-[2px_0_12px_rgba(0,0,0,0.07)] transition-[width] duration-200 ease-in-out ${
             pinned ? 'w-[250px]' : 'w-12 hover:w-[250px]'
           }`}
         >
           {/* Header row */}
-          <div className="flex items-center gap-1 pl-3 pr-2 h-16 flex-shrink-0 border-b border-[#e8eaf0] dark:border-[#2e3148]">
+          <div className="flex items-center gap-1 pl-3 pr-2 h-16 flex-shrink-0 border-b border-[#e3e0d8]">
             <div
               className={`flex items-center gap-2.5 overflow-hidden transition-[max-width,opacity] duration-200 ${
                 pinned
@@ -148,12 +147,12 @@ export default function Sidebar({ open, onClose }) {
                   : 'max-w-0 opacity-0 group-hover/nav:max-w-[210px] group-hover/nav:opacity-100'
               }`}
             >
-              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-[#e8f0fe] dark:bg-[#1a2550]">
-                <span className="material-symbols-outlined text-lg text-[#004ac6] dark:text-[#7ba8f0]">
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-[#E3EEEE]">
+                <span className="material-symbols-outlined text-lg text-[#003B43]">
                   {modules.find((m) => m.id === activeModule)?.icon}
                 </span>
               </span>
-              <span className="text-[15px] font-bold tracking-tight text-[#191c1e] dark:text-[#e4e6f0] whitespace-nowrap">
+              <span className="text-[15px] font-bold tracking-tight text-[#191c1e] whitespace-nowrap">
                 {MODULE_TITLES[activeModule]}
               </span>
             </div>
@@ -167,10 +166,10 @@ export default function Sidebar({ open, onClose }) {
             <button
               onClick={togglePin}
               title={pinned ? 'Desanclar sidebar' : 'Anclar sidebar'}
-              className={`flex-shrink-0 p-1.5 rounded-lg transition-[colors,opacity] duration-200 hover:bg-[#edeef0] dark:hover:bg-[#252840] ${
+              className={`flex-shrink-0 p-1.5 rounded-lg transition-[colors,opacity] duration-200 hover:bg-[#edeef0] ${
                 pinned
-                  ? 'text-[#004ac6] opacity-100'
-                  : 'text-[#b0b4cc] dark:text-[#4a5078] opacity-0 group-hover/nav:opacity-100'
+                  ? 'text-[#003B43] opacity-100'
+                  : 'text-[#b0b4cc] opacity-0 group-hover/nav:opacity-100'
               }`}
             >
               <span
@@ -187,7 +186,7 @@ export default function Sidebar({ open, onClose }) {
             </button>
             <button
               onClick={onClose}
-              className="lg:hidden flex-shrink-0 p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] transition"
+              className="lg:hidden flex-shrink-0 p-1.5 rounded-lg hover:bg-[#edeef0] text-[#434655] transition"
             >
               <span className="material-symbols-outlined text-xl">close</span>
             </button>
@@ -234,8 +233,8 @@ export default function Sidebar({ open, onClose }) {
                       className={({ isActive }) =>
                         `flex items-center gap-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
                           isActive
-                            ? 'bg-[#d6e0f3] dark:bg-[#1a2040] text-[#004ac6] dark:text-[#7ba8f0]'
-                            : 'text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840]'
+                            ? 'bg-[#FBEAC0] text-[#946000]'
+                            : 'text-[#434655] hover:bg-[#edeef0]'
                         }`
                       }
                     >
@@ -264,10 +263,10 @@ export default function Sidebar({ open, onClose }) {
                     scrolleando arrastrando, o para no bloquear el último
                     ítem visible bajo el degradado inferior). */}
                 {scrollShadow.top && (
-                  <div className="pointer-events-none absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-white dark:from-[#1e2030] to-transparent" />
+                  <div className="pointer-events-none absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-white to-transparent" />
                 )}
                 {scrollShadow.bottom && (
-                  <div className="pointer-events-none absolute bottom-0 inset-x-0 h-4 bg-gradient-to-t from-white dark:from-[#1e2030] to-transparent" />
+                  <div className="pointer-events-none absolute bottom-0 inset-x-0 h-4 bg-gradient-to-t from-white to-transparent" />
                 )}
               </div>
 
@@ -278,8 +277,8 @@ export default function Sidebar({ open, onClose }) {
                       if (hasPermission('canCreateTask')) setShowModal(true)
                       else addToast('No tienes permiso para crear tareas', 'error')
                     }}
-                    className="w-full h-10 rounded-lg text-xs font-semibold text-white flex items-center gap-3 hover:opacity-90 transition active:scale-[0.97] overflow-hidden"
-                    style={{ background: '#004ac6' }}
+                    className="w-full h-10 rounded-lg text-xs font-semibold flex items-center gap-3 hover:opacity-90 transition active:scale-[0.97] overflow-hidden"
+                    style={{ background: '#E5A70C', color: '#20160A' }}
                   >
                     {/* Mismo slot w-8 que el ícono de los NavLink de arriba (línea
                         ~205) en vez de centrar todo el contenido con
@@ -302,11 +301,11 @@ export default function Sidebar({ open, onClose }) {
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 overflow-hidden px-2">
-              <span className="material-symbols-outlined text-5xl text-[#c3c6d7] dark:text-[#3e4260] flex-shrink-0">
+              <span className="material-symbols-outlined text-5xl text-white/20 flex-shrink-0">
                 {activeModuleMeta?.icon}
               </span>
               <span
-                className={`text-xs text-center font-semibold text-[#8890b5] dark:text-[#5a5f7a] whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${labelCls}`}
+                className={`text-xs text-center font-semibold text-[#cfe3e1] whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${labelCls}`}
               >
                 Próximamente
               </span>

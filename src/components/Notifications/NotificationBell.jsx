@@ -78,9 +78,9 @@ export default function NotificationBell() {
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+        className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] transition"
       >
-        <span className="material-symbols-outlined text-[#434655] dark:text-[#c4c8e8]">notifications</span>
+        <span className="material-symbols-outlined text-[#434655]">notifications</span>
         {unreadCount > 0 && (
           <>
             <span className="absolute top-1 right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white" style={{ background: '#EF4444' }}>
@@ -94,9 +94,9 @@ export default function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 z-50 bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl border border-[#c3c6d7] dark:border-[#2e3148] w-80">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-[#c3c6d7] dark:border-[#2e3148]">
-              <h3 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0]">Notificaciones</h3>
+          <div className="absolute top-full right-0 mt-1 z-50 bg-white rounded-2xl shadow-2xl border border-[#c3c6d7] w-80">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#c3c6d7]">
+              <h3 className="text-sm font-bold text-[#191c1e]">Notificaciones</h3>
               {unreadCount > 0 && (
                 <button onClick={markAllAsRead} className="text-xs text-[#004ac6] hover:underline">
                   Marcar todas como leídas
@@ -108,20 +108,20 @@ export default function NotificationBell() {
               {recent.length === 0 ? (
                 <div className="px-4 py-8 text-center">
                   <span className="material-symbols-outlined text-3xl text-[#c3c6d7]">notifications_none</span>
-                  <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-2">Sin notificaciones</p>
+                  <p className="text-sm text-[#434655] mt-2">Sin notificaciones</p>
                 </div>
               ) : (
                 recent.map((n, i) => (
                   <div
                     key={n.id ?? `notif-${i}`}
                     onClick={() => handleClick(n)}
-                    className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-[#edeef0] dark:hover:bg-[#252840] transition text-left cursor-pointer ${!n.read ? 'bg-blue-50 dark:bg-[#1a2040]' : ''}`}
+                    className={`w-full flex items-start gap-3 px-4 py-3 hover:bg-[#edeef0] transition text-left cursor-pointer ${!n.read ? 'bg-blue-50' : ''}`}
                   >
                     <span className="material-symbols-outlined text-base mt-0.5 flex-shrink-0 text-[#004ac6]">
                       {TYPE_ICONS[n.type] || 'notifications'}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-[#191c1e] dark:text-[#e4e6f0] leading-relaxed">{n.message}</p>
+                      <p className="text-xs text-[#191c1e] leading-relaxed">{n.message}</p>
                       <p className="text-[10px] text-[#888] mt-0.5">{timeAgo(n.createdAt)}</p>
                       {n.type === 'delete_request' && (
                         <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
@@ -136,7 +136,7 @@ export default function NotificationBell() {
                           <button
                             onClick={() => handleResolve(n, 'reject')}
                             disabled={resolvingId === n.id}
-                            className="h-7 px-2.5 rounded-lg text-[10px] font-semibold border border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] disabled:opacity-40 hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+                            className="h-7 px-2.5 rounded-lg text-[10px] font-semibold border border-[#c3c6d7] text-[#434655] disabled:opacity-40 hover:bg-[#edeef0] transition"
                           >
                             Rechazar
                           </button>
@@ -154,7 +154,7 @@ export default function NotificationBell() {
               )}
             </div>
 
-            <div className="border-t border-[#c3c6d7] dark:border-[#2e3148] px-4 py-2.5">
+            <div className="border-t border-[#c3c6d7] px-4 py-2.5">
               <button
                 onClick={() => { navigate('/notifications'); setOpen(false) }}
                 className="text-xs text-[#004ac6] hover:underline w-full text-center"

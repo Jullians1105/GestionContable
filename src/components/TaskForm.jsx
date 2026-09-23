@@ -22,8 +22,8 @@ const EMPTY_TASK = {
   recurrence: null,
 }
 
-const labelCls = 'block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5'
-const inputCls = 'w-full border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 h-10 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-[#edeef0] dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
+const labelCls = 'block text-xs font-semibold text-[#434655] mb-1.5'
+const inputCls = 'w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
 const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
 
 export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = false }) {
@@ -129,7 +129,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
           onChange={(e) => handleChange('description', e.target.value)}
           placeholder="Descripción detallada..."
           rows={3}
-          className="w-full border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 py-2 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-[#edeef0] dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition resize-none"
+          className="w-full border border-[#c3c6d7] rounded-lg px-3 py-2 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition resize-none"
         />
       </div>
 
@@ -169,7 +169,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
         <button
           type="button"
           onClick={() => setAssigneeOpen(v => !v)}
-          className={`w-full min-h-[40px] px-3 py-1.5 rounded-lg border text-left flex items-center gap-2 flex-wrap bg-[#edeef0] dark:bg-[#252840] transition ${errors.assignedTo ? 'border-[#EF4444]' : 'border-[#c3c6d7] dark:border-[#2e3148]'} ${assigneeOpen ? 'ring-2 ring-[#004ac6]' : ''}`}
+          className={`w-full min-h-[40px] px-3 py-1.5 rounded-lg border text-left flex items-center gap-2 flex-wrap bg-[#edeef0] transition ${errors.assignedTo ? 'border-[#EF4444]' : 'border-[#c3c6d7]'} ${assigneeOpen ? 'ring-2 ring-[#004ac6]' : ''}`}
         >
           {(form.assignedTo || []).length === 0 ? (
             <span className="text-sm text-[#888]">Seleccionar personas...</span>
@@ -179,7 +179,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
                 const m = members.find(x => x.id === id)
                 if (!m) return null
                 return (
-                  <span key={id} className="flex items-center gap-1 bg-[#dbe1ff] dark:bg-[#1e2252] text-[#004ac6] dark:text-[#a5b4fc] text-xs font-semibold px-2 py-0.5 rounded-full">
+                  <span key={id} className="flex items-center gap-1 bg-[#dbe1ff] text-[#004ac6] text-xs font-semibold px-2 py-0.5 rounded-full">
                     <span className={`w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold ${getAvatarColor(m.name)}`}>
                       {getInitials(m.name)}
                     </span>
@@ -198,24 +198,24 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
               })}
             </>
           )}
-          <span className="material-symbols-outlined text-sm text-[#434655] dark:text-[#c4c8e8] ml-auto flex-shrink-0">
+          <span className="material-symbols-outlined text-sm text-[#434655] ml-auto flex-shrink-0">
             {assigneeOpen ? 'expand_less' : 'expand_more'}
           </span>
         </button>
 
         {/* Dropdown */}
         {assigneeOpen && (
-          <div className="absolute z-20 mt-1 w-full bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] rounded-xl shadow-xl overflow-hidden">
+          <div className="absolute z-20 mt-1 w-full bg-white border border-[#c3c6d7] rounded-xl shadow-xl overflow-hidden">
             <div className="px-2 pt-2 pb-1">
               <div className="relative">
-                <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[#434655] dark:text-[#c4c8e8] text-base pointer-events-none">search</span>
+                <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[#434655] text-base pointer-events-none">search</span>
                 <input
                   type="text"
                   value={assigneeSearch}
                   onChange={e => setAssigneeSearch(e.target.value)}
                   placeholder="Buscar persona..."
                   autoFocus
-                  className="w-full h-8 pl-7 pr-2 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+                  className="w-full h-8 pl-7 pr-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
                 />
               </div>
             </div>
@@ -226,7 +226,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
                 return (
                   <label
                     key={m.id}
-                    className={`flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition select-none ${selected ? 'bg-[#dbe1ff] dark:bg-[#1e2252]' : 'hover:bg-[#edeef0] dark:hover:bg-[#252840]'}`}
+                    className={`flex items-center gap-2.5 px-3 py-2.5 cursor-pointer transition select-none ${selected ? 'bg-[#dbe1ff]' : 'hover:bg-[#edeef0]'}`}
                   >
                     <input
                       type="checkbox"
@@ -240,13 +240,13 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 ${getAvatarColor(m.name)}`}>
                       {getInitials(m.name)}
                     </div>
-                    <span className="text-sm text-[#191c1e] dark:text-[#e4e6f0] flex-1">{m.name}</span>
+                    <span className="text-sm text-[#191c1e] flex-1">{m.name}</span>
                     {!task && (
                       <span className="flex items-center gap-1 flex-shrink-0">
                         {m.id === suggestedId && (
                           <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[#dcfce7] text-[#10B981]">Sugerido</span>
                         )}
-                        <span className="text-[10px] font-semibold text-[#888] dark:text-[#6b7280]">
+                        <span className="text-[10px] font-semibold text-[#888]">
                           {load} abierta{load !== 1 ? 's' : ''}
                         </span>
                       </span>
@@ -257,8 +257,8 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
               })}
             </div>
             {(form.assignedTo || []).length > 0 && (
-              <div className="px-3 py-2 border-t border-[#edeef0] dark:border-[#2e3148] flex justify-between items-center">
-                <span className="text-xs text-[#434655] dark:text-[#c4c8e8]">{(form.assignedTo || []).length} seleccionado{(form.assignedTo || []).length !== 1 ? 's' : ''}</span>
+              <div className="px-3 py-2 border-t border-[#edeef0] flex justify-between items-center">
+                <span className="text-xs text-[#434655]">{(form.assignedTo || []).length} seleccionado{(form.assignedTo || []).length !== 1 ? 's' : ''}</span>
                 <button type="button" onClick={() => setAssigneeOpen(false)} className="text-xs font-semibold text-[#004ac6] hover:underline">Listo</button>
               </div>
             )}
@@ -310,7 +310,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
               type="time"
               value={form.dueTime}
               onChange={(e) => handleChange('dueTime', e.target.value)}
-              className="border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 h-9 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-[#edeef0] dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+              className="border border-[#c3c6d7] rounded-lg px-3 h-9 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
             />
           </div>
         </>
@@ -334,9 +334,9 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
         {(form.subtasks || []).length > 0 && (
           <ul className="mb-2 space-y-1">
             {form.subtasks.map((s) => (
-              <li key={s.id} className="flex items-center gap-2 px-2 py-1 rounded-lg bg-[#edeef0] dark:bg-[#252840] group">
+              <li key={s.id} className="flex items-center gap-2 px-2 py-1 rounded-lg bg-[#edeef0] group">
                 <span className="material-symbols-outlined text-sm text-[#004ac6]">radio_button_unchecked</span>
-                <span className="flex-1 text-sm text-[#191c1e] dark:text-[#e4e6f0]">{s.title}</span>
+                <span className="flex-1 text-sm text-[#191c1e]">{s.title}</span>
                 <button
                   type="button"
                   onClick={() => handleRemoveSubtask(s.id)}
@@ -354,14 +354,14 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
             onChange={(e) => setSubtaskInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask(e)}
             placeholder="Agregar subtarea..."
-            className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+            className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
           />
           <button
             type="button"
             onClick={handleAddSubtask}
             disabled={!subtaskInput.trim()}
             className="h-9 px-3 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition hover:opacity-90"
-            style={{ background: '#004ac6' }}
+            style={{ background: '#2563eb' }}
           >
             <span className="material-symbols-outlined text-base">add</span>
           </button>
@@ -381,14 +381,14 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
         <button
           type="button"
           onClick={onCancel}
-          className="h-10 px-4 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+          className="h-10 px-4 rounded-lg border border-[#c3c6d7] text-sm font-semibold text-[#434655] hover:bg-[#edeef0] transition"
         >
           Cancelar
         </button>
         <button
           type="submit"
           className="h-10 px-4 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5 hover:opacity-90 transition"
-          style={{ background: '#004ac6' }}
+          style={{ background: '#2563eb' }}
         >
           <span className="material-symbols-outlined text-base">save</span>
           {task ? 'Guardar cambios' : form.isRecurring ? 'Crear template' : 'Crear tarea'}

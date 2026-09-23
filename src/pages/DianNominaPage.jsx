@@ -58,11 +58,11 @@ function PreviewRow({ label, tasa, tasaLabel, base, valor: valorProp, isTotal, i
   const valor = valorProp !== undefined ? valorProp : base * tasa
   const pct = tasaLabel ?? (tasa ? `${(tasa * 100).toFixed(tasa * 100 % 1 === 0 ? 0 : 2)}%` : null)
   return (
-    <div className={`flex items-center justify-between py-1.5 ${isTotal ? 'border-t border-[#e2e4ef] dark:border-[#2e3148] mt-1 pt-2.5 font-semibold' : ''}`}>
-      <span className={`text-sm ${isTotal ? 'text-[#191c1e] dark:text-[#e4e6f0]' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
+    <div className={`flex items-center justify-between py-1.5 ${isTotal ? 'border-t border-[#e2e4ef] mt-1 pt-2.5 font-semibold' : ''}`}>
+      <span className={`text-sm ${isTotal ? 'text-[#191c1e]' : 'text-[#6b7280]'}`}>
         {label}{!isTotal && pct ? <span className="text-[11px] ml-1 opacity-70">({pct})</span> : ''}
       </span>
-      <span className={`text-sm tabular-nums ${isNeg ? 'text-red-600 dark:text-red-400' : isTotal ? 'text-[#191c1e] dark:text-[#e4e6f0]' : 'text-[#434655] dark:text-[#c4c8e8]'}`}>
+      <span className={`text-sm tabular-nums ${isNeg ? 'text-red-600' : isTotal ? 'text-[#191c1e]' : 'text-[#434655]'}`}>
         {isNeg ? `(${fmt(Math.abs(valor))})` : fmt(valor)}
       </span>
     </div>
@@ -176,11 +176,11 @@ export default function DianNominaPage() {
   if (cargando) {
     return (
       <div className="max-w-lg mx-auto mt-20 text-center">
-        <svg className="animate-spin h-10 w-10 text-[#004ac6] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <svg className="animate-spin h-10 w-10 text-[#E5A70C] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
-        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">Cargando borrador…</p>
+        <p className="mt-4 text-[#6b7280]">Cargando borrador…</p>
       </div>
     )
   }
@@ -188,12 +188,12 @@ export default function DianNominaPage() {
   if (errorCarga) {
     return (
       <div className="max-w-lg mx-auto mt-20 text-center">
-        <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">error_outline</span>
-        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">{errorCarga}</p>
+        <span className="material-symbols-outlined text-5xl text-[#d1d5db]">error_outline</span>
+        <p className="mt-4 text-[#6b7280]">{errorCarga}</p>
         <button
           onClick={() => navigate('/dian/upload')}
-          className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-          style={{ background: '#004ac6' }}
+          className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-[#20160A] hover:opacity-90 transition active:scale-[0.97]"
+          style={{ background: '#E5A70C' }}
         >
           Subir otro reporte
         </button>
@@ -207,22 +207,22 @@ export default function DianNominaPage() {
       {/* Encabezado */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#004ac6]">badge</span>
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">
+          <span className="material-symbols-outlined text-3xl text-[#E5A70C]">badge</span>
+          <h1 className="text-2xl font-bold text-[#191c1e]">
             Nómina
           </h1>
         </div>
-        <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
+        <p className="text-sm text-[#6b7280]">
           Opcional — ingresa los datos de nómina si aplican para este período.
         </p>
       </div>
 
       {/* ── Formulario ───────────────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-6 mb-6">
+      <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-6 mb-6">
 
         {/* Número de empleados */}
         <div className="mb-5">
-          <label className="block text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">
+          <label className="block text-sm font-semibold text-[#434655] mb-1.5">
             Número de empleados
           </label>
           <input
@@ -231,16 +231,16 @@ export default function DianNominaPage() {
             value={empleados}
             onChange={(e) => setEmpleados(e.target.value)}
             placeholder="Ej. 5"
-            className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] text-sm focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
           />
-          <p className="mt-1 text-xs text-[#9ca3af] dark:text-[#6b7280]">
+          <p className="mt-1 text-xs text-[#9ca3af]">
             Deja en blanco o 0 si no tienes nómina
           </p>
         </div>
 
         {/* Número de meses */}
         <div className="mb-5">
-          <label className="block text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">
+          <label className="block text-sm font-semibold text-[#434655] mb-1.5">
             Número de meses
           </label>
           <input
@@ -249,20 +249,20 @@ export default function DianNominaPage() {
             value={meses}
             onChange={(e) => setMeses(e.target.value)}
             placeholder="Ej. 12"
-            className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] text-sm focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
           />
-          <p className="mt-1 text-xs text-[#9ca3af] dark:text-[#6b7280]">
+          <p className="mt-1 text-xs text-[#9ca3af]">
             Período de nómina a reportar
           </p>
         </div>
 
         {/* Salario mensual */}
         <div className="mb-2">
-          <label className="block text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">
+          <label className="block text-sm font-semibold text-[#434655] mb-1.5">
             Salario mensual
           </label>
           <div className="relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#9ca3af] dark:text-[#6b7280] select-none">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[#9ca3af] select-none">
               $
             </span>
             <input
@@ -271,10 +271,10 @@ export default function DianNominaPage() {
               value={salario}
               onChange={(e) => setSalario(e.target.value)}
               placeholder={String(SMMLV_ACTUAL)}
-              className="w-full pl-7 pr-3.5 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] text-sm focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent"
+              className="w-full pl-7 pr-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
             />
           </div>
-          <p className="mt-1 text-xs text-[#9ca3af] dark:text-[#6b7280]">
+          <p className="mt-1 text-xs text-[#9ca3af]">
             COP — SMMLV {LATEST_YEAR} por defecto · Auxilio de transporte {LATEST_YEAR}: {fmt(AUXILIO_ACTUAL)} (aplica si el salario es ≤ 2 SMMLV)
           </p>
         </div>
@@ -282,20 +282,20 @@ export default function DianNominaPage() {
         {/* Tarifa ARL — varía por clase de riesgo, no se puede calcular directo como pensión/caja */}
         {tieneNomina && (
           <div className="mb-2 mt-5">
-            <label className="block text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">
+            <label className="block text-sm font-semibold text-[#434655] mb-1.5">
               Tarifa ARL
             </label>
             <select
               value={tarifaArl}
               onChange={(e) => setTarifaArl(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] text-sm focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
             >
               <option value="">Selecciona…</option>
               {OPCIONES_ARL.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-[#9ca3af] dark:text-[#6b7280]">
+            <p className="mt-1 text-xs text-[#9ca3af]">
               Depende de la clase de riesgo de la labor del trabajador
             </p>
           </div>
@@ -303,21 +303,21 @@ export default function DianNominaPage() {
 
         {/* Error de validación cruzada */}
         {error && (
-          <div className="mt-4 flex items-center gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700">
+          <div className="mt-4 flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200">
             <span className="material-symbols-outlined text-amber-500 text-lg">warning</span>
-            <span className="text-sm text-amber-700 dark:text-amber-400">{error}</span>
+            <span className="text-sm text-amber-700">{error}</span>
           </div>
         )}
       </div>
 
       {/* ── Preview de cálculo ───────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-6 mb-6">
-        <h2 className="text-sm font-bold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide mb-4">
+      <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-6 mb-6">
+        <h2 className="text-sm font-bold text-[#434655] uppercase tracking-wide mb-4">
           Vista previa del cálculo
         </h2>
 
         {!calc.tieneNomina ? (
-          <p className="text-sm text-[#9ca3af] dark:text-[#6b7280] text-center py-4">
+          <p className="text-sm text-[#9ca3af] text-center py-4">
             Ingresa empleados y meses para ver el cálculo
           </p>
         ) : (
@@ -352,27 +352,27 @@ export default function DianNominaPage() {
                   <PreviewRow label="Total seguridad social y parafiscales" valor={calc.aportesPatronales} isTotal />
                 </>
               ) : (
-                <p className="text-sm text-[#9ca3af] dark:text-[#6b7280] py-2">
+                <p className="text-sm text-[#9ca3af] py-2">
                   Selecciona la tarifa ARL para ver el detalle
                 </p>
               )}
             </div>
 
             {/* Costo por empleado/mes */}
-            <div className="rounded-xl bg-[#f3f6ff] dark:bg-[#1a2040] border border-[#d6e0f3] dark:border-[#2a3560] p-4">
+            <div className="rounded-xl bg-[#FBEAC0] border border-[#F0BE4D] p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-[#434655] dark:text-[#c4c8e8]">
+                <span className="text-sm font-semibold text-[#434655]">
                   Costo por empleado / mes
                 </span>
-                <span className="text-sm font-bold text-[#004ac6] dark:text-[#7ba8f0] tabular-nums">
+                <span className="text-sm font-bold text-[#946000] tabular-nums">
                   {calc.arlValida ? fmt(calc.costoMes) : '—'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-[#6b7280] dark:text-[#8890b5]">
+                <span className="text-sm text-[#6b7280]">
                   {empVal} empleado{empVal !== 1 ? 's' : ''} × {mesVal} mes{mesVal !== 1 ? 'es' : ''}
                 </span>
-                <span className="text-base font-bold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">
+                <span className="text-base font-bold text-[#191c1e] tabular-nums">
                   {calc.arlValida ? fmt(calc.costoTotal) : '—'}
                 </span>
               </div>
@@ -383,8 +383,8 @@ export default function DianNominaPage() {
 
       {/* ── Autorretención en la renta — solo si hay nómina Y hay ventas ────────── */}
       {mostrarAutorretencion && (
-        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-6 mb-6">
-          <h2 className="text-sm font-bold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide mb-4">
+        <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-6 mb-6">
+          <h2 className="text-sm font-bold text-[#434655] uppercase tracking-wide mb-4">
             Autorretención en la renta
           </h2>
 
@@ -394,7 +394,7 @@ export default function DianNominaPage() {
               <label className="block text-xs font-semibold text-[#8890b5] uppercase tracking-wide mb-1.5">
                 Base (Ventas Netas)
               </label>
-              <div className="px-3.5 py-2.5 rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9ff] dark:bg-[#181a2e] text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums">
+              <div className="px-3.5 py-2.5 rounded-xl border border-[#e2e4ef] bg-[#f8f9fc] text-sm font-semibold text-[#191c1e] tabular-nums">
                 {fmt(ventasNetas)}
               </div>
             </div>
@@ -407,7 +407,7 @@ export default function DianNominaPage() {
               <select
                 value={tasaAutorretencion}
                 onChange={(e) => setTasaAutorretencion(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] dark:border-[#3a3e5c] bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] text-sm focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
               >
                 <option value="">Selecciona…</option>
                 {OPCIONES_AUTORRETENCION.map((o) => (
@@ -418,11 +418,11 @@ export default function DianNominaPage() {
           </div>
 
           {tasaAutorretencion && (
-            <div className="rounded-xl bg-[#f3f6ff] dark:bg-[#1a2040] border border-[#d6e0f3] dark:border-[#2a3560] p-4 flex items-center justify-between">
-              <span className="text-sm font-semibold text-[#434655] dark:text-[#c4c8e8]">
+            <div className="rounded-xl bg-[#FBEAC0] border border-[#F0BE4D] p-4 flex items-center justify-between">
+              <span className="text-sm font-semibold text-[#434655]">
                 Valor Autorretención
               </span>
-              <span className="text-base font-bold text-[#004ac6] dark:text-[#7ba8f0] tabular-nums">
+              <span className="text-base font-bold text-[#946000] tabular-nums">
                 {fmt(valorAutorretencion)}
               </span>
             </div>
@@ -434,7 +434,7 @@ export default function DianNominaPage() {
       <div className="flex items-center justify-between">
         <button
           onClick={handleVolver}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] dark:border-[#3a3e5c] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition active:scale-[0.97]"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] text-[#434655] hover:bg-[#f3f4f6] transition active:scale-[0.97]"
         >
           <span className="material-symbols-outlined text-base">arrow_back</span>
           Volver
@@ -443,8 +443,8 @@ export default function DianNominaPage() {
         <button
           onClick={handleContinuar}
           disabled={!!error}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
-          style={{ background: '#004ac6' }}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-[#20160A] transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+          style={{ background: '#E5A70C' }}
         >
           Generar Excel
           <span className="material-symbols-outlined text-base">table_view</span>

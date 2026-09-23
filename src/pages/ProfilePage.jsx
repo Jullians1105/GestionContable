@@ -11,8 +11,8 @@ export default function ProfilePage() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingPassword, setSavingPassword] = useState(false)
 
-  const cardCls = 'bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-6'
-  const inputCls = 'w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
+  const cardCls = 'bg-white rounded-2xl border border-[#c3c6d7] p-6'
+  const inputCls = 'w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
 
   const handleSaveProfile = async (e) => {
     e.preventDefault()
@@ -52,12 +52,12 @@ export default function ProfilePage() {
     }
   }
 
-  const avatarBg = user ? getAvatarColor(user.name) : 'bg-[#004ac6]'
+  const avatarBg = user ? getAvatarColor(user.name) : 'bg-[#2563eb]'
 
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Mi Perfil</h2>
+        <h2 className="text-2xl font-bold text-[#191c1e]">Mi Perfil</h2>
         <p className="text-sm text-[#434655] mt-1">Gestiona tu información personal y tu contraseña.</p>
       </div>
 
@@ -68,8 +68,8 @@ export default function ProfilePage() {
               {getInitials(user?.name || '')}
             </div>
             <div>
-              <p className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0]">{user?.name}</p>
-              <p className="text-sm text-[#434655] dark:text-[#c4c8e8]">{ROLE_LABELS[user?.role]}</p>
+              <p className="text-lg font-bold text-[#191c1e]">{user?.name}</p>
+              <p className="text-sm text-[#434655]">{ROLE_LABELS[user?.role]}</p>
             </div>
           </div>
           <form onSubmit={handleSaveProfile} className="space-y-4">
@@ -84,7 +84,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="flex justify-end">
-              <button type="submit" disabled={savingProfile} className="h-10 px-4 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50" style={{ background: '#004ac6' }}>
+              <button type="submit" disabled={savingProfile} className="h-10 px-4 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50" style={{ background: '#2563eb' }}>
                 {savingProfile ? 'Guardando...' : 'Guardar cambios'}
               </button>
             </div>
@@ -92,7 +92,7 @@ export default function ProfilePage() {
         </div>
 
         <div className={cardCls}>
-          <h3 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">Cambiar Contraseña</h3>
+          <h3 className="text-lg font-bold text-[#191c1e] mb-1">Cambiar Contraseña</h3>
           <p className="text-sm text-[#434655] mb-4">Introduce tu contraseña actual para establecer una nueva.</p>
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div>
@@ -110,7 +110,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="flex justify-end">
-              <button type="submit" disabled={savingPassword} className="h-10 px-4 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50" style={{ background: '#004ac6' }}>
+              <button type="submit" disabled={savingPassword} className="h-10 px-4 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50" style={{ background: '#2563eb' }}>
                 {savingPassword ? 'Guardando...' : 'Actualizar contraseña'}
               </button>
             </div>

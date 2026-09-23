@@ -315,7 +315,7 @@ export default function EmpresasPage() {
     <div className="max-w-5xl mx-auto">
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#004ac6]">contacts</span>
+          <span className="material-symbols-outlined text-3xl text-[#E5A70C]">contacts</span>
           <h1 className="text-2xl font-bold text-[#191c1e]">Empresas</h1>
         </div>
         <div className="flex items-center gap-4 mt-1 text-xs">
@@ -397,7 +397,7 @@ export default function EmpresasPage() {
           <button
             onClick={abrirModalNuevaEmpresa}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-            style={{ background: '#004ac6' }}
+            style={{ background: '#003B43' }}
           >
             <span className="material-symbols-outlined text-lg">add_business</span>
             Nueva empresa
@@ -412,13 +412,13 @@ export default function EmpresasPage() {
             key={key}
             onClick={() => setModuloFiltro(key)}
             className={`relative pb-3 text-sm transition ${
-              moduloFiltro === key ? 'font-bold text-[#191c1e]' : 'font-semibold text-[#9ca3af] hover:text-[#434655]'
+              moduloFiltro === key ? 'font-bold text-[#003B43]' : 'font-semibold text-[#9ca3af] hover:text-[#434655]'
             }`}
           >
             {label}
             <span className="ml-1.5 text-xs tabular-nums text-[#9ca3af]">{moduloCounts[key]}</span>
             {moduloFiltro === key && (
-              <span className="absolute left-0 right-0 -bottom-px h-[2.5px] rounded-full" style={{ background: '#004ac6' }} />
+              <span className="absolute left-0 right-0 -bottom-px h-[2.5px] rounded-full" style={{ background: '#E5A70C' }} />
             )}
           </button>
         ))}
@@ -453,7 +453,7 @@ export default function EmpresasPage() {
                       onClick={() => toggleExpandir(empresa)}
                       className={`transition cursor-pointer ${expandido ? 'bg-[#eef3ff]' : 'hover:bg-[#f8f9ff]'}`}
                     >
-                      <td className={`px-5 py-3 border-l-4 ${expandido ? 'border-[#004ac6]' : 'border-transparent'}`}>
+                      <td className={`px-5 py-3 border-l-4 ${expandido ? 'border-[#003B43]' : 'border-transparent'}`}>
                         <span className={`font-semibold ${empresa.activa ? 'text-[#191c1e]' : 'text-[#9ca3af] line-through'}`}>
                           {empresa.name}
                         </span>
@@ -514,7 +514,7 @@ export default function EmpresasPage() {
                             disabled={generandoTokenId === empresa.id || !empresa.tipoContribuyente}
                             title={!empresa.tipoContribuyente ? 'Completa el tipo de contribuyente primero' : 'Generar token DIAN'}
                             className="flex items-center gap-1.5 px-5 py-2 rounded-full text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200 active:scale-[0.96] whitespace-nowrap"
-                            style={{ background: '#004ac6' }}
+                            style={{ background: '#003B43' }}
                           >
                             {generandoTokenId === empresa.id && (
                               <span className="material-symbols-outlined animate-spin flex-shrink-0" style={{ fontSize: 15 }}>progress_activity</span>
@@ -559,7 +559,7 @@ export default function EmpresasPage() {
 
                     {expandido && (
                       <tr>
-                        <td colSpan={5} className="bg-[#fafbff] border-l-4 border-[#004ac6] px-5 py-5">
+                        <td colSpan={5} className="bg-[#fafbff] border-l-4 border-[#003B43] px-5 py-5">
                           {accionError && <p className="text-xs text-red-500 mb-3">{accionError}</p>}
 
                           <div className="flex gap-8 flex-wrap items-start">
@@ -593,7 +593,7 @@ export default function EmpresasPage() {
                                           onClick={() => setIdentidadEdit((prev) => ({ ...prev, tipoContribuyente: val }))}
                                           className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold border-2 transition ${
                                             identidadEdit?.tipoContribuyente === val
-                                              ? 'border-[#004ac6] bg-[#eef3ff] text-[#004ac6]'
+                                              ? 'border-[#003B43] bg-[#E3EEEE] text-[#003B43]'
                                               : 'border-[#d1d5db] text-[#9ca3af] bg-white'
                                           }`}
                                         >
@@ -633,7 +633,7 @@ export default function EmpresasPage() {
                                       onClick={() => guardarIdentidad(empresa.id)}
                                       disabled={guardandoIdentidad}
                                       className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
-                                      style={{ background: '#004ac6' }}
+                                      style={{ background: '#003B43' }}
                                     >
                                       {guardandoIdentidad ? 'Guardando…' : 'Guardar'}
                                     </button>
@@ -688,7 +688,7 @@ export default function EmpresasPage() {
                                               disabled={guardandoVigenciaModulo === modulo || !draft.mes || !draft.anio}
                                               title={!draft.mes || !draft.anio ? 'Elige mes y año' : undefined}
                                               className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white disabled:opacity-50"
-                                              style={{ background: '#004ac6' }}
+                                              style={{ background: '#003B43' }}
                                             >
                                               Guardar
                                             </button>
@@ -725,7 +725,7 @@ export default function EmpresasPage() {
                                     onClick={() => habilitar(empresa.id)}
                                     disabled={!moduloNuevo || accionEnCurso}
                                     className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40"
-                                    style={{ background: '#16a34a' }}
+                                    style={{ background: '#003B43' }}
                                   >
                                     Habilitar
                                   </button>
@@ -749,7 +749,7 @@ export default function EmpresasPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModalNuevaEmpresa(false)}>
           <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-1">
-              <span className="material-symbols-outlined text-[#004ac6]" style={{ fontSize: 20 }}>add_business</span>
+              <span className="material-symbols-outlined text-[#E5A70C]" style={{ fontSize: 20 }}>add_business</span>
               <h3 className="text-base font-bold text-[#191c1e]">Nueva empresa</h3>
             </div>
             <p className="text-xs text-[#6b7280] mb-4">
@@ -776,7 +776,7 @@ export default function EmpresasPage() {
                       onClick={() => setNuevaEmpresaForm((prev) => ({ ...prev, tipoContribuyente: val }))}
                       className={`flex-1 py-2 rounded-lg text-xs font-semibold border-2 transition ${
                         nuevaEmpresaForm.tipoContribuyente === val
-                          ? 'border-[#004ac6] bg-[#eef3ff] text-[#004ac6]'
+                          ? 'border-[#003B43] bg-[#E3EEEE] text-[#003B43]'
                           : 'border-[#d1d5db] text-[#9ca3af]'
                       }`}
                     >
@@ -814,7 +814,7 @@ export default function EmpresasPage() {
                 onClick={crearEmpresa}
                 disabled={creandoEmpresa || !nuevaEmpresaForm.name.trim()}
                 className="flex-1 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40"
-                style={{ background: '#004ac6' }}
+                style={{ background: '#003B43' }}
               >
                 {creandoEmpresa ? 'Creando…' : 'Crear empresa'}
               </button>

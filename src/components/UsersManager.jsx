@@ -61,18 +61,18 @@ const ROLE_OPTIONS = [
 ]
 
 const ROLE_COLORS = {
-  admin: 'bg-[#fce7f3] text-[#9d174d] dark:bg-[#4a1630] dark:text-[#f9a8d4]',
-  leader: 'bg-[#e0e7ff] text-[#3730a3] dark:bg-[#1e1b4b] dark:text-[#a5b4fc]',
-  member: 'bg-[#dcfce7] text-[#166534] dark:bg-[#14532d] dark:text-[#86efac]',
-  viewer: 'bg-[#f3f4f6] text-[#374151] dark:bg-[#252840] dark:text-[#c4c8e8]',
+  admin: 'bg-[#fce7f3] text-[#9d174d]',
+  leader: 'bg-[#e0e7ff] text-[#3730a3]',
+  member: 'bg-[#dcfce7] text-[#166534]',
+  viewer: 'bg-[#f3f4f6] text-[#374151]',
 }
 
 const EMPTY_FORM = { name: '', email: '', role: '', password: '' }
 
 const ROLE_ORDER = { admin: 0, leader: 1, member: 2, viewer: 3 }
 
-const labelCls = 'block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5'
-const inputCls = 'w-full border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg px-3 h-10 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-[#edeef0] dark:bg-[#252840] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
+const labelCls = 'block text-xs font-semibold text-[#434655] mb-1.5'
+const inputCls = 'w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
 const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
 
 export default function UsersManager() {
@@ -256,15 +256,15 @@ export default function UsersManager() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Gestión de Usuarios</h2>
-          <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">
+          <h2 className="text-xl font-bold text-[#191c1e]">Gestión de Usuarios</h2>
+          <p className="text-sm text-[#434655] mt-0.5">
             {members.length} usuario{members.length !== 1 ? 's' : ''} registrado{members.length !== 1 ? 's' : ''}
           </p>
         </div>
         <button
           onClick={openCreate}
           className="h-10 px-4 rounded-lg text-sm font-semibold text-white flex items-center gap-2 hover:opacity-90 transition"
-          style={{ background: '#004ac6' }}
+          style={{ background: '#2563eb' }}
         >
           <span className="material-symbols-outlined text-base">person_add</span>
           Nuevo usuario
@@ -272,19 +272,19 @@ export default function UsersManager() {
       </div>
 
       <div className="relative">
-        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655] dark:text-[#c4c8e8] text-lg pointer-events-none">search</span>
+        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655] text-lg pointer-events-none">search</span>
         <input
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por nombre o email..."
-          className="w-full border border-[#c3c6d7] dark:border-[#2e3148] rounded-lg pl-10 pr-4 h-10 text-sm text-[#191c1e] dark:text-[#e4e6f0] bg-white dark:bg-[#1e2030] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+          className="w-full border border-[#c3c6d7] rounded-lg pl-10 pr-4 h-10 text-sm text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
         />
       </div>
 
-      <div className="rounded-xl border border-[#c3c6d7] dark:border-[#2e3148] overflow-hidden overflow-x-auto">
+      <div className="rounded-xl border border-[#c3c6d7] overflow-hidden overflow-x-auto">
         <table className="w-full min-w-[480px] text-sm">
-          <thead className="bg-[#edeef0] dark:bg-[#252840]">
+          <thead className="bg-[#edeef0]">
             <tr>
               {[
                 { col: 'name', label: 'Usuario', cls: 'text-left' },
@@ -294,7 +294,7 @@ export default function UsersManager() {
                 <th
                   key={col}
                   onClick={() => handleSort(col)}
-                  className={`${cls} px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] cursor-pointer select-none hover:text-[#004ac6] dark:hover:text-[#a5b4fc] transition`}
+                  className={`${cls} px-4 py-3 text-xs font-semibold text-[#434655] cursor-pointer select-none hover:text-[#004ac6] transition`}
                 >
                   <span className="inline-flex items-center gap-1">
                     {label}
@@ -305,32 +305,32 @@ export default function UsersManager() {
                 </th>
               ))}
               {showPermCols && (
-                <th className="px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] text-left hidden lg:table-cell">
+                <th className="px-4 py-3 text-xs font-semibold text-[#434655] text-left hidden lg:table-cell">
                   Gestor de Tareas
                 </th>
               )}
               {showPermCols && (
-                <th className="px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] text-left hidden lg:table-cell">
+                <th className="px-4 py-3 text-xs font-semibold text-[#434655] text-left hidden lg:table-cell">
                   Fondo Emprender
                 </th>
               )}
               {showPermCols && (
-                <th className="px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] text-left hidden lg:table-cell">
+                <th className="px-4 py-3 text-xs font-semibold text-[#434655] text-left hidden lg:table-cell">
                   Empresas Externas
                 </th>
               )}
               {showPermCols && (
-                <th className="px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] text-left hidden lg:table-cell">
+                <th className="px-4 py-3 text-xs font-semibold text-[#434655] text-left hidden lg:table-cell">
                   Nómina Electrónica
                 </th>
               )}
-              <th className="px-4 py-3 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] text-right">Acciones</th>
+              <th className="px-4 py-3 text-xs font-semibold text-[#434655] text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#edeef0] dark:divide-[#2e3148]">
+          <tbody className="divide-y divide-[#edeef0]">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={showPermCols ? 7 : 4} className="text-center py-10 text-sm text-[#434655] dark:text-[#c4c8e8]">
+                <td colSpan={showPermCols ? 7 : 4} className="text-center py-10 text-sm text-[#434655]">
                   No se encontraron usuarios
                 </td>
               </tr>
@@ -340,7 +340,7 @@ export default function UsersManager() {
               const effectivePerms = getEffectivePermissions(user)
               return (
                 <React.Fragment key={user.id}>
-                  <tr className="bg-white dark:bg-[#1e2030] hover:bg-[#f8f9ff] dark:hover:bg-[#252840] transition">
+                  <tr className="bg-white hover:bg-[#eef3ff] transition">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div
@@ -350,8 +350,8 @@ export default function UsersManager() {
                           {user.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <p className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{user.name}</p>
-                          <p className="text-xs text-[#434655] dark:text-[#c4c8e8]">{user.email}</p>
+                          <p className="font-semibold text-[#191c1e]">{user.name}</p>
+                          <p className="text-xs text-[#434655]">{user.email}</p>
                         </div>
                       </div>
                     </td>
@@ -368,7 +368,7 @@ export default function UsersManager() {
                         </p>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs text-[#434655] dark:text-[#c4c8e8] hidden sm:table-cell">
+                    <td className="px-4 py-3 text-xs text-[#434655] hidden sm:table-cell">
                       {user.createdAt ? new Date(user.createdAt).toLocaleDateString('es-ES') : '—'}
                     </td>
 
@@ -421,7 +421,7 @@ export default function UsersManager() {
                             })}
                           </div>
                         ) : (
-                          <span className="text-xs text-[#c3c6d7] dark:text-[#3a3f5c]">—</span>
+                          <span className="text-xs text-[#c3c6d7]">—</span>
                         )}
                       </td>
                     )}
@@ -481,7 +481,7 @@ export default function UsersManager() {
                         {showPermCols && (
                           <button
                             onClick={() => setExpandedPermsId(isExpanded ? null : user.id)}
-                            className={`flex items-center gap-1 px-2 h-7 rounded-lg text-xs font-semibold border transition ${isExpanded ? 'bg-[#004ac6] text-white border-[#004ac6]' : 'border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840]'}`}
+                            className={`flex items-center gap-1 px-2 h-7 rounded-lg text-xs font-semibold border transition ${isExpanded ? 'bg-[#2563eb] text-white border-[#004ac6]' : 'border-[#c3c6d7] text-[#434655] hover:bg-[#edeef0]'}`}
                             title="Permisos"
                           >
                             <span className="material-symbols-outlined text-sm">shield</span>
@@ -490,7 +490,7 @@ export default function UsersManager() {
                         )}
                         <button
                           onClick={() => openEdit(user)}
-                          className="p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] transition"
+                          className="p-1.5 rounded-lg hover:bg-[#edeef0] text-[#434655] transition"
                           title="Editar"
                         >
                           <span className="material-symbols-outlined text-base">edit</span>
@@ -505,7 +505,7 @@ export default function UsersManager() {
                             </button>
                             <button
                               onClick={() => setDeleteConfirm(null)}
-                              className="px-2 h-7 rounded-lg text-xs font-semibold border border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+                              className="px-2 h-7 rounded-lg text-xs font-semibold border border-[#c3c6d7] text-[#434655] hover:bg-[#edeef0] transition"
                             >
                               Cancelar
                             </button>
@@ -513,7 +513,7 @@ export default function UsersManager() {
                         ) : (
                           <button
                             onClick={() => setDeleteConfirm(user.id)}
-                            className="p-1.5 rounded-lg hover:bg-[#fce7f3] dark:hover:bg-[#4a1630] text-[#434655] hover:text-[#EF4444] dark:text-[#c4c8e8] transition"
+                            className="p-1.5 rounded-lg hover:bg-[#fce7f3] text-[#434655] hover:text-[#EF4444] transition"
                             title="Eliminar"
                           >
                             <span className="material-symbols-outlined text-base">delete</span>
@@ -523,22 +523,22 @@ export default function UsersManager() {
                     </td>
                   </tr>
                   {isExpanded && (
-                    <tr className="bg-[#f8f9ff] dark:bg-[#181a2e]">
+                    <tr className="bg-[#eef3ff]">
                       <td colSpan={showPermCols ? 7 : 4} className="px-6 py-4 space-y-4">
                         {/* Gestor de Tareas */}
                         <div>
-                          <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
+                          <p className="text-xs font-semibold text-[#434655] mb-3 flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">shield</span>
                             Permisos de {user.name}
                             {user.permissions && Object.keys(user.permissions).length > 0 && (
-                              <span className="ml-1 px-1.5 py-0.5 rounded bg-[#004ac6] text-white text-[10px]">personalizados</span>
+                              <span className="ml-1 px-1.5 py-0.5 rounded bg-[#2563eb] text-white text-[10px]">personalizados</span>
                             )}
                           </p>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {PERMISSIONS.map(({ key, label }) => (
                               <label
                                 key={key}
-                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] cursor-pointer hover:border-[#004ac6] transition select-none"
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-[#c3c6d7] cursor-pointer hover:border-[#004ac6] transition select-none"
                               >
                                 <input
                                   type="checkbox"
@@ -546,7 +546,7 @@ export default function UsersManager() {
                                   onChange={() => handleTogglePermission(user, key)}
                                   className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
                                 />
-                                <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{label}</span>
+                                <span className="text-xs text-[#191c1e]">{label}</span>
                               </label>
                             ))}
                           </div>
@@ -555,7 +555,7 @@ export default function UsersManager() {
                         {/* Grupos que lidera — solo aplica a role === 'leader' */}
                         {user.role === 'leader' && (
                           <div>
-                            <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
+                            <p className="text-xs font-semibold text-[#434655] mb-3 flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-sm">shield_person</span>
                               Grupos que lidera
                             </p>
@@ -565,7 +565,7 @@ export default function UsersManager() {
                                 return (
                                   <label
                                     key={g.id}
-                                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] cursor-pointer hover:border-[#004ac6] transition select-none"
+                                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-[#c3c6d7] cursor-pointer hover:border-[#004ac6] transition select-none"
                                   >
                                     <input
                                       type="checkbox"
@@ -573,7 +573,7 @@ export default function UsersManager() {
                                       onChange={() => handleToggleGroupLeader(g.id, user.id, !isGroupLeader)}
                                       className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
                                     />
-                                    <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{g.name}</span>
+                                    <span className="text-xs text-[#191c1e]">{g.name}</span>
                                   </label>
                                 )
                               })}
@@ -584,7 +584,7 @@ export default function UsersManager() {
                         {/* Fondo Emprender — solo si el usuario es miembro del grupo */}
                         {isFondoMember(user.id) && (
                           <div>
-                            <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
+                            <p className="text-xs font-semibold text-[#434655] mb-3 flex items-center gap-1.5">
                               <span className="material-symbols-outlined text-sm">corporate_fare</span>
                               Fondo Emprender
                             </p>
@@ -592,7 +592,7 @@ export default function UsersManager() {
                               {FONDO_PERMS.map(({ key, icon, label }) => (
                                 <label
                                   key={key}
-                                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] cursor-pointer hover:border-[#004ac6] transition select-none"
+                                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-[#c3c6d7] cursor-pointer hover:border-[#004ac6] transition select-none"
                                 >
                                   <input
                                     type="checkbox"
@@ -601,7 +601,7 @@ export default function UsersManager() {
                                     className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
                                   />
                                   <span className="material-symbols-outlined text-[#8890b5]" style={{ fontSize: 13 }}>{icon}</span>
-                                  <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{label}</span>
+                                  <span className="text-xs text-[#191c1e]">{label}</span>
                                 </label>
                               ))}
                             </div>
@@ -610,7 +610,7 @@ export default function UsersManager() {
 
                         {/* Empresas Externas */}
                         <div>
-                          <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
+                          <p className="text-xs font-semibold text-[#434655] mb-3 flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">corporate_fare</span>
                             Empresas Externas
                           </p>
@@ -618,7 +618,7 @@ export default function UsersManager() {
                             {EXTERNAS_PERMS.map(({ key, icon, label }) => (
                               <label
                                 key={key}
-                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] cursor-pointer hover:border-[#004ac6] transition select-none"
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-[#c3c6d7] cursor-pointer hover:border-[#004ac6] transition select-none"
                               >
                                 <input
                                   type="checkbox"
@@ -627,7 +627,7 @@ export default function UsersManager() {
                                   className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
                                 />
                                 <span className="material-symbols-outlined text-[#8890b5]" style={{ fontSize: 13 }}>{icon}</span>
-                                <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{label}</span>
+                                <span className="text-xs text-[#191c1e]">{label}</span>
                               </label>
                             ))}
                           </div>
@@ -635,7 +635,7 @@ export default function UsersManager() {
 
                         {/* Nómina Electrónica */}
                         <div>
-                          <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-3 flex items-center gap-1.5">
+                          <p className="text-xs font-semibold text-[#434655] mb-3 flex items-center gap-1.5">
                             <span className="material-symbols-outlined text-sm">badge</span>
                             Nómina Electrónica
                           </p>
@@ -643,7 +643,7 @@ export default function UsersManager() {
                             {NE_PERMS.map(({ key, icon, label }) => (
                               <label
                                 key={key}
-                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] cursor-pointer hover:border-[#004ac6] transition select-none"
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-[#c3c6d7] cursor-pointer hover:border-[#004ac6] transition select-none"
                               >
                                 <input
                                   type="checkbox"
@@ -652,7 +652,7 @@ export default function UsersManager() {
                                   className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
                                 />
                                 <span className="material-symbols-outlined text-[#8890b5]" style={{ fontSize: 13 }}>{icon}</span>
-                                <span className="text-xs text-[#191c1e] dark:text-[#e4e6f0]">{label}</span>
+                                <span className="text-xs text-[#191c1e]">{label}</span>
                               </label>
                             ))}
                           </div>
@@ -670,12 +670,12 @@ export default function UsersManager() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={closeModal} />
-          <div className="relative bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl w-full max-w-md border border-[#c3c6d7] dark:border-[#2e3148]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#edeef0] dark:border-[#2e3148]">
-              <h3 className="text-base font-bold text-[#191c1e] dark:text-[#e4e6f0]">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md border border-[#c3c6d7]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#edeef0]">
+              <h3 className="text-base font-bold text-[#191c1e]">
                 {editingUser ? 'Editar usuario' : 'Nuevo usuario'}
               </h3>
-              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] transition">
+              <button onClick={closeModal} className="p-1.5 rounded-lg hover:bg-[#edeef0] text-[#434655] transition">
                 <span className="material-symbols-outlined text-xl">close</span>
               </button>
             </div>
@@ -720,7 +720,7 @@ export default function UsersManager() {
                 <label className={labelCls}>
                   Contraseña{' '}
                   {editingUser
-                    ? <span className="text-[#434655] dark:text-[#8b8fa8] font-normal">(dejar vacío para no cambiar)</span>
+                    ? <span className="text-[#434655] font-normal">(dejar vacío para no cambiar)</span>
                     : <span className="text-[#EF4444]">*</span>
                   }
                 </label>
@@ -737,14 +737,14 @@ export default function UsersManager() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="h-10 px-4 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+                  className="h-10 px-4 rounded-lg border border-[#c3c6d7] text-sm font-semibold text-[#434655] hover:bg-[#edeef0] transition"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   className="h-10 px-4 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5 hover:opacity-90 transition"
-                  style={{ background: '#004ac6' }}
+                  style={{ background: '#2563eb' }}
                 >
                   <span className="material-symbols-outlined text-base">save</span>
                   {editingUser ? 'Guardar cambios' : 'Crear usuario'}

@@ -237,7 +237,7 @@ export default function FondoEmprenderEmpresasPage() {
 
   // ── loading / error states ────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
+    <div className="flex items-center justify-center py-20 text-[#8890b5]">
       <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
         progress_activity
       </span>
@@ -251,7 +251,7 @@ export default function FondoEmprenderEmpresasPage() {
       <p className="text-sm text-[#ef4444]">{error}</p>
       <button
         onClick={fetchEmpresas}
-        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] hover:bg-[#f3f4f6] transition"
       >
         Reintentar
       </button>
@@ -266,27 +266,27 @@ export default function FondoEmprenderEmpresasPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="material-symbols-outlined text-2xl text-[#004ac6]">corporate_fare</span>
-            <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Empresas</h1>
+            <span className="material-symbols-outlined text-2xl text-[#E5A70C]">corporate_fare</span>
+            <h1 className="text-xl font-bold text-[#191c1e]">Empresas</h1>
           </div>
-          <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
+          <p className="text-sm text-[#6b7280]">
             Fondo Emprender · {empresas.length} empresas
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Month navigator */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2 shadow-sm">
-            <button onClick={prevMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280]">
+          <div className="flex items-center gap-1 bg-white border border-[#e2e4ef] rounded-xl px-3 py-2 shadow-sm">
+            <button onClick={prevMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280]">
               <span className="material-symbols-outlined text-xl">chevron_left</span>
             </button>
-            <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] px-2 min-w-[130px] text-center">
+            <span className="text-sm font-semibold text-[#191c1e] px-2 min-w-[130px] text-center">
               {MONTHS[month]} {year}
             </span>
             <button
               onClick={nextMonth}
               disabled={atMesHabilitado}
               title={atMesHabilitado ? 'El mes en curso aún no está habilitado (mes vencido)' : undefined}
-              className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-xl">chevron_right</span>
             </button>
@@ -338,7 +338,7 @@ export default function FondoEmprenderEmpresasPage() {
       <div className="flex items-center gap-3 flex-wrap">
 
         {/* Segment control / pills */}
-        <div className="flex items-center bg-[#f0f2f8] dark:bg-[#252840] rounded-xl p-1 gap-0.5 flex-shrink-0">
+        <div className="flex items-center bg-[#f0f2f8] rounded-xl p-1 gap-0.5 flex-shrink-0">
           {tabs.map(({ key, label, count }) => {
             const active = activeTab === key
             return (
@@ -347,8 +347,8 @@ export default function FondoEmprenderEmpresasPage() {
                 onClick={() => setActiveTab(key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
                   active
-                    ? 'bg-white dark:bg-[#1e2030] text-[#004ac6] dark:text-[#7ba8f0] shadow-sm'
-                    : 'text-[#6b7280] dark:text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0]'
+                    ? 'bg-white text-[#003B43] shadow-sm'
+                    : 'text-[#6b7280] hover:text-[#191c1e]'
                 }`}
               >
                 {label}
@@ -356,7 +356,7 @@ export default function FondoEmprenderEmpresasPage() {
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors"
                   style={
                     active
-                      ? { background: '#004ac6', color: '#fff' }
+                      ? { background: '#003B43', color: '#fff' }
                       : { background: '#e2e4ef', color: '#6b7280' }
                   }
                 >
@@ -379,7 +379,7 @@ export default function FondoEmprenderEmpresasPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar empresa..."
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
           />
         </div>
 
@@ -397,8 +397,8 @@ export default function FondoEmprenderEmpresasPage() {
               onClick={toggleMacroPanel}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
                 appliedMacroFilter
-                  ? 'border-[#004ac6] text-[#004ac6] bg-[#f0f4ff] dark:bg-[#252840]'
-                  : 'border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]'
+                  ? 'border-[#004ac6] text-[#004ac6] bg-[#eef3ff]'
+                  : 'border-[#e2e4ef] text-[#6b7280] hover:bg-[#f3f4f6]'
               }`}
             >
               <span className="material-symbols-outlined" style={{ fontSize: 16 }}>fact_check</span>
@@ -409,7 +409,7 @@ export default function FondoEmprenderEmpresasPage() {
                 <span
                   role="button"
                   onClick={e => { e.stopPropagation(); limpiarMacroFilter() }}
-                  className="material-symbols-outlined hover:text-[#ef4444] dark:hover:text-[#ef4444]"
+                  className="material-symbols-outlined hover:text-[#ef4444]"
                   style={{ fontSize: 15 }}
                   title="Limpiar filtro"
                 >
@@ -425,11 +425,11 @@ export default function FondoEmprenderEmpresasPage() {
             </button>
 
             {macroPanelOpen && (
-              <div className="absolute z-20 top-full mt-2 right-0 w-[340px] bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-lg p-4 flex flex-col gap-3">
+              <div className="absolute z-20 top-full mt-2 right-0 w-[340px] bg-white border border-[#e2e4ef] rounded-xl shadow-lg p-4 flex flex-col gap-3">
                 <div className="grid grid-cols-2 gap-4">
                   {/* Macroprocesos — columna izquierda */}
                   <div className="flex flex-col gap-1.5 min-w-0">
-                    <label className="text-[10px] font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
+                    <label className="text-[10px] font-semibold text-[#434655] uppercase tracking-wide">
                       Macroprocesos
                     </label>
                     <div className="flex flex-col gap-0.5">
@@ -441,7 +441,7 @@ export default function FondoEmprenderEmpresasPage() {
                             type="button"
                             onClick={() => toggleMacroDraft(id)}
                             className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-semibold text-left transition-all duration-150 ${
-                              active ? 'text-white' : 'text-[#6b7280] dark:text-[#8890b5]'
+                              active ? 'text-white' : 'text-[#6b7280]'
                             }`}
                             style={{ background: active ? '#004ac6' : 'transparent' }}
                           >
@@ -457,7 +457,7 @@ export default function FondoEmprenderEmpresasPage() {
 
                   {/* Estado — columna derecha */}
                   <div className="flex flex-col gap-1.5 min-w-0">
-                    <label className="text-[10px] font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
+                    <label className="text-[10px] font-semibold text-[#434655] uppercase tracking-wide">
                       Estado
                     </label>
                     <div className="flex flex-col gap-0.5">
@@ -469,7 +469,7 @@ export default function FondoEmprenderEmpresasPage() {
                             type="button"
                             onClick={() => setEstadoDraft(key)}
                             className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-semibold text-left transition-all duration-150 ${
-                              active ? 'bg-[#f0f2f8] dark:bg-[#252840]' : ''
+                              active ? 'bg-[#f0f2f8]' : ''
                             }`}
                           >
                             <span
@@ -477,7 +477,7 @@ export default function FondoEmprenderEmpresasPage() {
                               style={{ background: active ? color : '#c3c6d7' }}
                             />
                             <span
-                              className={active ? '' : 'text-[#6b7280] dark:text-[#8890b5]'}
+                              className={active ? '' : 'text-[#6b7280]'}
                               style={active ? { color } : undefined}
                             >
                               {label}
@@ -489,10 +489,10 @@ export default function FondoEmprenderEmpresasPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#f0f2f8] dark:border-[#2e3148]">
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#f0f2f8]">
                   <button
                     onClick={limpiarMacroFilter}
-                    className="px-2 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+                    className="px-2 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] hover:bg-[#f3f4f6] transition"
                   >
                     Limpiar
                   </button>
@@ -500,7 +500,7 @@ export default function FondoEmprenderEmpresasPage() {
                     onClick={aplicarMacroFilter}
                     disabled={macroDraft.length === 0}
                     className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40 transition active:scale-[0.97]"
-                    style={{ background: '#004ac6' }}
+                    style={{ background: '#2563eb' }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 15 }}>search</span>
                     Buscar
@@ -512,9 +512,9 @@ export default function FondoEmprenderEmpresasPage() {
         </div>
 
         {appliedMacroFilter && (
-          <div className="flex items-center gap-1.5 text-xs text-[#434655] dark:text-[#c4c8e8] justify-end">
+          <div className="flex items-center gap-1.5 text-xs text-[#434655] justify-end">
             <span className="material-symbols-outlined flex-shrink-0" style={{ fontSize: 14, color: '#004ac6' }}>info</span>
-            Mostrando <span className="font-bold text-[#191c1e] dark:text-[#e4e6f0]">{filtered.length}</span> empresa{filtered.length !== 1 ? 's' : ''} con{' '}
+            Mostrando <span className="font-bold text-[#191c1e]">{filtered.length}</span> empresa{filtered.length !== 1 ? 's' : ''} con{' '}
             <span className="font-semibold">{appliedMacroFilter.macros.map(id => MACRO_PROCESSES.find(m => m.id === id)?.name).join(', ')}</span> en estado{' '}
             <span className="font-semibold" style={{ color: ESTADO_OPTIONS.find(o => o.key === appliedMacroFilter.estado)?.color }}>
               {ESTADO_OPTIONS.find(o => o.key === appliedMacroFilter.estado)?.label}
@@ -524,7 +524,7 @@ export default function FondoEmprenderEmpresasPage() {
 
       {/* ── Compact table ────────────────────────────────────────────────── */}
       {filtered.length > 0 ? (
-        <div className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-[#e2e4ef] shadow-sm overflow-hidden">
           {filtered.map((company, idx) => {
             const stats = getMacroStats(company)
             const color = SEM_COLOR[stats.semaphore]
@@ -535,8 +535,8 @@ export default function FondoEmprenderEmpresasPage() {
               <div key={company.id}>
                 {/* ── Company row ─────────────────────────────────────── */}
                 <div
-                  className={`flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 hover:bg-[#f0f4ff] dark:hover:bg-[#252840] transition-colors group cursor-pointer${
-                    idx > 0 ? ' border-t border-[#f0f2f8] dark:border-[#2e3148]' : ''
+                  className={`flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 hover:bg-[#eef3ff] transition-colors group cursor-pointer${
+                    idx > 0 ? ' border-t border-[#f0f2f8]' : ''
                   }`}
                   onClick={() => navigate(`/fondo-emprender/empresas/${company.id}?anio=${year}&mes=${month + 1}`)}
                 >
@@ -547,7 +547,7 @@ export default function FondoEmprenderEmpresasPage() {
                   />
 
                   {/* Company name */}
-                  <span className="flex-1 min-w-0 text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">
+                  <span className="flex-1 min-w-0 text-sm font-semibold text-[#191c1e] truncate">
                     {company.name}
                   </span>
 
@@ -556,7 +556,7 @@ export default function FondoEmprenderEmpresasPage() {
                     className="hidden sm:inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 uppercase tracking-wide"
                     style={
                       (company.categoria ?? 'contable') === 'contable'
-                        ? { background: '#f0f4ff', color: '#004ac6' }
+                        ? { background: '#eef3ff', color: '#004ac6' }
                         : { background: '#f0fdf4', color: '#16a34a' }
                     }
                   >
@@ -565,7 +565,7 @@ export default function FondoEmprenderEmpresasPage() {
 
                   {/* Progress bar + count */}
                   <div className="flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0">
-                    <div className="hidden sm:block w-24 h-1.5 rounded-full bg-[#e8eaf0] dark:bg-[#2e3148] overflow-hidden">
+                    <div className="hidden sm:block w-24 h-1.5 rounded-full bg-[#e8eaf0] overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-300"
                         style={{ width: `${pct}%`, background: color }}
@@ -589,8 +589,8 @@ export default function FondoEmprenderEmpresasPage() {
                       title={isEditing ? 'Cerrar edición' : 'Editar empresa'}
                       className={`p-1.5 rounded-lg transition ${
                         isEditing
-                          ? 'text-[#004ac6] bg-[#f0f4ff] dark:bg-[#252840]'
-                          : 'text-[#c3c6d7] dark:text-[#3e4260] hover:text-[#004ac6] dark:hover:text-[#7ba8f0]'
+                          ? 'text-[#004ac6] bg-[#eef3ff]'
+                          : 'text-[#c3c6d7] hover:text-[#004ac6]'
                       }`}
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
@@ -600,7 +600,7 @@ export default function FondoEmprenderEmpresasPage() {
                     <button
                       onClick={() => handleEliminar(company.id)}
                       title="Eliminar empresa"
-                      className="p-1.5 rounded-lg text-[#c3c6d7] dark:text-[#3e4260] hover:text-[#ef4444] dark:hover:text-[#ef4444] transition"
+                      className="p-1.5 rounded-lg text-[#c3c6d7] hover:text-[#ef4444] transition"
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>delete</span>
                     </button>
@@ -608,7 +608,7 @@ export default function FondoEmprenderEmpresasPage() {
 
                   {/* Arrow */}
                   <span
-                    className="material-symbols-outlined text-[#c3c6d7] dark:text-[#3e4260] group-hover:text-[#004ac6] dark:group-hover:text-[#7ba8f0] transition flex-shrink-0"
+                    className="material-symbols-outlined text-[#c3c6d7] group-hover:text-[#004ac6] transition flex-shrink-0"
                     style={{ fontSize: 18 }}
                   >
                     chevron_right
@@ -618,26 +618,26 @@ export default function FondoEmprenderEmpresasPage() {
                 {/* ── Inline edit panel ────────────────────────────────── */}
                 {isEditing && (
                   <div
-                    className="px-5 py-4 bg-[#f8f9fe] dark:bg-[#252840] border-t border-[#e2e4ef] dark:border-[#2e3148] flex flex-col gap-3"
+                    className="px-5 py-4 bg-[#eef3ff] border-t border-[#e2e4ef] flex flex-col gap-3"
                     onClick={e => e.stopPropagation()}
                   >
                     <div className="flex flex-wrap gap-3">
                       {/* Name */}
                       <div className="flex flex-col gap-1 flex-1 min-w-[160px]">
-                        <label className="text-[10px] font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
+                        <label className="text-[10px] font-semibold text-[#434655] uppercase tracking-wide">
                           Nombre
                         </label>
                         <input
                           autoFocus
                           value={editForm.name}
                           onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                          className="px-3 py-1.5 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+                          className="px-3 py-1.5 text-sm rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
                         />
                       </div>
 
                       {/* Categoría */}
                       <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
+                        <label className="text-[10px] font-semibold text-[#434655] uppercase tracking-wide">
                           Categoría
                         </label>
                         <div className="flex gap-1.5">
@@ -651,7 +651,7 @@ export default function FondoEmprenderEmpresasPage() {
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all"
                                 style={{
                                   borderColor: active ? '#004ac6' : '#e2e4ef',
-                                  background:  active ? '#f0f4ff' : 'transparent',
+                                  background:  active ? '#eef3ff' : 'transparent',
                                   color:       active ? '#004ac6' : '#6b7280',
                                 }}
                               >
@@ -668,7 +668,7 @@ export default function FondoEmprenderEmpresasPage() {
 
                       {/* Monthly fee */}
                       <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-semibold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-wide">
+                        <label className="text-[10px] font-semibold text-[#434655] uppercase tracking-wide">
                           Mensualidad
                         </label>
                         <input
@@ -678,7 +678,7 @@ export default function FondoEmprenderEmpresasPage() {
                           value={editForm.monthlyFee}
                           onChange={e => setEditForm(f => ({ ...f, monthlyFee: e.target.value }))}
                           placeholder="—"
-                          className="px-3 py-1.5 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 w-36"
+                          className="px-3 py-1.5 text-sm rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30 w-36"
                         />
                       </div>
                     </div>
@@ -686,7 +686,7 @@ export default function FondoEmprenderEmpresasPage() {
                     <div className="flex gap-2 justify-end">
                       <button
                         onClick={closeEdit}
-                        className="px-4 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f3f4f6] dark:hover:bg-[#1e2030] transition"
+                        className="px-4 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] hover:bg-[#f3f4f6] transition"
                       >
                         Cancelar
                       </button>
@@ -694,7 +694,7 @@ export default function FondoEmprenderEmpresasPage() {
                         onClick={() => handleEditar(company.id)}
                         disabled={!editForm.name.trim()}
                         className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50 transition active:scale-[0.97]"
-                        style={{ background: '#004ac6' }}
+                        style={{ background: '#2563eb' }}
                       >
                         Guardar
                       </button>
@@ -706,7 +706,7 @@ export default function FondoEmprenderEmpresasPage() {
           })}
         </div>
       ) : (
-        <div className="text-center py-16 text-[#8890b5] dark:text-[#5a5f7a] text-sm">
+        <div className="text-center py-16 text-[#8890b5] text-sm">
           {search || activeTab !== 'todas' || appliedMacroFilter
             ? 'No hay empresas que coincidan con el filtro'
             : 'No se encontraron empresas'}

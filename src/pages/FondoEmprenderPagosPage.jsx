@@ -817,7 +817,7 @@ export default function FondoEmprenderPagosPage() {
 
   // ── loading / error ───────────────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
+    <div className="flex items-center justify-center py-20 text-[#8890b5]">
       <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
         progress_activity
       </span>
@@ -831,7 +831,7 @@ export default function FondoEmprenderPagosPage() {
       <p className="text-sm text-[#ef4444]">{error}</p>
       <button
         onClick={fetchAll}
-        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] hover:bg-[#f3f4f6] transition"
       >
         Reintentar
       </button>
@@ -845,10 +845,10 @@ export default function FondoEmprenderPagosPage() {
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div>
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="material-symbols-outlined text-2xl text-[#004ac6]">payments</span>
-          <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Pagos Fondo Emprender</h1>
+          <span className="material-symbols-outlined text-2xl text-[#E5A70C]">payments</span>
+          <h1 className="text-xl font-bold text-[#191c1e]">Pagos Fondo Emprender</h1>
         </div>
-        <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
+        <p className="text-sm text-[#6b7280]">
           Mensualidades a la fiduciaria · {rows.length} empresas
         </p>
       </div>
@@ -907,7 +907,7 @@ export default function FondoEmprenderPagosPage() {
       {/* ── Filters row ──────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 flex-wrap">
 
-        <div className="flex items-center bg-[#f0f2f8] dark:bg-[#252840] rounded-xl p-1 gap-0.5 flex-shrink-0">
+        <div className="flex items-center bg-[#f0f2f8] rounded-xl p-1 gap-0.5 flex-shrink-0">
           {tabs.map(({ key, label, count }) => {
             const active = activeTab === key
             return (
@@ -916,14 +916,14 @@ export default function FondoEmprenderPagosPage() {
                 onClick={() => setActiveTab(key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
                   active
-                    ? 'bg-white dark:bg-[#1e2030] text-[#004ac6] dark:text-[#7ba8f0] shadow-sm'
-                    : 'text-[#6b7280] dark:text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0]'
+                    ? 'bg-white text-[#003B43] shadow-sm'
+                    : 'text-[#6b7280] hover:text-[#191c1e]'
                 }`}
               >
                 {label}
                 <span
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors"
-                  style={active ? { background: '#004ac6', color: '#fff' } : { background: '#e2e4ef', color: '#6b7280' }}
+                  style={active ? { background: '#003B43', color: '#fff' } : { background: '#e2e4ef', color: '#6b7280' }}
                 >
                   {count}
                 </span>
@@ -940,14 +940,14 @@ export default function FondoEmprenderPagosPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar empresa..."
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
           />
         </div>
       </div>
 
       {/* ── Table ────────────────────────────────────────────────────────── */}
       {visibleRows.length === 0 ? (
-        <div className="text-center py-16 text-[#8890b5] dark:text-[#5a5f7a] text-sm">
+        <div className="text-center py-16 text-[#8890b5] text-sm">
           {search || activeTab !== 'todas'
             ? 'No hay empresas que coincidan con el filtro'
             : 'No se encontraron empresas'}
@@ -957,8 +957,8 @@ export default function FondoEmprenderPagosPage() {
 
           <div className="flex justify-between items-center flex-wrap gap-2">
             <div className="flex items-center gap-2 text-xs">
-              <span className="text-[#6b7280] dark:text-[#8890b5]">
-                Mes habilitado: <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
+              <span className="text-[#6b7280]">
+                Mes habilitado: <span className="font-semibold text-[#191c1e]">
                   {mesHabilitadoYM != null && `${MONTHS_SHORT[fromYM(mesHabilitadoYM).mes - 1]} ${fromYM(mesHabilitadoYM).anio}`}
                 </span>
               </span>
@@ -978,7 +978,7 @@ export default function FondoEmprenderPagosPage() {
                   onClick={requestRetrocederMes}
                   disabled={avanzandoMes}
                   title={`Deshacer — volver a ${(() => { const p = fromYM(prevYM(mesHabilitadoYM)); return `${MONTHS_SHORT[p.mes - 1]} ${p.anio}` })()}`}
-                  className="flex items-center justify-center w-6 h-6 rounded-lg border transition-colors disabled:opacity-50 text-[#6b7280] dark:text-[#8890b5] border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
+                  className="flex items-center justify-center w-6 h-6 rounded-lg border transition-colors disabled:opacity-50 text-[#6b7280] border-[#e2e4ef] hover:bg-[#f3f4f6]"
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>undo</span>
                 </button>
@@ -987,16 +987,16 @@ export default function FondoEmprenderPagosPage() {
 
             {/* Ventana deslizante de VENTANA_MESES meses — las flechas
                 desplazan de a un mes, entre Feb 2026 y el mes habilitado */}
-            <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-2 py-1.5 shadow-sm">
+            <div className="flex items-center gap-1 bg-white border border-[#e2e4ef] rounded-xl px-2 py-1.5 shadow-sm">
               <button
                 onClick={() => setMonthsBack(b => Math.min(b + 1, maxMonthsBack))}
                 disabled={monthsBack >= maxMonthsBack}
                 title="Meses anteriores"
-                className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
                 <span className="material-symbols-outlined text-xl">chevron_left</span>
               </button>
-              <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] px-1 min-w-[140px] text-center whitespace-nowrap">
+              <span className="text-xs font-semibold text-[#191c1e] px-1 min-w-[140px] text-center whitespace-nowrap">
                 {months.length > 0 && (
                   months.length === 1
                     ? `${MONTHS_SHORT[months[0].mes - 1]} ${months[0].anio}`
@@ -1007,7 +1007,7 @@ export default function FondoEmprenderPagosPage() {
                 onClick={() => setMonthsBack(b => Math.max(b - 1, 0))}
                 disabled={monthsBack <= 0}
                 title="Meses más recientes"
-                className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
               >
                 <span className="material-symbols-outlined text-xl">chevron_right</span>
               </button>
@@ -1015,7 +1015,7 @@ export default function FondoEmprenderPagosPage() {
           </div>
 
           <div
-            className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm"
+            className="bg-white rounded-xl border border-[#e2e4ef] shadow-sm"
             style={{ overflowX: 'auto' }}
           >
             {/* Ancho exacto según las columnas que haya (nunca más de
@@ -1054,7 +1054,7 @@ export default function FondoEmprenderPagosPage() {
                       boxShadow: '2px 0 4px rgba(0,0,0,0.04)',
                       overflow: 'hidden',
                     }}
-                    className="bg-white dark:bg-[#1e2030] text-[#434655] dark:text-[#c4c8e8] border-b-2 border-r-2 border-[#e2e4ef] dark:border-[#2e3148]"
+                    className="bg-white text-[#434655] border-b-2 border-r-2 border-[#e2e4ef]"
                   >
                     Empresa
                   </th>
@@ -1067,7 +1067,7 @@ export default function FondoEmprenderPagosPage() {
                         padding: '6px 4px',
                         whiteSpace: 'nowrap',
                       }}
-                      className="bg-white dark:bg-[#1e2030] text-[#434655] dark:text-[#c4c8e8] border-b border-l-2 border-[#e2e4ef] dark:border-[#2e3148]"
+                      className="bg-white text-[#434655] border-b border-l-2 border-[#e2e4ef]"
                     >
                       {MONTHS_SHORT[m.mes - 1]} {m.anio}
                     </th>
@@ -1079,13 +1079,13 @@ export default function FondoEmprenderPagosPage() {
                     <Fragment key={m.ym}>
                       <th
                         style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, padding: '4px 6px', width: 100, maxWidth: 100 }}
-                        className="bg-[#f8f9fe] dark:bg-[#252840] text-[#8890b5] dark:text-[#5a5f7a] border-b-2 border-l-2 border-[#e2e4ef] dark:border-[#2e3148]"
+                        className="bg-[#eef3ff] text-[#8890b5] border-b-2 border-l-2 border-[#e2e4ef]"
                       >
                         Envío
                       </th>
                       <th
                         style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, padding: '4px 6px', width: 100, maxWidth: 100 }}
-                        className="bg-[#f8f9fe] dark:bg-[#252840] text-[#8890b5] dark:text-[#5a5f7a] border-b-2 border-[#e2e4ef] dark:border-[#2e3148]"
+                        className="bg-[#eef3ff] text-[#8890b5] border-b-2 border-[#e2e4ef]"
                       >
                         Resultado
                       </th>
@@ -1098,7 +1098,7 @@ export default function FondoEmprenderPagosPage() {
                   <tr
                     key={row.empresa.id}
                     style={idx > 0 ? { borderTop: '1px solid #f0f2f8' } : undefined}
-                    className="dark:border-[#2e3148]"
+                    className=""
                   >
                     {/* Sticky empresa column */}
                     <td
@@ -1111,7 +1111,7 @@ export default function FondoEmprenderPagosPage() {
                         overflow: 'hidden',
                         whiteSpace: 'nowrap',
                       }}
-                      className="bg-white dark:bg-[#1e2030] border-r-2 border-[#e2e4ef] dark:border-[#2e3148]"
+                      className="bg-white border-r-2 border-[#e2e4ef]"
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         <span
@@ -1121,7 +1121,7 @@ export default function FondoEmprenderPagosPage() {
                           }}
                         />
                         <span
-                          className="text-[#191c1e] dark:text-[#e4e6f0] truncate"
+                          className="text-[#191c1e] truncate"
                           title={row.empresa.name}
                           style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}
                         >
@@ -1162,7 +1162,7 @@ export default function FondoEmprenderPagosPage() {
       {confirmMes && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setConfirmMes(null)}>
           <div
-            className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef] dark:border-[#2e3148]"
+            className="bg-white rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-3">
@@ -1172,11 +1172,11 @@ export default function FondoEmprenderPagosPage() {
               >
                 {confirmMes.tipo === 'habilitar' ? 'event_available' : 'undo'}
               </span>
-              <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
+              <p className="text-sm font-semibold text-[#191c1e]">
                 {confirmMes.tipo === 'habilitar' ? `¿Habilitar ${confirmMes.label}?` : `¿Volver a ${confirmMes.label}?`}
               </p>
             </div>
-            <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-4">
+            <p className="text-xs text-[#6b7280] mb-4">
               {confirmMes.tipo === 'habilitar'
                 ? 'Todas las empresas podrán empezar a tramitar ese mes.'
                 : 'Se ocultará el mes habilitado actualmente.'}
@@ -1184,7 +1184,7 @@ export default function FondoEmprenderPagosPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirmMes(null)}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] text-[#6b7280] hover:bg-[#f3f4f6] transition"
               >
                 Cancelar
               </button>

@@ -22,11 +22,11 @@ const fmtAbs = (n) => fmt(Math.abs(n ?? 0))
 // Fila del resumen de cifras
 function CifraRow({ label, value, isNeg, isBold, isTotal }) {
   return (
-    <div className={`flex items-center justify-between py-2 ${isTotal ? 'border-t border-[#e2e4ef] dark:border-[#2e3148] mt-1 pt-3' : ''}`}>
-      <span className={`text-sm ${isBold || isTotal ? 'font-semibold text-[#191c1e] dark:text-[#e4e6f0]' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
+    <div className={`flex items-center justify-between py-2 ${isTotal ? 'border-t border-[#e2e4ef] mt-1 pt-3' : ''}`}>
+      <span className={`text-sm ${isBold || isTotal ? 'font-semibold text-[#191c1e]' : 'text-[#6b7280]'}`}>
         {label}
       </span>
-      <span className={`text-sm tabular-nums font-medium ${isNeg ? 'text-red-600 dark:text-red-400' : 'text-[#191c1e] dark:text-[#e4e6f0]'} ${isBold || isTotal ? 'font-bold' : ''}`}>
+      <span className={`text-sm tabular-nums font-medium ${isNeg ? 'text-red-600' : 'text-[#191c1e]'} ${isBold || isTotal ? 'font-bold' : ''}`}>
         {isNeg ? `(${fmtAbs(value)})` : fmt(value)}
       </span>
     </div>
@@ -164,11 +164,11 @@ export default function DianExportacionPage() {
   if (cargando) {
     return (
       <div className="max-w-lg mx-auto mt-20 text-center">
-        <svg className="animate-spin h-10 w-10 text-[#004ac6] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <svg className="animate-spin h-10 w-10 text-[#E5A70C] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
-        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">Cargando borrador…</p>
+        <p className="mt-4 text-[#6b7280]">Cargando borrador…</p>
       </div>
     )
   }
@@ -176,9 +176,9 @@ export default function DianExportacionPage() {
   if (errorCarga) {
     return (
       <div className="max-w-lg mx-auto mt-20 text-center">
-        <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">error_outline</span>
-        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">{errorCarga}</p>
-        <button onClick={() => navigate('/dian/upload')} className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]" style={{ background: '#004ac6' }}>
+        <span className="material-symbols-outlined text-5xl text-[#d1d5db]">error_outline</span>
+        <p className="mt-4 text-[#6b7280]">{errorCarga}</p>
+        <button onClick={() => navigate('/dian/upload')} className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-[#20160A] hover:opacity-90 transition active:scale-[0.97]" style={{ background: '#E5A70C' }}>
           Subir otro reporte
         </button>
       </div>
@@ -193,18 +193,18 @@ export default function DianExportacionPage() {
       {/* ── Encabezado ──────────────────────────────────────────────────── */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#004ac6]">table_view</span>
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">
+          <span className="material-symbols-outlined text-3xl text-[#E5A70C]">table_view</span>
+          <h1 className="text-2xl font-bold text-[#191c1e]">
             Exportación
           </h1>
         </div>
-        <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
+        <p className="text-sm text-[#6b7280]">
           Revisa el resumen y descarga el Excel contable.
         </p>
       </div>
 
       {/* ── Checklist de pasos completados ──────────────────────────────── */}
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-5 mb-5">
+      <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-5 mb-5">
         <h2 className="text-xs font-bold text-[#8890b5] uppercase tracking-wide mb-3">
           Estado del proceso
         </h2>
@@ -222,14 +222,14 @@ export default function DianExportacionPage() {
           ].map((paso) => (
             <div key={paso} className="flex items-center gap-2.5">
               <span className="material-symbols-outlined text-green-500 text-lg flex-shrink-0">check_circle</span>
-              <span className="text-sm text-[#434655] dark:text-[#c4c8e8]">{paso}</span>
+              <span className="text-sm text-[#434655]">{paso}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* ── Cifras a exportar ───────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-5 mb-5">
+      <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-5 mb-5">
         <h2 className="text-xs font-bold text-[#8890b5] uppercase tracking-wide mb-3">
           Cifras a exportar
         </h2>
@@ -237,7 +237,7 @@ export default function DianExportacionPage() {
         {/* Nota: los valores exactos los calcula el backend al exportar. Aquí mostramos un
             preview calculado con la misma fórmula (shared/calcularNomina.js) a partir de lo
             guardado en el borrador. */}
-        <div className="divide-y divide-[#f0f2f8] dark:divide-[#2a2e45]">
+        <div className="divide-y divide-[#f0f2f8]">
           {tieneNomina && (
             <CifraRow label="Costo nómina total" value={calcNomina.costoNominaTotal} isNeg />
           )}
@@ -252,15 +252,15 @@ export default function DianExportacionPage() {
             </>
           )}
           {!tieneNomina && !tieneAutorretencion && (
-            <div className="py-2 text-sm text-[#9ca3af] dark:text-[#6b7280] italic">
+            <div className="py-2 text-sm text-[#9ca3af] italic">
               Sin nómina para este período
             </div>
           )}
         </div>
 
-        <div className="mt-3 pt-3 border-t border-[#f0f2f8] dark:border-[#2a2e45]">
-          <p className="text-xs text-[#9ca3af] dark:text-[#6b7280]">
-            El Excel incluye <span className="font-semibold text-[#434655] dark:text-[#c4c8e8]">varias hojas</span>:
+        <div className="mt-3 pt-3 border-t border-[#f0f2f8]">
+          <p className="text-xs text-[#9ca3af]">
+            El Excel incluye <span className="font-semibold text-[#434655]">varias hojas</span>:
             Resumen · IVA · Retenciones por Proveedor · Detalle Compras
             {empresaId ? ' · Conceptos' : ''}
             {tieneNomina ? ' · Nómina' : ''}{tieneAutorretencion ? ' · Autorretención' : ''} · Metadatos
@@ -271,21 +271,21 @@ export default function DianExportacionPage() {
 
       {/* ── Conflicto de guardado permanente ─────────────────────────────── */}
       {conflictoGuardado && (
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl shadow-sm p-5 mb-5">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl shadow-sm p-5 mb-5">
           <div className="flex items-start gap-3">
             <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">warning</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+              <p className="text-sm font-semibold text-amber-800">
                 Ya hay datos guardados para {conflictoGuardado.periodos.length === 1 ? 'este mes' : 'estos meses'} de esta empresa
               </p>
               <div className="mt-2 space-y-1">
                 {conflictoGuardado.periodos.map((p) => (
-                  <p key={`${p.anio}-${p.mes}`} className="text-xs text-amber-700 dark:text-amber-400">
+                  <p key={`${p.anio}-${p.mes}`} className="text-xs text-amber-700">
                     {MESES_ES[p.mes - 1]} {p.anio}: {p.existentes} ya guardada{p.existentes !== 1 ? 's' : ''}, {p.enElReporte} en este reporte
                   </p>
                 ))}
               </div>
-              <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
+              <p className="text-xs text-amber-700 mt-2">
                 <strong>Actualizar</strong> agrega lo nuevo y actualiza lo que cambió, conservando lo demás.{' '}
                 <strong>Reemplazar</strong> borra ese mes por completo y lo carga de nuevo con este reporte.
               </p>
@@ -293,21 +293,21 @@ export default function DianExportacionPage() {
                 <button
                   onClick={() => handleDescargar('actualizar')}
                   disabled={aplicandoModo != null}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#004ac6] text-white disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#E5A70C] text-[#20160A] disabled:opacity-50"
                 >
                   {aplicandoModo === 'actualizar' ? 'Actualizando…' : 'Actualizar'}
                 </button>
                 <button
                   onClick={() => handleDescargar('reemplazar')}
                   disabled={aplicandoModo != null}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-300 text-amber-800 disabled:opacity-50"
                 >
                   {aplicandoModo === 'reemplazar' ? 'Reemplazando…' : 'Reemplazar'}
                 </button>
                 <button
                   onClick={() => setConflictoGuardado(null)}
                   disabled={aplicandoModo != null}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-700 hover:underline disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -319,12 +319,12 @@ export default function DianExportacionPage() {
 
       {/* ── Panel de descarga / estado ───────────────────────────────────── */}
       {status !== 'done' ? (
-        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-6 mb-5">
+        <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-6 mb-5">
           <div className="flex flex-col items-center gap-4 py-2">
             {status === 'idle' && (
               <>
                 <span className="material-symbols-outlined text-5xl text-green-500">download</span>
-                <p className="text-sm text-[#6b7280] dark:text-[#8890b5] text-center">
+                <p className="text-sm text-[#6b7280] text-center">
                   El archivo se generará con todos los cálculos finales.
                 </p>
               </>
@@ -332,22 +332,22 @@ export default function DianExportacionPage() {
 
             {status === 'loading' && (
               <>
-                <svg className="animate-spin h-10 w-10 text-[#004ac6]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <svg className="animate-spin h-10 w-10 text-[#E5A70C]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                <p className="text-sm font-semibold text-[#434655] dark:text-[#c4c8e8]">
+                <p className="text-sm font-semibold text-[#434655]">
                   Generando Excel…
                 </p>
               </>
             )}
 
             {status === 'error' && (
-              <div className="w-full flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700">
+              <div className="w-full flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200">
                 <span className="material-symbols-outlined text-red-500 text-xl flex-shrink-0 mt-0.5">error</span>
                 <div>
-                  <p className="text-sm font-semibold text-red-700 dark:text-red-400">Error al generar el archivo</p>
-                  <p className="text-sm text-red-600 dark:text-red-400 mt-0.5">{errorMsg}</p>
+                  <p className="text-sm font-semibold text-red-700">Error al generar el archivo</p>
+                  <p className="text-sm text-red-600 mt-0.5">{errorMsg}</p>
                 </div>
               </div>
             )}
@@ -365,11 +365,11 @@ export default function DianExportacionPage() {
         </div>
       ) : (
         /* ── Estado COMPLETADO ────────────────────────────────────────── */
-        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-4 mb-5">
+        <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-4 mb-5">
           <div className="flex flex-col items-center gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
               <span className="material-symbols-outlined text-2xl text-green-500 flex-shrink-0">check_circle</span>
-              <p className="text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] truncate">{filename}</p>
+              <p className="text-sm font-semibold text-[#434655] truncate">{filename}</p>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap justify-center">
@@ -383,7 +383,7 @@ export default function DianExportacionPage() {
               </button>
               <button
                 onClick={() => navigate('/dian/upload')}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] dark:border-[#3a3e5c] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition active:scale-[0.97]"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] text-[#434655] hover:bg-[#f3f4f6] transition active:scale-[0.97]"
               >
                 <span className="material-symbols-outlined text-base">upload_file</span>
                 Procesar otro reporte
@@ -397,7 +397,7 @@ export default function DianExportacionPage() {
       {status !== 'done' && (
         <button
           onClick={() => navigate(`/dian/nomina/${borradorId}`)}
-          className="flex items-center gap-2 text-sm text-[#6b7280] dark:text-[#8890b5] hover:text-[#434655] dark:hover:text-[#c4c8e8] transition"
+          className="flex items-center gap-2 text-sm text-[#6b7280] hover:text-[#434655] transition"
         >
           <span className="material-symbols-outlined text-base">arrow_back</span>
           Volver a nómina

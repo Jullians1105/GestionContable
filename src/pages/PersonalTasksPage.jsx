@@ -29,7 +29,7 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
   }
 
   return (
-    <div className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#c3c6d7] dark:border-[#2e3148] p-4 shadow-sm">
+    <div className="bg-white rounded-xl border border-[#c3c6d7] p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <input
           type="checkbox"
@@ -37,19 +37,19 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
           onChange={() => onToggleTask(task)}
           className="mt-0.5 accent-[#004ac6] cursor-pointer w-4 h-4 flex-shrink-0"
         />
-        <span className={`flex-1 min-w-0 font-semibold text-sm ${task.completed ? 'line-through text-[#8890b5]' : 'text-[#191c1e] dark:text-[#e4e6f0]'}`}>
+        <span className={`flex-1 min-w-0 font-semibold text-sm ${task.completed ? 'line-through text-[#8890b5]' : 'text-[#191c1e]'}`}>
           {task.title}
         </span>
         <button
           onClick={handleOpenReminder}
-          className={`flex-shrink-0 transition ${task.reminderAt ? 'text-[#b45309]' : 'text-[#c3c6d7] dark:text-[#3e4260] hover:text-[#b45309]'}`}
+          className={`flex-shrink-0 transition ${task.reminderAt ? 'text-[#b45309]' : 'text-[#c3c6d7] hover:text-[#b45309]'}`}
           title={task.reminderAt ? `Recordatorio: ${formatReminder(task.reminderAt)}` : 'Agregar recordatorio (opcional)'}
         >
           <span className="material-symbols-outlined text-lg">{task.reminderAt ? 'notifications_active' : 'notification_add'}</span>
         </button>
         <button
           onClick={() => onDeleteTask(task.id)}
-          className="flex-shrink-0 text-[#c3c6d7] dark:text-[#3e4260] hover:text-[#EF4444] transition"
+          className="flex-shrink-0 text-[#c3c6d7] hover:text-[#EF4444] transition"
           title="Eliminar"
         >
           <span className="material-symbols-outlined text-lg">delete</span>
@@ -62,9 +62,9 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
             type="datetime-local"
             value={reminderInput}
             onChange={(e) => setReminderInput(e.target.value)}
-            className="flex-1 h-8 px-2 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-xs text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+            className="flex-1 h-8 px-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-xs text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
           />
-          <button onClick={handleSaveReminder} className="h-8 px-2.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition" style={{ background: '#004ac6' }}>
+          <button onClick={handleSaveReminder} className="h-8 px-2.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition" style={{ background: '#2563eb' }}>
             Guardar
           </button>
           {task.reminderAt && (
@@ -72,7 +72,7 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
               Quitar
             </button>
           )}
-          <button onClick={() => setEditingReminder(false)} className="h-8 px-2 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] hover:underline">
+          <button onClick={() => setEditingReminder(false)} className="h-8 px-2 text-xs font-semibold text-[#434655] hover:underline">
             Cancelar
           </button>
         </div>
@@ -80,26 +80,26 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
 
       {items.length > 0 && (
         <div className="mt-3 ml-7">
-          <div className="h-1.5 bg-[#edeef0] dark:bg-[#252840] rounded-full overflow-hidden">
+          <div className="h-1.5 bg-[#edeef0] rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-300"
-              style={{ width: `${pct}%`, background: '#004ac6' }}
+              style={{ width: `${pct}%`, background: '#E5A70C' }}
             />
           </div>
-          <p className="text-xs text-[#434655] dark:text-[#c4c8e8] mt-0.5">{completedCount}/{items.length} completado</p>
+          <p className="text-xs text-[#434655] mt-0.5">{completedCount}/{items.length} completado</p>
         </div>
       )}
 
       <div className="mt-2 ml-7 space-y-1">
         {items.map(item => (
-          <div key={item.id} className="flex items-center gap-2 group px-2 py-1 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition">
+          <div key={item.id} className="flex items-center gap-2 group px-2 py-1 rounded-lg hover:bg-[#edeef0] transition">
             <input
               type="checkbox"
               checked={item.completed}
               onChange={() => onToggleItem(task.id, item)}
               className="accent-[#004ac6] cursor-pointer"
             />
-            <span className={`flex-1 min-w-0 text-sm ${item.completed ? 'line-through text-[#888]' : 'text-[#191c1e] dark:text-[#e4e6f0]'}`}>
+            <span className={`flex-1 min-w-0 text-sm ${item.completed ? 'line-through text-[#888]' : 'text-[#191c1e]'}`}>
               {item.title}
             </span>
             <button
@@ -116,13 +116,13 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
             value={newItemTitle}
             onChange={(e) => setNewItemTitle(e.target.value)}
             placeholder="Agregar subtarea..."
-            className="flex-1 h-8 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+            className="flex-1 h-8 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition"
           />
           <button
             type="submit"
             disabled={!newItemTitle.trim()}
             className="h-8 px-2.5 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition hover:opacity-90"
-            style={{ background: '#004ac6' }}
+            style={{ background: '#003B43' }}
           >
             <span className="material-symbols-outlined text-base block">add</span>
           </button>
@@ -231,8 +231,8 @@ export default function PersonalTasksPage() {
   return (
     <div className="max-w-2xl mx-auto flex flex-col gap-5">
       <div>
-        <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Mis Pendientes</h1>
-        <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">
+        <h1 className="text-2xl font-bold text-[#191c1e]">Mis Pendientes</h1>
+        <p className="text-sm text-[#434655] mt-0.5">
           Un espacio personal para tus propias tareas — nadie más las ve.
         </p>
       </div>
@@ -242,13 +242,13 @@ export default function PersonalTasksPage() {
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder="Agregar un pendiente..."
-          className="flex-1 h-10 px-4 rounded-xl border border-[#c3c6d7] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+          className="flex-1 h-10 px-4 rounded-xl border border-[#c3c6d7] bg-white text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition"
         />
         <button
           type="submit"
           disabled={!newTitle.trim()}
           className="h-10 px-4 rounded-xl text-sm font-semibold text-white disabled:opacity-40 transition hover:opacity-90 active:scale-[0.97] flex items-center gap-1.5"
-          style={{ background: '#004ac6' }}
+          style={{ background: '#003B43' }}
         >
           <span className="material-symbols-outlined text-lg">add</span>
           Agregar
@@ -256,7 +256,7 @@ export default function PersonalTasksPage() {
       </form>
 
       {tasks.length > 0 && (
-        <label className="flex items-center gap-2 text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] cursor-pointer select-none">
+        <label className="flex items-center gap-2 text-xs font-semibold text-[#434655] cursor-pointer select-none">
           <input
             type="checkbox"
             checked={hideCompleted}
@@ -268,11 +268,11 @@ export default function PersonalTasksPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-[#8890b5] dark:text-[#5a5f7a]">
+        <div className="flex items-center justify-center py-16 text-[#8890b5]">
           <span className="material-symbols-outlined animate-spin">progress_activity</span>
         </div>
       ) : visibleTasks.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-[#8890b5] dark:text-[#5a5f7a]">
+        <div className="flex flex-col items-center gap-2 py-16 text-[#8890b5]">
           <span className="material-symbols-outlined text-4xl">checklist</span>
           <p className="text-sm">
             {tasks.length === 0 ? 'Todavía no agregaste ningún pendiente.' : 'Nada pendiente por acá.'}

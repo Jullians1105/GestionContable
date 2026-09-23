@@ -57,12 +57,12 @@ export default function NotificationsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Notificaciones</h1>
-          {unread > 0 && <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">{unread} sin leer</p>}
+          <h1 className="text-2xl font-bold text-[#191c1e]">Notificaciones</h1>
+          {unread > 0 && <p className="text-sm text-[#434655] mt-0.5">{unread} sin leer</p>}
         </div>
         <div className="flex gap-2">
           {unread > 0 && (
-            <button onClick={markAllAsRead} className="h-9 px-3 rounded-lg text-sm font-semibold border border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition">
+            <button onClick={markAllAsRead} className="h-9 px-3 rounded-lg text-sm font-semibold border border-[#c3c6d7] text-[#434655] hover:bg-[#edeef0] transition">
               Marcar todas como leídas
             </button>
           )}
@@ -74,11 +74,11 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] overflow-hidden">
+      <div className="bg-white rounded-2xl border border-[#c3c6d7] overflow-hidden">
         {notifications.length === 0 ? (
           <div className="py-20 text-center">
             <span className="material-symbols-outlined text-5xl text-[#c3c6d7]">notifications_none</span>
-            <p className="text-lg font-semibold text-[#434655] dark:text-[#c4c8e8] mt-3">Sin notificaciones</p>
+            <p className="text-lg font-semibold text-[#434655] mt-3">Sin notificaciones</p>
             <p className="text-sm text-[#888] mt-1">Aquí aparecerán las notificaciones de tus tareas</p>
           </div>
         ) : (
@@ -100,7 +100,7 @@ export default function NotificationsPage() {
               <div
                 key={n.id}
                 onClick={handleRowClick}
-                className={`flex items-start gap-4 px-5 py-4 border-b border-[#edeef0] dark:border-[#252840] last:border-0 ${!n.read ? 'bg-blue-50 dark:bg-[#1a2040]' : ''} ${(n.taskId || n.type === 'personal_task_reminder') ? 'cursor-pointer hover:bg-[#f3f4f6] dark:hover:bg-[#252840]' : ''} transition`}
+                className={`flex items-start gap-4 px-5 py-4 border-b border-[#edeef0] last:border-0 ${!n.read ? 'bg-blue-50' : ''} ${(n.taskId || n.type === 'personal_task_reminder') ? 'cursor-pointer hover:bg-[#f3f4f6]' : ''} transition`}
               >
                 <div className="relative flex-shrink-0">
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: `${meta.color}22` }}>
@@ -114,7 +114,7 @@ export default function NotificationsPage() {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0]">{n.message}</p>
+                  <p className="text-sm text-[#191c1e]">{n.message}</p>
                   <p className="text-xs text-[#888] mt-0.5">{timeAgo(n.createdAt)}</p>
                   {n.type === 'delete_request' && (
                     <div className="flex gap-2 mt-2" onClick={(e) => e.stopPropagation()}>
@@ -129,7 +129,7 @@ export default function NotificationsPage() {
                       <button
                         onClick={() => handleResolve(n, 'reject')}
                         disabled={resolvingId === n.id}
-                        className="h-8 px-3 rounded-lg text-xs font-semibold border border-[#c3c6d7] dark:border-[#2e3148] text-[#434655] dark:text-[#c4c8e8] disabled:opacity-40 hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+                        className="h-8 px-3 rounded-lg text-xs font-semibold border border-[#c3c6d7] text-[#434655] disabled:opacity-40 hover:bg-[#edeef0] transition"
                       >
                         Rechazar
                       </button>
@@ -138,7 +138,7 @@ export default function NotificationsPage() {
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                   {!n.read && (
-                    <button onClick={() => markAsRead(n.id)} className="p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] transition" title="Marcar como leída">
+                    <button onClick={() => markAsRead(n.id)} className="p-1.5 rounded-lg hover:bg-[#edeef0] transition" title="Marcar como leída">
                       <span className="material-symbols-outlined text-sm text-[#004ac6]">done</span>
                     </button>
                   )}

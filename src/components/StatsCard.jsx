@@ -39,11 +39,11 @@ export default function StatsCard({
 
   return (
     <div
-      className="h-full min-w-0 bg-white dark:bg-[#1e2030] p-6 rounded-xl shadow-sm border-l-4 flex flex-col justify-between hover:shadow-md transition-shadow"
+      className="h-full min-w-0 bg-white p-6 rounded-xl shadow-sm border-l-4 flex flex-col justify-between hover:shadow-md transition-shadow"
       style={{ borderLeftColor: borderColor }}
     >
       <div className="flex justify-between items-start">
-        <span className="text-[12px] font-semibold text-[#434655] dark:text-[#c4c8e8]">{title}</span>
+        <span className="text-[12px] font-semibold text-[#434655]">{title}</span>
         <span className="material-symbols-outlined" style={{ color: iconColor, fontSize: 22 }}>{icon}</span>
       </div>
       {monthLabel && (
@@ -52,23 +52,23 @@ export default function StatsCard({
             onClick={onPrevMonth}
             disabled={prevMonthDisabled}
             title="Mes anterior"
-            className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#8890b5] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#8890b5] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>chevron_left</span>
           </button>
-          <span className="text-[11px] font-medium text-[#8890b5] dark:text-[#5a5f7a] min-w-[64px] text-center">{monthLabel}</span>
+          <span className="text-[11px] font-medium text-[#8890b5] min-w-[64px] text-center">{monthLabel}</span>
           <button
             onClick={onNextMonth}
             disabled={nextMonthDisabled}
             title="Mes siguiente"
-            className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#8890b5] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#8890b5] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>chevron_right</span>
           </button>
         </div>
       )}
       <div className="mt-4">
-        <h3 className={`${tamañoValor} font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-none whitespace-nowrap`}>
+        <h3 className={`${tamañoValor} font-bold text-[#191c1e] leading-none whitespace-nowrap`}>
           <span ref={countUpRef} />
         </h3>
         {sub && (

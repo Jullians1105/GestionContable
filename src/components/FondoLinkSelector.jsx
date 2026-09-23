@@ -140,7 +140,7 @@ export default function FondoLinkSelector({ taskId = null, readOnly = false, onD
           <>
             <button
               onClick={() => setEditing(true)}
-              className="p-1 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] text-[#8890b5] hover:text-[#004ac6] transition"
+              className="p-1 rounded hover:bg-[#f3f4f6] text-[#8890b5] hover:text-[#004ac6] transition"
               title="Cambiar vínculo"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
@@ -175,7 +175,7 @@ export default function FondoLinkSelector({ taskId = null, readOnly = false, onD
 
   // ── Formulario de edición ─────────────────────────────────────────────────
   return (
-    <div className="rounded-xl border border-[#c4b5fd] bg-[#faf5ff] dark:bg-[#1e1530] p-3 space-y-3">
+    <div className="rounded-xl border border-[#c4b5fd] bg-[#faf5ff] p-3 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-bold text-[#7c3aed] uppercase tracking-wide flex items-center gap-1">
           <span className="material-symbols-outlined" style={{ fontSize: 13 }}>link</span>
@@ -183,7 +183,7 @@ export default function FondoLinkSelector({ taskId = null, readOnly = false, onD
         </span>
         <button
           onClick={() => { setEditing(false); setError(null) }}
-          className="p-0.5 rounded text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0] transition"
+          className="p-0.5 rounded text-[#8890b5] hover:text-[#191c1e] transition"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
         </button>
@@ -208,11 +208,11 @@ export default function FondoLinkSelector({ taskId = null, readOnly = false, onD
       </div>
 
       <div>
-        <label className="block text-[10px] font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1 uppercase tracking-wide">Empresa</label>
+        <label className="block text-[10px] font-semibold text-[#6b7280] mb-1 uppercase tracking-wide">Empresa</label>
         <select
           value={empresaId}
           onChange={e => setEmpresaId(e.target.value)}
-          className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#7c3aed]/30"
+          className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#7c3aed]/30"
         >
           <option value="">-- Seleccionar --</option>
           {empresas.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
@@ -221,11 +221,11 @@ export default function FondoLinkSelector({ taskId = null, readOnly = false, onD
 
       {linkType === 'macroproceso' && (
         <div>
-          <label className="block text-[10px] font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1 uppercase tracking-wide">Macroproceso</label>
+          <label className="block text-[10px] font-semibold text-[#6b7280] mb-1 uppercase tracking-wide">Macroproceso</label>
           <select
             value={macroId}
             onChange={e => setMacroId(e.target.value)}
-            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#7c3aed]/30"
+            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#7c3aed]/30"
           >
             {MACROS.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
           </select>
@@ -235,11 +235,11 @@ export default function FondoLinkSelector({ taskId = null, readOnly = false, onD
       {linkType === 'checklist' && (
         <>
           <div>
-            <label className="block text-[10px] font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1 uppercase tracking-wide">Proceso</label>
+            <label className="block text-[10px] font-semibold text-[#6b7280] mb-1 uppercase tracking-wide">Proceso</label>
             <select
               value={procesoId}
               onChange={e => setProcesoId(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#7c3aed]/30"
+              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#7c3aed]/30"
             >
               <option value="">-- Seleccionar --</option>
               {procesos.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -247,24 +247,24 @@ export default function FondoLinkSelector({ taskId = null, readOnly = false, onD
           </div>
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1 uppercase tracking-wide">Mes</label>
+              <label className="block text-[10px] font-semibold text-[#6b7280] mb-1 uppercase tracking-wide">Mes</label>
               <select
                 value={mes}
                 onChange={e => setMes(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#7c3aed]/30"
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#7c3aed]/30"
               >
                 {MONTHS.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
               </select>
             </div>
             <div className="flex-1">
-              <label className="block text-[10px] font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1 uppercase tracking-wide">Año</label>
+              <label className="block text-[10px] font-semibold text-[#6b7280] mb-1 uppercase tracking-wide">Año</label>
               <input
                 type="number"
                 value={anio}
                 min={2020}
                 max={2100}
                 onChange={e => setAnio(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#7c3aed]/30"
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#7c3aed]/30"
               />
             </div>
           </div>

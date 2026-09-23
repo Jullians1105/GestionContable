@@ -57,13 +57,13 @@ export default function RecurringTasksPage() {
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Tareas recurrentes</h1>
+          <h1 className="text-2xl font-bold text-[#191c1e]">Tareas recurrentes</h1>
           <p className="text-sm text-[#888] mt-0.5">Templates que generan instancias automáticamente al inicio de cada mes</p>
         </div>
         <button
           onClick={() => { setEditTask(null); setShowModal(true) }}
           className="flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition"
-          style={{ background: '#004ac6' }}
+          style={{ background: '#2563eb' }}
         >
           <span className="material-symbols-outlined text-base">add</span>
           Nuevo template
@@ -76,19 +76,19 @@ export default function RecurringTasksPage() {
         </div>
       ) : templates.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <span className="material-symbols-outlined text-5xl text-[#c3c6d7] dark:text-[#2e3148] mb-3">repeat</span>
+          <span className="material-symbols-outlined text-5xl text-[#c3c6d7] mb-3">repeat</span>
           <p className="text-[#888] text-sm">No hay templates recurrentes.</p>
           <p className="text-[#888] text-xs mt-1">Crea uno para automatizar tareas que se repiten cada mes.</p>
         </div>
       ) : (
         <div className="space-y-3">
           {templates.map(t => (
-            <div key={t.id} className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#c3c6d7] dark:border-[#2e3148] p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-[#dbe1ff] dark:bg-[#1e2252] flex items-center justify-center flex-shrink-0">
+            <div key={t.id} className="bg-white rounded-xl border border-[#c3c6d7] p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-[#dbe1ff] flex items-center justify-center flex-shrink-0">
                 <span className="material-symbols-outlined text-[#004ac6]">repeat</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">{t.title}</p>
+                <p className="text-sm font-semibold text-[#191c1e] truncate">{t.title}</p>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${PRIORITY_COLORS[t.priority]}`}>
                     {PRIORITY_LABELS[t.priority]}
@@ -116,14 +116,14 @@ export default function RecurringTasksPage() {
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
                   onClick={() => { setEditTask(t); setShowModal(true) }}
-                  className="p-2 rounded-lg text-[#434655] dark:text-[#c4c8e8] hover:text-[#004ac6] hover:bg-[#dbe1ff] transition"
+                  className="p-2 rounded-lg text-[#434655] hover:text-[#004ac6] hover:bg-[#dbe1ff] transition"
                   title="Editar"
                 >
                   <span className="material-symbols-outlined text-base">edit</span>
                 </button>
                 <button
                   onClick={() => handleDelete(t.id)}
-                  className="p-2 rounded-lg text-[#434655] dark:text-[#c4c8e8] hover:text-[#93000a] hover:bg-[#ffdad6] transition"
+                  className="p-2 rounded-lg text-[#434655] hover:text-[#93000a] hover:bg-[#ffdad6] transition"
                   title="Eliminar"
                 >
                   <span className="material-symbols-outlined text-base">delete</span>
