@@ -9,6 +9,8 @@ const normalizeEmpresa = (row) => ({
   name:      row.name,
   nit:       row.nit ?? null,
   activa:    row.activa,
+  vigenteHastaAnio: row.vigente_hasta_anio ?? null,
+  vigenteHastaMes:  row.vigente_hasta_mes  ?? null,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -43,11 +45,17 @@ const updateEmpresa = async (req, res, next) => {
     // (desasignar) — COALESCE no sirve para eso, mismo patrón que responsableId en
     // extEmpresasController.js.
     const nitProvided = Object.prototype.hasOwnProperty.call(req.body, 'nit');
+    // vigenteHasta* viaja como par (o los dos o ninguno, ver constraint de la
+    // migración 060) — mismo criterio de flag-de-presencia que nit.
+    const vigenciaProvided = Object.prototype.hasOwnProperty.call(req.body, 'vigenteHastaAnio')
+      || Object.prototype.hasOwnProperty.call(req.body, 'vigenteHastaMes');
     const result = await db.query(
       `UPDATE contab_empresas SET
         name   = COALESCE($1, name),
         activa = COALESCE($2, activa),
-        nit    = CASE WHEN $3 THEN $4 ELSE nit END
+        nit    = CASE WHEN $3 THEN $4 ELSE nit END,
+        vigente_hasta_anio = CASE WHEN $6 THEN $7 ELSE vigente_hasta_anio END,
+        vigente_hasta_mes  = CASE WHEN $6 THEN $8 ELSE vigente_hasta_mes END
        WHERE id = $5
        RETURNING *`,
       [
@@ -56,9 +64,12 @@ const updateEmpresa = async (req, res, next) => {
         nitProvided,
         req.body.nit ? req.body.nit.trim() : null,
         id,
+        vigenciaProvided,
+        req.body.vigenteHastaAnio ?? null,
+        req.body.vigenteHastaMes ?? null,
       ]
     );
-    await auditLog(req.user.userId, 'UPDATE', 'contab_empresas', id, { name, activa, nit: req.body.nit });
+    await auditLog(req.user.userId, 'UPDATE', 'contab_empresas', id, { name, activa, nit: req.body.nit, vigenteHastaAnio: req.body.vigenteHastaAnio, vigenteHastaMes: req.body.vigenteHastaMes });
     req.io.emit('contabilidad:updated', { empresaId: id, tipo: 'empresa' });
     res.json(normalizeEmpresa(result.rows[0]));
   } catch (err) {

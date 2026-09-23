@@ -8,6 +8,8 @@ const normalizeEmpresa = (row) => ({
   responsableNombre: row.responsable_nombre ?? null,
   contador:          row.contador ?? null,
   activa:            row.activa,
+  vigenteHastaAnio:  row.vigente_hasta_anio ?? null,
+  vigenteHastaMes:   row.vigente_hasta_mes  ?? null,
   createdAt:         row.created_at,
   updatedAt:         row.updated_at,
 });
@@ -54,12 +56,18 @@ const updateEmpresa = async (req, res, next) => {
     // mismo problema que codigo_siigo en fondoEmpresasController.js.
     const responsableIdProvided = Object.prototype.hasOwnProperty.call(req.body, 'responsableId');
     const contadorProvided = Object.prototype.hasOwnProperty.call(req.body, 'contador');
+    // vigenteHasta* viaja como par (o los dos o ninguno, ver constraint de la
+    // migración 060) — mismo criterio de flag-de-presencia que responsableId/contador.
+    const vigenciaProvided = Object.prototype.hasOwnProperty.call(req.body, 'vigenteHastaAnio')
+      || Object.prototype.hasOwnProperty.call(req.body, 'vigenteHastaMes');
     const result = await db.query(
       `UPDATE ext_empresas SET
         name           = COALESCE($1, name),
         activa         = COALESCE($2, activa),
         responsable_id = CASE WHEN $3 THEN $4 ELSE responsable_id END,
-        contador       = CASE WHEN $5 THEN $6 ELSE contador END
+        contador       = CASE WHEN $5 THEN $6 ELSE contador END,
+        vigente_hasta_anio = CASE WHEN $8 THEN $9 ELSE vigente_hasta_anio END,
+        vigente_hasta_mes  = CASE WHEN $8 THEN $10 ELSE vigente_hasta_mes END
        WHERE id = $7
        RETURNING *`,
       [
@@ -70,9 +78,12 @@ const updateEmpresa = async (req, res, next) => {
         contadorProvided,
         req.body.contador ? req.body.contador.trim() : null,
         id,
+        vigenciaProvided,
+        req.body.vigenteHastaAnio ?? null,
+        req.body.vigenteHastaMes ?? null,
       ]
     );
-    await auditLog(req.user.userId, 'UPDATE', 'ext_empresas', id, { name, activa, responsableId: req.body.responsableId, contador: req.body.contador });
+    await auditLog(req.user.userId, 'UPDATE', 'ext_empresas', id, { name, activa, responsableId: req.body.responsableId, contador: req.body.contador, vigenteHastaAnio: req.body.vigenteHastaAnio, vigenteHastaMes: req.body.vigenteHastaMes });
     req.io.emit('externas:updated', { empresaId: id, tipo: 'empresa' });
     res.json(normalizeEmpresa(result.rows[0]));
   } catch (err) {

@@ -12,6 +12,8 @@ const normalizeEmpresa = (row) => ({
   extEmpresaId:      row.ext_empresa_id ?? null,
   extEmpresaNombre:  row.ext_empresa_nombre ?? null,
   activa:            row.activa,
+  vigenteHastaAnio:  row.vigente_hasta_anio ?? null,
+  vigenteHastaMes:   row.vigente_hasta_mes  ?? null,
   createdAt:         row.created_at,
   updatedAt:         row.updated_at,
 });
@@ -66,6 +68,11 @@ const updateEmpresa = async (req, res, next) => {
     const responsableIdProvided = Object.prototype.hasOwnProperty.call(req.body, 'responsableId');
     const fondoEmpresaIdProvided = Object.prototype.hasOwnProperty.call(req.body, 'fondoEmpresaId');
     const extEmpresaIdProvided = Object.prototype.hasOwnProperty.call(req.body, 'extEmpresaId');
+    // vigenteHasta* viaja como par (o los dos o ninguno, ver constraint de la
+    // migración 059) — un solo flag basta para distinguir "no lo mandaron" de
+    // "lo mandaron en null" (quitar el límite, volver a "sin vencimiento").
+    const vigenciaProvided = Object.prototype.hasOwnProperty.call(req.body, 'vigenteHastaAnio')
+      || Object.prototype.hasOwnProperty.call(req.body, 'vigenteHastaMes');
 
     const result = await db.query(
       `UPDATE ne_empresas SET
@@ -74,7 +81,9 @@ const updateEmpresa = async (req, res, next) => {
         origen            = CASE WHEN $3 THEN $4 ELSE origen END,
         responsable_id    = CASE WHEN $5 THEN $6 ELSE responsable_id END,
         fondo_empresa_id  = CASE WHEN $7 THEN $8 ELSE fondo_empresa_id END,
-        ext_empresa_id    = CASE WHEN $9 THEN $10 ELSE ext_empresa_id END
+        ext_empresa_id    = CASE WHEN $9 THEN $10 ELSE ext_empresa_id END,
+        vigente_hasta_anio = CASE WHEN $12 THEN $13 ELSE vigente_hasta_anio END,
+        vigente_hasta_mes  = CASE WHEN $12 THEN $14 ELSE vigente_hasta_mes END
        WHERE id = $11
        RETURNING *`,
       [
@@ -85,10 +94,12 @@ const updateEmpresa = async (req, res, next) => {
         fondoEmpresaIdProvided, req.body.fondoEmpresaId ?? null,
         extEmpresaIdProvided, req.body.extEmpresaId ?? null,
         id,
+        vigenciaProvided, req.body.vigenteHastaAnio ?? null, req.body.vigenteHastaMes ?? null,
       ]
     );
     await auditLog(req.user.userId, 'UPDATE', 'ne_empresas', id, {
       name, activa, origen: req.body.origen, responsableId: req.body.responsableId, fondoEmpresaId: req.body.fondoEmpresaId, extEmpresaId: req.body.extEmpresaId,
+      vigenteHastaAnio: req.body.vigenteHastaAnio, vigenteHastaMes: req.body.vigenteHastaMes,
     });
     req.io.emit('nominaElectronica:updated', { empresaId: id, tipo: 'empresa' });
     res.json(await reload(id));

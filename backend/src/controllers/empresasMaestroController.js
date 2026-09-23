@@ -68,9 +68,13 @@ const getDirectorio = async (req, res, next) => {
       SELECT
         e.id, e.name, e.nit, e.tipo_contribuyente, e.cedula_representante, e.activa, e.created_at, e.updated_at,
         fe.id AS fondo_id, fe.categoria AS fondo_categoria, fe.monthly_fee AS fondo_monthly_fee,
+        fe.vigente_hasta_anio AS fondo_vigente_hasta_anio, fe.vigente_hasta_mes AS fondo_vigente_hasta_mes,
         ee.id AS ext_id, ee.responsable_id AS ext_responsable_id,
+        ee.vigente_hasta_anio AS ext_vigente_hasta_anio, ee.vigente_hasta_mes AS ext_vigente_hasta_mes,
         ne.id AS ne_id, ne.responsable_id AS ne_responsable_id,
-        ce.id AS contab_id, ce.nit AS contab_nit
+        ne.vigente_hasta_anio AS ne_vigente_hasta_anio, ne.vigente_hasta_mes AS ne_vigente_hasta_mes,
+        ce.id AS contab_id, ce.nit AS contab_nit,
+        ce.vigente_hasta_anio AS contab_vigente_hasta_anio, ce.vigente_hasta_mes AS contab_vigente_hasta_mes
       FROM empresas e
       LEFT JOIN fondo_empresas  fe ON fe.empresa_id = e.id
       LEFT JOIN ext_empresas    ee ON ee.empresa_id = e.id
@@ -81,10 +85,23 @@ const getDirectorio = async (req, res, next) => {
     res.json(rows.map((r) => ({
       ...normalizeEmpresa(r),
       modulos: {
-        fondo: r.fondo_id ? { id: r.fondo_id, categoria: r.fondo_categoria, monthlyFee: r.fondo_monthly_fee != null ? parseFloat(r.fondo_monthly_fee) : null } : null,
-        ext: r.ext_id ? { id: r.ext_id, responsableId: r.ext_responsable_id } : null,
-        ne: r.ne_id ? { id: r.ne_id, responsableId: r.ne_responsable_id } : null,
-        contab: r.contab_id ? { id: r.contab_id, nit: r.contab_nit } : null,
+        fondo: r.fondo_id ? {
+          id: r.fondo_id, categoria: r.fondo_categoria,
+          monthlyFee: r.fondo_monthly_fee != null ? parseFloat(r.fondo_monthly_fee) : null,
+          vigenteHastaAnio: r.fondo_vigente_hasta_anio ?? null, vigenteHastaMes: r.fondo_vigente_hasta_mes ?? null,
+        } : null,
+        ext: r.ext_id ? {
+          id: r.ext_id, responsableId: r.ext_responsable_id,
+          vigenteHastaAnio: r.ext_vigente_hasta_anio ?? null, vigenteHastaMes: r.ext_vigente_hasta_mes ?? null,
+        } : null,
+        ne: r.ne_id ? {
+          id: r.ne_id, responsableId: r.ne_responsable_id,
+          vigenteHastaAnio: r.ne_vigente_hasta_anio ?? null, vigenteHastaMes: r.ne_vigente_hasta_mes ?? null,
+        } : null,
+        contab: r.contab_id ? {
+          id: r.contab_id, nit: r.contab_nit,
+          vigenteHastaAnio: r.contab_vigente_hasta_anio ?? null, vigenteHastaMes: r.contab_vigente_hasta_mes ?? null,
+        } : null,
       },
     })));
   } catch (err) {
@@ -152,14 +169,19 @@ const getPosiblesDuplicados = async (req, res, next) => {
 // ── CRUD de identidad ────────────────────────────────────────────────────────────
 const createEmpresa = async (req, res, next) => {
   try {
-    const { name } = req.body;
+    const { name, nit, tipoContribuyente, cedulaRepresentante } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: 'El nombre es obligatorio' });
+    if (tipoContribuyente !== undefined && tipoContribuyente !== null
+        && !['empresa', 'natural'].includes(tipoContribuyente)) {
+      return res.status(400).json({ error: "tipoContribuyente debe ser 'empresa' o 'natural'" });
+    }
     const id = uuidv4();
     const result = await db.query(
-      'INSERT INTO empresas (id, name) VALUES ($1, $2) RETURNING *',
-      [id, name.trim().toUpperCase()]
+      `INSERT INTO empresas (id, name, nit, tipo_contribuyente, cedula_representante)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [id, name.trim().toUpperCase(), nit ?? null, tipoContribuyente ?? null, cedulaRepresentante ?? null]
     );
-    await auditLog(req.user.userId, 'CREATE', 'empresas', id, { name });
+    await auditLog(req.user.userId, 'CREATE', 'empresas', id, { name, nit, tipoContribuyente, cedulaRepresentante });
     req.io.emit('empresas:updated', { empresaId: id });
     res.status(201).json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
@@ -175,13 +197,28 @@ const updateEmpresa = async (req, res, next) => {
   const client = await db.getClient();
   try {
     const { id } = req.params;
-    const { name, activa } = req.body;
+    const { name, activa, nit, tipoContribuyente, cedulaRepresentante } = req.body;
     const nombreNuevo = name !== undefined ? name.trim().toUpperCase() : null;
+    if (tipoContribuyente !== undefined && tipoContribuyente !== null
+        && !['empresa', 'natural'].includes(tipoContribuyente)) {
+      return res.status(400).json({ error: "tipoContribuyente debe ser 'empresa' o 'natural'" });
+    }
+    // nit/cedulaRepresentante: flag-de-presencia (mismo criterio que vigenteHasta* en los
+    // controllers de módulo) — distingue "no vino en el body" (no tocar la columna) de "vino
+    // explícito en null" (vaciarla), algo que COALESCE no puede expresar.
+    const nitProvided = Object.prototype.hasOwnProperty.call(req.body, 'nit');
+    const cedulaProvided = Object.prototype.hasOwnProperty.call(req.body, 'cedulaRepresentante');
 
     await client.query('BEGIN');
     const result = await client.query(
-      `UPDATE empresas SET name = COALESCE($1, name), activa = COALESCE($2, activa) WHERE id = $3 RETURNING *`,
-      [nombreNuevo, activa ?? null, id]
+      `UPDATE empresas SET
+        name = COALESCE($1, name),
+        activa = COALESCE($2, activa),
+        nit = CASE WHEN $4 THEN $5 ELSE nit END,
+        tipo_contribuyente = COALESCE($6, tipo_contribuyente),
+        cedula_representante = CASE WHEN $7 THEN $8 ELSE cedula_representante END
+       WHERE id = $3 RETURNING *`,
+      [nombreNuevo, activa ?? null, id, nitProvided, nit ?? null, tipoContribuyente ?? null, cedulaProvided, cedulaRepresentante ?? null]
     );
     if (!result.rows[0]) {
       await client.query('ROLLBACK');
@@ -193,7 +230,7 @@ const updateEmpresa = async (req, res, next) => {
       }
     }
     await client.query('COMMIT');
-    await auditLog(req.user.userId, 'UPDATE', 'empresas', id, { name, activa });
+    await auditLog(req.user.userId, 'UPDATE', 'empresas', id, { name, activa, nit, tipoContribuyente, cedulaRepresentante });
     req.io.emit('empresas:updated', { empresaId: id });
     res.json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
