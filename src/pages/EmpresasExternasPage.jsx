@@ -610,18 +610,28 @@ export default function EmpresasExternasPage() {
   // Contador la key es RESPONSABLE_FILTER_KEY/CONTADOR_FILTER_KEY y los
   // valores son los nombres que realmente aparecen en esa columna. ─────────
 
+  // Empresas visibles en el módulo para el mes actual — activa + vigencia,
+  // mismo criterio que usa filteredCompanies más abajo (antes de aplicar
+  // buscador/filtros de columna) — se reutiliza acá para las opciones del
+  // dropdown de Responsable/Contador y para los stats del header (progreso
+  // general), así todo coincide con lo que realmente se ve en la grilla.
+  const visibleCompanies = companies.filter(c => {
+    if (!canEditStructure && c.activa === false) return false
+    if (!canEditStructure && c.vigenteHastaAnio
+        && (year * 12 + (month + 1)) > (c.vigenteHastaAnio * 12 + c.vigenteHastaMes)) return false
+    return true
+  })
+
   // Nombres únicos presentes en cada columna (incluye "(Sin asignar)" si hay
   // empresas sin ese dato) — son las opciones que ofrece el dropdown de
   // filtro, calculadas sobre TODAS las empresas visibles (no solo las que
   // sobreviven a otros filtros ya aplicados), igual que Excel.
   const responsableOptions = [...new Set(
-    companies.filter(c => canEditStructure || c.activa !== false)
-      .map(c => firstName(c.responsableNombre) || SIN_ASIGNAR)
+    visibleCompanies.map(c => firstName(c.responsableNombre) || SIN_ASIGNAR)
   )].sort((a, b) => a.localeCompare(b, 'es'))
 
   const contadorOptions = [...new Set(
-    companies.filter(c => canEditStructure || c.activa !== false)
-      .map(c => c.contador?.trim() || SIN_ASIGNAR)
+    visibleCompanies.map(c => c.contador?.trim() || SIN_ASIGNAR)
   )].sort((a, b) => a.localeCompare(b, 'es'))
 
   function optionsForFilterKey(key) {
@@ -1097,17 +1107,7 @@ export default function EmpresasExternasPage() {
   // ── filters: search + column filter ───────────────────────────────────────
 
   const q = search.toLowerCase()
-  const filteredCompanies = companies.filter(c => {
-    // Las inactivas solo se muestran en modo edición (para poder reactivarlas
-    // o borrarlas de verdad) — en la vista normal quedan fuera, igual que un
-    // proceso desactivado no aparece en meses nuevos.
-    if (!canEditStructure && c.activa === false) return false
-    // "vigente hasta" a nivel de empresa (se configura desde el directorio maestro,
-    // EmpresasPage.jsx) — igual que arriba con `activa`, solo se respeta fuera del modo
-    // edición, para que un admin pueda seguir viendo/corrigiendo meses pasados de una
-    // empresa ya vencida si hace falta.
-    if (!canEditStructure && c.vigenteHastaAnio
-        && (year * 12 + (month + 1)) > (c.vigenteHastaAnio * 12 + c.vigenteHastaMes)) return false
+  const filteredCompanies = visibleCompanies.filter(c => {
     // Solo empresa: Responsable/Contador ya tienen su propio filtro por
     // columna, no hace falta que el buscador también los cubra.
     const matchSearch = !q || c.name.toLowerCase().includes(q)
@@ -1123,8 +1123,8 @@ export default function EmpresasExternasPage() {
 
   // ── stats ──────────────────────────────────────────────────────────────
 
-  const totalCells = companies.length * visibleProcesses.length
-  const doneCells  = companies.reduce(
+  const totalCells = visibleCompanies.length * visibleProcesses.length
+  const doneCells  = visibleCompanies.reduce(
     (acc, c) => acc + visibleProcesses.filter(p => ['done', 'na'].includes(c.cells[p.id]?.status ?? 'pending')).length,
     0
   )
