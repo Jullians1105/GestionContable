@@ -130,12 +130,12 @@ const FILTER_STRIP_HEIGHT = 16
 // que ya usa colores hardcodeados sin variante dark, igual que el resto de
 // esa función.
 const GROUP_PALETTE = [
-  { bg: 'bg-[#f0f4ff] dark:bg-[#182544]', text: 'text-[#004ac6] dark:text-[#7ba8f0]', accent: '#004ac6', bgHex: '#f0f4ff',
-    confirmBg: 'bg-[#004ac6] dark:bg-[#7ba8f0]', confirmText: 'text-[#f0f4ff] dark:text-[#182544]' },
-  { bg: 'bg-[#f0fdf4] dark:bg-[#0d2e1a]', text: 'text-[#16a34a] dark:text-[#4ade80]', accent: '#16a34a', bgHex: '#f0fdf4',
-    confirmBg: 'bg-[#16a34a] dark:bg-[#4ade80]', confirmText: 'text-[#f0fdf4] dark:text-[#0d2e1a]' },
-  { bg: 'bg-[#fffbeb] dark:bg-[#2e2410]', text: 'text-[#d97706] dark:text-[#fbbf24]', accent: '#d97706', bgHex: '#fffbeb',
-    confirmBg: 'bg-[#d97706] dark:bg-[#fbbf24]', confirmText: 'text-[#fffbeb] dark:text-[#2e2410]' },
+  { bg: 'bg-[#f0f4ff]', text: 'text-[#004ac6]', accent: '#004ac6', bgHex: '#f0f4ff',
+    confirmBg: 'bg-[#004ac6]', confirmText: 'text-[#f0f4ff]' },
+  { bg: 'bg-[#f0fdf4]', text: 'text-[#16a34a]', accent: '#16a34a', bgHex: '#f0fdf4',
+    confirmBg: 'bg-[#16a34a]', confirmText: 'text-[#f0fdf4]' },
+  { bg: 'bg-[#fffbeb]', text: 'text-[#d97706]', accent: '#d97706', bgHex: '#fffbeb',
+    confirmBg: 'bg-[#d97706]', confirmText: 'text-[#fffbeb]' },
 ]
 
 const emptyCell = { status: 'pending', note: '', readonly: false, fuente: null }
@@ -172,13 +172,13 @@ function SortableProcessHeader({ proc, rowSpan, editable, groupColor, hasTopBord
   // celda vecina de la izquierda ya lo puso. Declarar los dos lados de una
   // misma línea compartida (como hacía antes) hace que se dibuje dos veces
   // encimada y se vea borrosa/gruesa en vez de una línea limpia.
-  const textClass = 'text-[#6b7280] dark:text-[#8890b5]'
+  const textClass = 'text-[#6b7280]'
   return (
     <th
       ref={setNodeRef}
       rowSpan={rowSpan}
       title={proc.name}
-      className="bg-[#f8f9fc] dark:bg-[#1a1d2e]"
+      className="bg-[#f8f9fc]"
       style={{
         width: COL_WIDTH, minWidth: COL_WIDTH, padding: 0,
         boxShadow: headerBoxShadow({
@@ -199,8 +199,8 @@ function SortableProcessHeader({ proc, rowSpan, editable, groupColor, hasTopBord
               onClick={(e) => onFilterClick(proc.id, e)}
               className={`flex items-center justify-center rounded transition-colors ${
                 hasFilter
-                  ? 'text-[#004ac6] dark:text-[#7ba8f0] bg-[#e8eefc] dark:bg-[#1a2444]'
-                  : 'text-[#b0b4c8] dark:text-[#4b5170] hover:text-[#6b7280] dark:hover:text-[#8890b5] hover:bg-[#edeef0] dark:hover:bg-[#252840]'
+                  ? 'text-[#004ac6] bg-[#eef3ff]'
+                  : 'text-[#b0b4c8] hover:text-[#6b7280] hover:bg-[#edeef0]'
               }`}
               style={{ width: 20, height: 14 }}
               title={hasFilter ? `Filtro activo — ${proc.name}` : `Filtrar "${proc.name}" por estado`}
@@ -229,7 +229,7 @@ function SortableProcessHeader({ proc, rowSpan, editable, groupColor, hasTopBord
           <div
             {...attributes}
             {...listeners}
-            className="flex items-center justify-center cursor-grab active:cursor-grabbing hover:brightness-95 dark:hover:brightness-125 transition flex-shrink-0"
+            className="flex items-center justify-center cursor-grab active:cursor-grabbing hover:brightness-95 transition flex-shrink-0"
             style={{ height: 12 }}
             title="Arrastrar para reordenar"
           >
@@ -252,14 +252,14 @@ function SortableProcessHeader({ proc, rowSpan, editable, groupColor, hasTopBord
           <div className="flex items-center justify-center gap-0.5 flex-shrink-0" style={{ height: 16 }}>
             <button
               onClick={() => startEditProcess(proc)}
-              className="p-0.5 rounded hover:bg-[#e2e4ef] dark:hover:bg-[#252840] text-[#6b7280] hover:text-[#004ac6] transition"
+              className="p-0.5 rounded hover:bg-[#e2e4ef] text-[#6b7280] hover:text-[#004ac6] transition"
               title="Editar nombre"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 12 }}>edit</span>
             </button>
             <button
               onClick={() => setDeleteConfirm({ type: 'proceso', id: proc.id, name: proc.name })}
-              className="p-0.5 rounded hover:bg-[#e2e4ef] dark:hover:bg-[#252840] text-[#6b7280] hover:text-red-500 transition"
+              className="p-0.5 rounded hover:bg-[#e2e4ef] text-[#6b7280] hover:text-red-500 transition"
               title="Eliminar"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 12 }}>delete</span>
@@ -365,7 +365,7 @@ function GroupHeaderCell({ grupo, procesos, collapsed, editable, paletteIndex, o
               if (e.key === 'Escape') setEditingGroup(null)
             }}
             onBlur={saveEditGroup}
-            className="w-full px-1 py-0.5 text-[11px] rounded border border-[#004ac6] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+            className="w-full px-1 py-0.5 text-[11px] rounded border border-[#004ac6] outline-none bg-white text-[#191c1e]"
           />
         </div>
       ) : showAsSingleCell ? (
@@ -396,14 +396,14 @@ function GroupHeaderCell({ grupo, procesos, collapsed, editable, paletteIndex, o
             <div className="flex items-center gap-0.5 flex-shrink-0">
               <button
                 onClick={() => startEditGroup(grupo)}
-                className={`p-0.5 rounded hover:bg-white/60 dark:hover:bg-black/20 transition ${palette.text}`}
+                className={`p-0.5 rounded hover:bg-white/60 transition ${palette.text}`}
                 title="Renombrar grupo"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
               </button>
               <button
                 onClick={() => setDeleteConfirm({ type: 'grupo', id: grupo.id, name: grupo.name })}
-                className="p-0.5 rounded hover:bg-white/60 dark:hover:bg-black/20 text-red-500 transition"
+                className="p-0.5 rounded hover:bg-white/60 text-red-500 transition"
                 title="Eliminar grupo (los procesos quedan sin grupo)"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 14 }}>delete</span>
@@ -1380,23 +1380,23 @@ export default function FondoEmprenderPage() {
                 if (e.key === 'Enter')  e.target.blur()
                 if (e.key === 'Escape') { codigoCancelRef.current = true; e.target.blur() }
               }}
-              className="w-full h-7 px-1 rounded border border-[#004ac6] bg-white dark:bg-[#1e2030] text-xs font-semibold text-center text-[#191c1e] dark:text-[#e4e6f0] outline-none"
+              className="w-full h-7 px-1 rounded border border-[#004ac6] bg-white text-xs font-semibold text-center text-[#191c1e] outline-none"
             />
           </div>
         ) : canEditStructure ? (
           <button
             onClick={() => setEditingCodigo({ companyId: company.id })}
             title={codigo ? `Código Siigo: ${codigo} — clic para editar` : 'Asignar código Siigo'}
-            className="w-full h-full px-1 flex items-center justify-center transition hover:bg-[#eef2ff] dark:hover:bg-[#252840]"
+            className="w-full h-full px-1 flex items-center justify-center transition hover:bg-[#eef2ff]"
           >
-            <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">
-              {codigo ?? <span className="text-[#c3c8dd] dark:text-[#5a5f7a]">—</span>}
+            <span className="text-xs font-semibold text-[#191c1e] truncate">
+              {codigo ?? <span className="text-[#c3c8dd]">—</span>}
             </span>
           </button>
         ) : (
           <div className="w-full h-full px-1 flex items-center justify-center" title={codigo ? `Código Siigo: ${codigo}` : undefined}>
-            <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">
-              {codigo ?? <span className="text-[#c3c8dd] dark:text-[#5a5f7a]">—</span>}
+            <span className="text-xs font-semibold text-[#191c1e] truncate">
+              {codigo ?? <span className="text-[#c3c8dd]">—</span>}
             </span>
           </div>
         )}
@@ -1540,7 +1540,7 @@ export default function FondoEmprenderPage() {
                   onClick={() => toggleEnviado(company.id, tipo)}
                   title="Marcar como enviada"
                   className="flex-1 h-8 rounded flex items-center justify-center transition hover:opacity-80"
-                  style={{ background: '#004ac6', color: '#fff' }}
+                  style={{ background: '#2563eb', color: '#fff' }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 15 }}>send</span>
                 </button>
@@ -1554,7 +1554,7 @@ export default function FondoEmprenderPage() {
 
   // ── loading / error states ────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
+    <div className="flex items-center justify-center py-20 text-[#8890b5]">
       <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
         progress_activity
       </span>
@@ -1568,7 +1568,7 @@ export default function FondoEmprenderPage() {
       <p className="text-sm text-[#ef4444]">{error}</p>
       <button
         onClick={fetchGrid}
-        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] hover:bg-[#f3f4f6] transition"
       >
         Reintentar
       </button>
@@ -1583,25 +1583,25 @@ export default function FondoEmprenderPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="material-symbols-outlined text-2xl text-[#004ac6]">table_chart</span>
-            <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Fondo Emprender</h1>
+            <span className="material-symbols-outlined text-2xl text-[#003B43]">table_chart</span>
+            <h1 className="text-xl font-bold text-[#191c1e]">Fondo Emprender</h1>
           </div>
-          <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">Seguimiento contable mensual</p>
+          <p className="text-sm text-[#6b7280]">Seguimiento contable mensual</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {/* Month navigator */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2 shadow-sm">
-            <button onClick={prevMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280]">
+          <div className="flex items-center gap-1 bg-white border border-[#e2e4ef] rounded-xl px-3 py-2 shadow-sm">
+            <button onClick={prevMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280]">
               <span className="material-symbols-outlined text-xl">chevron_left</span>
             </button>
-            <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] px-2 min-w-[130px] text-center">
+            <span className="text-sm font-semibold text-[#191c1e] px-2 min-w-[130px] text-center">
               {MONTHS[month]} {year}
             </span>
             <button
               onClick={nextMonth}
               disabled={atMesHabilitado}
               title={atMesHabilitado ? 'El mes en curso aún no está habilitado (mes vencido)' : undefined}
-              className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-xl">chevron_right</span>
             </button>
@@ -1624,9 +1624,9 @@ export default function FondoEmprenderPage() {
                 'flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition active:scale-[0.97] ' +
                 (editMode
                   ? 'text-white'
-                  : 'text-[#6b7280] dark:text-[#8890b5] border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]')
+                  : 'text-[#6b7280] border border-[#e2e4ef] hover:bg-[#f3f4f6]')
               }
-              style={editMode ? { background: '#004ac6' } : undefined}
+              style={editMode ? { background: '#2563eb' } : undefined}
               title="Crear, renombrar, borrar o reordenar grupos y procesos"
             >
               <span className="material-symbols-outlined text-lg">{editMode ? 'lock_open' : 'edit'}</span>
@@ -1646,12 +1646,12 @@ export default function FondoEmprenderPage() {
                   }}
                   onBlur={() => { if (!newGroupName.trim()) setAddingGroup(false); else handleAddGroup() }}
                   placeholder="Nombre del grupo..."
-                  className="px-3 py-2 text-sm rounded-xl border border-[#004ac6] outline-none bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0]"
+                  className="px-3 py-2 text-sm rounded-xl border border-[#004ac6] outline-none bg-white text-[#191c1e]"
                 />
               ) : (
                 <button
                   onClick={() => setAddingGroup(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#004ac6] dark:text-[#7ba8f0] border border-[#004ac6] dark:border-[#7ba8f0] hover:bg-[#004ac6]/5 transition active:scale-[0.97]"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#004ac6] border border-[#004ac6] hover:bg-[#2563eb]/5 transition active:scale-[0.97]"
                   title="Agrupar procesos relacionados en una sola columna con sub-columnas"
                 >
                   <span className="material-symbols-outlined text-lg">create_new_folder</span>
@@ -1661,7 +1661,7 @@ export default function FondoEmprenderPage() {
               <button
                 onClick={openCreateProcesoModal}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-                style={{ background: '#004ac6' }}
+                style={{ background: '#2563eb' }}
               >
                 <span className="material-symbols-outlined text-lg">add_column_right</span>
                 Nuevo proceso
@@ -1675,7 +1675,7 @@ export default function FondoEmprenderPage() {
       <div className="flex items-center gap-3 flex-wrap">
 
         {/* Segment control / pills */}
-        <div className="flex items-center bg-[#f0f2f8] dark:bg-[#252840] rounded-xl p-1 gap-0.5 flex-shrink-0">
+        <div className="flex items-center bg-[#f0f2f8] rounded-xl p-1 gap-0.5 flex-shrink-0">
           {tabs.map(({ key, label, count }) => {
             const active = activeTab === key
             return (
@@ -1684,8 +1684,8 @@ export default function FondoEmprenderPage() {
                 onClick={() => setActiveTab(key)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
                   active
-                    ? 'bg-white dark:bg-[#1e2030] text-[#004ac6] dark:text-[#7ba8f0] shadow-sm'
-                    : 'text-[#6b7280] dark:text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0]'
+                    ? 'bg-white text-[#003B43] shadow-sm'
+                    : 'text-[#6b7280] hover:text-[#191c1e]'
                 }`}
               >
                 {label}
@@ -1693,7 +1693,7 @@ export default function FondoEmprenderPage() {
                   className="text-[10px] font-bold px-1.5 py-0.5 rounded-full transition-colors"
                   style={
                     active
-                      ? { background: '#004ac6', color: '#fff' }
+                      ? { background: '#003B43', color: '#fff' }
                       : { background: '#e2e4ef', color: '#6b7280' }
                   }
                 >
@@ -1716,7 +1716,7 @@ export default function FondoEmprenderPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar empresa..."
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
           />
         </div>
 
@@ -1724,7 +1724,7 @@ export default function FondoEmprenderPage() {
         {activeColumnFilterCount > 0 && (
           <button
             onClick={() => setColumnFilters({})}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold flex-shrink-0 transition hover:opacity-80 bg-[#e8eefc] dark:bg-[#1a2444] text-[#004ac6] dark:text-[#7ba8f0]"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold flex-shrink-0 transition hover:opacity-80 bg-[#eef3ff] text-[#004ac6]"
             title="Quitar todos los filtros de columna"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>filter_alt</span>
@@ -1736,9 +1736,9 @@ export default function FondoEmprenderPage() {
 
       {/* ── Legacy data recovery banner ─────────────────────────────────── */}
       {migrationReport && migrationReport.length > 0 && (
-        <div className="bg-[#fef9c3] dark:bg-[#3a3312] border border-[#eab308] rounded-xl p-3 flex items-start gap-2.5">
+        <div className="bg-[#fef9c3] border border-[#eab308] rounded-xl p-3 flex items-start gap-2.5">
           <span className="material-symbols-outlined text-[#d97706] flex-shrink-0" style={{ fontSize: 18 }}>warning</span>
-          <div className="flex-1 text-xs text-[#7a5b00] dark:text-[#f0d878]">
+          <div className="flex-1 text-xs text-[#7a5b00]">
             <p className="font-semibold mb-0.5">Datos locales no recuperados automáticamente</p>
             <p>
               Se encontró información guardada en este navegador para {migrationReport.length === 1 ? 'una empresa' : `${migrationReport.length} empresas`}{' '}
@@ -1747,7 +1747,7 @@ export default function FondoEmprenderPage() {
           </div>
           <button
             onClick={() => { dismissMigrationReport(); setMigrationReport(null) }}
-            className="text-[#7a5b00] dark:text-[#f0d878] hover:opacity-70 transition flex-shrink-0"
+            className="text-[#7a5b00] hover:opacity-70 transition flex-shrink-0"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 16 }}>close</span>
           </button>
@@ -1755,17 +1755,17 @@ export default function FondoEmprenderPage() {
       )}
 
       {/* ── Progress bar ─────────────────────────────────────────────────── */}
-      <div className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] p-4 shadow-sm flex items-center gap-4">
+      <div className="bg-white rounded-xl border border-[#e2e4ef] p-4 shadow-sm flex items-center gap-4">
         <div className="flex-1">
           <div className="flex justify-between mb-1.5">
-            <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0]">Progreso general</span>
+            <span className="text-xs font-semibold text-[#191c1e]">Progreso general</span>
             <span className="text-xs font-bold text-[#16a34a]">{pct}%</span>
           </div>
-          <div className="w-full h-2 rounded-full bg-[#f3f4f6] dark:bg-[#252840]">
+          <div className="w-full h-2 rounded-full bg-[#f3f4f6]">
             <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: '#16a34a' }} />
           </div>
         </div>
-        <span className="text-xs text-[#6b7280] dark:text-[#8890b5] whitespace-nowrap">
+        <span className="text-xs text-[#6b7280] whitespace-nowrap">
           {doneCells} / {totalCells} tareas
         </span>
       </div>
@@ -1796,7 +1796,7 @@ export default function FondoEmprenderPage() {
           tapado/parpadeando — no vale la pena la complejidad si ya está la
           barra real. */}
       <div
-        className="overflow-auto rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm scrollbar-styled"
+        className="overflow-auto rounded-xl border border-[#e2e4ef] shadow-sm scrollbar-styled"
         style={{ maxHeight: 'calc(100vh - 6rem)' }}
       >
         <DndContext sensors={sensors} collisionDetection={collisionDetectionStrategy} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -1835,7 +1835,7 @@ export default function FondoEmprenderPage() {
                     angosta sin que el texto la ensanche. */}
                 <th
                   rowSpan={2}
-                  className="sticky left-0 top-0 z-30 bg-[#f8f9fc] dark:bg-[#1a1d2e] text-center text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
+                  className="sticky left-0 top-0 z-30 bg-[#f8f9fc] text-center text-[10px] font-bold text-[#6b7280] uppercase tracking-wide"
                   style={{
                     width: CODIGO_COL_WIDTH, minWidth: CODIGO_COL_WIDTH, verticalAlign: 'bottom', padding: '6px 4px 8px',
                     boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, left: BORDER, right: BORDER_COL }),
@@ -1852,7 +1852,7 @@ export default function FondoEmprenderPage() {
                 {/* Company column header */}
                 <th
                   rowSpan={2}
-                  className="sticky top-0 z-30 bg-[#f8f9fc] dark:bg-[#1a1d2e] text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide"
+                  className="sticky top-0 z-30 bg-[#f8f9fc] text-left text-[10px] font-bold text-[#6b7280] uppercase tracking-wide"
                   style={{
                     left: CODIGO_COL_WIDTH,
                     width: EMPRESA_COL_WIDTH, minWidth: EMPRESA_COL_WIDTH, verticalAlign: 'bottom', padding: '6px 8px 8px',
@@ -1942,7 +1942,7 @@ export default function FondoEmprenderPage() {
                 <tr>
                   <td
                     colSpan={totalLeafColumns}
-                    className="text-center py-10 text-xs text-[#8890b5] dark:text-[#5a5f7a]"
+                    className="text-center py-10 text-xs text-[#8890b5]"
                   >
                     {search || activeTab !== 'todas' || activeColumnFilterCount > 0
                       ? 'No hay empresas que coincidan con el filtro'
@@ -1951,7 +1951,7 @@ export default function FondoEmprenderPage() {
                 </tr>
               )}
               {filteredCompanies.map((company, idx) => {
-                const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fbff'
+                const rowBg = idx % 2 === 0 ? '#ffffff' : '#F5F9F9'
                 return (
                   <tr key={company.id} style={{ background: rowBg }}>
 
@@ -1975,7 +1975,7 @@ export default function FondoEmprenderPage() {
                       }}
                     >
                       <div className="flex items-center h-full px-2">
-                        <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={company.name}>
+                        <span className="text-xs font-semibold text-[#191c1e] truncate flex-1 min-w-0" title={company.name}>
                           {company.name}
                         </span>
                       </div>
@@ -2044,7 +2044,7 @@ export default function FondoEmprenderPage() {
           <DragOverlay>
             {activeDragProc && (
               <div
-                className="px-3 py-1.5 rounded-lg shadow-lg text-xs font-semibold bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] border border-[#004ac6]"
+                className="px-3 py-1.5 rounded-lg shadow-lg text-xs font-semibold bg-white text-[#191c1e] border border-[#004ac6]"
               >
                 {activeDragProc.name}
               </div>
@@ -2058,12 +2058,12 @@ export default function FondoEmprenderPage() {
         {Object.entries(STATUS).map(([key, cfg]) => (
           <div key={key} className="flex items-center gap-1.5">
             <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 16 }}>{cfg.icon}</span>
-            <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">{cfg.label}</span>
+            <span className="text-xs text-[#6b7280]">{cfg.label}</span>
           </div>
         ))}
         <div className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
-          <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">Tiene nota</span>
+          <span className="text-xs text-[#6b7280]">Tiene nota</span>
         </div>
       </div>
 
@@ -2071,10 +2071,10 @@ export default function FondoEmprenderPage() {
       {openCell && openProcess && (
         <div
           ref={dropdownRef}
-          className="fixed z-50 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-2xl p-4 w-64"
+          className="fixed z-50 bg-white border border-[#e2e4ef] rounded-xl shadow-2xl p-4 w-64"
           style={{ left: openCell.left, top: openCell.top }}
         >
-          <p className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-3 truncate" title={openProcess.name}>
+          <p className="text-[11px] font-bold text-[#191c1e] mb-3 truncate" title={openProcess.name}>
             {openProcess.name}
           </p>
           <div className="grid grid-cols-2 gap-1.5 mb-3">
@@ -2106,7 +2106,7 @@ export default function FondoEmprenderPage() {
             }}
             onBlur={e => handleNoteBlur(openCell.companyId, openCell.procId, e.target.value)}
             placeholder="Nota opcional..."
-            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
             style={{ minHeight: 52, overflowY: 'hidden' }}
           />
           <div className="mt-2 flex items-center gap-2">
@@ -2119,7 +2119,7 @@ export default function FondoEmprenderPage() {
             </button>
             <button
               onClick={() => { flushPendingNote(); setOpenCell(null) }}
-              className="flex-1 py-1 text-xs text-[#6b7280] hover:text-[#191c1e] dark:hover:text-[#e4e6f0] transition text-center"
+              className="flex-1 py-1 text-xs text-[#6b7280] hover:text-[#191c1e] transition text-center"
             >
               Cerrar
             </button>
@@ -2131,12 +2131,12 @@ export default function FondoEmprenderPage() {
       {openFilter && openFilterProcess && (
         <div
           ref={filterDropdownRef}
-          className="fixed z-50 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-2xl p-3 w-52"
+          className="fixed z-50 bg-white border border-[#e2e4ef] rounded-xl shadow-2xl p-3 w-52"
           style={{ left: openFilter.left, top: openFilter.top }}
         >
           <div className="flex items-center justify-between gap-2 mb-2">
             <p
-              className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0"
+              className="text-[11px] font-bold text-[#191c1e] truncate flex-1 min-w-0"
               title={openFilterProcess.name}
             >
               {openFilterProcess.name}
@@ -2144,7 +2144,7 @@ export default function FondoEmprenderPage() {
             {columnFilters[openFilter.procId] && (
               <button
                 onClick={() => clearColumnFilter(openFilter.procId)}
-                className="text-[10px] font-semibold text-[#004ac6] dark:text-[#7ba8f0] hover:underline flex-shrink-0"
+                className="text-[10px] font-semibold text-[#004ac6] hover:underline flex-shrink-0"
               >
                 Limpiar
               </button>
@@ -2158,11 +2158,11 @@ export default function FondoEmprenderPage() {
             return (
               <button
                 onClick={() => toggleSelectAllFilter(openFilter.procId)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840] mb-1"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] mb-1"
               >
                 <span
                   className={`flex items-center justify-center rounded flex-shrink-0 ${
-                    noneChecked ? 'border-[#c3c6d7] dark:border-[#3e4260]' : ''
+                    noneChecked ? 'border-[#c3c6d7]' : ''
                   }`}
                   style={{
                     width: 15, height: 15,
@@ -2177,11 +2177,11 @@ export default function FondoEmprenderPage() {
                     </span>
                   )}
                 </span>
-                <span className="font-bold text-[#191c1e] dark:text-[#e4e6f0]">Seleccionar todo</span>
+                <span className="font-bold text-[#191c1e]">Seleccionar todo</span>
               </button>
             )
           })()}
-          <div className="h-px bg-[#e2e4ef] dark:bg-[#2e3148] mb-1" />
+          <div className="h-px bg-[#e2e4ef] mb-1" />
           <div className="flex flex-col gap-0.5">
             {Object.entries(STATUS).map(([key, cfg]) => {
               const checked = isStatusChecked(openFilter.procId, key)
@@ -2189,10 +2189,10 @@ export default function FondoEmprenderPage() {
                 <button
                   key={key}
                   onClick={() => toggleStatusFilter(openFilter.procId, key)}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6]"
                 >
                   <span
-                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7] dark:border-[#3e4260]' : ''}`}
+                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7]' : ''}`}
                     style={{
                       width: 15, height: 15,
                       borderWidth: 1.5, borderStyle: 'solid',
@@ -2203,7 +2203,7 @@ export default function FondoEmprenderPage() {
                     {checked && <span className="material-symbols-outlined text-white" style={{ fontSize: 11 }}>check</span>}
                   </span>
                   <span className="material-symbols-outlined flex-shrink-0" style={{ color: cfg.color, fontSize: 14 }}>{cfg.icon}</span>
-                  <span className="font-medium text-[#191c1e] dark:text-[#e4e6f0]">{cfg.label}</span>
+                  <span className="font-medium text-[#191c1e]">{cfg.label}</span>
                 </button>
               )
             })}
@@ -2255,20 +2255,20 @@ export default function FondoEmprenderPage() {
       {procesoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={closeProcesoModal}>
           <div
-            className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-[#e2e4ef] dark:border-[#2e3148]"
+            className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}
           >
-            <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] mb-4">
+            <p className="text-sm font-semibold text-[#191c1e] mb-4">
               {procesoModal.mode === 'create' ? 'Nuevo proceso' : 'Editar proceso'}
             </p>
 
-            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Nombre</label>
+            <label className="block text-xs font-semibold text-[#6b7280] mb-1">Nombre</label>
             <input
               autoFocus
               value={procesoModal.name}
               onChange={e => setProcesoModal(m => ({ ...m, name: e.target.value }))}
               onKeyDown={e => { if (e.key === 'Enter') submitProcesoModal() }}
-              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] outline-none focus:border-[#003B43] bg-white text-[#191c1e]"
             />
 
             {procesoModal.mode === 'create' && (
@@ -2286,7 +2286,7 @@ export default function FondoEmprenderPage() {
               )
             })()}
 
-            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">
+            <label className="block text-xs font-semibold text-[#6b7280] mb-1">
               ¿Hasta cuándo aplica?
             </label>
             <div className="flex flex-col gap-1.5 mb-5">
@@ -2295,7 +2295,7 @@ export default function FondoEmprenderPage() {
                 { value: 'esteMes',  label: `Solo ${MONTHS[month]} ${year}` },
                 { value: 'porMeses', label: 'Por una cantidad de meses' },
               ].map(opt => (
-                <label key={opt.value} className="flex items-center gap-2 text-xs text-[#191c1e] dark:text-[#e4e6f0] cursor-pointer">
+                <label key={opt.value} className="flex items-center gap-2 text-xs text-[#191c1e] cursor-pointer">
                   <input
                     type="radio"
                     checked={procesoModal.hastaMode === opt.value}
@@ -2312,7 +2312,7 @@ export default function FondoEmprenderPage() {
                     min={1}
                     value={procesoModal.porMeses}
                     onChange={e => setProcesoModal(m => ({ ...m, porMeses: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
-                    className="w-16 px-2 py-1 text-xs rounded border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+                    className="w-16 px-2 py-1 text-xs rounded border border-[#e2e4ef] outline-none focus:border-[#003B43] bg-white text-[#191c1e]"
                   />
                   <span className="text-xs text-[#8890b5]">
                     meses — hasta {(() => {
@@ -2327,7 +2327,7 @@ export default function FondoEmprenderPage() {
             <div className="flex gap-2">
               <button
                 onClick={closeProcesoModal}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] text-[#6b7280] hover:bg-[#f3f4f6] transition"
               >
                 Cancelar
               </button>
@@ -2335,7 +2335,7 @@ export default function FondoEmprenderPage() {
                 onClick={submitProcesoModal}
                 disabled={!procesoModal.name.trim()}
                 className="flex-1 py-2 text-xs font-semibold rounded-lg text-white transition disabled:opacity-40"
-                style={{ background: '#004ac6' }}
+                style={{ background: '#2563eb' }}
               >
                 {procesoModal.mode === 'create' ? 'Crear' : 'Guardar'}
               </button>
@@ -2348,25 +2348,25 @@ export default function FondoEmprenderPage() {
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setDeleteConfirm(null)}>
           <div
-            className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef] dark:border-[#2e3148]"
+            className="bg-white rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-3">
               <span className="material-symbols-outlined text-red-500 text-2xl">warning</span>
-              <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
+              <p className="text-sm font-semibold text-[#191c1e]">
                 ¿Eliminar {deleteConfirm.type === 'grupo' ? 'grupo' : 'proceso'}?
               </p>
             </div>
-            <p className={`text-xs text-[#6b7280] dark:text-[#8890b5] truncate ${deleteConfirm.type === 'grupo' ? 'mb-1' : 'mb-4'}`}>
+            <p className={`text-xs text-[#6b7280] truncate ${deleteConfirm.type === 'grupo' ? 'mb-1' : 'mb-4'}`}>
               &ldquo;{deleteConfirm.name}&rdquo;
             </p>
             {deleteConfirm.type === 'grupo' && (
-              <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-3">Sus procesos no se borran, quedan sin grupo.</p>
+              <p className="text-xs text-[#6b7280] mb-3">Sus procesos no se borran, quedan sin grupo.</p>
             )}
             <div className="flex gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] text-[#6b7280] hover:bg-[#f3f4f6] transition"
               >
                 Cancelar
               </button>

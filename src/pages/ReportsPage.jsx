@@ -393,40 +393,40 @@ export default function ReportsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Reportes</h1>
-        <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">Analiza el rendimiento de tu equipo</p>
+        <h1 className="text-2xl font-bold text-[#191c1e]">Reportes</h1>
+        <p className="text-sm text-[#434655] mt-0.5">Analiza el rendimiento de tu equipo</p>
       </div>
 
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-5 mb-5">
-        <h2 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-4">Filtros</h2>
+      <div className="bg-white rounded-2xl border border-[#c3c6d7] p-5 mb-5">
+        <h2 className="text-sm font-bold text-[#191c1e] mb-4">Filtros</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Tipo de reporte</label>
+            <label className="block text-xs font-semibold text-[#434655] mb-1.5">Tipo de reporte</label>
             <select
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]"
             >
               {REPORT_TYPES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Grupo</label>
+            <label className="block text-xs font-semibold text-[#434655] mb-1.5">Grupo</label>
             <select
               value={filters.groupId}
               onChange={(e) => setFilters({ ...filters, groupId: e.target.value })}
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]"
             >
               <option value="">Todos los grupos</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Miembro</label>
+            <label className="block text-xs font-semibold text-[#434655] mb-1.5">Miembro</label>
             <select
               value={filters.memberId}
               onChange={(e) => setFilters({ ...filters, memberId: e.target.value })}
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]"
             >
               <option value="">Todos</option>
               {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -434,19 +434,19 @@ export default function ReportsPage() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Desde</label>
-              <input type="date" value={filters.dateFrom} onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]" />
+              <label className="block text-xs font-semibold text-[#434655] mb-1.5">Desde</label>
+              <input type="date" value={filters.dateFrom} onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Hasta</label>
-              <input type="date" value={filters.dateTo} onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]" />
+              <label className="block text-xs font-semibold text-[#434655] mb-1.5">Hasta</label>
+              <input type="date" value={filters.dateTo} onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]" />
             </div>
           </div>
         </div>
         <button
           onClick={() => { setGenerated(true); setOpenMembers(new Set()) }}
           className="mt-4 flex items-center gap-2 h-10 px-5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition"
-          style={{ background: '#004ac6' }}
+          style={{ background: '#2563eb' }}
         >
           <span className="material-symbols-outlined text-base">bar_chart</span>
           Generar Reporte
@@ -454,11 +454,11 @@ export default function ReportsPage() {
       </div>
 
       {generated && reportData && (
-        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-5">
+        <div className="bg-white rounded-2xl border border-[#c3c6d7] p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0]">{REPORT_TYPES.find((r) => r.value === filters.type)?.label}</h2>
-              <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">{totalCompleted} tareas completadas en este período</p>
+              <h2 className="text-sm font-bold text-[#191c1e]">{REPORT_TYPES.find((r) => r.value === filters.type)?.label}</h2>
+              <p className="text-sm text-[#434655] mt-0.5">{totalCompleted} tareas completadas en este período</p>
             </div>
             <div className="flex gap-2">
               <button onClick={handleExportPDF} className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition" style={{ background: '#EF4444' }}>
@@ -476,26 +476,26 @@ export default function ReportsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#edeef0] dark:border-[#252840]">
+                  <tr className="border-b border-[#edeef0]">
                     {['Nombre', 'Completadas', 'En Progreso', 'Pendientes', 'Total', '% Completado'].map((h) => (
-                      <th key={h} className="text-left text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] py-2 px-3">{h}</th>
+                      <th key={h} className="text-left text-xs font-semibold text-[#434655] py-2 px-3">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {reportData.map((r) => (
-                    <tr key={r.name} className="border-b border-[#edeef0] dark:border-[#252840] hover:bg-[#f8f9ff] dark:hover:bg-[#252840]">
-                      <td className="py-2 px-3 font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{r.name}</td>
+                    <tr key={r.name} className="border-b border-[#edeef0] hover:bg-[#eef3ff]">
+                      <td className="py-2 px-3 font-semibold text-[#191c1e]">{r.name}</td>
                       <td className="py-2 px-3"><span className="text-[#10B981] font-semibold">{r.completed}</span></td>
                       <td className="py-2 px-3"><span className="text-[#004ac6] font-semibold">{r.inProgress}</span></td>
                       <td className="py-2 px-3"><span className="text-[#888] font-semibold">{r.pending}</span></td>
-                      <td className="py-2 px-3 text-[#434655] dark:text-[#c4c8e8]">{r.total}</td>
+                      <td className="py-2 px-3 text-[#434655]">{r.total}</td>
                       <td className="py-2 px-3">
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-[#edeef0] dark:bg-[#252840] rounded-full">
-                            <div className="h-full rounded-full" style={{ width: `${r.pct}%`, background: '#004ac6' }} />
+                          <div className="flex-1 h-1.5 bg-[#edeef0] rounded-full">
+                            <div className="h-full rounded-full" style={{ width: `${r.pct}%`, background: '#16a34a' }} />
                           </div>
-                          <span className="text-xs text-[#434655] dark:text-[#c4c8e8] w-8">{r.pct}%</span>
+                          <span className="text-xs text-[#434655] w-8">{r.pct}%</span>
                         </div>
                       </td>
                     </tr>
@@ -522,19 +522,19 @@ export default function ReportsPage() {
           )}
 
           {memberDetails?.length > 0 && (
-            <div className="mt-5 border-t border-[#edeef0] dark:border-[#2e3148] pt-4">
-              <p className="text-[10px] font-bold text-[#434655] dark:text-[#c4c8e8] uppercase tracking-widest mb-3">Tareas por persona</p>
+            <div className="mt-5 border-t border-[#edeef0] pt-4">
+              <p className="text-[10px] font-bold text-[#434655] uppercase tracking-widest mb-3">Tareas por persona</p>
               <div className="space-y-1.5">
                 {memberDetails.map((m) => (
-                  <div key={m.id} className="rounded-xl border border-[#edeef0] dark:border-[#2e3148] overflow-hidden">
+                  <div key={m.id} className="rounded-xl border border-[#edeef0] overflow-hidden">
                     <button
                       onClick={() => toggleMember(m.id)}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#f8f9ff] dark:hover:bg-[#252840] transition text-left"
+                      className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#eef3ff] transition text-left"
                     >
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 ${getAvatarColor(m.name)}`}>
                         {getInitials(m.name)}
                       </div>
-                      <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] flex-1">{m.name}</span>
+                      <span className="text-sm font-semibold text-[#191c1e] flex-1">{m.name}</span>
                       <div className="flex items-center gap-3 text-xs">
                         {m.completedTasks.length > 0 && (
                           <span className="flex items-center gap-1 font-semibold text-[#10B981]">
@@ -561,13 +561,13 @@ export default function ReportsPage() {
                     </button>
 
                     {openMembers.has(m.id) && (
-                      <div className="px-4 pb-3 pt-2 border-t border-[#edeef0] dark:border-[#2e3148] space-y-3">
+                      <div className="px-4 pb-3 pt-2 border-t border-[#edeef0] space-y-3">
                         {m.completedTasks.length > 0 && (
                           <div>
                             <p className="text-[9px] font-bold text-[#10B981] uppercase tracking-widest mb-1.5">Completadas</p>
                             <div className="space-y-0.5">
                               {m.completedTasks.map((t) => (
-                                <div key={t.id} className="flex items-center gap-2 text-xs text-[#888] dark:text-[#6b7280] line-through">
+                                <div key={t.id} className="flex items-center gap-2 text-xs text-[#888] line-through">
                                   <span className="material-symbols-outlined text-[#10B981] text-xs shrink-0" style={{ textDecoration: 'none' }}>check</span>
                                   <span style={{ textDecoration: 'none' }} className="no-underline">
                                     {t.source === 'fondo' && (
@@ -585,7 +585,7 @@ export default function ReportsPage() {
                             <p className="text-[9px] font-bold text-[#004ac6] uppercase tracking-widest mb-1.5">En Progreso</p>
                             <div className="space-y-0.5">
                               {m.inProgressTasks.map((t) => (
-                                <div key={t.id} className="flex items-center gap-2 text-xs text-[#191c1e] dark:text-[#e4e6f0]">
+                                <div key={t.id} className="flex items-center gap-2 text-xs text-[#191c1e]">
                                   <span className="material-symbols-outlined text-[#004ac6] text-xs shrink-0">arrow_right</span>
                                   {t.source === 'fondo' && (
                                     <span className="inline-block text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: '#e0f2fe', color: '#0369a1' }}>Fondo</span>
@@ -601,7 +601,7 @@ export default function ReportsPage() {
                             <p className="text-[9px] font-bold text-[#888] uppercase tracking-widest mb-1.5">Pendientes</p>
                             <div className="space-y-0.5">
                               {m.pendingTasks.map((t) => (
-                                <div key={t.id} className="flex items-center gap-2 text-xs text-[#434655] dark:text-[#c4c8e8]">
+                                <div key={t.id} className="flex items-center gap-2 text-xs text-[#434655]">
                                   <span className="material-symbols-outlined text-[#888] text-xs shrink-0">circle</span>
                                   {t.source === 'fondo' && (
                                     <span className="inline-block text-[9px] font-bold px-1 py-0.5 rounded" style={{ background: '#e0f2fe', color: '#0369a1' }}>Fondo</span>

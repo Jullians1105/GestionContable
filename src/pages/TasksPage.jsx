@@ -47,13 +47,13 @@ function FondoPanel({ userId }) {
   useEffect(() => { fetchTareas() }, [fetchTareas])
 
   return (
-    <div className="mb-6 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-2xl shadow-sm overflow-hidden">
+    <div className="mb-6 bg-white border border-[#e2e4ef] rounded-2xl shadow-sm overflow-hidden">
 
       {/* Panel header */}
-      <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-[#f0f2f8] dark:border-[#2e3148]">
+      <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-[#f0f2f8]">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-[#004ac6]" style={{ fontSize: 18 }}>rocket_launch</span>
-          <span className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0]">Fondo Emprender</span>
+          <span className="text-sm font-bold text-[#191c1e]">Fondo Emprender</span>
           {!loading && (
             <span
               className="text-[10px] font-bold px-2 py-0.5 rounded-full"
@@ -70,13 +70,13 @@ function FondoPanel({ userId }) {
 
         {/* Month navigator */}
         <div className="flex items-center gap-1">
-          <button onClick={prevMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280]">
+          <button onClick={prevMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280]">
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_left</span>
           </button>
-          <span className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] min-w-[110px] text-center">
+          <span className="text-xs font-semibold text-[#434655] min-w-[110px] text-center">
             {MONTHS[month]} {year}
           </span>
-          <button onClick={nextMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280]">
+          <button onClick={nextMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280]">
             <span className="material-symbols-outlined" style={{ fontSize: 18 }}>chevron_right</span>
           </button>
         </div>
@@ -84,7 +84,7 @@ function FondoPanel({ userId }) {
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-5 text-[#8890b5] dark:text-[#5a5f7a] text-xs gap-2">
+        <div className="flex items-center justify-center py-5 text-[#8890b5] text-xs gap-2">
           <span className="material-symbols-outlined" style={{ fontSize: 16, animation: 'spin 1s linear infinite' }}>progress_activity</span>
           Cargando…
         </div>
@@ -94,23 +94,23 @@ function FondoPanel({ userId }) {
           Sin tareas pendientes en {MONTHS[month]}
         </div>
       ) : (
-        <div className="divide-y divide-[#f0f2f8] dark:divide-[#2e3148]">
+        <div className="divide-y divide-[#f0f2f8]">
           {tareas.map((t, i) => {
             const cfg = ESTADO_CFG[t.estado] ?? ESTADO_CFG.pending
             return (
               <Link
                 key={i}
                 to={`/fondo-emprender/empresas/${t.empresaId}?anio=${year}&mes=${month + 1}`}
-                className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#f8f9fe] dark:hover:bg-[#252840] transition group"
+                className="flex items-center gap-3 px-5 py-2.5 hover:bg-[#eef3ff] transition group"
               >
                 <span className="material-symbols-outlined flex-shrink-0" style={{ fontSize: 16, color: cfg.color }}>
                   {cfg.icon}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate block">
+                  <span className="text-sm font-semibold text-[#191c1e] truncate block">
                     {t.empresaNombre}
                   </span>
-                  <span className="text-[11px] text-[#6b7280] dark:text-[#8890b5] truncate block">
+                  <span className="text-[11px] text-[#6b7280] truncate block">
                     {t.macroNombre}
                   </span>
                 </div>
@@ -149,8 +149,8 @@ export default function TasksPage() {
     <div>
       <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-[24px] font-bold text-[#191c1e] dark:text-[#e4e6f0]">Mis Tareas</h2>
-          <p className="text-[14px] text-[#434655] dark:text-[#c4c8e8] mt-1">Gestiona y organiza tus entregables activos</p>
+          <h2 className="text-[24px] font-bold text-[#191c1e]">Mis Tareas</h2>
+          <p className="text-[14px] text-[#434655] mt-1">Gestiona y organiza tus entregables activos</p>
         </div>
 
         {isInFondo && (
@@ -159,7 +159,7 @@ export default function TasksPage() {
             className="flex items-center gap-2 h-10 px-4 rounded-xl text-sm font-semibold border-2 transition-all active:scale-[0.97]"
             style={
               showFondo
-                ? { borderColor: '#004ac6', background: '#f0f4ff', color: '#004ac6' }
+                ? { borderColor: '#004ac6', background: '#eef3ff', color: '#004ac6' }
                 : { borderColor: '#e2e4ef', background: 'white', color: '#434655' }
             }
           >

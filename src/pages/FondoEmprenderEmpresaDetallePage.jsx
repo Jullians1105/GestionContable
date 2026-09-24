@@ -128,12 +128,12 @@ function ResponsableBadges({ macroId }) {
         {lista.map(({ name, note }) => (
           <span
             key={name}
-            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#f3f4f6] dark:bg-[#252840]"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#f3f4f6]"
           >
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 ${getAvatarColor(name)}`}>
               {getInitials(name)}
             </span>
-            <span className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8]">
+            <span className="text-xs font-semibold text-[#434655]">
               {name.split(' ')[0]}
             </span>
             {note && (
@@ -254,7 +254,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
 
   // ── Loading / error ───────────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
+    <div className="flex items-center justify-center py-20 text-[#8890b5]">
       <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
         progress_activity
       </span>
@@ -268,7 +268,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
       <p className="text-sm text-[#ef4444]">{error}</p>
       <button
         onClick={fetchDetalle}
-        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] hover:bg-[#f3f4f6] transition"
       >
         Reintentar
       </button>
@@ -285,7 +285,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
       <div>
         <Link
           to={`/fondo-emprender/empresas?anio=${anio}&mes=${mes}`}
-          className="inline-flex items-center gap-1 text-sm text-[#6b7280] dark:text-[#8890b5] hover:text-[#004ac6] dark:hover:text-[#7ba8f0] transition"
+          className="inline-flex items-center gap-1 text-sm text-[#6b7280] hover:text-[#004ac6] transition"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span>
           Empresas
@@ -295,8 +295,8 @@ export default function FondoEmprenderEmpresaDetallePage() {
       {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">{companyName}</h1>
-          <p className="text-xs sm:text-sm text-[#6b7280] dark:text-[#8890b5] mt-0.5">
+          <h1 className="text-lg sm:text-xl font-bold text-[#191c1e] leading-tight">{companyName}</h1>
+          <p className="text-xs sm:text-sm text-[#6b7280] mt-0.5">
             Procesos macro · {MONTHS[mes - 1]} {anio}
           </p>
         </div>
@@ -333,7 +333,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
           return (
             <div
               key={proc.id}
-              className="bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl p-4 shadow-sm flex flex-col gap-3"
+              className="bg-white border border-[#e2e4ef] rounded-xl p-4 shadow-sm flex flex-col gap-3"
             >
               {/* Process header */}
               <div className="flex items-start justify-between gap-2">
@@ -344,12 +344,12 @@ export default function FondoEmprenderEmpresaDetallePage() {
                   >
                     {cfgStatus.icon}
                   </span>
-                  <h3 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] leading-tight">
+                  <h3 className="text-sm font-bold text-[#191c1e] leading-tight">
                     {proc.nombre}
                   </h3>
                 </div>
                 {(isContabilidad || isImpuestos || isPagos || isNominaElectronica || isNomina || isProduccionVentas) && (
-                  <span className="text-[9px] font-bold uppercase tracking-wide text-[#8890b5] bg-[#f3f4f6] dark:bg-[#252840] px-1.5 py-0.5 rounded flex-shrink-0">
+                  <span className="text-[9px] font-bold uppercase tracking-wide text-[#8890b5] bg-[#f3f4f6] px-1.5 py-0.5 rounded flex-shrink-0">
                     Auto
                   </span>
                 )}
@@ -498,9 +498,9 @@ export default function FondoEmprenderEmpresaDetallePage() {
                       return (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-[#f8f9fc] dark:bg-[#252840]"
+                          className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-[#eef3ff]"
                         >
-                          <span className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate">
+                          <span className="text-xs text-[#434655] truncate">
                             {item.nombre}
                           </span>
                           <span
@@ -530,7 +530,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                       return (
                         <div key={item.id} className="flex flex-col gap-1">
                           <div className="flex items-center gap-1">
-                            <span className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8]">
+                            <span className="text-xs font-semibold text-[#434655]">
                               {item.nombre}
                             </span>
                             <button
@@ -539,7 +539,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                                 setNotaAbiertaId(prev => prev === item.id ? null : item.id)
                               }}
                               title={tieneNota ? 'Editar nota' : 'Agregar nota'}
-                              className="flex-shrink-0 text-[#9ca3af] hover:text-[#6b7280] dark:hover:text-[#c4c8e8] transition"
+                              className="flex-shrink-0 text-[#9ca3af] hover:text-[#6b7280] transition"
                             >
                               <span className="material-symbols-outlined" style={{ fontSize: 13, lineHeight: 1 }}>edit</span>
                             </button>
@@ -550,12 +550,12 @@ export default function FondoEmprenderEmpresaDetallePage() {
                             onChange={key => handleUpdateImpuesto(item, { estado: key })}
                           />
                           {tieneNota && !notaAbierta && (
-                            <div className="rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] px-2.5 py-1.5">
+                            <div className="rounded-lg border border-[#e2e4ef] bg-[#eef3ff] px-2.5 py-1.5">
                               <p className="text-[9px] font-semibold text-[#8890b5] uppercase tracking-wide mb-0.5">
                                 Nota
                               </p>
                               <p
-                                className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate"
+                                className="text-xs text-[#434655] truncate"
                                 title={item.nota}
                               >
                                 {item.nota}
@@ -576,7 +576,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                               }}
                               placeholder="Notas adicionales..."
                               rows={2}
-                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#eef3ff] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
                             />
                           )}
                         </div>
@@ -602,7 +602,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                       return (
                         <div
                           key={tarea.id}
-                          className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-[#f8f9fc] dark:bg-[#252840]"
+                          className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-[#eef3ff]"
                         >
                           <button
                             onClick={() => handleToggleTarea(proc.id, tarea.id, tarea.status)}
@@ -619,8 +619,8 @@ export default function FondoEmprenderEmpresaDetallePage() {
                           <div className="flex-1 min-w-0">
                             <p className={`text-xs font-semibold line-clamp-1 transition-colors ${
                               tarea.status === 'completed'
-                                ? 'line-through text-[#9ca3af] dark:text-[#5a5f7a]'
-                                : 'text-[#434655] dark:text-[#c4c8e8]'
+                                ? 'line-through text-[#9ca3af]'
+                                : 'text-[#434655]'
                             }`}>
                               {tarea.title}
                             </p>
@@ -671,7 +671,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     }}
                     placeholder="Notas adicionales..."
                     rows={2}
-                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#eef3ff] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
                   />
                 </div>
               )}

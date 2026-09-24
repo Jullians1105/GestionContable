@@ -5,7 +5,6 @@ import { BlockNoteView } from '@blocknote/ariakit'
 import '@blocknote/ariakit/style.css'
 import { api } from '../services/api'
 import { useToast } from '../context/ToastContext'
-import { useTheme } from '../context/ThemeContext'
 
 const SAVE_DEBOUNCE_MS = 800
 
@@ -22,7 +21,6 @@ function relativeDate(iso) {
 }
 
 function NoteEditor({ note, onSaved, onBack }) {
-  const { theme } = useTheme()
   const { addToast } = useToast()
   const [saveState, setSaveState] = useState('saved')
   // El input de título vive como estado local en vez de estar controlado por
@@ -102,7 +100,7 @@ function NoteEditor({ note, onSaved, onBack }) {
       <div className="flex items-center gap-2 px-4 sm:px-6 pt-4 pb-2 flex-shrink-0">
         <button
           onClick={onBack}
-          className="sm:hidden -ml-1 p-1.5 rounded-lg text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+          className="sm:hidden -ml-1 p-1.5 rounded-lg text-[#434655] hover:bg-[#edeef0] transition"
         >
           <span className="material-symbols-outlined">arrow_back</span>
         </button>
@@ -110,14 +108,14 @@ function NoteEditor({ note, onSaved, onBack }) {
           value={title}
           onChange={handleTitleChange}
           placeholder="Sin título"
-          className="text-xl sm:text-2xl font-bold bg-transparent outline-none flex-1 min-w-0 text-[#191c1e] dark:text-[#e4e6f0]"
+          className="text-xl sm:text-2xl font-bold bg-transparent outline-none flex-1 min-w-0 text-[#191c1e]"
         />
-        <span className="text-xs text-[#8890b5] dark:text-[#5a5f7a] flex-shrink-0">
+        <span className="text-xs text-[#8890b5] flex-shrink-0">
           {saveState === 'saving' ? 'Guardando…' : 'Guardado'}
         </span>
       </div>
       <div className="flex-1 overflow-y-auto pb-10">
-        <BlockNoteView editor={editor} theme={theme} />
+        <BlockNoteView editor={editor} theme="light" />
       </div>
     </div>
   )
@@ -127,17 +125,17 @@ function ConfirmDeleteModal({ noteTitle, onConfirm, onCancel }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} />
-      <div className="relative bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl w-full max-w-sm border border-[#c3c6d7] dark:border-[#2e3148] p-6">
-        <h3 className="text-base font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-[#c3c6d7] p-6">
+        <h3 className="text-base font-bold text-[#191c1e] mb-1">
           Eliminar nota
         </h3>
-        <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-5">
+        <p className="text-sm text-[#434655] mb-5">
           ¿Eliminar <strong>{noteTitle || 'Sin título'}</strong>? No se puede deshacer.
         </p>
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="h-10 px-4 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] text-sm font-semibold text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840] transition"
+            className="h-10 px-4 rounded-lg border border-[#c3c6d7] text-sm font-semibold text-[#434655] hover:bg-[#edeef0] transition"
           >
             Cancelar
           </button>
@@ -217,15 +215,15 @@ export default function PersonalNotesPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-6.5rem)] -m-6 bg-white dark:bg-[#1e2030] rounded-none sm:rounded-xl sm:m-0 border-0 sm:border border-[#c3c6d7] dark:border-[#2e3148] overflow-hidden">
+    <div className="flex h-[calc(100vh-6.5rem)] -m-6 bg-white rounded-none sm:rounded-xl sm:m-0 border-0 sm:border border-[#c3c6d7] overflow-hidden">
       {/* Panel de lista */}
-      <div className={`w-full sm:w-72 sm:flex-shrink-0 border-r border-[#e2e4ef] dark:border-[#2e3148] flex-col ${selected ? 'hidden sm:flex' : 'flex'}`}>
+      <div className={`w-full sm:w-72 sm:flex-shrink-0 border-r border-[#e2e4ef] flex-col ${selected ? 'hidden sm:flex' : 'flex'}`}>
         <div className="flex items-center justify-between px-4 py-4 flex-shrink-0">
-          <h1 className="text-lg font-bold text-[#191c1e] dark:text-[#e4e6f0]">Mis Notas</h1>
+          <h1 className="text-lg font-bold text-[#191c1e]">Mis Notas</h1>
           <button
             onClick={handleCreate}
             className="w-8 h-8 rounded-lg text-white flex items-center justify-center hover:opacity-90 transition active:scale-[0.95]"
-            style={{ background: '#004ac6' }}
+            style={{ background: '#003B43' }}
             title="Nueva nota"
           >
             <span className="material-symbols-outlined text-lg">add</span>
@@ -234,11 +232,11 @@ export default function PersonalNotesPage() {
 
         <div className="flex-1 overflow-y-auto px-2 pb-4">
           {loading ? (
-            <div className="flex items-center justify-center py-10 text-[#8890b5] dark:text-[#5a5f7a]">
+            <div className="flex items-center justify-center py-10 text-[#8890b5]">
               <span className="material-symbols-outlined animate-spin">progress_activity</span>
             </div>
           ) : notes.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-10 px-4 text-center text-[#8890b5] dark:text-[#5a5f7a]">
+            <div className="flex flex-col items-center gap-2 py-10 px-4 text-center text-[#8890b5]">
               <span className="material-symbols-outlined text-3xl">note_add</span>
               <p className="text-sm">Escribe lo que quieras — usa &quot;/&quot; para insertar títulos, listas, checkboxes, etc.</p>
             </div>
@@ -249,22 +247,22 @@ export default function PersonalNotesPage() {
                 onClick={() => handleSelect(n.id)}
                 className={`w-full text-left group flex items-center gap-2 px-3 py-2.5 rounded-lg transition ${
                   selected?.id === n.id
-                    ? 'bg-[#d6e0f3] dark:bg-[#1a2040]'
-                    : 'hover:bg-[#edeef0] dark:hover:bg-[#252840]'
+                    ? 'bg-[#eef3ff]'
+                    : 'hover:bg-[#edeef0]'
                 }`}
               >
-                <span className="material-symbols-outlined text-base text-[#8890b5] dark:text-[#5a5f7a] flex-shrink-0">description</span>
+                <span className="material-symbols-outlined text-base text-[#8890b5] flex-shrink-0">description</span>
                 <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate">
+                  <span className="block text-sm font-semibold text-[#191c1e] truncate">
                     {n.title || 'Sin título'}
                   </span>
-                  <span className="block text-xs text-[#8890b5] dark:text-[#5a5f7a]">{relativeDate(n.updatedAt)}</span>
+                  <span className="block text-xs text-[#8890b5]">{relativeDate(n.updatedAt)}</span>
                 </span>
                 <span
                   role="button"
                   tabIndex={-1}
                   onClick={(e) => { e.stopPropagation(); setDeleteTarget(n) }}
-                  className="opacity-0 group-hover:opacity-100 p-1 rounded text-[#c3c6d7] dark:text-[#3e4260] hover:text-[#EF4444] transition flex-shrink-0"
+                  className="opacity-0 group-hover:opacity-100 p-1 rounded text-[#c3c6d7] hover:text-[#EF4444] transition flex-shrink-0"
                 >
                   <span className="material-symbols-outlined text-base">delete</span>
                 </span>
@@ -279,7 +277,7 @@ export default function PersonalNotesPage() {
         {selected ? (
           <NoteEditor key={selected.id} note={selected} onSaved={handleSaved} onBack={() => setSelected(null)} />
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-[#8890b5] dark:text-[#5a5f7a]">
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-[#8890b5]">
             <span className="material-symbols-outlined text-4xl">edit_note</span>
             <p className="text-sm">Elegí una nota o creá una nueva</p>
           </div>

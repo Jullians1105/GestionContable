@@ -133,12 +133,12 @@ export default function NominaElectronicaEmpresasPage() {
     <div className="p-4 md:p-6 space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <Link to="/dian/nomina-electronica" className="text-[12px] text-[#004ac6] dark:text-[#7ba8f0] hover:underline flex items-center gap-1 mb-1">
+          <Link to="/dian/nomina-electronica" className="text-[12px] text-[#946000] hover:underline flex items-center gap-1 mb-1">
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_back</span>
             Volver al seguimiento
           </Link>
-          <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Editar empresas — Nómina Electrónica</h1>
-          <p className="text-[13px] text-[#6b7280] dark:text-[#8890b5]">{empresas.length} empresas</p>
+          <h1 className="text-xl font-bold text-[#191c1e]">Editar empresas — Nómina Electrónica</h1>
+          <p className="text-[13px] text-[#6b7280]">{empresas.length} empresas</p>
         </div>
       </div>
 
@@ -149,16 +149,16 @@ export default function NominaElectronicaEmpresasPage() {
           placeholder="Buscar empresa..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 pr-3 py-2 text-[13px] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/30 w-full"
+          className="pl-9 pr-3 py-2 text-[13px] rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C]/30 w-full"
         />
       </div>
 
       {error && (
-        <div className="text-[13px] px-4 py-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">{error}</div>
+        <div className="text-[13px] px-4 py-2.5 rounded-xl bg-red-50 text-red-700 border border-red-200">{error}</div>
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-[#6b7280] dark:text-[#8890b5] text-[13px]">Cargando...</div>
+        <div className="text-center py-12 text-[#6b7280] text-[13px]">Cargando...</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
           {ORIGEN_ORDER.map(key => (
@@ -186,10 +186,10 @@ export default function NominaElectronicaEmpresasPage() {
       {popup && (
         <div
           ref={popupRef}
-          className="fixed z-50 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-2xl p-4 w-64"
+          className="fixed z-50 bg-white border border-[#e2e4ef] rounded-xl shadow-2xl p-4 w-64"
           style={{ left: popup.left, top: popup.top }}
         >
-          <p className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-3">
+          <p className="text-[11px] font-bold text-[#191c1e] mb-3">
             Editar empresa
           </p>
           <form onSubmit={handleSubmit} className="space-y-2.5">
@@ -200,7 +200,7 @@ export default function NominaElectronicaEmpresasPage() {
                 autoFocus
                 value={form.name}
                 onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
               />
             </div>
             <div>
@@ -208,7 +208,7 @@ export default function NominaElectronicaEmpresasPage() {
               <select
                 value={form.origen}
                 onChange={(e) => setForm(f => ({ ...f, origen: e.target.value }))}
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
               >
                 <option value="">Sin grupo</option>
                 {Object.entries(ORIGEN_LABELS).map(([value, label]) => (
@@ -221,7 +221,7 @@ export default function NominaElectronicaEmpresasPage() {
               <select
                 value={form.responsableId}
                 onChange={(e) => setForm(f => ({ ...f, responsableId: e.target.value }))}
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
               >
                 <option value="">Sin asignar</option>
                 {allUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -232,7 +232,7 @@ export default function NominaElectronicaEmpresasPage() {
               <select
                 value={form.fondoEmpresaId}
                 onChange={(e) => setForm(f => ({ ...f, fondoEmpresaId: e.target.value }))}
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
               >
                 <option value="">Sin enlazar</option>
                 {fondoList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -243,13 +243,13 @@ export default function NominaElectronicaEmpresasPage() {
               <select
                 value={form.extEmpresaId}
                 onChange={(e) => setForm(f => ({ ...f, extEmpresaId: e.target.value }))}
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
               >
                 <option value="">Sin enlazar</option>
                 {extList.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
               </select>
             </div>
-            <label className="flex items-center gap-2 text-xs font-medium text-[#434655] dark:text-[#c4c8e8] cursor-pointer select-none pt-1">
+            <label className="flex items-center gap-2 text-xs font-medium text-[#434655] cursor-pointer select-none pt-1">
               <input
                 type="checkbox"
                 checked={form.activa}
@@ -258,20 +258,20 @@ export default function NominaElectronicaEmpresasPage() {
               Activa
             </label>
 
-            {formError && <p className="text-[11px] text-red-600 dark:text-red-400">{formError}</p>}
+            {formError && <p className="text-[11px] text-red-600">{formError}</p>}
 
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setPopup(null)}
-                className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition-colors text-center"
+                className="flex-1 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] hover:bg-[#f3f4f6] transition-colors text-center"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-[#004ac6] text-white hover:bg-[#003a9c] transition-colors disabled:opacity-60"
+                className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-[#E5A70C] text-[#20160A] hover:bg-[#E5A70C] transition-colors disabled:opacity-60"
               >
                 {saving ? 'Guardando...' : 'Guardar'}
               </button>
@@ -287,9 +287,9 @@ export default function NominaElectronicaEmpresasPage() {
 // CompanyColumn en NominaElectronicaPage.jsx ───────────────────────────────
 function EmpresaColumn({ title, accent, empresas, onEdit }) {
   return (
-    <div className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-[#e2e4ef] shadow-sm overflow-hidden">
       <div
-        className="px-4 py-2.5 bg-[#f8f9fc] dark:bg-[#252840] flex items-center justify-between"
+        className="px-4 py-2.5 bg-[#f8f9fc] flex items-center justify-between"
         style={{ borderBottom: `2px solid ${accent}` }}
       >
         <span className="text-xs font-bold uppercase tracking-wide" style={{ color: accent }}>{title}</span>
@@ -301,11 +301,11 @@ function EmpresaColumn({ title, accent, empresas, onEdit }) {
         empresas.map(emp => (
           <div
             key={emp.id}
-            className="flex items-center gap-2 pl-4 pr-2.5 py-1.5 border-b border-black/5 dark:border-white/10 last:border-0 hover:bg-[#f9fafb] dark:hover:bg-[#20233a] transition-colors"
+            className="flex items-center gap-2 pl-4 pr-2.5 py-1.5 border-b border-black/5 last:border-0 hover:bg-[#f9fafb] transition-colors"
             style={{ opacity: emp.activa ? 1 : 0.5 }}
           >
             <div className="flex-1 min-w-0">
-              <div className="truncate text-[13px] font-medium text-[#191c1e] dark:text-[#e4e6f0]" title={emp.name}>
+              <div className="truncate text-[13px] font-medium text-[#191c1e]" title={emp.name}>
                 {emp.name}
               </div>
               <div className="truncate text-[11px] text-[#8890b5]">
@@ -329,7 +329,7 @@ function EmpresaColumn({ title, accent, empresas, onEdit }) {
                 style={{ width: 26, height: 26 }}
                 title="Editar"
               >
-                <span className="material-symbols-outlined" style={{ color: '#004ac6', fontSize: 15 }}>edit</span>
+                <span className="material-symbols-outlined" style={{ color: '#946000', fontSize: 15 }}>edit</span>
               </button>
             )}
           </div>

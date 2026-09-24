@@ -7,13 +7,6 @@ import TaskModal from './TaskModal'
 import logoBlanco from '../assets/logo-icono-blanco.png'
 import { navItems, modules, MODULE_TITLES, DIAN_NAV, EMPRESAS_MAESTRO_NAV, FONDO_NAV, moduleForPath } from '../config/navigation'
 
-function setSidebarCssVar(pinned) {
-  document.documentElement.style.setProperty(
-    '--sidebar-w',
-    pinned ? '314px' : '112px'
-  )
-}
-
 export default function Sidebar({ open, onClose }) {
   const { isAdmin, isLeader, hasPermission } = useAuth()
   const { addToast } = useToast()
@@ -31,20 +24,17 @@ export default function Sidebar({ open, onClose }) {
     setActiveModule(moduleForPath(location.pathname))
   }, [location.pathname])
 
-  const [pinned, setPinned] = useState(() => {
-    const p = localStorage.getItem('sidebar_pinned') === 'true'
-    setSidebarCssVar(p)
-    return p
-  })
-
-  function togglePin() {
-    setPinned(prev => {
-      const next = !prev
-      localStorage.setItem('sidebar_pinned', String(next))
-      setSidebarCssVar(next)
-      return next
-    })
-  }
+  // Disparador de expandir la Columna 2 — a propósito NO es un `:hover` CSS en toda la
+  // columna: esa columna, colapsada, sigue ocupando la franja del header (invisible ahí,
+  // pero el hitbox del mouse seguía "vivo"), así que pasar el mouse rápido sobre el
+  // wordmark del Header (que invade ese hueco) disparaba la expansión sin querer — se
+  // veía como una línea blanca moviéndose sobre el logo. Con este estado, el listener de
+  // mouse solo vive en la franja de abajo (los íconos de navegación reales), donde sí
+  // tiene sentido que pasar el mouse abra el panel. Ya no hay opción de "fijar" (pin) —
+  // el botón se quitó porque vivía en la franja de arriba, fuera de esa zona de trigger,
+  // así que quedaba inalcanzable (aparecía y desaparecía antes de poder hacer clic).
+  const [navHover, setNavHover] = useState(false)
+  const expandido = navHover
 
   const visible = navItems.filter(item => {
     if (item.leaderOnly && !isAdmin() && !isLeader()) return false
@@ -92,10 +82,10 @@ export default function Sidebar({ open, onClose }) {
     return () => window.removeEventListener('resize', updateScrollShadow)
   }, [activeModule, hasNav, updateScrollShadow])
 
-  // Shared label class: hidden when collapsed, revealed on hover or when pinned
-  const labelCls = pinned
+  // Shared label class: hidden when collapsed, revealed on hover
+  const labelCls = expandido
     ? 'max-w-[180px] opacity-100'
-    : 'max-w-0 opacity-0 group-hover/nav:max-w-[180px] group-hover/nav:opacity-100'
+    : 'max-w-0 opacity-0'
 
   return (
     <>
@@ -106,11 +96,10 @@ export default function Sidebar({ open, onClose }) {
       >
         {/* Column 1 – module icons (always 64 px) */}
         <div
-          className="w-16 h-full flex flex-col items-center py-4 gap-1 flex-shrink-0 overflow-hidden"
-          style={{ background: '#004ac6' }}
+          className="w-16 h-full flex flex-col items-center py-4 gap-1 flex-shrink-0 overflow-hidden bg-[#06272E]"
         >
           {/* Logo — navega al inicio */}
-          <NavLink to="/" className="w-10 h-10 flex items-center justify-center mb-3 flex-shrink-0">
+          <NavLink to="/" className="w-10 h-10 flex items-center justify-center mb-3 flex-shrink-0 -mt-0.5">
             <img
               src={logoBlanco}
               alt="Logo"
@@ -124,8 +113,8 @@ export default function Sidebar({ open, onClose }) {
               title={label}
               className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
                 activeModule === id
-                  ? 'bg-white/20 text-white'
-                  : 'text-white/60 hover:bg-white/10 hover:text-white'
+                  ? 'bg-[#E5A70C] text-[#20160A]'
+                  : 'text-[#9fb4b3] hover:bg-[#0e3a42] hover:text-[#f3f1ea]'
               }`}
             >
               <span className="material-symbols-outlined text-xl">{icon}</span>
@@ -133,67 +122,76 @@ export default function Sidebar({ open, onClose }) {
           ))}
         </div>
 
-        {/* Column 2 – nav content (collapses to 48 px, expands on hover/pin) */}
+        {/* Column 2 – nav content (collapses to 48 px, expands on hover). Sigue exactamente
+            igual que siempre (h-full, desde arriba) — lo único que cambia es que colapsada NO
+            tiene borde ni sombra propios (border-r-0 shadow-none), así queda invisible/mezclada
+            con el blanco de atrás y el header se ve como una sola pieza sin línea divisoria. El
+            borde y la sombra vuelven solos al pasar el mouse por los íconos de abajo (navHover)
+            — ya no por CSS `:hover` en toda la columna, ver `expandido` más arriba: esta franja
+            de aquí (el header interno) invade el hueco del wordmark de Header.jsx, y un `:hover`
+            en toda la columna disparaba la expansión con solo pasar el mouse sobre el logo, sin
+            querer. */}
         <div
-          className={`group/nav h-full bg-white dark:bg-[#1e2030] border-r border-[#c3c6d7] dark:border-[#2e3148] flex flex-col overflow-hidden shadow-[2px_0_12px_rgba(0,0,0,0.07)] transition-[width] duration-200 ease-in-out ${
-            pinned ? 'w-[250px]' : 'w-12 hover:w-[250px]'
+          className={`sidebar-nav-expand h-full flex flex-col ${
+            expandido
+              ? 'w-[250px] bg-white border-r border-[#e3e0d8] shadow-[2px_0_12px_rgba(0,0,0,0.07)]'
+              : 'w-12 bg-transparent border-r-0 shadow-none'
           }`}
         >
-          {/* Header row */}
-          <div className="flex items-center gap-1 pl-3 pr-2 h-16 flex-shrink-0 border-b border-[#e8eaf0] dark:border-[#2e3148]">
+          {/* Header row — el fondo blanco sigue siendo del propio wrapper de arriba, no
+              de acá: mismo criterio de "transparente colapsada" que la columna entera, para
+              que el logo del Header (que invade este hueco, ver Header.jsx) se vea completo
+              en reposo. El borde inferior también queda condicionado, si no se notaría como
+              una línea suelta aunque el resto esté transparente. pointer-events-none mientras
+              está colapsada: por las dudas, para que el mouse literalmente no pueda interactuar
+              con esta franja (ni disparar nada) mientras el logo la está usando — el clic/hover
+              cae directo al buscador del Header, que está detrás. */}
+          <div
+            className={`flex items-center gap-1 pl-3 pr-2 h-16 flex-shrink-0 border-b transition-colors duration-200 ${
+              expandido ? 'border-[#e3e0d8] pointer-events-auto' : 'border-transparent pointer-events-none'
+            }`}
+          >
             <div
-              className={`flex items-center gap-2.5 overflow-hidden transition-[max-width,opacity] duration-200 ${
-                pinned
-                  ? 'max-w-[210px] opacity-100'
-                  : 'max-w-0 opacity-0 group-hover/nav:max-w-[210px] group-hover/nav:opacity-100'
+              className={`sidebar-title-reveal flex items-center gap-2.5 overflow-hidden ${
+                expandido ? 'max-w-[210px] opacity-100' : 'max-w-0 opacity-0'
               }`}
             >
-              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-[#e8f0fe] dark:bg-[#1a2550]">
-                <span className="material-symbols-outlined text-lg text-[#004ac6] dark:text-[#7ba8f0]">
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-[#E3EEEE]">
+                <span className="material-symbols-outlined text-lg text-[#E5A70C]">
                   {modules.find((m) => m.id === activeModule)?.icon}
                 </span>
               </span>
-              <span className="text-[15px] font-bold tracking-tight text-[#191c1e] dark:text-[#e4e6f0] whitespace-nowrap">
+              <span className="text-[15px] font-bold tracking-tight text-[#191c1e] whitespace-nowrap">
                 {MODULE_TITLES[activeModule]}
               </span>
             </div>
             {/* spacer that only exists when expanded */}
             <span
-              className={`transition-[flex] duration-200 ${
-                pinned ? 'flex-1' : 'group-hover/nav:flex-1'
-              }`}
+              className={`transition-[flex] duration-200 ${expandido ? 'flex-1' : ''}`}
             />
-            {/* Pin button – only visible when expanded (hover or pinned) */}
-            <button
-              onClick={togglePin}
-              title={pinned ? 'Desanclar sidebar' : 'Anclar sidebar'}
-              className={`flex-shrink-0 p-1.5 rounded-lg transition-[colors,opacity] duration-200 hover:bg-[#edeef0] dark:hover:bg-[#252840] ${
-                pinned
-                  ? 'text-[#004ac6] opacity-100'
-                  : 'text-[#b0b4cc] dark:text-[#4a5078] opacity-0 group-hover/nav:opacity-100'
-              }`}
-            >
-              <span
-                className="material-symbols-outlined"
-                style={{
-                  fontSize: 18,
-                  display: 'block',
-                  transform: pinned ? 'rotate(-45deg)' : 'none',
-                  transition: 'transform 0.2s',
-                }}
-              >
-                push_pin
-              </span>
-            </button>
             <button
               onClick={onClose}
-              className="lg:hidden flex-shrink-0 p-1.5 rounded-lg hover:bg-[#edeef0] dark:hover:bg-[#252840] text-[#434655] dark:text-[#c4c8e8] transition"
+              className="lg:hidden flex-shrink-0 p-1.5 rounded-lg hover:bg-[#edeef0] text-[#434655] transition"
             >
               <span className="material-symbols-outlined text-xl">close</span>
             </button>
           </div>
 
-          {/* Nav links */}
+          {/* Nav links — envuelto en su propio fondo blanco opaco (a diferencia de la
+              columna que lo contiene, que ahora va transparente colapsada, ver arriba):
+              acá sí hay contenido siempre visible (los íconos de cada NavLink, incluso
+              colapsado, sin su etiqueta) y necesita quedar contra blanco de verdad, no
+              transparente sobre lo que sea que haya detrás en la página. Por eso este
+              pedazo SÍ conserva el border-r y la sombra fijos de siempre (a diferencia de
+              la franja del header, que va sin ninguno de los dos) — sigue diferenciando
+              dónde termina el sidebar del contenido principal, como antes. También es acá
+              (y solo acá, no en la franja del header) donde vive el onMouseEnter/Leave que
+              dispara navHover — ver el comentario junto a `expandido` más arriba. */}
+          <div
+            onMouseEnter={() => setNavHover(true)}
+            onMouseLeave={() => setNavHover(false)}
+            className="flex-1 flex flex-col overflow-hidden bg-white border-r border-[#e3e0d8] shadow-[2px_0_12px_rgba(0,0,0,0.07)]"
+          >
           {hasNav ? (
             <>
               {/* overflow-x-hidden explícito: si solo se fija overflow-y-auto,
@@ -234,13 +232,13 @@ export default function Sidebar({ open, onClose }) {
                       className={({ isActive }) =>
                         `flex items-center gap-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
                           isActive
-                            ? 'bg-[#d6e0f3] dark:bg-[#1a2040] text-[#004ac6] dark:text-[#7ba8f0]'
-                            : 'text-[#434655] dark:text-[#c4c8e8] hover:bg-[#edeef0] dark:hover:bg-[#252840]'
+                            ? 'bg-[#FBEAC0] text-[#003B43]'
+                            : 'text-[#434655] hover:bg-[#edeef0]'
                         }`
                       }
                     >
                       <span className="relative w-8 flex items-center justify-center flex-shrink-0">
-                        <span className="material-symbols-outlined text-xl">{icon}</span>
+                        <span className="material-symbols-outlined text-xl text-[#003B43]">{icon}</span>
                         {to === '/notifications' && unreadCount > 0 && (
                           <span
                             className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full flex items-center justify-center text-[9px] font-bold text-white"
@@ -264,10 +262,10 @@ export default function Sidebar({ open, onClose }) {
                     scrolleando arrastrando, o para no bloquear el último
                     ítem visible bajo el degradado inferior). */}
                 {scrollShadow.top && (
-                  <div className="pointer-events-none absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-white dark:from-[#1e2030] to-transparent" />
+                  <div className="pointer-events-none absolute top-0 inset-x-0 h-4 bg-gradient-to-b from-white to-transparent" />
                 )}
                 {scrollShadow.bottom && (
-                  <div className="pointer-events-none absolute bottom-0 inset-x-0 h-4 bg-gradient-to-t from-white dark:from-[#1e2030] to-transparent" />
+                  <div className="pointer-events-none absolute bottom-0 inset-x-0 h-4 bg-gradient-to-t from-white to-transparent" />
                 )}
               </div>
 
@@ -278,8 +276,8 @@ export default function Sidebar({ open, onClose }) {
                       if (hasPermission('canCreateTask')) setShowModal(true)
                       else addToast('No tienes permiso para crear tareas', 'error')
                     }}
-                    className="w-full h-10 rounded-lg text-xs font-semibold text-white flex items-center gap-3 hover:opacity-90 transition active:scale-[0.97] overflow-hidden"
-                    style={{ background: '#004ac6' }}
+                    className="w-full h-10 rounded-lg text-xs font-semibold flex items-center gap-3 hover:opacity-90 transition active:scale-[0.97] overflow-hidden"
+                    style={{ background: '#E5A70C', color: '#20160A' }}
                   >
                     {/* Mismo slot w-8 que el ícono de los NavLink de arriba (línea
                         ~205) en vez de centrar todo el contenido con
@@ -302,17 +300,19 @@ export default function Sidebar({ open, onClose }) {
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 overflow-hidden px-2">
-              <span className="material-symbols-outlined text-5xl text-[#c3c6d7] dark:text-[#3e4260] flex-shrink-0">
+              <span className="material-symbols-outlined text-5xl text-white/20 flex-shrink-0">
                 {activeModuleMeta?.icon}
               </span>
               <span
-                className={`text-xs text-center font-semibold text-[#8890b5] dark:text-[#5a5f7a] whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${labelCls}`}
+                className={`text-xs text-center font-semibold text-[#cfe3e1] whitespace-nowrap overflow-hidden transition-[max-width,opacity] duration-150 ${labelCls}`}
               >
                 Próximamente
               </span>
             </div>
           )}
+          </div>
         </div>
+
       </aside>
 
       {showModal && <TaskModal onClose={() => setShowModal(false)} />}

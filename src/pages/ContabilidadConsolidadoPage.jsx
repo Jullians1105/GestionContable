@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
 import EmpresaCombobox from '../components/EmpresaCombobox'
-import { useTheme } from '../context/ThemeContext'
 import { useToast } from '../context/ToastContext'
 
 const MESES_ES = [
@@ -39,11 +38,11 @@ function TotalGroupHeader({ label, color }) {
 function TotalRow({ icon, label, value, grande }) {
   return (
     <div className="px-4 py-2.5 min-w-0">
-      <span className="flex items-center gap-1.5 text-[11px] text-[#6b7280] dark:text-[#8890b5] truncate mb-0.5">
-        <span className="material-symbols-outlined text-[15px] flex-shrink-0 text-[#9ca3af] dark:text-[#5a5f7a]">{icon}</span>
+      <span className="flex items-center gap-1.5 text-[11px] text-[#6b7280] truncate mb-0.5">
+        <span className="material-symbols-outlined text-[15px] flex-shrink-0 text-[#9ca3af]">{icon}</span>
         {label}
       </span>
-      <p className={`font-bold text-[#191c1e] dark:text-[#e4e6f0] tabular-nums truncate ${grande ? 'text-lg' : 'text-sm'}`}>
+      <p className={`font-bold text-[#191c1e] tabular-nums truncate ${grande ? 'text-lg' : 'text-sm'}`}>
         {value}
       </p>
     </div>
@@ -96,66 +95,64 @@ function TendenciaChart({ resumenAnual, tab, mes, cuatrimestre }) {
       ? { x: STEP * (CUATRIMESTRE_MESES[cuatrimestre][0] - 1), w: STEP * 4 }
       : null
 
-  // Colores calculados en JS según el tema real de la app (useTheme), aplicados por `style`
-  // inline en cada elemento — no por clases CSS. Un <style> con selectores .dark dentro del
-  // <svg> dependía de que ninguna otra regla le ganara en la cascada, y algo se lo estaba
-  // ganando: la opacidad del área no se veía (quedaba sólida en vez de un tinte suave). Un
-  // `style` inline tiene la especificidad más alta posible, no hay cascada que le gane.
-  const { theme } = useTheme()
-  const dark = theme === 'dark'
+  // Colores calculados en JS (fijos, modo claro) y aplicados por `style` inline en cada
+  // elemento — no por clases CSS. Un <style> con selectores dentro del <svg> dependía de que
+  // ninguna otra regla le ganara en la cascada, y algo se lo estaba ganando: la opacidad del
+  // área no se veía (quedaba sólida en vez de un tinte suave). Un `style` inline tiene la
+  // especificidad más alta posible, no hay cascada que le gane.
   // Compras se queda en el azul de la app (consistencia). Ventas pasa al dorado real de
   // GESTCON (docs/Entrega.pdf) — un toque de marca acotado a este gráfico puntual, no a toda
   // la página otra vez (eso ya se probó y se revirtió por no combinar con el resto en azul).
   const col = {
-    base: dark ? '#2e3148' : '#e2e4ef',
-    banda: dark ? '#7ba8f0' : '#004ac6',
-    compras: dark ? '#7ba8f0' : '#004ac6',
-    ventas: dark ? '#f0c04a' : '#E5A70C',
-    lbl: dark ? '#5a5f7a' : '#9ca3af',
-    lblOn: dark ? '#7ba8f0' : '#004ac6',
-    halo: dark ? '#1e2030' : '#ffffff',
+    base: '#e2e4ef',
+    banda: '#004ac6',
+    compras: '#004ac6',
+    ventas: '#E5A70C',
+    lbl: '#9ca3af',
+    lblOn: '#004ac6',
+    halo: '#ffffff',
   }
   const gradId = {
-    compras: `tc-grad-compras-${dark ? 'd' : 'l'}`,
-    ventas: `tc-grad-ventas-${dark ? 'd' : 'l'}`,
-    banda: `tc-grad-banda-${dark ? 'd' : 'l'}`,
+    compras: 'tc-grad-compras-l',
+    ventas: 'tc-grad-ventas-l',
+    banda: 'tc-grad-banda-l',
   }
 
   return (
-    <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-5 flex-1 min-w-0">
+    <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-5 flex-1 min-w-0">
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-bold text-[#8890b5] uppercase tracking-wide">Tendencia — año</span>
-        <div className="flex items-center gap-4 text-xs text-[#6b7280] dark:text-[#8890b5]">
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#004ac6]" />Compras</span>
+        <div className="flex items-center gap-4 text-xs text-[#6b7280]">
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#2563eb]" />Compras</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#E5A70C' }} />Ventas</span>
         </div>
       </div>
       {/* Tono de fondo propio para el área de dibujo — distingue el "lienzo" del blanco de la
           tarjeta, mismo gris-azulado que ya usa el resto de la app para superficies
           secundarias (la píldora de tabs, el header de la tabla de Detalle). */}
-      <div className="rounded-xl bg-[#f8f9ff] dark:bg-[#181a2e] p-3">
+      <div className="rounded-xl bg-[#f8f9fc] p-3">
         <svg viewBox={`0 0 ${W} ${H + 34}`} className="w-full block overflow-visible" style={{ aspectRatio: `${W} / ${H + 34}` }}>
           <defs>
             {/* Relleno en degradado (más presente arriba, se disuelve hacia la base) en vez de
                 un tono plano — así se lee como "profundidad", no como un bloque de color. */}
             <linearGradient id={gradId.compras} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={col.compras} stopOpacity={dark ? 0.32 : 0.22} />
+              <stop offset="0%" stopColor={col.compras} stopOpacity={0.22} />
               <stop offset="100%" stopColor={col.compras} stopOpacity="0" />
             </linearGradient>
             <linearGradient id={gradId.ventas} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={col.ventas} stopOpacity={dark ? 0.34 : 0.24} />
+              <stop offset="0%" stopColor={col.ventas} stopOpacity={0.24} />
               <stop offset="100%" stopColor={col.ventas} stopOpacity="0" />
             </linearGradient>
             {/* Franja de selección: más marcada arriba, se disuelve hacia la base — igual que
                 las áreas de Compras/Ventas, en vez del tono plano que tenía antes. */}
             <linearGradient id={gradId.banda} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={col.banda} stopOpacity={dark ? 0.30 : 0.16} />
+              <stop offset="0%" stopColor={col.banda} stopOpacity={0.16} />
               <stop offset="100%" stopColor={col.banda} stopOpacity="0" />
             </linearGradient>
             {/* Sombra suave bajo cada línea — le da un poco de relieve en vez de quedar
                 perfectamente plana sobre el fondo. */}
             <filter id="tc-line-shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#000000" floodOpacity={dark ? 0.35 : 0.14} />
+              <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#000000" floodOpacity={0.14} />
             </filter>
           </defs>
           <line x1="0" y1={H} x2={W} y2={H} stroke={col.base} strokeWidth="1" />
@@ -233,7 +230,7 @@ function TendenciaChart({ resumenAnual, tab, mes, cuatrimestre }) {
                 <div
                   style={{
                     fontFamily: 'Inter, system-ui, sans-serif',
-                    background: dark ? '#2a2d47' : '#1f2430',
+                    background: '#1f2430',
                     color: '#fff',
                     borderRadius: 8,
                     padding: '6px 10px',
@@ -373,10 +370,10 @@ export default function ContabilidadConsolidadoPage() {
       {/* ── Encabezado ─────────────────────────────────────────────────── */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#004ac6]">query_stats</span>
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Consolidado</h1>
+          <span className="material-symbols-outlined text-3xl text-[#003B43]">query_stats</span>
+          <h1 className="text-2xl font-bold text-[#191c1e]">Consolidado</h1>
         </div>
-        <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">
+        <p className="text-sm text-[#6b7280]">
           Lo ya guardado por empresa — mensual, cuatrimestral o anual.
         </p>
       </div>
@@ -388,22 +385,22 @@ export default function ContabilidadConsolidadoPage() {
           ("business") como contexto, así que la etiqueta sobraba. Con justify-between además se
           usa el ancho completo del panel en vez de dejar todo apretado a la izquierda con un
           vacío grande a la derecha. */}
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
+      <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-4 mb-6 flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
         <div className="w-full sm:w-96" role="group" aria-label="Empresa">
           <EmpresaCombobox empresas={empresas} value={empresaId} onChange={setEmpresaId} />
         </div>
 
         {empresaId && (
           <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex bg-[#f0f2f8] dark:bg-[#181a2e] rounded-xl p-1">
+            <div className="inline-flex bg-[#f0f2f8] rounded-xl p-1">
               {TABS.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
                   className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition ${
                     tab === t.id
-                      ? 'bg-white dark:bg-[#252840] shadow-sm text-[#004ac6]'
-                      : 'text-[#6b7280] dark:text-[#8890b5] hover:text-[#434655] dark:hover:text-[#c4c8e8]'
+                      ? 'bg-white shadow-sm text-[#003B43]'
+                      : 'text-[#6b7280] hover:text-[#434655]'
                   }`}
                 >
                   {t.label}
@@ -412,34 +409,34 @@ export default function ContabilidadConsolidadoPage() {
             </div>
 
             {tab === 'mensual' && (
-              <div className="flex items-center gap-0.5 border border-[#e2e4ef] dark:border-[#2e3148] bg-[#fafbff] dark:bg-[#181a2e] rounded-2xl px-1.5 py-1.5">
-                <button onClick={() => cambiarMes(-1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white dark:hover:bg-[#252840] hover:text-[#004ac6] dark:hover:text-[#7ba8f0] hover:shadow-sm transition active:scale-90">
+              <div className="flex items-center gap-0.5 border border-[#e2e4ef] bg-[#f8f9fc] rounded-2xl px-1.5 py-1.5">
+                <button onClick={() => cambiarMes(-1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white hover:text-[#003B43] hover:shadow-sm transition active:scale-90">
                   <span className="material-symbols-outlined text-[20px]">chevron_left</span>
                 </button>
-                <span className="text-sm font-semibold min-w-[130px] text-center text-[#191c1e] dark:text-[#e4e6f0]">{MESES_ES[mes - 1]} {anio}</span>
-                <button onClick={() => cambiarMes(1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white dark:hover:bg-[#252840] hover:text-[#004ac6] dark:hover:text-[#7ba8f0] hover:shadow-sm transition active:scale-90">
+                <span className="text-sm font-semibold min-w-[130px] text-center text-[#191c1e]">{MESES_ES[mes - 1]} {anio}</span>
+                <button onClick={() => cambiarMes(1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white hover:text-[#003B43] hover:shadow-sm transition active:scale-90">
                   <span className="material-symbols-outlined text-[20px]">chevron_right</span>
                 </button>
               </div>
             )}
             {tab === 'cuatrimestral' && (
-              <div className="flex items-center gap-0.5 border border-[#e2e4ef] dark:border-[#2e3148] bg-[#fafbff] dark:bg-[#181a2e] rounded-2xl px-1.5 py-1.5">
-                <button onClick={() => cambiarCuatrimestre(-1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white dark:hover:bg-[#252840] hover:text-[#004ac6] dark:hover:text-[#7ba8f0] hover:shadow-sm transition active:scale-90">
+              <div className="flex items-center gap-0.5 border border-[#e2e4ef] bg-[#f8f9fc] rounded-2xl px-1.5 py-1.5">
+                <button onClick={() => cambiarCuatrimestre(-1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white hover:text-[#003B43] hover:shadow-sm transition active:scale-90">
                   <span className="material-symbols-outlined text-[20px]">chevron_left</span>
                 </button>
-                <span className="text-sm font-semibold min-w-[150px] text-center text-[#191c1e] dark:text-[#e4e6f0]">{CUATRIMESTRE_LABEL[cuatrimestre]} {anio}</span>
-                <button onClick={() => cambiarCuatrimestre(1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white dark:hover:bg-[#252840] hover:text-[#004ac6] dark:hover:text-[#7ba8f0] hover:shadow-sm transition active:scale-90">
+                <span className="text-sm font-semibold min-w-[150px] text-center text-[#191c1e]">{CUATRIMESTRE_LABEL[cuatrimestre]} {anio}</span>
+                <button onClick={() => cambiarCuatrimestre(1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white hover:text-[#003B43] hover:shadow-sm transition active:scale-90">
                   <span className="material-symbols-outlined text-[20px]">chevron_right</span>
                 </button>
               </div>
             )}
             {tab === 'anual' && (
-              <div className="flex items-center gap-0.5 border border-[#e2e4ef] dark:border-[#2e3148] bg-[#fafbff] dark:bg-[#181a2e] rounded-2xl px-1.5 py-1.5">
-                <button onClick={() => setAnio((a) => a - 1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white dark:hover:bg-[#252840] hover:text-[#004ac6] dark:hover:text-[#7ba8f0] hover:shadow-sm transition active:scale-90">
+              <div className="flex items-center gap-0.5 border border-[#e2e4ef] bg-[#f8f9fc] rounded-2xl px-1.5 py-1.5">
+                <button onClick={() => setAnio((a) => a - 1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white hover:text-[#003B43] hover:shadow-sm transition active:scale-90">
                   <span className="material-symbols-outlined text-[20px]">chevron_left</span>
                 </button>
-                <span className="text-sm font-semibold min-w-[80px] text-center text-[#191c1e] dark:text-[#e4e6f0]">{anio}</span>
-                <button onClick={() => setAnio((a) => a + 1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white dark:hover:bg-[#252840] hover:text-[#004ac6] dark:hover:text-[#7ba8f0] hover:shadow-sm transition active:scale-90">
+                <span className="text-sm font-semibold min-w-[80px] text-center text-[#191c1e]">{anio}</span>
+                <button onClick={() => setAnio((a) => a + 1)} className="w-7 h-7 flex items-center justify-center rounded-full text-[#8890b5] hover:bg-white hover:text-[#003B43] hover:shadow-sm transition active:scale-90">
                   <span className="material-symbols-outlined text-[20px]">chevron_right</span>
                 </button>
               </div>
@@ -449,9 +446,9 @@ export default function ContabilidadConsolidadoPage() {
       </div>
 
       {!empresaId ? (
-        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] p-12 text-center shadow-sm">
-          <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">business</span>
-          <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">Elige una empresa para ver su información guardada.</p>
+        <div className="bg-white rounded-2xl border border-[#e2e4ef] p-12 text-center shadow-sm">
+          <span className="material-symbols-outlined text-5xl text-[#d1d5db]">business</span>
+          <p className="mt-4 text-[#6b7280]">Elige una empresa para ver su información guardada.</p>
         </div>
       ) : (
         <>
@@ -461,14 +458,14 @@ export default function ContabilidadConsolidadoPage() {
               bloque de abajo (ver `cargando` en el className siguiente). */}
           {cargando && !data && (
             <div className="text-center py-12">
-              <svg className="animate-spin h-8 w-8 text-[#004ac6] mx-auto" viewBox="0 0 24 24" fill="none">
+              <svg className="animate-spin h-8 w-8 text-[#E5A70C] mx-auto" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
             </div>
           )}
           {error && (
-            <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-400 mb-6">
+            <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700 mb-6">
               {error}
             </div>
           )}
@@ -483,15 +480,15 @@ export default function ContabilidadConsolidadoPage() {
                   — el año completo no se estaba recargando, solo la franja resaltada del mes. */}
               <TendenciaChart resumenAnual={resumenAnual} tab={tab} mes={mes} cuatrimestre={cuatrimestre} />
               {data && (
-                <div className={`bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden lg:w-72 flex-shrink-0 transition-opacity duration-150 ${cargando ? 'opacity-50' : 'opacity-100'}`}>
+                <div className={`bg-white rounded-2xl border border-[#e2e4ef] shadow-sm overflow-hidden lg:w-72 flex-shrink-0 transition-opacity duration-150 ${cargando ? 'opacity-50' : 'opacity-100'}`}>
                   <TotalGroupHeader label="Compras" color="#004ac6" />
-                  <div className="divide-y divide-[#e2e4ef] dark:divide-[#2e3148] border-b border-[#e2e4ef] dark:border-[#2e3148]">
+                  <div className="divide-y divide-[#e2e4ef] border-b border-[#e2e4ef]">
                     <TotalRow icon="payments" label="Base (sin IVA)" value={fmt(data.totales.compras.base)} grande />
                     <TotalRow icon="receipt_long" label="# Facturas" value={data.totales.compras.cantidad} />
                     <TotalRow icon="percent" label="IVA descontable" value={fmt(data.totales.compras.iva)} />
                   </div>
                   <TotalGroupHeader label="Ventas" color="#d97706" />
-                  <div className="divide-y divide-[#e2e4ef] dark:divide-[#2e3148]">
+                  <div className="divide-y divide-[#e2e4ef]">
                     <TotalRow icon="trending_up" label="Base (sin IVA)" value={fmt(data.totales.ventas.base)} grande />
                     <TotalRow icon="sell" label="IVA generado" value={fmt(data.totales.ventas.iva)} />
                     <TotalRow icon="local_mall" label="INC generado" value={fmt(data.totales.ventas.inc)} />
@@ -509,7 +506,7 @@ export default function ContabilidadConsolidadoPage() {
                   { titulo: 'Compras por Concepto', grupos: data.porConcepto },
                   { titulo: 'Compras por Clasificación de IVA', grupos: data.porClasificacionIva },
                 ].map(({ titulo, grupos }) => (
-                  <div key={titulo} className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-5">
+                  <div key={titulo} className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-5">
                     <h2 className="text-xs font-bold text-[#8890b5] uppercase tracking-wide mb-3">{titulo}</h2>
                     {grupos.length === 0 ? (
                       <p className="text-sm text-[#9ca3af] italic">Sin datos</p>
@@ -523,10 +520,10 @@ export default function ContabilidadConsolidadoPage() {
                             <th className="pb-2 text-right">IVA</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#f0f2f8] dark:divide-[#2a2e45]">
+                        <tbody className="divide-y divide-[#f0f2f8]">
                           {grupos.map((g) => (
                             <tr key={g.nombre}>
-                              <td className="py-1.5 text-[#191c1e] dark:text-[#e4e6f0]">{g.nombre}</td>
+                              <td className="py-1.5 text-[#191c1e]">{g.nombre}</td>
                               <td className="py-1.5 text-right tabular-nums">{g.cantidad}</td>
                               <td className="py-1.5 text-right tabular-nums">{fmt(g.base)}</td>
                               <td className="py-1.5 text-right tabular-nums">{fmt(g.iva)}</td>
@@ -534,7 +531,7 @@ export default function ContabilidadConsolidadoPage() {
                           ))}
                         </tbody>
                         <tfoot>
-                          <tr className="border-t border-[#e2e4ef] dark:border-[#2e3148] font-bold text-[#191c1e] dark:text-[#e4e6f0]">
+                          <tr className="border-t border-[#e2e4ef] font-bold text-[#191c1e]">
                             <td className="pt-2">Total</td>
                             <td className="pt-2 text-right tabular-nums">{grupos.reduce((s, g) => s + g.cantidad, 0)}</td>
                             <td className="pt-2 text-right tabular-nums">{fmt(grupos.reduce((s, g) => s + g.base, 0))}</td>
@@ -556,7 +553,7 @@ export default function ContabilidadConsolidadoPage() {
                 <button
                   onClick={handleExportar}
                   disabled={exportando || data.documentos.length === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 shadow-sm shadow-green-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#1e2030] focus-visible:ring-green-600"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 shadow-sm shadow-green-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:ring-green-600"
                   style={{ background: '#15803d' }}
                 >
                   <span className={`material-symbols-outlined text-lg ${exportando ? 'animate-spin' : ''}`}>
@@ -565,7 +562,7 @@ export default function ContabilidadConsolidadoPage() {
                   {exportando ? 'Generando…' : `Exportar ${tab === 'mensual' ? 'mes' : tab === 'cuatrimestral' ? 'cuatrimestre' : 'año'}`}
                 </button>
                 {data.mesesFaltantes.length > 0 && (
-                  <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">
+                  <span className="text-xs text-[#6b7280]">
                     Se puede exportar igual — el Excel avisa qué meses faltan.
                   </span>
                 )}
@@ -573,8 +570,8 @@ export default function ContabilidadConsolidadoPage() {
               </div>
 
               {/* ── Detalle ────────────────────────────────────────────── */}
-              <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b border-[#e2e4ef] dark:border-[#2e3148]">
+              <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm overflow-hidden">
+                <div className="px-5 py-3 border-b border-[#e2e4ef]">
                   <h2 className="text-xs font-bold text-[#8890b5] uppercase tracking-wide">
                     Detalle ({data.documentos.length} documentos)
                   </h2>
@@ -586,7 +583,7 @@ export default function ContabilidadConsolidadoPage() {
                 ) : (
                   <div className="overflow-auto scrollbar-styled" style={{ maxHeight: '480px' }}>
                     <table className="w-full text-sm border-collapse">
-                      <thead className="sticky top-0 z-10 bg-[#f8f9ff] dark:bg-[#181a2e]">
+                      <thead className="sticky top-0 z-10 bg-[#f8f9fc]">
                         <tr className="text-left text-xs text-[#8890b5] uppercase">
                           <th className="px-4 py-2">Fecha</th>
                           <th className="px-4 py-2">Grupo</th>
@@ -602,8 +599,8 @@ export default function ContabilidadConsolidadoPage() {
                       </thead>
                       <tbody>
                         {data.documentos.map((d, i) => (
-                          <tr key={d.id} className={`border-t border-[#f0f2f8] dark:border-[#2e3148] ${i % 2 === 1 ? 'bg-[#fafbff] dark:bg-[#191b2e]' : ''}`}>
-                            <td className="px-4 py-2 whitespace-nowrap text-[#6b7280] dark:text-[#8890b5]">
+                          <tr key={d.id} className={`border-t border-[#f0f2f8] ${i % 2 === 1 ? 'bg-[#f8f9fc]' : ''}`}>
+                            <td className="px-4 py-2 whitespace-nowrap text-[#6b7280]">
                               {d.fechaEmision ? new Date(d.fechaEmision).toLocaleDateString('es-CO') : '—'}
                             </td>
                             <td className="px-4 py-2">{d.grupo}</td>

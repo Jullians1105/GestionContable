@@ -40,9 +40,9 @@ const ORIGEN_ORDER = ['maritza', 'diana', 'externas']
 // importar cuánto se oscureciera a mano. Estos pares sí están pensados por
 // Tailwind para leerse bien tanto en claro como en oscuro.
 const PLAZO_ZONE_CLASS = {
-  verde:    'text-green-600 dark:text-green-400',
-  amarillo: 'text-amber-600 dark:text-amber-400',
-  rojo:     'text-red-600 dark:text-red-400',
+  verde:    'text-green-600',
+  amarillo: 'text-amber-600',
+  rojo:     'text-red-600',
 }
 
 // Misma cuenta hardcodeada que requireNEPlazoAdmin en el backend — la fecha límite es un campo
@@ -401,29 +401,29 @@ export default function NominaElectronicaPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-3 mb-0.5">
-            <span className="material-symbols-outlined text-3xl text-[#004ac6]">badge</span>
-            <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Nómina Electrónica</h1>
+            <span className="material-symbols-outlined text-3xl text-[#003B43]">badge</span>
+            <h1 className="text-2xl font-bold text-[#191c1e]">Nómina Electrónica</h1>
           </div>
-          <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">Seguimiento mensual de presentación por empresa</p>
+          <p className="text-sm text-[#6b7280]">Seguimiento mensual de presentación por empresa</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-1 bg-white border border-[#e2e4ef] rounded-xl px-3 py-2 shadow-sm">
             <button
               onClick={prevMonth}
               disabled={atFloor}
               title={atFloor ? 'No hay seguimiento antes de agosto 2026' : undefined}
-              className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-xl">chevron_left</span>
             </button>
-            <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] px-2 min-w-[130px] text-center">
+            <span className="text-sm font-semibold text-[#191c1e] px-2 min-w-[130px] text-center">
               {MONTHS[mes - 1]} {anio}
             </span>
             <button
               onClick={nextMonth}
               disabled={atCeiling}
               title={atCeiling ? 'El mes en curso aún no está habilitado (mes vencido)' : undefined}
-              className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-xl">chevron_right</span>
             </button>
@@ -431,7 +431,7 @@ export default function NominaElectronicaPage() {
           {puedeGestionarCatalogo && (
             <Link
               to="/dian/nomina-electronica/empresas"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#6b7280] dark:text-[#8890b5] border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#6b7280] border border-[#e2e4ef] hover:bg-[#f3f4f6] transition"
             >
               <span className="material-symbols-outlined text-lg">edit</span>
               Editar empresas
@@ -461,34 +461,34 @@ export default function NominaElectronicaPage() {
         <div className="min-w-0">
           {editandoPlazo ? (
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">Plazo para presentar:</span>
+              <span className="text-sm font-semibold text-[#191c1e]">Plazo para presentar:</span>
               <input
                 type="date"
                 autoFocus
                 value={plazoDraft}
                 onChange={(e) => setPlazoDraft(e.target.value)}
-                className="text-sm px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+                className="text-sm px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
               />
               <button
                 onClick={savePlazo}
                 disabled={savingPlazo}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#004ac6] text-white hover:bg-[#003a9c] transition-colors disabled:opacity-60"
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#E5A70C] text-[#20160A] hover:bg-[#E5A70C] transition-colors disabled:opacity-60"
               >
                 {savingPlazo ? 'Guardando...' : 'Guardar'}
               </button>
               <button
                 onClick={() => setEditandoPlazo(false)}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-[#6b7280] dark:text-[#8890b5] hover:bg-white/60 dark:hover:bg-white/10 transition-colors"
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-[#6b7280] hover:bg-white/60 transition-colors"
               >
                 Cancelar
               </button>
             </div>
           ) : (
-            <p className="text-sm font-medium text-[#191c1e] dark:text-[#e4e6f0]">
+            <p className="text-sm font-medium text-[#191c1e]">
               {plazo?.fechaLimite ? (
                 <>
                   Plazo para presentar: <b>hasta el {formatFechaLimite(plazo.fechaLimite)}</b>
-                  {diasFaltantesLabel && <span className="text-[#6b7280] dark:text-[#8890b5]"> ({diasFaltantesLabel})</span>}
+                  {diasFaltantesLabel && <span className="text-[#6b7280]"> ({diasFaltantesLabel})</span>}
                 </>
               ) : (
                 <span className="italic opacity-70">Plazo no configurado todavía</span>
@@ -500,7 +500,7 @@ export default function NominaElectronicaPage() {
           <button
             onClick={startEditPlazo}
             title="Editar plazo"
-            className={`hover:bg-white/60 dark:hover:bg-white/10 rounded-full p-1.5 shrink-0 transition-colors ${plazoColor ? PLAZO_ZONE_CLASS[plazoColor.zone] : 'text-[#6b7280] dark:text-[#8890b5]'}`}
+            className={`hover:bg-white/60 rounded-full p-1.5 shrink-0 transition-colors ${plazoColor ? PLAZO_ZONE_CLASS[plazoColor.zone] : 'text-[#6b7280]'}`}
           >
             <span className="material-symbols-outlined text-lg">edit</span>
           </button>
@@ -512,20 +512,20 @@ export default function NominaElectronicaPage() {
           barra + "van / total" (excluye "no aplica" del total, ver
           presentacionStats). */}
       {!loading && !error && presentacionStats.total > 0 && (
-        <div className="flex-1 min-w-[260px] flex items-center gap-3 bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] px-4 py-3 shadow-sm">
+        <div className="flex-1 min-w-[260px] flex items-center gap-3 bg-white rounded-xl border border-[#e2e4ef] px-4 py-3 shadow-sm">
           <span className="material-symbols-outlined text-2xl shrink-0" style={{ color: '#16a34a' }}>
             check_circle
           </span>
-          <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] whitespace-nowrap shrink-0">
+          <span className="text-xs font-semibold text-[#191c1e] whitespace-nowrap shrink-0">
             Progreso general
           </span>
           <div className="flex-1 min-w-[60px]">
-            <div className="w-full h-2 rounded-full bg-[#f3f4f6] dark:bg-[#252840]">
+            <div className="w-full h-2 rounded-full bg-[#f3f4f6]">
               <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${presentacionStats.pct}%`, background: '#16a34a' }} />
             </div>
           </div>
           <span className="text-xs font-bold shrink-0" style={{ color: '#16a34a' }}>{presentacionStats.pct}%</span>
-          <span className="text-xs text-[#6b7280] dark:text-[#8890b5] whitespace-nowrap shrink-0">
+          <span className="text-xs text-[#6b7280] whitespace-nowrap shrink-0">
             {presentacionStats.presentadas} / {presentacionStats.total} presentadas
           </span>
         </div>
@@ -546,10 +546,10 @@ export default function NominaElectronicaPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar empresa..."
-              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
             />
           </div>
-          <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl p-1 shadow-sm">
+          <div className="flex items-center gap-1 bg-white border border-[#e2e4ef] rounded-xl p-1 shadow-sm">
             {[
               { key: 'all',  label: 'Todas' },
               { key: 'mine', label: 'Mis empresas' },
@@ -559,8 +559,8 @@ export default function NominaElectronicaPage() {
                 onClick={() => setRespFilter(opt.key)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                   respFilter === opt.key
-                    ? 'bg-[#004ac6] text-white'
-                    : 'text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]'
+                    ? 'bg-[#003B43] text-white'
+                    : 'text-[#6b7280] hover:bg-[#f3f4f6]'
                 }`}
               >
                 {opt.label}
@@ -594,13 +594,13 @@ export default function NominaElectronicaPage() {
       </div>
 
       {error && (
-        <div className="text-sm px-4 py-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
+        <div className="text-sm px-4 py-2.5 rounded-xl bg-red-50 text-red-700 border border-red-200">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
+        <div className="flex items-center justify-center py-20 text-[#8890b5]">
           <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
             progress_activity
           </span>
@@ -655,10 +655,10 @@ export default function NominaElectronicaPage() {
       {openCell && openRow && (
         <div
           ref={dropdownRef}
-          className="fixed z-50 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-2xl p-4 w-60"
+          className="fixed z-50 bg-white border border-[#e2e4ef] rounded-xl shadow-2xl p-4 w-60"
           style={{ left: openCell.left, top: openCell.top }}
         >
-          <p className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-3 truncate" title={openRow.name}>
+          <p className="text-[11px] font-bold text-[#191c1e] mb-3 truncate" title={openRow.name}>
             {openRow.name}
           </p>
 
@@ -693,13 +693,13 @@ export default function NominaElectronicaPage() {
                 onBlur={(e) => handleNota(openRow.empresaId, e.target.value)}
                 placeholder="¿Qué hay que revisar?"
                 rows={2}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30 resize-none"
               />
             </div>
           )}
 
-          <div className="border-t border-[#e2e4ef] dark:border-[#2e3148] pt-2.5">
-            <label className="flex items-center gap-2 text-xs font-medium text-[#434655] dark:text-[#c4c8e8] cursor-pointer select-none">
+          <div className="border-t border-[#e2e4ef] pt-2.5">
+            <label className="flex items-center gap-2 text-xs font-medium text-[#434655] cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={!!openRow.tieneNovedad}
@@ -715,14 +715,14 @@ export default function NominaElectronicaPage() {
                 onBlur={(e) => handleNovedadNota(openRow.empresaId, e.target.value)}
                 placeholder="¿Cuál novedad?"
                 rows={2}
-                className="w-full mt-2 px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+                className="w-full mt-2 px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30 resize-none"
               />
             )}
           </div>
 
           <button
             onClick={() => { flushPending(); setOpenCell(null) }}
-            className="w-full mt-3 py-1 text-xs text-[#6b7280] hover:text-[#191c1e] dark:hover:text-[#e4e6f0] transition text-center"
+            className="w-full mt-3 py-1 text-xs text-[#6b7280] hover:text-[#191c1e] transition text-center"
           >
             Cerrar
           </button>
@@ -744,9 +744,9 @@ const NOTE_TRIANGLE = {
 // ─── una columna (Maritza / Diana / Externas) — alto natural, sin scroll interno ──
 function CompanyColumn({ title, accent, rows, onCellClick, openEmpresaId, onShowTooltip, onHideTooltip }) {
   return (
-    <div className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-[#e2e4ef] shadow-sm overflow-hidden">
       <div
-        className="px-4 py-2.5 bg-[#f8f9fc] dark:bg-[#252840] flex items-center justify-between"
+        className="px-4 py-2.5 bg-[#f8f9fc] flex items-center justify-between"
         style={{ borderBottom: `2px solid ${accent}` }}
       >
         <span className="text-xs font-bold uppercase tracking-wide" style={{ color: accent }}>{title}</span>
@@ -770,7 +770,7 @@ function CompanyColumn({ title, accent, rows, onCellClick, openEmpresaId, onShow
           return (
             <div
               key={row.empresaId}
-              className={`relative flex items-center gap-1.5 pl-4 pr-2.5 py-1.5 border-b border-black/5 dark:border-white/10 last:border-0 transition-colors ${isOpen ? 'ring-2 ring-inset ring-[#004ac6]' : ''}`}
+              className={`relative flex items-center gap-1.5 pl-4 pr-2.5 py-1.5 border-b border-black/5 last:border-0 transition-colors ${isOpen ? 'ring-2 ring-inset ring-[#E5A70C]' : ''}`}
               style={{ background: cfg.bg }}
               onMouseEnter={hasNote ? (e) => onShowTooltip(e, tooltipContent) : undefined}
               onMouseLeave={hasNote ? onHideTooltip : undefined}
@@ -786,7 +786,7 @@ function CompanyColumn({ title, accent, rows, onCellClick, openEmpresaId, onShow
               >
                 <span
                   className="material-symbols-outlined"
-                  style={{ color: row.responsableNombre ? '#004ac6' : '#c3c6d7', fontSize: 15 }}
+                  style={{ color: row.responsableNombre ? '#003B43' : '#c3c6d7', fontSize: 15 }}
                 >
                   person
                 </span>

@@ -31,15 +31,15 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f3f4f6] dark:bg-[#0f1117] flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-lg p-8 w-full max-w-md border border-[#c3c6d7] dark:border-[#2e3148]">
+    <div className="min-h-screen bg-[#f3f4f6] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md border border-[#c3c6d7]">
         <div className="flex items-center gap-3 mb-8">
           <img src={logoIcono} alt="Gestcon" className="w-10 h-10 rounded-xl object-cover" />
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Gestcon</h1>
+          <h1 className="text-2xl font-bold text-[#191c1e]">Gestcon</h1>
         </div>
 
-        <h2 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">Recuperar contraseña</h2>
-        <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mb-6">
+        <h2 className="text-xl font-bold text-[#191c1e] mb-1">Recuperar contraseña</h2>
+        <p className="text-sm text-[#434655] mb-6">
           Ingresa tu email y te enviaremos instrucciones para restablecer tu contraseña
         </p>
 
@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
               <button
                 onClick={() => navigate(`/reset-password?token=${devToken}`)}
                 className="w-full h-10 rounded-lg text-sm font-semibold text-white transition flex items-center justify-center gap-2"
-                style={{ background: '#004ac6' }}
+                style={{ background: '#2563eb' }}
               >
                 <span className="material-symbols-outlined text-base">lock_reset</span>
                 Restablecer contraseña ahora
@@ -69,7 +69,7 @@ export default function ForgotPasswordPage() {
               <button
                 onClick={() => navigate('/reset-password')}
                 className="w-full h-10 rounded-lg text-sm font-semibold text-white transition"
-                style={{ background: '#004ac6' }}
+                style={{ background: '#2563eb' }}
               >
                 Ya tengo mi token
               </button>
@@ -78,13 +78,13 @@ export default function ForgotPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1.5">Email</label>
+              <label className="block text-xs font-semibold text-[#434655] mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setError('') }}
                 placeholder="tu@empresa.com"
-                className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] dark:border-[#2e3148] bg-[#edeef0] dark:bg-[#252840] text-sm text-[#191c1e] dark:text-[#e4e6f0] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition"
+                className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-transparent transition"
               />
             </div>
 
@@ -92,7 +92,7 @@ export default function ForgotPasswordPage() {
               type="submit"
               disabled={loading}
               className="w-full h-10 rounded-lg text-sm font-semibold text-white transition flex items-center justify-center gap-2 disabled:opacity-60"
-              style={{ background: '#004ac6' }}
+              style={{ background: '#2563eb' }}
             >
               {loading ? (
                 <span className="material-symbols-outlined animate-spin text-base">refresh</span>
@@ -106,7 +106,7 @@ export default function ForgotPasswordPage() {
           </form>
         )}
 
-        <p className="text-sm text-center text-[#434655] dark:text-[#c4c8e8] mt-6">
+        <p className="text-sm text-center text-[#434655] mt-6">
           <Link to="/login" className="font-semibold" style={{ color: '#004ac6' }}>
             Volver a iniciar sesión
           </Link>

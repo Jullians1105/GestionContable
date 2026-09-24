@@ -19,9 +19,9 @@ import { useAuth } from '../context/AuthContext'
 import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColor, PRIORITY_LABELS } from '../utils/helpers'
 
 const COLUMNS = [
-  { id: 'pending', label: 'Pendiente', icon: 'radio_button_unchecked', bg: 'bg-[#f3f4f6] dark:bg-[#1a1c2e]', border: 'border-[#c3c6d7] dark:border-[#2e3148]', dot: '#888' },
-  { id: 'in_progress', label: 'En Progreso', icon: 'pending', bg: 'bg-blue-50 dark:bg-[#1a2040]', border: 'border-blue-200 dark:border-blue-900', dot: '#004ac6' },
-  { id: 'completed', label: 'Completada', icon: 'check_circle', bg: 'bg-green-50 dark:bg-[#1a2a20]', border: 'border-green-200 dark:border-green-900', dot: '#10B981' },
+  { id: 'pending', label: 'Pendiente', icon: 'radio_button_unchecked', bg: 'bg-[#f3f4f6]', border: 'border-[#c3c6d7]', dot: '#888' },
+  { id: 'in_progress', label: 'En Progreso', icon: 'pending', bg: 'bg-blue-50', border: 'border-blue-200', dot: '#004ac6' },
+  { id: 'completed', label: 'Completada', icon: 'check_circle', bg: 'bg-green-50', border: 'border-green-200', dot: '#10B981' },
 ]
 
 const PRIORITY_COLORS = { high: '#EF4444', medium: '#FBBF24', low: '#10B981' }
@@ -35,9 +35,9 @@ function KanbanCard({ task, members, isDragging }) {
   const completed = subtasks.filter((s) => s.completed).length
 
   return (
-    <div className={`bg-white dark:bg-[#1e2030] rounded-xl border border-[#c3c6d7] dark:border-[#2e3148] p-3 shadow-sm cursor-grab transition-all ${isDragging ? 'opacity-50 shadow-lg rotate-2' : 'hover:shadow-md hover:border-[#004ac6]'}`}>
+    <div className={`bg-white rounded-xl border border-[#c3c6d7] p-3 shadow-sm cursor-grab transition-all ${isDragging ? 'opacity-50 shadow-lg rotate-2' : 'hover:shadow-md hover:border-[#004ac6]'}`}>
       <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] leading-snug flex-1">{task.title}</p>
+        <p className="text-sm font-semibold text-[#191c1e] leading-snug flex-1">{task.title}</p>
         <span
           className="px-1.5 py-0.5 rounded text-[10px] font-bold text-white flex-shrink-0"
           style={{ background: PRIORITY_COLORS[task.priority] }}
@@ -48,8 +48,8 @@ function KanbanCard({ task, members, isDragging }) {
 
       {subtasks.length > 0 && (
         <div className="mb-2">
-          <div className="h-1 bg-[#edeef0] dark:bg-[#252840] rounded-full overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: `${Math.round((completed / subtasks.length) * 100)}%`, background: '#004ac6' }} />
+          <div className="h-1 bg-[#edeef0] rounded-full overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${Math.round((completed / subtasks.length) * 100)}%`, background: '#16a34a' }} />
           </div>
           <p className="text-[10px] text-[#888] mt-0.5">{completed}/{subtasks.length} subtareas</p>
         </div>
@@ -88,7 +88,7 @@ function KanbanColumn({ column, tasks, members }) {
     <div ref={setNodeRef} className={`flex flex-col rounded-2xl border ${column.bg} ${column.border} min-h-[400px] w-full`}>
       <div className="flex items-center gap-2 px-4 py-3 border-b border-inherit">
         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: column.dot }} />
-        <span className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0]">{column.label}</span>
+        <span className="text-sm font-bold text-[#191c1e]">{column.label}</span>
         <span className="ml-auto text-xs text-white font-bold px-2 py-0.5 rounded-full" style={{ background: column.dot }}>{tasks.length}</span>
       </div>
       <div className="flex-1 p-3 space-y-2 overflow-y-auto">
@@ -163,8 +163,8 @@ export default function KanbanPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Tablero Kanban</h1>
-          <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">{filtered.length} tareas en total</p>
+          <h1 className="text-2xl font-bold text-[#191c1e]">Tablero Kanban</h1>
+          <p className="text-sm text-[#434655] mt-0.5">{filtered.length} tareas en total</p>
         </div>
       </div>
 

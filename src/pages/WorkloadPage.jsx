@@ -106,30 +106,30 @@ export default function WorkloadPage() {
   }
 
   if (loading) {
-    return <p className="text-sm text-[#434655] dark:text-[#c4c8e8]">Cargando carga de trabajo...</p>
+    return <p className="text-sm text-[#434655]">Cargando carga de trabajo...</p>
   }
 
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Carga de Trabajo</h1>
-        <p className="text-sm text-[#434655] dark:text-[#c4c8e8] mt-0.5">Visión general de la distribución de tareas del equipo</p>
+        <h1 className="text-2xl font-bold text-[#191c1e]">Carga de Trabajo</h1>
+        <p className="text-sm text-[#434655] mt-0.5">Visión general de la distribución de tareas del equipo</p>
       </div>
 
       {!rows.length ? (
-        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-8 text-center text-sm text-[#434655] dark:text-[#c4c8e8]">
+        <div className="bg-white rounded-2xl border border-[#c3c6d7] p-8 text-center text-sm text-[#434655]">
           No hay tareas abiertas registradas todavía.
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
-            <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-5">
-              <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1">Total tareas abiertas</p>
-              <p className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">{stats.total}</p>
+            <div className="bg-white rounded-2xl border border-[#c3c6d7] p-5">
+              <p className="text-xs font-semibold text-[#434655] mb-1">Total tareas abiertas</p>
+              <p className="text-2xl font-bold text-[#191c1e]">{stats.total}</p>
               <p className="text-xs text-[#888] mt-1">Promedio: {stats.avg.toFixed(1)} por persona</p>
             </div>
-            <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-5">
-              <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1">Balance del equipo</p>
+            <div className="bg-white rounded-2xl border border-[#c3c6d7] p-5">
+              <p className="text-xs font-semibold text-[#434655] mb-1">Balance del equipo</p>
               <p className={`text-2xl font-bold ${stats.balanced ? 'text-[#10B981]' : 'text-[#EF4444]'}`}>
                 {stats.balanced ? 'Balanceado' : 'Desbalanceado'}
               </p>
@@ -137,16 +137,16 @@ export default function WorkloadPage() {
                 {stats.max.name}: {stats.max.abiertas} · {stats.min.name}: {stats.min.abiertas}
               </p>
             </div>
-            <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-5">
-              <p className="text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] mb-1">Tareas vencidas</p>
+            <div className="bg-white rounded-2xl border border-[#c3c6d7] p-5">
+              <p className="text-xs font-semibold text-[#434655] mb-1">Tareas vencidas</p>
               <p className="text-2xl font-bold text-[#EF4444]">{rows.reduce((a, r) => a + r.vencidas, 0)}</p>
               <p className="text-xs text-[#888] mt-1">entre tareas abiertas del equipo</p>
             </div>
           </div>
 
           {recommendationsByGroup.length > 0 && (
-            <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-5 mb-5">
-              <h2 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1 flex items-center gap-2">
+            <div className="bg-white rounded-2xl border border-[#c3c6d7] p-5 mb-5">
+              <h2 className="text-sm font-bold text-[#191c1e] mb-1 flex items-center gap-2">
                 <span className="material-symbols-outlined text-base text-[#004ac6]">lightbulb</span>
                 Recomendaciones de rebalanceo
               </h2>
@@ -159,12 +159,12 @@ export default function WorkloadPage() {
                     <p className="text-[10px] font-bold text-[#888] uppercase tracking-widest mb-1.5">{g.groupName}</p>
                     <ul className="space-y-2">
                       {g.recs.map((rec, i) => (
-                        <li key={i} className="text-sm text-[#434655] dark:text-[#c4c8e8] flex items-start gap-2">
+                        <li key={i} className="text-sm text-[#434655] flex items-start gap-2">
                           <span className="material-symbols-outlined text-sm text-[#FBBF24] mt-0.5">arrow_forward</span>
                           <span>
-                            Transferir <strong className="text-[#191c1e] dark:text-[#e4e6f0]">{rec.move} tarea{rec.move !== 1 ? 's' : ''}</strong> de{' '}
-                            <strong className="text-[#191c1e] dark:text-[#e4e6f0]">{rec.from.name}</strong> ({rec.from.abiertas} abiertas) a{' '}
-                            <strong className="text-[#191c1e] dark:text-[#e4e6f0]">{rec.to.name}</strong> (carga baja, {rec.to.abiertas} abiertas)
+                            Transferir <strong className="text-[#191c1e]">{rec.move} tarea{rec.move !== 1 ? 's' : ''}</strong> de{' '}
+                            <strong className="text-[#191c1e]">{rec.from.name}</strong> ({rec.from.abiertas} abiertas) a{' '}
+                            <strong className="text-[#191c1e]">{rec.to.name}</strong> (carga baja, {rec.to.abiertas} abiertas)
                           </span>
                         </li>
                       ))}
@@ -175,8 +175,8 @@ export default function WorkloadPage() {
             </div>
           )}
 
-          <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-5 mb-5">
-            <h2 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-4">Tareas abiertas por persona</h2>
+          <div className="bg-white rounded-2xl border border-[#c3c6d7] p-5 mb-5">
+            <h2 className="text-sm font-bold text-[#191c1e] mb-4">Tareas abiertas por persona</h2>
             <ResponsiveContainer width="100%" height={Math.max(280, rows.length * 32)}>
               <BarChart data={rows} layout="vertical" margin={{ top: 5, right: 24, bottom: 5, left: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#edeef0" />
@@ -190,26 +190,26 @@ export default function WorkloadPage() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-5 mb-5">
-            <h2 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-4">Detalle por persona</h2>
+          <div className="bg-white rounded-2xl border border-[#c3c6d7] p-5 mb-5">
+            <h2 className="text-sm font-bold text-[#191c1e] mb-4">Detalle por persona</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#edeef0] dark:border-[#252840]">
+                  <tr className="border-b border-[#edeef0]">
                     {['Persona', 'Abiertas', 'Vencidas'].map((h) => (
-                      <th key={h} className="text-left text-xs font-semibold text-[#434655] dark:text-[#c4c8e8] py-2 px-3">{h}</th>
+                      <th key={h} className="text-left text-xs font-semibold text-[#434655] py-2 px-3">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.id} className="border-b border-[#edeef0] dark:border-[#252840] hover:bg-[#f8f9ff] dark:hover:bg-[#252840]">
+                    <tr key={r.id} className="border-b border-[#edeef0] hover:bg-[#eef3ff]">
                       <td className="py-2 px-3">
                         <div className="flex items-center gap-2">
                           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0 ${getAvatarColor(r.name)}`}>
                             {getInitials(r.name)}
                           </div>
-                          <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{r.name}</span>
+                          <span className="font-semibold text-[#191c1e]">{r.name}</span>
                         </div>
                       </td>
                       <td className="py-2 px-3 font-semibold" style={{ color: barColor(r.abiertas) }}>{r.abiertas}</td>
@@ -226,8 +226,8 @@ export default function WorkloadPage() {
           </div>
 
           {monthlyChart.length > 0 && (
-            <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#c3c6d7] dark:border-[#2e3148] p-5">
-              <h2 className="text-sm font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-1">Histórico de carga (tareas nuevas por mes)</h2>
+            <div className="bg-white rounded-2xl border border-[#c3c6d7] p-5">
+              <h2 className="text-sm font-bold text-[#191c1e] mb-1">Histórico de carga (tareas nuevas por mes)</h2>
               <p className="text-xs text-[#888] mb-4">Tendencia de tareas creadas para el equipo en los últimos meses</p>
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={monthlyChart} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>

@@ -19,16 +19,16 @@ const BORDER     = '1px solid #e2e4ef'
 const BORDER_COL = '1px solid #d5d9ea'
 
 // Mismo criterio que FondoEmprenderPage.jsx: fondo del header gris neutro
-// muy tenue (bg-[#f8f9fc], NO un tinte azul — eso se probó y se veía como
+// muy tenue (bg-[#eef3ff], NO un tinte azul — eso se probó y se veía como
 // que toda la fila tenía color) para las columnas fijas (Empresa/Responsable/
 // Contador). Las columnas de dato (Proceso, o Tipo/Valor en la vista
 // Utilidad/Pérdida) llevan además una sola línea de acento abajo — ahí sí,
 // igual que el filo de color que conecta cada columna con su grupo en Fondo
 // Emprender — nunca arriba Y abajo a la vez (eso se veía como un sándwich
 // grueso de 3px+3px en vez de un simple subrayado).
-const HEADER_ACCENT = '#004ac6'
+const HEADER_ACCENT = '#E5A70C'
 const HEADER_ACCENT_BORDER = `3px solid ${HEADER_ACCENT}`
-const HEADER_BG = 'bg-[#f8f9fc] dark:bg-[#1a1d2e]'
+const HEADER_BG = 'bg-[#f8f9fc]'
 
 // A diferencia de Fondo Emprender (23+ procesos, columnas angostas de 48px
 // con texto rotado para que todos quepan), acá son solo 11 — hay espacio de
@@ -73,8 +73,8 @@ const GROUP_ROW_HEIGHT = 30
 // (ver memoria de colores del sistema) — ciclada por índice como en Fondo
 // Emprender, acá solo hacen falta 2 (Nómina/Contabilidad).
 const GROUP_PALETTE = [
-  { bg: 'bg-[#f0f4ff] dark:bg-[#182544]', text: 'text-[#004ac6] dark:text-[#7ba8f0]', accent: '#004ac6' },
-  { bg: 'bg-[#f0fdf4] dark:bg-[#0d2e1a]', text: 'text-[#16a34a] dark:text-[#4ade80]', accent: '#16a34a' },
+  { bg: 'bg-[#f0f4ff]', text: 'text-[#004ac6]', accent: '#004ac6' },
+  { bg: 'bg-[#f0fdf4]', text: 'text-[#16a34a]', accent: '#16a34a' },
 ]
 
 // Claves sintéticas para filtrar por Responsable/Contador dentro del mismo
@@ -163,8 +163,8 @@ function FilterButton({ onClick, hasFilter, title }) {
       onClick={onClick}
       className={`flex items-center justify-center rounded transition-colors ${
         hasFilter
-          ? 'text-[#004ac6] dark:text-[#7ba8f0] bg-[#e8eefc] dark:bg-[#1a2444]'
-          : 'text-[#b0b4c8] dark:text-[#4b5170] hover:text-[#6b7280] dark:hover:text-[#8890b5] hover:bg-[#edeef0] dark:hover:bg-[#252840]'
+          ? 'text-[#946000] bg-[#FBEAC0]'
+          : 'text-[#b0b4c8] hover:text-[#6b7280] hover:bg-[#edeef0]'
       }`}
       style={{ width: FILTER_BTN_WIDTH, height: FILTER_BTN_HEIGHT }}
       title={title}
@@ -185,7 +185,7 @@ function ProcessHeaderCell({ proc, editable, isFirst, isLast, onMoveLeft, onMove
     <th
       title={proc.name}
       rowSpan={rowSpan}
-      className={`${HEADER_BG} text-[#6b7280] dark:text-[#8890b5]`}
+      className={`${HEADER_BG} text-[#6b7280]`}
       style={{
         // Sin `width`: columna proporcional al largo de su nombre (ver
         // procColWidth), calculada en el <col> del colgroup. minWidth es el
@@ -222,7 +222,7 @@ function ProcessHeaderCell({ proc, editable, isFirst, isLast, onMoveLeft, onMove
               onClick={onMoveLeft}
               disabled={isFirst}
               title="Mover a la izquierda"
-              className="p-0.5 rounded hover:bg-[#e2e4ef] dark:hover:bg-[#252840] disabled:opacity-30 disabled:hover:bg-transparent transition"
+              className="p-0.5 rounded hover:bg-[#e2e4ef] disabled:opacity-30 disabled:hover:bg-transparent transition"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 13 }}>chevron_left</span>
             </button>
@@ -230,7 +230,7 @@ function ProcessHeaderCell({ proc, editable, isFirst, isLast, onMoveLeft, onMove
               onClick={onMoveRight}
               disabled={isLast}
               title="Mover a la derecha"
-              className="p-0.5 rounded hover:bg-[#e2e4ef] dark:hover:bg-[#252840] disabled:opacity-30 disabled:hover:bg-transparent transition"
+              className="p-0.5 rounded hover:bg-[#e2e4ef] disabled:opacity-30 disabled:hover:bg-transparent transition"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 13 }}>chevron_right</span>
             </button>
@@ -241,14 +241,14 @@ function ProcessHeaderCell({ proc, editable, isFirst, isLast, onMoveLeft, onMove
           <div className="flex items-center justify-center gap-1">
             <button
               onClick={() => startEditProcess(proc)}
-              className="p-0.5 rounded hover:bg-[#e2e4ef] dark:hover:bg-[#252840] hover:text-[#004ac6] transition"
+              className="p-0.5 rounded hover:bg-[#e2e4ef] hover:text-[#003B43] transition"
               title="Editar nombre"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
             </button>
             <button
               onClick={() => setDeleteConfirm({ type: 'proceso', id: proc.id, name: proc.name })}
-              className="p-0.5 rounded hover:bg-[#e2e4ef] dark:hover:bg-[#252840] hover:text-red-500 transition"
+              className="p-0.5 rounded hover:bg-[#e2e4ef] hover:text-red-500 transition"
               title="Eliminar"
             >
               <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
@@ -298,7 +298,7 @@ function GroupHeaderCell({ grupo, procesos, editable, palette, editingGroup, set
               if (e.key === 'Escape') setEditingGroup(null)
             }}
             onBlur={saveEditGroup}
-            className="w-full px-1.5 py-0.5 text-[11px] rounded border border-[#004ac6] outline-none bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+            className="w-full px-1.5 py-0.5 text-[11px] rounded border border-[#E5A70C] outline-none bg-white text-[#191c1e]"
           />
         </div>
       ) : showAsSingleCell ? (
@@ -316,14 +316,14 @@ function GroupHeaderCell({ grupo, procesos, editable, palette, editingGroup, set
             <div className="flex items-center gap-0.5 flex-shrink-0">
               <button
                 onClick={() => startEditGroup(grupo)}
-                className={`p-0.5 rounded hover:bg-white/60 dark:hover:bg-black/20 transition ${palette.text}`}
+                className={`p-0.5 rounded hover:bg-white/60 transition ${palette.text}`}
                 title="Renombrar grupo"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
               </button>
               <button
                 onClick={() => setDeleteConfirm({ type: 'grupo', id: grupo.id, name: grupo.name })}
-                className="p-0.5 rounded hover:bg-white/60 dark:hover:bg-black/20 text-red-500 transition"
+                className="p-0.5 rounded hover:bg-white/60 text-red-500 transition"
                 title="Eliminar grupo (los procesos quedan sin grupo)"
               >
                 <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
@@ -353,7 +353,7 @@ function ResultadoValorCell({ tipo, valor, onInput, onCommit }) {
 
   if (!tipo) {
     return (
-      <div className="flex items-center justify-center h-full text-xs text-[#c3c6d7] dark:text-[#4b5170]">—</div>
+      <div className="flex items-center justify-center h-full text-xs text-[#c3c6d7]">—</div>
     )
   }
 
@@ -368,7 +368,7 @@ function ResultadoValorCell({ tipo, valor, onInput, onCommit }) {
         onBlur={() => { onCommit(); setEditing(false) }}
         onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
         placeholder="0"
-        className="w-full px-2 py-1.5 text-xs text-right font-semibold rounded-lg border border-[#004ac6]/50 bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+        className="w-full px-2 py-1.5 text-xs text-right font-semibold rounded-lg border border-[#E5A70C]/50 bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
       />
     )
   }
@@ -377,10 +377,10 @@ function ResultadoValorCell({ tipo, valor, onInput, onCommit }) {
     <button
       onClick={() => setEditing(true)}
       title="Clic para editar"
-      className="w-full px-2 py-1.5 text-xs text-right rounded-lg transition hover:bg-black/[0.04] dark:hover:bg-white/[0.06] truncate"
+      className="w-full px-2 py-1.5 text-xs text-right rounded-lg transition hover:bg-black/[0.04] truncate"
     >
       {valor !== null && valor !== undefined && valor !== ''
-        ? <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{formatCOP(valor)}</span>
+        ? <span className="font-semibold text-[#191c1e]">{formatCOP(valor)}</span>
         : <span className="text-[#8890b5]">Agregar valor</span>}
     </button>
   )
@@ -399,7 +399,7 @@ function NameFilterHeaderCell({ label, width, left, rowSpan = 1, onFilterClick, 
   return (
     <th
       rowSpan={rowSpan}
-      className={`sticky top-0 z-30 ${HEADER_BG} text-[#6b7280] dark:text-[#8890b5]`}
+      className={`sticky top-0 z-30 ${HEADER_BG} text-[#6b7280]`}
       style={{
         left,
         width, minWidth: width, verticalAlign: 'bottom',
@@ -1244,7 +1244,7 @@ export default function EmpresasExternasPage() {
             borderTop: BORDER, borderBottom: BORDER, borderLeft: BORDER_COL, borderRight: BORDER_COL,
           }}
         >
-          <div className="flex items-center gap-0.5 bg-[#f0f2f8] dark:bg-[#252840] border border-[#e2e4ef] dark:border-[#2e3148] rounded-lg p-1">
+          <div className="flex items-center gap-0.5 bg-[#f0f2f8] border border-[#e2e4ef] rounded-lg p-1">
             {RESULTADO_TIPOS.map((opt) => {
               const active = resultado.tipo === opt.key
               return (
@@ -1253,7 +1253,7 @@ export default function EmpresasExternasPage() {
                   onClick={() => handleResultadoTipoClick(company.id, opt.key)}
                   title={active ? `Quitar ${opt.label.toLowerCase()}` : `Marcar como ${opt.label.toLowerCase()}`}
                   className={`flex-1 py-1 rounded-md text-[10px] font-bold whitespace-nowrap transition-all duration-150 ${
-                    active ? 'text-white shadow-sm' : 'text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0] hover:bg-white/60 dark:hover:bg-white/5'
+                    active ? 'text-white shadow-sm' : 'text-[#8890b5] hover:text-[#191c1e] hover:bg-white/60'
                   }`}
                   style={active ? { background: opt.color } : undefined}
                 >
@@ -1283,7 +1283,7 @@ export default function EmpresasExternasPage() {
 
   // ── loading / error states ────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
+    <div className="flex items-center justify-center py-20 text-[#8890b5]">
       <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
         progress_activity
       </span>
@@ -1297,7 +1297,7 @@ export default function EmpresasExternasPage() {
       <p className="text-sm text-[#ef4444]">{error}</p>
       <button
         onClick={fetchGrid}
-        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+        className="px-4 py-2 text-sm rounded-lg border border-[#e2e4ef] hover:bg-[#f3f4f6] transition"
       >
         Reintentar
       </button>
@@ -1312,24 +1312,24 @@ export default function EmpresasExternasPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="material-symbols-outlined text-2xl text-[#004ac6]">table_chart</span>
-            <h1 className="text-xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">Empresas Externas</h1>
+            <span className="material-symbols-outlined text-2xl text-[#003B43]">table_chart</span>
+            <h1 className="text-xl font-bold text-[#191c1e]">Empresas Externas</h1>
           </div>
-          <p className="text-sm text-[#6b7280] dark:text-[#8890b5]">Seguimiento contable mensual</p>
+          <p className="text-sm text-[#6b7280]">Seguimiento contable mensual</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl px-3 py-2 shadow-sm">
-            <button onClick={prevMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280]">
+          <div className="flex items-center gap-1 bg-white border border-[#e2e4ef] rounded-xl px-3 py-2 shadow-sm">
+            <button onClick={prevMonth} className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280]">
               <span className="material-symbols-outlined text-xl">chevron_left</span>
             </button>
-            <span className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] px-2 min-w-[130px] text-center">
+            <span className="text-sm font-semibold text-[#191c1e] px-2 min-w-[130px] text-center">
               {MONTHS[month]} {year}
             </span>
             <button
               onClick={nextMonth}
               disabled={atMesHabilitado}
               title={atMesHabilitado ? 'El mes en curso aún no está habilitado (mes vencido)' : undefined}
-              className="p-0.5 rounded hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="p-0.5 rounded hover:bg-[#f3f4f6] transition text-[#6b7280] disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-xl">chevron_right</span>
             </button>
@@ -1343,10 +1343,10 @@ export default function EmpresasExternasPage() {
               className={
                 'flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition active:scale-[0.97] ' +
                 (editMode
-                  ? 'text-white'
-                  : 'text-[#6b7280] dark:text-[#8890b5] border border-[#e2e4ef] dark:border-[#2e3148] hover:bg-[#f3f4f6] dark:hover:bg-[#252840]')
+                  ? 'text-[#20160A]'
+                  : 'text-[#6b7280] border border-[#e2e4ef] hover:bg-[#f3f4f6]')
               }
-              style={editMode ? { background: '#004ac6' } : undefined}
+              style={editMode ? { background: '#E5A70C' } : undefined}
               title="Renombrar, borrar o reordenar procesos"
             >
               <span className="material-symbols-outlined text-lg">{editMode ? 'lock_open' : 'edit'}</span>
@@ -1366,12 +1366,12 @@ export default function EmpresasExternasPage() {
                   }}
                   onBlur={() => { if (!newGroupName.trim()) setAddingGroup(false); else handleAddGroup() }}
                   placeholder="Nombre del grupo..."
-                  className="px-3 py-2 text-sm rounded-xl border border-[#004ac6] outline-none bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0]"
+                  className="px-3 py-2 text-sm rounded-xl border border-[#E5A70C] outline-none bg-white text-[#191c1e]"
                 />
               ) : (
                 <button
                   onClick={() => setAddingGroup(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#004ac6] dark:text-[#7ba8f0] border border-[#004ac6] dark:border-[#7ba8f0] hover:bg-[#004ac6]/5 transition active:scale-[0.97]"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#946000] border border-[#E5A70C] hover:bg-[#E5A70C]/10 transition active:scale-[0.97]"
                   title="Agrupar procesos relacionados en una sola columna con sub-columnas"
                 >
                   <span className="material-symbols-outlined text-lg">create_new_folder</span>
@@ -1380,8 +1380,8 @@ export default function EmpresasExternasPage() {
               )}
               <button
                 onClick={openCreateProcesoModal}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-                style={{ background: '#004ac6' }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#20160A] hover:opacity-90 transition active:scale-[0.97]"
+                style={{ background: '#E5A70C' }}
               >
                 <span className="material-symbols-outlined text-lg">add_column_right</span>
                 Nuevo proceso
@@ -1401,14 +1401,14 @@ export default function EmpresasExternasPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar empresa..."
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
           />
         </div>
 
         {/* Mismo patrón de píldoras segmentadas que ya usa esta app (ver
             FondoEmprenderEmpresasPage.jsx) para elegir entre 2 modos excluyentes. Con borde +
             sombra encima del fondo — solo el fondo gris muy claro se perdía contra la página. */}
-        <div className="flex items-center bg-[#f0f2f8] dark:bg-[#252840] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl p-1 gap-0.5 shadow-sm flex-shrink-0">
+        <div className="flex items-center bg-[#f0f2f8] border border-[#e2e4ef] rounded-xl p-1 gap-0.5 shadow-sm flex-shrink-0">
           {[
             { key: 'checklist', label: 'Checklist' },
             // Solo desde agosto de 2026 (ver RESULTADO_HABILITADO_DESDE_YM) — meses
@@ -1422,8 +1422,8 @@ export default function EmpresasExternasPage() {
                 onClick={() => setView(key)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 whitespace-nowrap ${
                   active
-                    ? 'bg-white dark:bg-[#1e2030] text-[#004ac6] dark:text-[#7ba8f0] shadow-sm'
-                    : 'text-[#6b7280] dark:text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0]'
+                    ? 'bg-white text-[#003B43] shadow-sm'
+                    : 'text-[#6b7280] hover:text-[#191c1e]'
                 }`}
               >
                 {label}
@@ -1435,7 +1435,7 @@ export default function EmpresasExternasPage() {
         {activeColumnFilterCount > 0 && (
           <button
             onClick={() => setColumnFilters({})}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold flex-shrink-0 transition hover:opacity-80 bg-[#e8eefc] dark:bg-[#1a2444] text-[#004ac6] dark:text-[#7ba8f0]"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold flex-shrink-0 transition hover:opacity-80 bg-[#FBEAC0] text-[#946000]"
             title="Quitar todos los filtros de columna"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>filter_alt</span>
@@ -1446,17 +1446,17 @@ export default function EmpresasExternasPage() {
       </div>
 
       {/* ── Progress bar ── visible en las 2 vistas (no solo checklist). */}
-      <div className="bg-white dark:bg-[#1e2030] rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] p-4 shadow-sm flex items-center gap-4">
+      <div className="bg-white rounded-xl border border-[#e2e4ef] p-4 shadow-sm flex items-center gap-4">
         <div className="flex-1">
           <div className="flex justify-between mb-1.5">
-            <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0]">Progreso general</span>
+            <span className="text-xs font-semibold text-[#191c1e]">Progreso general</span>
             <span className="text-xs font-bold text-[#16a34a]">{pct}%</span>
           </div>
-          <div className="w-full h-2 rounded-full bg-[#f3f4f6] dark:bg-[#252840]">
+          <div className="w-full h-2 rounded-full bg-[#f3f4f6]">
             <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: '#16a34a' }} />
           </div>
         </div>
-        <span className="text-xs text-[#6b7280] dark:text-[#8890b5] whitespace-nowrap">
+        <span className="text-xs text-[#6b7280] whitespace-nowrap">
           {doneCells} / {totalCells} tareas
         </span>
       </div>
@@ -1466,7 +1466,7 @@ export default function EmpresasExternasPage() {
           después de Contador: las columnas de Proceso, o Tipo/Valor. Así la
           vista de Utilidad/Pérdida no se ve "distinta", es la misma grilla. */}
       <div
-        className="overflow-auto rounded-xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm scrollbar-styled"
+        className="overflow-auto rounded-xl border border-[#e2e4ef] shadow-sm scrollbar-styled"
         style={{ maxHeight: 'calc(100vh - 6rem)', width: view === 'checklist' ? '100%' : 'fit-content', maxWidth: '100%' }}
       >
         {/* width:100% en checklist (procColWidth reparte el sobrante entre las columnas de
@@ -1494,7 +1494,7 @@ export default function EmpresasExternasPage() {
             <tr>
               <th
                 rowSpan={headerRowSpan}
-                className={`sticky left-0 top-0 z-30 ${HEADER_BG} text-left text-[10px] font-bold text-[#6b7280] dark:text-[#8890b5] uppercase tracking-wide`}
+                className={`sticky left-0 top-0 z-30 ${HEADER_BG} text-left text-[10px] font-bold text-[#6b7280] uppercase tracking-wide`}
                 style={{
                   width: EMPRESA_COL_WIDTH, minWidth: EMPRESA_COL_WIDTH, verticalAlign: 'bottom', padding: '6px 8px 8px',
                   boxShadow: headerBoxShadow({ top: BORDER, bottom: BORDER, left: BORDER, right: BORDER_COL }),
@@ -1564,7 +1564,7 @@ export default function EmpresasExternasPage() {
                     <>
                       <th
                         key="tipo"
-                        className={`${HEADER_BG} text-[#6b7280] dark:text-[#8890b5] text-center text-[10.5px] font-semibold`}
+                        className={`${HEADER_BG} text-[#6b7280] text-center text-[10.5px] font-semibold`}
                         style={{
                           minWidth: RESULTADO_TIPO_WIDTH, verticalAlign: 'bottom', position: 'relative',
                           padding: `${HEADER_TOP_CLEARANCE}px 4px 6px`,
@@ -1582,7 +1582,7 @@ export default function EmpresasExternasPage() {
                       </th>
                       <th
                         key="valor"
-                        className={`${HEADER_BG} text-[#6b7280] dark:text-[#8890b5] text-center text-[10.5px] font-semibold`}
+                        className={`${HEADER_BG} text-[#6b7280] text-center text-[10.5px] font-semibold`}
                         style={{
                           minWidth: RESULTADO_VALOR_WIDTH, verticalAlign: 'bottom', padding: `${HEADER_TOP_CLEARANCE}px 4px 6px`,
                           boxShadow: headerBoxShadow({ top: BORDER, bottom: HEADER_ACCENT_BORDER, right: BORDER_COL }),
@@ -1628,7 +1628,7 @@ export default function EmpresasExternasPage() {
               <tr>
                 <td
                   colSpan={fixedColWidths.length + (view === 'checklist' ? singleCellGroupIds.size + expandedProcesses.length : 2)}
-                  className="text-center py-10 text-xs text-[#8890b5] dark:text-[#5a5f7a]"
+                  className="text-center py-10 text-xs text-[#8890b5]"
                 >
                   {search || activeColumnFilterCount > 0
                     ? 'No hay empresas que coincidan con el filtro'
@@ -1637,7 +1637,7 @@ export default function EmpresasExternasPage() {
               </tr>
             )}
             {filteredCompanies.map((company, idx) => {
-              const rowBg = idx % 2 === 0 ? '#ffffff' : '#f9fbff'
+              const rowBg = idx % 2 === 0 ? '#ffffff' : '#F5F9F9'
               return (
                 <tr key={company.id} style={{ background: rowBg }}>
                   <td
@@ -1649,7 +1649,7 @@ export default function EmpresasExternasPage() {
                     }}
                   >
                     <div className="flex items-center h-full px-2 gap-1">
-                      <span className="text-xs font-semibold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={company.name}>
+                      <span className="text-xs font-semibold text-[#191c1e] truncate flex-1 min-w-0" title={company.name}>
                         {company.name}
                       </span>
                       {company.activa === false && (
@@ -1665,14 +1665,14 @@ export default function EmpresasExternasPage() {
                           <button
                             onClick={() => openEditEmpresaModal(company)}
                             title="Editar empresa"
-                            className="p-0.5 rounded hover:bg-[#e2e4ef] dark:hover:bg-[#252840] text-[#6b7280] hover:text-[#004ac6] transition"
+                            className="p-0.5 rounded hover:bg-[#e2e4ef] text-[#6b7280] hover:text-[#003B43] transition"
                           >
                             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>edit</span>
                           </button>
                           <button
                             onClick={() => setDeleteConfirm({ type: 'empresa', id: company.id, name: company.name })}
                             title="Eliminar empresa"
-                            className="p-0.5 rounded hover:bg-[#e2e4ef] dark:hover:bg-[#252840] text-[#6b7280] hover:text-red-500 transition"
+                            className="p-0.5 rounded hover:bg-[#e2e4ef] text-[#6b7280] hover:text-red-500 transition"
                           >
                             <span className="material-symbols-outlined" style={{ fontSize: 13 }}>delete</span>
                           </button>
@@ -1690,8 +1690,8 @@ export default function EmpresasExternasPage() {
                     }}
                   >
                     <div className="flex items-center h-full px-2">
-                      <span className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate flex-1 min-w-0" title={company.responsableNombre ?? undefined}>
-                        {firstName(company.responsableNombre) || <span className="text-[#c3c8dd] dark:text-[#5a5f7a]">—</span>}
+                      <span className="text-xs text-[#434655] truncate flex-1 min-w-0" title={company.responsableNombre ?? undefined}>
+                        {firstName(company.responsableNombre) || <span className="text-[#c3c8dd]">—</span>}
                       </span>
                     </div>
                   </td>
@@ -1705,8 +1705,8 @@ export default function EmpresasExternasPage() {
                     }}
                   >
                     <div className="flex items-center h-full px-2">
-                      <span className="text-xs text-[#434655] dark:text-[#c4c8e8] truncate flex-1 min-w-0" title={company.contador ?? undefined}>
-                        {company.contador || <span className="text-[#c3c8dd] dark:text-[#5a5f7a]">—</span>}
+                      <span className="text-xs text-[#434655] truncate flex-1 min-w-0" title={company.contador ?? undefined}>
+                        {company.contador || <span className="text-[#c3c8dd]">—</span>}
                       </span>
                     </div>
                   </td>
@@ -1731,12 +1731,12 @@ export default function EmpresasExternasPage() {
           {Object.entries(STATUS).map(([key, cfg]) => (
             <div key={key} className="flex items-center gap-1.5">
               <span className="material-symbols-outlined" style={{ color: cfg.color, fontSize: 16 }}>{cfg.icon}</span>
-              <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">{cfg.label}</span>
+              <span className="text-xs text-[#6b7280]">{cfg.label}</span>
             </div>
           ))}
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />
-            <span className="text-xs text-[#6b7280] dark:text-[#8890b5]">Tiene nota</span>
+            <span className="text-xs text-[#6b7280]">Tiene nota</span>
           </div>
         </div>
       )}
@@ -1745,10 +1745,10 @@ export default function EmpresasExternasPage() {
       {openCell && openProcess && (
         <div
           ref={dropdownRef}
-          className="fixed z-50 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-2xl p-4 w-64"
+          className="fixed z-50 bg-white border border-[#e2e4ef] rounded-xl shadow-2xl p-4 w-64"
           style={{ left: openCell.left, top: openCell.top }}
         >
-          <p className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] mb-3 truncate" title={openProcess.name}>
+          <p className="text-[11px] font-bold text-[#191c1e] mb-3 truncate" title={openProcess.name}>
             {openProcess.name}
           </p>
           <div className="grid grid-cols-2 gap-1.5 mb-3">
@@ -1780,7 +1780,7 @@ export default function EmpresasExternasPage() {
             }}
             onBlur={e => handleNoteBlur(openCell.companyId, openCell.procId, e.target.value)}
             placeholder="Nota opcional..."
-            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] bg-[#f8f9fc] dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30 resize-none"
             style={{ minHeight: 52, overflowY: 'hidden' }}
           />
           <div className="mt-2 flex items-center gap-2">
@@ -1793,7 +1793,7 @@ export default function EmpresasExternasPage() {
             </button>
             <button
               onClick={() => { flushPendingNote(); setOpenCell(null) }}
-              className="flex-1 py-1 text-xs text-[#6b7280] hover:text-[#191c1e] dark:hover:text-[#e4e6f0] transition text-center"
+              className="flex-1 py-1 text-xs text-[#6b7280] hover:text-[#191c1e] transition text-center"
             >
               Cerrar
             </button>
@@ -1805,17 +1805,17 @@ export default function EmpresasExternasPage() {
       {openFilter && (
         <div
           ref={filterDropdownRef}
-          className="fixed z-50 bg-white dark:bg-[#1e2030] border border-[#e2e4ef] dark:border-[#2e3148] rounded-xl shadow-2xl p-3 w-52"
+          className="fixed z-50 bg-white border border-[#e2e4ef] rounded-xl shadow-2xl p-3 w-52"
           style={{ left: openFilter.left, top: openFilter.top }}
         >
           <div className="flex items-center justify-between gap-2 mb-2">
-            <p className="text-[11px] font-bold text-[#191c1e] dark:text-[#e4e6f0] truncate flex-1 min-w-0" title={openFilter.label}>
+            <p className="text-[11px] font-bold text-[#191c1e] truncate flex-1 min-w-0" title={openFilter.label}>
               {openFilter.label}
             </p>
             {columnFilters[openFilter.key] && (
               <button
                 onClick={() => clearColumnFilter(openFilter.key)}
-                className="text-[10px] font-semibold text-[#004ac6] dark:text-[#7ba8f0] hover:underline flex-shrink-0"
+                className="text-[10px] font-semibold text-[#946000] hover:underline flex-shrink-0"
               >
                 Limpiar
               </button>
@@ -1829,15 +1829,15 @@ export default function EmpresasExternasPage() {
             return (
               <button
                 onClick={() => toggleSelectAllFilter(openFilter.key)}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840] mb-1"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] mb-1"
               >
                 <span
-                  className={`flex items-center justify-center rounded flex-shrink-0 ${noneChecked ? 'border-[#c3c6d7] dark:border-[#3e4260]' : ''}`}
+                  className={`flex items-center justify-center rounded flex-shrink-0 ${noneChecked ? 'border-[#c3c6d7]' : ''}`}
                   style={{
                     width: 15, height: 15,
                     borderWidth: 1.5, borderStyle: 'solid',
-                    borderColor: noneChecked ? undefined : '#004ac6',
-                    background: noneChecked ? 'transparent' : '#004ac6',
+                    borderColor: noneChecked ? undefined : '#E5A70C',
+                    background: noneChecked ? 'transparent' : '#E5A70C',
                   }}
                 >
                   {!noneChecked && (
@@ -1846,11 +1846,11 @@ export default function EmpresasExternasPage() {
                     </span>
                   )}
                 </span>
-                <span className="font-bold text-[#191c1e] dark:text-[#e4e6f0]">Seleccionar todo</span>
+                <span className="font-bold text-[#191c1e]">Seleccionar todo</span>
               </button>
             )
           })()}
-          <div className="h-px bg-[#e2e4ef] dark:bg-[#2e3148] mb-1" />
+          <div className="h-px bg-[#e2e4ef] mb-1" />
           <div className="flex flex-col gap-0.5">
             {openFilter.kind === 'status' && Object.entries(STATUS).map(([key, cfg]) => {
               const checked = isOptionChecked(openFilter.key, key)
@@ -1858,10 +1858,10 @@ export default function EmpresasExternasPage() {
                 <button
                   key={key}
                   onClick={() => toggleOptionFilter(openFilter.key, key)}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6]"
                 >
                   <span
-                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7] dark:border-[#3e4260]' : ''}`}
+                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7]' : ''}`}
                     style={{
                       width: 15, height: 15,
                       borderWidth: 1.5, borderStyle: 'solid',
@@ -1872,7 +1872,7 @@ export default function EmpresasExternasPage() {
                     {checked && <span className="material-symbols-outlined text-white" style={{ fontSize: 11 }}>check</span>}
                   </span>
                   <span className="material-symbols-outlined flex-shrink-0" style={{ color: cfg.color, fontSize: 14 }}>{cfg.icon}</span>
-                  <span className="font-medium text-[#191c1e] dark:text-[#e4e6f0]">{cfg.label}</span>
+                  <span className="font-medium text-[#191c1e]">{cfg.label}</span>
                 </button>
               )
             })}
@@ -1882,20 +1882,20 @@ export default function EmpresasExternasPage() {
                 <button
                   key={value}
                   onClick={() => toggleOptionFilter(openFilter.key, value)}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6]"
                 >
                   <span
-                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7] dark:border-[#3e4260]' : ''}`}
+                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7]' : ''}`}
                     style={{
                       width: 15, height: 15,
                       borderWidth: 1.5, borderStyle: 'solid',
-                      borderColor: checked ? '#004ac6' : undefined,
-                      background: checked ? '#004ac6' : 'transparent',
+                      borderColor: checked ? '#E5A70C' : undefined,
+                      background: checked ? '#E5A70C' : 'transparent',
                     }}
                   >
                     {checked && <span className="material-symbols-outlined text-white" style={{ fontSize: 11 }}>check</span>}
                   </span>
-                  <span className="font-medium text-[#191c1e] dark:text-[#e4e6f0] truncate">{value}</span>
+                  <span className="font-medium text-[#191c1e] truncate">{value}</span>
                 </button>
               )
             })}
@@ -1905,10 +1905,10 @@ export default function EmpresasExternasPage() {
                 <button
                   key={opt.key}
                   onClick={() => toggleOptionFilter(openFilter.key, opt.key)}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6] dark:hover:bg-[#252840]"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-left transition hover:bg-[#f3f4f6]"
                 >
                   <span
-                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7] dark:border-[#3e4260]' : ''}`}
+                    className={`flex items-center justify-center rounded flex-shrink-0 ${!checked ? 'border-[#c3c6d7]' : ''}`}
                     style={{
                       width: 15, height: 15,
                       borderWidth: 1.5, borderStyle: 'solid',
@@ -1919,7 +1919,7 @@ export default function EmpresasExternasPage() {
                     {checked && <span className="material-symbols-outlined text-white" style={{ fontSize: 11 }}>check</span>}
                   </span>
                   <span className="material-symbols-outlined flex-shrink-0" style={{ color: opt.color, fontSize: 14 }}>{opt.icon}</span>
-                  <span className="font-medium text-[#191c1e] dark:text-[#e4e6f0]">{opt.label}</span>
+                  <span className="font-medium text-[#191c1e]">{opt.label}</span>
                 </button>
               )
             })}
@@ -1957,25 +1957,25 @@ export default function EmpresasExternasPage() {
       {procesoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={closeProcesoModal}>
           <div
-            className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-[#e2e4ef] dark:border-[#2e3148]"
+            className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}
           >
-            <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] mb-4">
+            <p className="text-sm font-semibold text-[#191c1e] mb-4">
               {procesoModal.mode === 'create' ? 'Nuevo proceso' : 'Editar proceso'}
             </p>
-            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Nombre</label>
+            <label className="block text-xs font-semibold text-[#6b7280] mb-1">Nombre</label>
             <input
               autoFocus
               value={procesoModal.name}
               onChange={e => setProcesoModal(m => ({ ...m, name: e.target.value }))}
               onKeyDown={e => { if (e.key === 'Enter') submitProcesoModal() }}
-              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] outline-none focus:border-[#E5A70C] bg-white text-[#191c1e]"
             />
-            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Grupo</label>
+            <label className="block text-xs font-semibold text-[#6b7280] mb-1">Grupo</label>
             <select
               value={procesoModal.grupoId}
               onChange={e => setProcesoModal(m => ({ ...m, grupoId: e.target.value }))}
-              className="w-full px-3 py-2 mb-5 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+              className="w-full px-3 py-2 mb-5 text-sm rounded-lg border border-[#e2e4ef] outline-none focus:border-[#E5A70C] bg-white text-[#191c1e]"
             >
               <option value="">Sin grupo</option>
               {grupos.map(g => (
@@ -1985,15 +1985,15 @@ export default function EmpresasExternasPage() {
             <div className="flex gap-2">
               <button
                 onClick={closeProcesoModal}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] text-[#6b7280] hover:bg-[#f3f4f6] transition"
               >
                 Cancelar
               </button>
               <button
                 onClick={submitProcesoModal}
                 disabled={!procesoModal.name.trim()}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg text-white transition disabled:opacity-40"
-                style={{ background: '#004ac6' }}
+                className="flex-1 py-2 text-xs font-semibold rounded-lg text-[#20160A] transition disabled:opacity-40"
+                style={{ background: '#E5A70C' }}
               >
                 {procesoModal.mode === 'create' ? 'Crear' : 'Guardar'}
               </button>
@@ -2006,28 +2006,28 @@ export default function EmpresasExternasPage() {
       {empresaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={closeEmpresaModal}>
           <div
-            className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-[#e2e4ef] dark:border-[#2e3148]"
+            className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}
           >
-            <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] mb-4">
+            <p className="text-sm font-semibold text-[#191c1e] mb-4">
               Editar empresa
             </p>
 
-            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Nombre</label>
+            <label className="block text-xs font-semibold text-[#6b7280] mb-1">Nombre</label>
             <input
               autoFocus
               value={empresaModal.name}
               onChange={e => setEmpresaModal(m => ({ ...m, name: e.target.value }))}
               onKeyDown={e => { if (e.key === 'Enter') submitEmpresaModal() }}
               placeholder="Ej. AGROESANA"
-              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] outline-none focus:border-[#E5A70C] bg-white text-[#191c1e]"
             />
 
-            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Responsable</label>
+            <label className="block text-xs font-semibold text-[#6b7280] mb-1">Responsable</label>
             <select
               value={empresaModal.responsableId}
               onChange={e => setEmpresaModal(m => ({ ...m, responsableId: e.target.value }))}
-              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] outline-none focus:border-[#E5A70C] bg-white text-[#191c1e]"
             >
               <option value="">Sin asignar</option>
               {members.map(m => (
@@ -2035,20 +2035,20 @@ export default function EmpresasExternasPage() {
               ))}
             </select>
 
-            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Contador</label>
+            <label className="block text-xs font-semibold text-[#6b7280] mb-1">Contador</label>
             <input
               value={empresaModal.contador}
               onChange={e => setEmpresaModal(m => ({ ...m, contador: e.target.value }))}
               onKeyDown={e => { if (e.key === 'Enter') submitEmpresaModal() }}
               placeholder="Ej. Fernando"
               list="ext-contador-options"
-              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] outline-none focus:border-[#004ac6] bg-white dark:bg-[#252840] text-[#191c1e] dark:text-[#e4e6f0]"
+              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] outline-none focus:border-[#E5A70C] bg-white text-[#191c1e]"
             />
             <datalist id="ext-contador-options">
               {contadorOptions.filter(v => v !== SIN_ASIGNAR).map(v => <option key={v} value={v} />)}
             </datalist>
 
-            <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1">Estado</label>
+            <label className="block text-xs font-semibold text-[#6b7280] mb-1">Estado</label>
             <button
               type="button"
               onClick={() => setEmpresaModal(m => ({ ...m, activa: !m.activa }))}
@@ -2066,15 +2066,15 @@ export default function EmpresasExternasPage() {
             <div className="flex gap-2">
               <button
                 onClick={closeEmpresaModal}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] text-[#6b7280] hover:bg-[#f3f4f6] transition"
               >
                 Cancelar
               </button>
               <button
                 onClick={submitEmpresaModal}
                 disabled={!empresaModal.name.trim()}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg text-white transition disabled:opacity-40"
-                style={{ background: '#004ac6' }}
+                className="flex-1 py-2 text-xs font-semibold rounded-lg text-[#20160A] transition disabled:opacity-40"
+                style={{ background: '#E5A70C' }}
               >
                 Guardar
               </button>
@@ -2087,32 +2087,32 @@ export default function EmpresasExternasPage() {
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setDeleteConfirm(null)}>
           <div
-            className="bg-white dark:bg-[#1e2030] rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef] dark:border-[#2e3148]"
+            className="bg-white rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-3">
               <span className="material-symbols-outlined text-red-500 text-2xl">warning</span>
-              <p className="text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0]">
+              <p className="text-sm font-semibold text-[#191c1e]">
                 ¿Eliminar {deleteConfirm.type === 'empresa' ? 'empresa' : deleteConfirm.type === 'grupo' ? 'grupo' : 'proceso'}?
               </p>
             </div>
-            <p className={`text-xs text-[#6b7280] dark:text-[#8890b5] truncate ${deleteConfirm.type === 'empresa' ? 'mb-1' : deleteConfirm.type === 'grupo' ? 'mb-1' : 'mb-4'}`}>
+            <p className={`text-xs text-[#6b7280] truncate ${deleteConfirm.type === 'empresa' ? 'mb-1' : deleteConfirm.type === 'grupo' ? 'mb-1' : 'mb-4'}`}>
               &ldquo;{deleteConfirm.name}&rdquo;
             </p>
             {deleteConfirm.type === 'empresa' && (
-              <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-3">
+              <p className="text-xs text-[#6b7280] mb-3">
                 Esta acción borra también su historial de checklist.
               </p>
             )}
             {deleteConfirm.type === 'grupo' && (
-              <p className="text-xs text-[#6b7280] dark:text-[#8890b5] mb-3">
+              <p className="text-xs text-[#6b7280] mb-3">
                 Sus procesos no se borran, quedan sin grupo.
               </p>
             )}
             <div className="flex gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] dark:border-[#2e3148] text-[#6b7280] hover:bg-[#f3f4f6] dark:hover:bg-[#252840] transition"
+                className="flex-1 py-2 text-xs font-semibold rounded-lg border border-[#e2e4ef] text-[#6b7280] hover:bg-[#f3f4f6] transition"
               >
                 Cancelar
               </button>

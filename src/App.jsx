@@ -7,7 +7,6 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { GroupProvider } from './context/GroupContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { TagProvider } from './context/TagContext'
-import { ThemeProvider } from './context/ThemeContext'
 import { ToastProvider } from './context/ToastContext'
 import { SocketProvider } from './context/SocketContext'
 import Sidebar from './components/Sidebar'
@@ -58,7 +57,7 @@ function Layout() {
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
   return (
-    <div className="min-h-screen bg-[#f3f4f6] dark:bg-[#0f1117] text-[#191c1e] dark:text-[#e4e6f0]">
+    <div className="min-h-screen bg-[#f3f4f6] text-[#191c1e]">
       {/* Pull-to-refresh indicator — visible solo en móvil cuando se arrastra hacia abajo */}
       <div
         className="lg:hidden fixed top-16 left-0 right-0 z-30 flex justify-center pointer-events-none"
@@ -68,7 +67,7 @@ function Layout() {
           opacity: pullY > 10 ? Math.min(pullY / 48, 1) : 0,
         }}
       >
-        <div className={`w-10 h-10 rounded-full shadow-md flex items-center justify-center bg-white dark:bg-[#1e2030] border border-[#c3c6d7] dark:border-[#2e3148] ${releasing ? 'animate-spin' : ''}`}>
+        <div className={`w-10 h-10 rounded-full shadow-md flex items-center justify-center bg-white border border-[#c3c6d7] ${releasing ? 'animate-spin' : ''}`}>
           <span
             className="material-symbols-outlined text-[#004ac6]"
             style={{
@@ -96,7 +95,7 @@ function Layout() {
               path="/notas"
               element={
                 <Suspense fallback={
-                  <div className="flex items-center justify-center py-20 text-[#8890b5] dark:text-[#5a5f7a]">
+                  <div className="flex items-center justify-center py-20 text-[#8890b5]">
                     <span className="material-symbols-outlined animate-spin">progress_activity</span>
                   </div>
                 }>
@@ -141,32 +140,30 @@ function Layout() {
 export default function App() {
   return (
     <BrowserRouter>
-      <ThemeProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <SocketProvider>
-              <TeamProvider>
-                <TaskProvider>
-                  <GroupProvider>
-                    <NotificationProvider>
-                      <TagProvider>
-                        <Routes>
-                          <Route path="/login" element={<LoginPage />} />
-                          <Route path="/register" element={<RegisterPage />} />
-                          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                          <Route path="/reset-password" element={<ResetPasswordPage />} />
-                          <Route path="/*" element={<Layout />} />
-                        </Routes>
-                      </TagProvider>
-                    </NotificationProvider>
-                  </GroupProvider>
-                </TaskProvider>
-              </TeamProvider>
-            </SocketProvider>
-          </AuthProvider>
-          <Toast />
-        </ToastProvider>
-      </ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <SocketProvider>
+            <TeamProvider>
+              <TaskProvider>
+                <GroupProvider>
+                  <NotificationProvider>
+                    <TagProvider>
+                      <Routes>
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/register" element={<RegisterPage />} />
+                        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                        <Route path="/reset-password" element={<ResetPasswordPage />} />
+                        <Route path="/*" element={<Layout />} />
+                      </Routes>
+                    </TagProvider>
+                  </NotificationProvider>
+                </GroupProvider>
+              </TaskProvider>
+            </TeamProvider>
+          </SocketProvider>
+        </AuthProvider>
+        <Toast />
+      </ToastProvider>
     </BrowserRouter>
   )
 }

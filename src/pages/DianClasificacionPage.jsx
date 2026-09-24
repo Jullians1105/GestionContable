@@ -186,7 +186,7 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
     <div
       ref={ref}
       style={style}
-      className="w-64 normal-case font-normal tracking-normal bg-white dark:bg-[#1e2030] border border-[#d1d5db] dark:border-[#3a3e5c] rounded-xl shadow-lg p-3 z-50 flex flex-col overflow-hidden"
+      className="w-64 normal-case font-normal tracking-normal bg-white border border-[#d1d5db] rounded-xl shadow-lg p-3 z-50 flex flex-col overflow-hidden"
     >
       <div className="relative mb-2 flex-shrink-0">
         <span className="material-symbols-outlined text-base text-[#8890b5] absolute left-2 top-1/2 -translate-y-1/2">search</span>
@@ -196,18 +196,18 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar…"
-          className="w-full text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg pl-8 pr-2 py-1.5 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent"
+          className="w-full text-sm border border-[#d1d5db] rounded-lg pl-8 pr-2 py-1.5 bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
         />
       </div>
 
-      <label className="flex items-center gap-2 px-1 py-1.5 border-b border-[#f0f2f8] dark:border-[#2e3148] mb-1 cursor-pointer flex-shrink-0">
+      <label className="flex items-center gap-2 px-1 py-1.5 border-b border-[#f0f2f8] mb-1 cursor-pointer flex-shrink-0">
         <input
           type="checkbox"
           checked={todasVisiblesMarcadas}
           onChange={toggleTodasVisibles}
-          className="w-4 h-4 rounded border-[#d1d5db] dark:border-[#3a3e5c] text-[#004ac6] focus:ring-[#004ac6] cursor-pointer"
+          className="w-4 h-4 rounded border-[#d1d5db] text-[#E5A70C] focus:ring-[#E5A70C] cursor-pointer"
         />
-        <span className="text-sm font-medium text-[#191c1e] dark:text-[#e4e6f0]">(Seleccionar todo)</span>
+        <span className="text-sm font-medium text-[#191c1e]">(Seleccionar todo)</span>
       </label>
 
       <div className="max-h-48 flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5">
@@ -216,30 +216,30 @@ function ColumnFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align
         ) : visibles.map((v) => (
           <label
             key={v.value}
-            className="flex items-center gap-2 px-1 py-1 rounded hover:bg-[#f8f9ff] dark:hover:bg-[#252840] cursor-pointer"
+            className="flex items-center gap-2 px-1 py-1 rounded hover:bg-[#E3EEEE] cursor-pointer"
           >
             <input
               type="checkbox"
               checked={borrador.has(v.value)}
               onChange={() => toggleValor(v.value)}
-              className="w-4 h-4 rounded border-[#d1d5db] dark:border-[#3a3e5c] text-[#004ac6] focus:ring-[#004ac6] cursor-pointer flex-shrink-0"
+              className="w-4 h-4 rounded border-[#d1d5db] text-[#E5A70C] focus:ring-[#E5A70C] cursor-pointer flex-shrink-0"
             />
-            <span className="text-sm text-[#191c1e] dark:text-[#e4e6f0] truncate" title={v.label}>{v.label}</span>
+            <span className="text-sm text-[#191c1e] truncate" title={v.label}>{v.label}</span>
           </label>
         ))}
       </div>
 
-      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-[#f0f2f8] dark:border-[#2e3148] flex-shrink-0">
+      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-[#f0f2f8] flex-shrink-0">
         <button
           onClick={onCerrar}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f0f2f8] dark:hover:bg-[#252840]"
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] hover:bg-[#f0f2f8]"
         >
           Cancelar
         </button>
         <button
           onClick={aplicar}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
-          style={{ background: '#004ac6' }}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#20160A]"
+          style={{ background: '#E5A70C' }}
         >
           Aceptar
         </button>
@@ -312,7 +312,7 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
   }
 
   const inputClase =
-    'w-full text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-2 py-1.5 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent'
+    'w-full text-sm border border-[#d1d5db] rounded-lg px-2 py-1.5 bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent'
 
   // Mismo fix que ColumnFilterMenu: intersectar con "visibles" para que buscar/acotar por
   // rango + Aceptar sin tocar checkboxes filtre a lo que quedó visible, no a "todo".
@@ -326,7 +326,7 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
     <div
       ref={ref}
       style={style}
-      className="w-64 normal-case font-normal tracking-normal bg-white dark:bg-[#1e2030] border border-[#d1d5db] dark:border-[#3a3e5c] rounded-xl shadow-lg p-3 z-50 flex flex-col overflow-hidden"
+      className="w-64 normal-case font-normal tracking-normal bg-white border border-[#d1d5db] rounded-xl shadow-lg p-3 z-50 flex flex-col overflow-hidden"
     >
       <div className="relative mb-2 flex-shrink-0">
         <span className="material-symbols-outlined text-base text-[#8890b5] absolute left-2 top-1/2 -translate-y-1/2">search</span>
@@ -358,14 +358,14 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
         />
       </div>
 
-      <label className="flex items-center gap-2 px-1 py-1.5 border-b border-[#f0f2f8] dark:border-[#2e3148] mb-1 cursor-pointer flex-shrink-0">
+      <label className="flex items-center gap-2 px-1 py-1.5 border-b border-[#f0f2f8] mb-1 cursor-pointer flex-shrink-0">
         <input
           type="checkbox"
           checked={todasVisiblesMarcadas}
           onChange={toggleTodasVisibles}
-          className="w-4 h-4 rounded border-[#d1d5db] dark:border-[#3a3e5c] text-[#004ac6] focus:ring-[#004ac6] cursor-pointer"
+          className="w-4 h-4 rounded border-[#d1d5db] text-[#E5A70C] focus:ring-[#E5A70C] cursor-pointer"
         />
-        <span className="text-sm font-medium text-[#191c1e] dark:text-[#e4e6f0]">(Seleccionar todo)</span>
+        <span className="text-sm font-medium text-[#191c1e]">(Seleccionar todo)</span>
       </label>
 
       <div className="max-h-48 flex-1 min-h-0 overflow-y-auto flex flex-col gap-0.5">
@@ -374,30 +374,30 @@ function TotalFilterMenu({ rect, valores, seleccion, onAplicar, onCerrar, align 
         ) : visibles.map((v) => (
           <label
             key={v.value}
-            className="flex items-center gap-2 px-1 py-1 rounded hover:bg-[#f8f9ff] dark:hover:bg-[#252840] cursor-pointer"
+            className="flex items-center gap-2 px-1 py-1 rounded hover:bg-[#E3EEEE] cursor-pointer"
           >
             <input
               type="checkbox"
               checked={borrador.has(v.value)}
               onChange={() => toggleValor(v.value)}
-              className="w-4 h-4 rounded border-[#d1d5db] dark:border-[#3a3e5c] text-[#004ac6] focus:ring-[#004ac6] cursor-pointer flex-shrink-0"
+              className="w-4 h-4 rounded border-[#d1d5db] text-[#E5A70C] focus:ring-[#E5A70C] cursor-pointer flex-shrink-0"
             />
-            <span className="text-sm text-[#191c1e] dark:text-[#e4e6f0] truncate" title={v.label}>{v.label}</span>
+            <span className="text-sm text-[#191c1e] truncate" title={v.label}>{v.label}</span>
           </label>
         ))}
       </div>
 
-      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-[#f0f2f8] dark:border-[#2e3148] flex-shrink-0">
+      <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-[#f0f2f8] flex-shrink-0">
         <button
           onClick={onCerrar}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] hover:bg-[#f0f2f8] dark:hover:bg-[#252840]"
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#6b7280] hover:bg-[#f0f2f8]"
         >
           Cancelar
         </button>
         <button
           onClick={aplicar}
-          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
-          style={{ background: '#004ac6' }}
+          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#20160A]"
+          style={{ background: '#E5A70C' }}
         >
           Aceptar
         </button>
@@ -512,28 +512,28 @@ function FilaClasificacion({
   })
 
   const labelActual = valorActual?.label ?? ''
-  const rowBg = isEven ? 'bg-[#fafbff] dark:bg-[#191b2e]' : ''
+  const rowBg = isEven ? 'bg-[#f8f9fc]' : ''
 
   return (
-    <tr className={`border-t border-[#f0f2f8] dark:border-[#2e3148] hover:bg-[#f8f9ff] dark:hover:bg-[#1e2135] transition-colors ${rowBg}`}>
+    <tr className={`border-t border-[#f0f2f8] hover:bg-[#E3EEEE] transition-colors ${rowBg}`}>
       <td className="px-4 py-3 w-10">
         <input
           type="checkbox"
           checked={seleccionada}
           onChange={() => onToggleSeleccion(fila.indice)}
-          className="w-4 h-4 rounded border-[#d1d5db] dark:border-[#3a3e5c] text-[#004ac6] focus:ring-[#004ac6] cursor-pointer"
+          className="w-4 h-4 rounded border-[#d1d5db] text-[#E5A70C] focus:ring-[#E5A70C] cursor-pointer"
         />
       </td>
-      <td className="px-4 py-3 text-sm text-[#6b7280] dark:text-[#8890b5] whitespace-nowrap">
+      <td className="px-4 py-3 text-sm text-[#6b7280] whitespace-nowrap">
         {formatFecha(fila.fechaEmision)}
       </td>
       <td className="px-4 py-3">
-        <span className="text-sm text-[#191c1e] dark:text-[#e4e6f0]" title={fila.nombreEmisor ?? ''}>
+        <span className="text-sm text-[#191c1e]" title={fila.nombreEmisor ?? ''}>
           {truncate(fila.nombreEmisor, 40)}
         </span>
         <div className="text-[11px] text-[#8890b5] mt-0.5">{fila.nitEmisor}</div>
       </td>
-      <td className="px-4 py-3 text-sm font-semibold text-[#191c1e] dark:text-[#e4e6f0] text-right tabular-nums whitespace-nowrap">
+      <td className="px-4 py-3 text-sm font-semibold text-[#191c1e] text-right tabular-nums whitespace-nowrap">
         {formatCOP(getBase(fila))}
       </td>
       <td className="px-4 py-3">
@@ -541,7 +541,7 @@ function FilaClasificacion({
           <select
             value={labelActual}
             onChange={handleChange}
-            className="text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-2.5 py-1.5 bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer min-w-[200px]"
+            className="text-sm border border-[#d1d5db] rounded-lg px-2.5 py-1.5 bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent cursor-pointer min-w-[200px]"
           >
             <option value="">— Seleccionar —</option>
             {OPCIONES.map((o) => (
@@ -555,7 +555,7 @@ function FilaClasificacion({
             <span className="text-[11px] text-red-500">{error}</span>
             <button
               onClick={handleRetry}
-              className="text-[11px] text-[#004ac6] underline hover:no-underline"
+              className="text-[11px] text-[#946000] underline hover:no-underline"
             >
               Reintentar
             </button>
@@ -569,7 +569,7 @@ function FilaClasificacion({
               <select
                 value={valorIvaActual ?? ''}
                 onChange={iva.handleChange}
-                className="text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-2.5 py-1.5 bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer min-w-[150px]"
+                className="text-sm border border-[#d1d5db] rounded-lg px-2.5 py-1.5 bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent cursor-pointer min-w-[150px]"
               >
                 <option value="">— Seleccionar —</option>
                 {CLASES_IVA.map((v) => (
@@ -581,7 +581,7 @@ function FilaClasificacion({
             {iva.error && (
               <div className="mt-1 flex items-center gap-2">
                 <span className="text-[11px] text-red-500">{iva.error}</span>
-                <button onClick={iva.handleRetry} className="text-[11px] text-[#004ac6] underline hover:no-underline">
+                <button onClick={iva.handleRetry} className="text-[11px] text-[#946000] underline hover:no-underline">
                   Reintentar
                 </button>
               </div>
@@ -592,7 +592,7 @@ function FilaClasificacion({
               <select
                 value={valorConceptoActual ?? ''}
                 onChange={concepto.handleChange}
-                className="text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-2.5 py-1.5 bg-white dark:bg-[#1e2030] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer min-w-[170px]"
+                className="text-sm border border-[#d1d5db] rounded-lg px-2.5 py-1.5 bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent cursor-pointer min-w-[170px]"
               >
                 <option value="">— Seleccionar —</option>
                 {CONCEPTOS.map((v) => (
@@ -604,7 +604,7 @@ function FilaClasificacion({
             {concepto.error && (
               <div className="mt-1 flex items-center gap-2">
                 <span className="text-[11px] text-red-500">{concepto.error}</span>
-                <button onClick={concepto.handleRetry} className="text-[11px] text-[#004ac6] underline hover:no-underline">
+                <button onClick={concepto.handleRetry} className="text-[11px] text-[#946000] underline hover:no-underline">
                   Reintentar
                 </button>
               </div>
@@ -743,8 +743,8 @@ export default function DianClasificacionPage() {
   const claseIconoFiltro = (activo) =>
     `material-symbols-outlined text-[15px] rounded-full p-1 leading-none transition-colors ${
       activo
-        ? 'bg-[#004ac6] text-white shadow-sm'
-        : 'bg-[#e2e4ef] dark:bg-[#2e3148] text-[#5b6178] dark:text-[#9aa0c3] hover:bg-[#c7d4f7] dark:hover:bg-[#333a5c] hover:text-[#004ac6] dark:hover:text-[#7ba8f0]'
+        ? 'bg-[#E5A70C] text-[#20160A] shadow-sm'
+        : 'bg-[#e2e4ef] text-[#5b6178] hover:bg-[#E3EEEE] hover:text-[#003B43]'
     }`
 
   const limpiarFiltros = useCallback(() => {
@@ -1053,11 +1053,11 @@ export default function DianClasificacionPage() {
   if (cargando) {
     return (
       <div className="max-w-lg mx-auto mt-20 text-center">
-        <svg className="animate-spin h-10 w-10 text-[#004ac6] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <svg className="animate-spin h-10 w-10 text-[#E5A70C] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
-        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">Cargando borrador…</p>
+        <p className="mt-4 text-[#6b7280]">Cargando borrador…</p>
       </div>
     )
   }
@@ -1065,12 +1065,12 @@ export default function DianClasificacionPage() {
   if (errorCarga) {
     return (
       <div className="max-w-lg mx-auto mt-20 text-center">
-        <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">error_outline</span>
-        <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">{errorCarga}</p>
+        <span className="material-symbols-outlined text-5xl text-[#d1d5db]">error_outline</span>
+        <p className="mt-4 text-[#6b7280]">{errorCarga}</p>
         <button
           onClick={() => navigate('/dian/upload')}
-          className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-          style={{ background: '#004ac6' }}
+          className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-[#20160A] hover:opacity-90 transition active:scale-[0.97]"
+          style={{ background: '#E5A70C' }}
         >
           Subir otro reporte
         </button>
@@ -1083,19 +1083,19 @@ export default function DianClasificacionPage() {
       {/* ── encabezado ─────────────────────────────────────────────────────── */}
       <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-[#191c1e] dark:text-[#e4e6f0]">
+          <h1 className="text-2xl font-bold text-[#191c1e]">
             {empresaId ? 'Clasificación de compras' : 'Clasificación de retención'}
           </h1>
-          <p className="mt-1 text-sm text-[#6b7280] dark:text-[#8890b5]">
+          <p className="mt-1 text-sm text-[#6b7280]">
             {empresaId
               ? 'Selecciona retención, IVA y concepto para cada compra recibida.'
               : 'Selecciona el tipo de retención para cada compra recibida.'}
           </p>
         </div>
         {empresaNombre && (
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#eef3ff] dark:bg-[#1a2540] border border-[#c7d9ff] dark:border-[#2e4470] flex-shrink-0">
-            <span className="material-symbols-outlined text-[#004ac6] text-lg">business</span>
-            <span className="text-sm font-semibold text-[#004ac6] dark:text-[#7ba8f0]">{empresaNombre}</span>
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#FBEAC0] border border-[#F0BE4D] flex-shrink-0">
+            <span className="material-symbols-outlined text-[#946000] text-lg">business</span>
+            <span className="text-sm font-semibold text-[#946000]">{empresaNombre}</span>
           </div>
         )}
       </div>
@@ -1104,9 +1104,9 @@ export default function DianClasificacionPage() {
           que el resto de la app, no ámbar). Antes no había forma de saber de un vistazo en
           qué mes se estaba trabajando al entrar acá recién subido el Excel. ─────────────── */}
       {mesesDelReporte.length > 0 && (
-        <div className="mb-5 flex items-center gap-3 px-4 py-3 rounded-xl bg-[#eef3ff] dark:bg-[#1a2540] border border-[#c7d9ff] dark:border-[#2e4470]">
-          <span className="material-symbols-outlined text-[#004ac6] dark:text-[#7ba8f0] text-xl flex-shrink-0">calendar_month</span>
-          <p className="text-sm text-[#191c1e] dark:text-[#e4e6f0]">
+        <div className="mb-5 flex items-center gap-3 px-4 py-3 rounded-xl bg-[#FBEAC0] border border-[#F0BE4D]">
+          <span className="material-symbols-outlined text-[#946000] text-xl flex-shrink-0">calendar_month</span>
+          <p className="text-sm text-[#191c1e]">
             {mesesDelReporte.length === 1 ? (
               <>Estás trabajando en <span className="font-semibold">{MESES_ES[mesesDelReporte[0].mes - 1]} {mesesDelReporte[0].anio}</span></>
             ) : (
@@ -1127,20 +1127,20 @@ export default function DianClasificacionPage() {
           clasificando un reporte que de todos modos va a pedir elegir actualizar/reemplazar
           al exportar (ver DianExportacionPage.jsx). No bloquea nada acá. ─────────────────── */}
       {periodosExistentes.length > 0 && (
-        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
           <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">history</span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            <p className="text-sm font-semibold text-amber-800">
               Ya hay datos guardados para {periodosExistentes.length === 1 ? 'este mes' : 'estos meses'} de esta empresa
             </p>
             <div className="mt-1 space-y-0.5">
               {periodosExistentes.map((p) => (
-                <p key={`${p.anio}-${p.mes}`} className="text-xs text-amber-700 dark:text-amber-400">
+                <p key={`${p.anio}-${p.mes}`} className="text-xs text-amber-700">
                   {MESES_ES[p.mes - 1]} {p.anio}: {p.existentes} ya guardada{p.existentes !== 1 ? 's' : ''}, {p.enElReporte} en este reporte
                 </p>
               ))}
             </div>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-1.5">
+            <p className="text-xs text-amber-700 mt-1.5">
               Puedes seguir clasificando; al exportar podrás elegir actualizar o reemplazar esos meses.
             </p>
           </div>
@@ -1151,22 +1151,22 @@ export default function DianClasificacionPage() {
           calendario, así que quedan fuera del guardado permanente en silencio si hay
           empresa asociada. No bloquea nada, es solo para que se note antes de exportar. ── */}
       {filasSinFecha.length > 0 && (
-        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
           <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">event_busy</span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            <p className="text-sm font-semibold text-amber-800">
               {filasSinFecha.length === 1
                 ? 'Hay una fila sin fecha de emisión utilizable'
                 : `Hay ${filasSinFecha.length} filas sin fecha de emisión utilizable`}
             </p>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+            <p className="text-xs text-amber-700 mt-0.5">
               {empresaId
                 ? 'No se puede determinar a qué mes pertenecen — no quedarán guardadas en el consolidado mensual de esta empresa.'
                 : 'No se puede determinar a qué mes pertenecen — revisa el archivo original si esperabas que se contabilizaran por mes.'}
             </p>
             <ul className="mt-2 flex flex-col gap-1">
               {filasSinFecha.map((f, i) => (
-                <li key={i} className="text-xs text-amber-800 dark:text-amber-300">
+                <li key={i} className="text-xs text-amber-800">
                   <b>{f.tipoDocumento ?? '(sin tipo)'}</b> {f.prefijo}{f.folio ?? ''} — fecha: {f.fechaEmisionCruda ? `"${f.fechaEmisionCruda}"` : '(vacía)'}
                 </li>
               ))}
@@ -1180,20 +1180,20 @@ export default function DianClasificacionPage() {
           ya quedaron fuera de todos los cálculos), es solo para que no pase desapercibido
           un tipo de documento nuevo que la DIAN empezó a usar. ─────────────────────── */}
       {documentosNoReconocidos.length > 0 && (
-        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
           <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">warning</span>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            <p className="text-sm font-semibold text-amber-800">
               {documentosNoReconocidos.length === 1
                 ? 'Este reporte trae un tipo de documento que no se reconoce'
                 : `Este reporte trae ${documentosNoReconocidos.length} tipos de documento que no se reconocen`}
             </p>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+            <p className="text-xs text-amber-700 mt-0.5">
               No entraron en ningún cálculo (ni compras, ni ventas, ni notas) — revisar si hace falta clasificarlos aparte.
             </p>
             <ul className="mt-2 flex flex-col gap-1">
               {documentosNoReconocidos.map((d) => (
-                <li key={d.tipo} className="text-xs text-amber-800 dark:text-amber-300">
+                <li key={d.tipo} className="text-xs text-amber-800">
                   <b>{d.tipo}</b> — {d.cantidad} {d.cantidad === 1 ? 'documento' : 'documentos'}, {formatCOP(d.total)}
                 </li>
               ))}
@@ -1204,15 +1204,15 @@ export default function DianClasificacionPage() {
 
       {filasRecibido.length === 0 ? (
         /* ── estado vacío ──────────────────────────────────────────────────── */
-        <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] p-12 text-center shadow-sm">
-          <span className="material-symbols-outlined text-5xl text-[#d1d5db] dark:text-[#3a3e5c]">check_circle</span>
-          <p className="mt-4 text-[#6b7280] dark:text-[#8890b5]">
+        <div className="bg-white rounded-2xl border border-[#e2e4ef] p-12 text-center shadow-sm">
+          <span className="material-symbols-outlined text-5xl text-[#d1d5db]">check_circle</span>
+          <p className="mt-4 text-[#6b7280]">
             No hay compras que clasificar en este reporte.
           </p>
           <button
             onClick={() => navigate(`/dian/nomina/${borradorId}`)}
-            className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-            style={{ background: '#004ac6' }}
+            className="mt-6 px-5 py-2.5 rounded-xl text-sm font-semibold text-[#20160A] hover:opacity-90 transition active:scale-[0.97]"
+            style={{ background: '#E5A70C' }}
           >
             Ir a nómina
           </button>
@@ -1220,23 +1220,23 @@ export default function DianClasificacionPage() {
       ) : (
         <>
           {/* ── clasificación rápida — una sola tarjeta, una fila por campo ── */}
-          <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm p-5 mb-5">
-            <h2 className="text-xs font-bold text-[#8890b5] dark:text-[#6b7280] uppercase tracking-wide mb-1">
+          <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-5 mb-5">
+            <h2 className="text-xs font-bold text-[#8890b5] uppercase tracking-wide mb-1">
               Clasificación rápida
             </h2>
-            <p className="text-xs text-[#9ca3af] dark:text-[#6b7280] mb-3">
+            <p className="text-xs text-[#9ca3af] mb-3">
               Aplica un valor a todas las filas que aún no tengan ese campo asignado.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4">
               {/* Retención */}
               <div>
-                <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1.5">Retención</label>
+                <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">Retención</label>
                 <select
                   value={clasificacionRapida}
                   onChange={(e) => setClasificacionRapida(e.target.value)}
                   disabled={cargandoRapida || sinClasificarCount === 0}
-                  className="w-full text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-3 py-2 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full text-sm border border-[#d1d5db] rounded-lg px-3 py-2 bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <option value="">— Seleccionar —</option>
                   {OPCIONES.map((o) => (
@@ -1247,8 +1247,8 @@ export default function DianClasificacionPage() {
                   <button
                     onClick={handleAplicarRapida}
                     disabled={!clasificacionRapida || cargandoRapida || sinClasificarCount === 0}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{ background: '#004ac6' }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-[#20160A] transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{ background: '#E5A70C' }}
                   >
                     {cargandoRapida ? (
                       <>
@@ -1265,7 +1265,7 @@ export default function DianClasificacionPage() {
                       </>
                     )}
                   </button>
-                  <span className={`text-xs font-medium text-right ${sinClasificarCount === 0 ? 'text-green-600 dark:text-green-400' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
+                  <span className={`text-xs font-medium text-right ${sinClasificarCount === 0 ? 'text-green-600' : 'text-[#6b7280]'}`}>
                     {sinClasificarCount === 0 ? '✓ Todas clasificadas' : `${sinClasificarCount} sin asignar`}
                   </span>
                 </div>
@@ -1275,12 +1275,12 @@ export default function DianClasificacionPage() {
               {empresaId && (
                 <>
                   <div>
-                    <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1.5">IVA</label>
+                    <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">IVA</label>
                     <select
                       value={clasificacionRapidaIva}
                       onChange={(e) => setClasificacionRapidaIva(e.target.value)}
                       disabled={cargandoRapidaIva || sinIvaCount === 0}
-                      className="w-full text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-3 py-2 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full text-sm border border-[#d1d5db] rounded-lg px-3 py-2 bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">— Seleccionar —</option>
                       {CLASES_IVA.map((v) => (
@@ -1291,25 +1291,25 @@ export default function DianClasificacionPage() {
                       <button
                         onClick={handleAplicarRapidaIva}
                         disabled={!clasificacionRapidaIva || cargandoRapidaIva || sinIvaCount === 0}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-                        style={{ background: '#004ac6' }}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-[#20160A] transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: '#E5A70C' }}
                       >
                         <span className="material-symbols-outlined text-base">bolt</span>
                         {cargandoRapidaIva ? 'Aplicando…' : 'Aplicar'}
                       </button>
-                      <span className={`text-xs font-medium text-right ${sinIvaCount === 0 ? 'text-green-600 dark:text-green-400' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
+                      <span className={`text-xs font-medium text-right ${sinIvaCount === 0 ? 'text-green-600' : 'text-[#6b7280]'}`}>
                         {sinIvaCount === 0 ? '✓ Todas clasificadas' : `${sinIvaCount} sin asignar`}
                       </span>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-[#6b7280] dark:text-[#8890b5] mb-1.5">Concepto</label>
+                    <label className="block text-xs font-semibold text-[#6b7280] mb-1.5">Concepto</label>
                     <select
                       value={clasificacionRapidaConcepto}
                       onChange={(e) => setClasificacionRapidaConcepto(e.target.value)}
                       disabled={cargandoRapidaConcepto || sinConceptoCount === 0}
-                      className="w-full text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-3 py-2 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full text-sm border border-[#d1d5db] rounded-lg px-3 py-2 bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <option value="">— Seleccionar —</option>
                       {CONCEPTOS.map((v) => (
@@ -1320,13 +1320,13 @@ export default function DianClasificacionPage() {
                       <button
                         onClick={handleAplicarRapidaConcepto}
                         disabled={!clasificacionRapidaConcepto || cargandoRapidaConcepto || sinConceptoCount === 0}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-                        style={{ background: '#004ac6' }}
+                        className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-[#20160A] transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{ background: '#E5A70C' }}
                       >
                         <span className="material-symbols-outlined text-base">bolt</span>
                         {cargandoRapidaConcepto ? 'Aplicando…' : 'Aplicar'}
                       </button>
-                      <span className={`text-xs font-medium text-right ${sinConceptoCount === 0 ? 'text-green-600 dark:text-green-400' : 'text-[#6b7280] dark:text-[#8890b5]'}`}>
+                      <span className={`text-xs font-medium text-right ${sinConceptoCount === 0 ? 'text-green-600' : 'text-[#6b7280]'}`}>
                         {sinConceptoCount === 0 ? '✓ Todos asignados' : `${sinConceptoCount} sin asignar`}
                       </span>
                     </div>
@@ -1339,8 +1339,8 @@ export default function DianClasificacionPage() {
             {toastRapido && (
               <div className={`mt-4 flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium
                 ${toastRapido.tipo === 'exito'
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700'
-                  : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-700'
+                  ? 'bg-green-50 text-green-700 border border-green-200'
+                  : 'bg-red-50 text-red-700 border border-red-200'
                 }`}
               >
                 <span className="material-symbols-outlined text-base flex-shrink-0">
@@ -1355,11 +1355,11 @@ export default function DianClasificacionPage() {
           {hayFiltrosActivos && (
             <div className="flex items-center justify-between mb-4 px-1">
               <p className="text-xs text-[#8890b5]">
-                Mostrando <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{filasFiltradas.length}</span> de {filasRecibido.length} compras (filtros activos)
+                Mostrando <span className="font-semibold text-[#191c1e]">{filasFiltradas.length}</span> de {filasRecibido.length} compras (filtros activos)
               </p>
               <button
                 onClick={limpiarFiltros}
-                className="text-xs font-medium text-[#004ac6] dark:text-[#7ba8f0] hover:underline"
+                className="text-xs font-medium text-[#946000] hover:underline"
               >
                 Limpiar filtros
               </button>
@@ -1368,8 +1368,8 @@ export default function DianClasificacionPage() {
 
           {/* ── barra de selección múltiple ──────────────────────────────── */}
           {seleccionadas.size > 0 && (
-            <div className="bg-[#eef3ff] dark:bg-[#1a2540] border border-[#c7d9ff] dark:border-[#2e4470] rounded-2xl shadow-sm p-4 mb-5 flex items-center gap-3 flex-wrap">
-              <span className="text-sm font-semibold text-[#004ac6] dark:text-[#7ba8f0]">
+            <div className="bg-[#FBEAC0] border border-[#F0BE4D] rounded-2xl shadow-sm p-4 mb-5 flex items-center gap-3 flex-wrap">
+              <span className="text-sm font-semibold text-[#946000]">
                 {seleccionadas.size} {seleccionadas.size === 1 ? 'fila seleccionada' : 'filas seleccionadas'}
               </span>
 
@@ -1377,7 +1377,7 @@ export default function DianClasificacionPage() {
                 value={clasificacionSeleccion}
                 onChange={(e) => setClasificacionSeleccion(e.target.value)}
                 disabled={aplicandoSeleccion}
-                className="text-sm border border-[#d1d5db] dark:border-[#3a3e5c] rounded-lg px-3 py-2 bg-white dark:bg-[#181a2e] text-[#191c1e] dark:text-[#e4e6f0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent cursor-pointer disabled:opacity-50 min-w-[220px]"
+                className="text-sm border border-[#d1d5db] rounded-lg px-3 py-2 bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent cursor-pointer disabled:opacity-50 min-w-[220px]"
               >
                 <option value="">— Seleccionar clasificación —</option>
                 {OPCIONES.map((o) => (
@@ -1388,8 +1388,8 @@ export default function DianClasificacionPage() {
               <button
                 onClick={handleAplicarSeleccion}
                 disabled={!clasificacionSeleccion || aplicandoSeleccion}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-                style={{ background: '#004ac6' }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-[#20160A] transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{ background: '#E5A70C' }}
               >
                 {aplicandoSeleccion ? 'Aplicando…' : 'Aplicar a la selección'}
               </button>
@@ -1397,7 +1397,7 @@ export default function DianClasificacionPage() {
               <button
                 onClick={() => setSeleccionadas(new Set())}
                 disabled={aplicandoSeleccion}
-                className="text-sm font-medium text-[#6b7280] dark:text-[#8890b5] hover:text-[#191c1e] dark:hover:text-[#e4e6f0] disabled:opacity-40"
+                className="text-sm font-medium text-[#6b7280] hover:text-[#191c1e] disabled:opacity-40"
               >
                 Deseleccionar todo
               </button>
@@ -1406,31 +1406,31 @@ export default function DianClasificacionPage() {
 
           {/* ── progreso ─────────────────────────────────────────────────── */}
           <div className="mb-4 flex items-center justify-between">
-            <span className="text-sm text-[#6b7280] dark:text-[#8890b5]">
-              <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{completasCount}</span>
+            <span className="text-sm text-[#6b7280]">
+              <span className="font-semibold text-[#191c1e]">{completasCount}</span>
               {' '}de{' '}
-              <span className="font-semibold text-[#191c1e] dark:text-[#e4e6f0]">{filasRecibido.length}</span>
+              <span className="font-semibold text-[#191c1e]">{filasRecibido.length}</span>
               {' '}compras clasificadas{empresaId ? ' (retención + IVA + concepto)' : ''}
             </span>
-            <div className="w-48 h-1.5 rounded-full bg-[#e5e7eb] dark:bg-[#2e3148] overflow-hidden">
+            <div className="w-48 h-1.5 rounded-full bg-[#e5e7eb] overflow-hidden">
               <div
-                className="h-full rounded-full bg-[#004ac6] transition-all duration-300"
+                className="h-full rounded-full bg-[#16a34a] transition-all duration-300"
                 style={{ width: `${filasRecibido.length ? (completasCount / filasRecibido.length) * 100 : 0}%` }}
               />
             </div>
           </div>
 
           {/* ── tabla ────────────────────────────────────────────────────── */}
-          <div className="bg-white dark:bg-[#1e2030] rounded-2xl border border-[#e2e4ef] dark:border-[#2e3148] shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm overflow-hidden">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="bg-[#f8f9ff] dark:bg-[#181a2e] border-b border-[#e2e4ef] dark:border-[#2e3148]">
+                <tr className="bg-[#f8f9fc] border-b border-[#e2e4ef]">
                   <th className="px-4 py-3 w-10">
                     <input
                       type="checkbox"
                       checked={todasVisiblesSeleccionadas}
                       onChange={toggleSeleccionarTodasVisibles}
-                      className="w-4 h-4 rounded border-[#d1d5db] dark:border-[#3a3e5c] text-[#004ac6] focus:ring-[#004ac6] cursor-pointer"
+                      className="w-4 h-4 rounded border-[#d1d5db] text-[#E5A70C] focus:ring-[#E5A70C] cursor-pointer"
                     />
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[#8890b5] uppercase tracking-wide">
@@ -1558,8 +1558,8 @@ export default function DianClasificacionPage() {
             <button
               disabled={!todasClasificadas}
               onClick={() => navigate(`/dian/nomina/${borradorId}`)}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: '#004ac6' }}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-[#20160A] transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: '#E5A70C' }}
               title={!todasClasificadas
                 ? `Clasifica todas las compras${empresaId ? ' (retención, IVA y concepto)' : ''} antes de continuar`
                 : ''}
@@ -1574,10 +1574,10 @@ export default function DianClasificacionPage() {
             onClick={irAlFinal}
             aria-label="Ir al final"
             title="Ir al final"
-            className={`fixed bottom-6 right-6 z-20 w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-white transition-opacity duration-200 active:scale-[0.95] ${
+            className={`fixed bottom-6 right-6 z-20 w-12 h-12 rounded-full shadow-lg flex items-center justify-center text-[#20160A] transition-opacity duration-200 active:scale-[0.95] ${
               mostrarBajar ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
-            style={{ background: '#004ac6' }}
+            style={{ background: '#E5A70C' }}
           >
             <span className="material-symbols-outlined">arrow_downward</span>
           </button>
