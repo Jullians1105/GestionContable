@@ -405,7 +405,7 @@ export default function ReportsPage() {
             <select
               value={filters.type}
               onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]"
             >
               {REPORT_TYPES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
@@ -415,7 +415,7 @@ export default function ReportsPage() {
             <select
               value={filters.groupId}
               onChange={(e) => setFilters({ ...filters, groupId: e.target.value })}
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]"
             >
               <option value="">Todos los grupos</option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -426,7 +426,7 @@ export default function ReportsPage() {
             <select
               value={filters.memberId}
               onChange={(e) => setFilters({ ...filters, memberId: e.target.value })}
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]"
             >
               <option value="">Todos</option>
               {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -435,11 +435,11 @@ export default function ReportsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-[#434655] mb-1.5">Desde</label>
-              <input type="date" value={filters.dateFrom} onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6]" />
+              <input type="date" value={filters.dateFrom} onChange={(e) => setFilters({ ...filters, dateFrom: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]" />
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#434655] mb-1.5">Hasta</label>
-              <input type="date" value={filters.dateTo} onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6]" />
+              <input type="date" value={filters.dateTo} onChange={(e) => setFilters({ ...filters, dateTo: e.target.value })} className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]" />
             </div>
           </div>
         </div>
@@ -493,7 +493,7 @@ export default function ReportsPage() {
                       <td className="py-2 px-3">
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-[#edeef0] rounded-full">
-                            <div className="h-full rounded-full" style={{ width: `${r.pct}%`, background: '#2563eb' }} />
+                            <div className="h-full rounded-full" style={{ width: `${r.pct}%`, background: '#16a34a' }} />
                           </div>
                           <span className="text-xs text-[#434655] w-8">{r.pct}%</span>
                         </div>

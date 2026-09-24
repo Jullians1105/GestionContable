@@ -61,7 +61,7 @@ export default function EmpresaCombobox({ empresas, value, onChange }) {
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => setOpen(true)}
             placeholder="Buscar empresa…"
-            className="w-full pl-10 pr-3.5 py-2.5 rounded-2xl border border-[#d1d5db] bg-white text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/30 focus:border-[#004ac6]"
+            className="w-full pl-10 pr-3.5 py-2.5 rounded-2xl border border-[#d1d5db] bg-white text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]/30 focus:border-[#003B43]"
           />
         </div>
       )}

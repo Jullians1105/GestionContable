@@ -2,7 +2,7 @@ import { useState } from "react"
 import { validators } from "../utils/validators"
 
 const labelCls = "block text-[12px] font-semibold text-[#434655] mb-1"
-const inputCls = "w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] hover:bg-[#f3f4f6] transition-colors"
+const inputCls = "w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#003B43] hover:bg-[#f3f4f6] transition-colors"
 const inputErrCls = "border-[#EF4444] focus:ring-[#EF4444] focus:border-[#EF4444]"
 
 const ROLE_HINTS = {

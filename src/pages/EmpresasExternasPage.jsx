@@ -1312,7 +1312,7 @@ export default function EmpresasExternasPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="material-symbols-outlined text-2xl text-[#E5A70C]">table_chart</span>
+            <span className="material-symbols-outlined text-2xl text-[#003B43]">table_chart</span>
             <h1 className="text-xl font-bold text-[#191c1e]">Empresas Externas</h1>
           </div>
           <p className="text-sm text-[#6b7280]">Seguimiento contable mensual</p>

@@ -275,7 +275,7 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
                 <span className="text-xs font-semibold text-[#191c1e]">{progress.completed}/{progress.total} completaron</span>
               </div>
               <div className="h-1.5 bg-[#edeef0] rounded-full overflow-hidden mb-3">
-                <div className="h-full rounded-full transition-all" style={{ width: `${progress.pct}%`, background: '#10B981' }} />
+                <div className="h-full rounded-full transition-all" style={{ width: `${progress.pct}%`, background: '#16a34a' }} />
               </div>
 
               {myAssignee && (

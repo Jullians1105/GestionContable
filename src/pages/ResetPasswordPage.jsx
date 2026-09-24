@@ -60,7 +60,7 @@ export default function ResetPasswordPage() {
               value={token}
               onChange={(e) => { setToken(e.target.value); setErrors((prev) => ({ ...prev, token: undefined })) }}
               placeholder="Token de recuperación"
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition font-mono"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-transparent transition font-mono"
             />
             {errors.token && <p className="text-xs text-[#EF4444] mt-1">{errors.token}</p>}
           </div>
@@ -72,7 +72,7 @@ export default function ResetPasswordPage() {
               value={password}
               onChange={(e) => { setPassword(e.target.value); setErrors((prev) => ({ ...prev, password: undefined })) }}
               placeholder="Mínimo 8 caracteres"
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-transparent transition"
             />
             {errors.password && <p className="text-xs text-[#EF4444] mt-1">{errors.password}</p>}
           </div>
@@ -84,7 +84,7 @@ export default function ResetPasswordPage() {
               value={confirmPassword}
               onChange={(e) => { setConfirmPassword(e.target.value); setErrors((prev) => ({ ...prev, confirmPassword: undefined })) }}
               placeholder="Repite la contraseña"
-              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition"
+              className="w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-transparent transition"
             />
             {errors.confirmPassword && <p className="text-xs text-[#EF4444] mt-1">{errors.confirmPassword}</p>}
           </div>

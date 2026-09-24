@@ -66,7 +66,7 @@ export default function GroupForm({ group, onClose }) {
               value={form.name}
               onChange={(e) => { setForm({ ...form, name: e.target.value }); setErrors({}) }}
               placeholder="Frontend Team"
-              className={`w-full h-10 px-3 rounded-lg border bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition ${errors.name ? 'border-[#EF4444]' : 'border-[#c3c6d7]'}`}
+              className={`w-full h-10 px-3 rounded-lg border bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition ${errors.name ? 'border-[#EF4444]' : 'border-[#c3c6d7]'}`}
             />
             {errors.name && <p className="text-xs text-[#EF4444] mt-1">{errors.name}</p>}
           </div>
@@ -78,7 +78,7 @@ export default function GroupForm({ group, onClose }) {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={2}
               placeholder="Descripción opcional..."
-              className="w-full px-3 py-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition resize-none"
+              className="w-full px-3 py-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition resize-none"
             />
           </div>
 

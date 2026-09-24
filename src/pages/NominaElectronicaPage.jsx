@@ -401,7 +401,7 @@ export default function NominaElectronicaPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-3 mb-0.5">
-            <span className="material-symbols-outlined text-3xl text-[#E5A70C]">badge</span>
+            <span className="material-symbols-outlined text-3xl text-[#003B43]">badge</span>
             <h1 className="text-2xl font-bold text-[#191c1e]">Nómina Electrónica</h1>
           </div>
           <p className="text-sm text-[#6b7280]">Seguimiento mensual de presentación por empresa</p>

@@ -13,7 +13,7 @@ export default function TaskFilters({ filters, onChange, onClear }) {
 
   const hasActive = filters.search || filters.status || filters.priority || filters.assignedTo || filters.groupId || filters.tagId || filters.createdByMe
 
-  const selectCls = 'h-10 border border-[#c3c6d7] rounded-lg px-3 text-sm text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition w-full'
+  const selectCls = 'h-10 border border-[#c3c6d7] rounded-lg px-3 text-sm text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#003B43] transition w-full'
 
   return (
     <div className="bg-white rounded-xl border border-[#c3c6d7] mb-6 shadow-sm overflow-hidden">
@@ -45,7 +45,7 @@ export default function TaskFilters({ filters, onChange, onClear }) {
               value={filters.search}
               onChange={(e) => handleChange('search', e.target.value)}
               placeholder="Buscar tareas..."
-              className="h-10 pl-9 pr-4 border border-[#c3c6d7] rounded-lg text-sm text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition w-full sm:min-w-[180px]"
+              className="h-10 pl-9 pr-4 border border-[#c3c6d7] rounded-lg text-sm text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#003B43] transition w-full sm:min-w-[180px]"
             />
           </div>
         </div>

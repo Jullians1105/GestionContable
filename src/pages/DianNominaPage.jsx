@@ -207,7 +207,7 @@ export default function DianNominaPage() {
       {/* Encabezado */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#E5A70C]">badge</span>
+          <span className="material-symbols-outlined text-3xl text-[#003B43]">badge</span>
           <h1 className="text-2xl font-bold text-[#191c1e]">
             Nómina
           </h1>

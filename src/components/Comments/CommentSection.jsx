@@ -114,7 +114,7 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
                     <input
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
-                      className="flex-1 h-8 px-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+                      className="flex-1 h-8 px-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]"
                       autoFocus
                     />
                     <button type="submit" className="text-xs px-2 py-1 rounded-lg text-white font-semibold hover:opacity-90" style={{ background: '#2563eb' }}>Guardar</button>
@@ -145,7 +145,7 @@ export default function CommentSection({ task, readOnly = false, scrollToComment
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Escribe un comentario..."
-              className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+              className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition"
             />
             <button
               type="submit"

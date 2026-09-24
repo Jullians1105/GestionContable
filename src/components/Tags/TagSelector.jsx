@@ -84,7 +84,7 @@ export default function TagSelector({ selectedIds = [], onChange }) {
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(e) }}
                 placeholder="nombre..."
-                className="flex-1 h-7 px-2 rounded-lg border border-[#c3c6d7] bg-white text-xs text-[#191c1e] focus:outline-none focus:ring-1 focus:ring-[#004ac6]"
+                className="flex-1 h-7 px-2 rounded-lg border border-[#c3c6d7] bg-white text-xs text-[#191c1e] focus:outline-none focus:ring-1 focus:ring-[#003B43]"
               />
               <button type="button" onClick={handleCreate} disabled={!newName.trim()} className="h-7 px-2 rounded-lg text-xs text-white font-semibold disabled:opacity-40" style={{ background: '#2563eb' }}>
                 +

@@ -104,7 +104,7 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
       {subtasks.length > 0 && (
         <div>
           <div className="h-1 bg-[#edeef0] rounded-full overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: `${Math.round((completedSubtasks / subtasks.length) * 100)}%`, background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: `${Math.round((completedSubtasks / subtasks.length) * 100)}%`, background: '#16a34a' }} />
           </div>
           <p className="text-[10px] text-[#888] mt-0.5">{completedSubtasks}/{subtasks.length} subtareas</p>
         </div>
@@ -113,7 +113,7 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
       {showAssigneeProgress && (
         <div>
           <div className="h-1 bg-[#edeef0] rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all" style={{ width: `${progress.pct}%`, background: '#10B981' }} />
+            <div className="h-full rounded-full transition-all" style={{ width: `${progress.pct}%`, background: '#16a34a' }} />
           </div>
           <p className="text-[10px] text-[#888] mt-0.5">{progress.completed}/{progress.total} asignados completaron</p>
         </div>
@@ -168,7 +168,7 @@ export default function TaskCard({ task, onEdit, onDelete, onStatusChange, onVie
         <select
           value={task.status}
           onChange={(e) => onStatusChange(task.id, e.target.value)}
-          className="w-full text-xs border border-[#c3c6d7] rounded-lg px-2 h-8 bg-[#f3f4f6] text-[#191c1e] focus:outline-none focus:ring-1 focus:ring-[#004ac6] cursor-pointer"
+          className="w-full text-xs border border-[#c3c6d7] rounded-lg px-2 h-8 bg-[#f3f4f6] text-[#191c1e] focus:outline-none focus:ring-1 focus:ring-[#003B43] cursor-pointer"
         >
           <option value="pending">Pendiente</option>
           <option value="in_progress">En Progreso</option>

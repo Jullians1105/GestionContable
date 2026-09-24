@@ -72,7 +72,7 @@ const EMPTY_FORM = { name: '', email: '', role: '', password: '' }
 const ROLE_ORDER = { admin: 0, leader: 1, member: 2, viewer: 3 }
 
 const labelCls = 'block text-xs font-semibold text-[#434655] mb-1.5'
-const inputCls = 'w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
+const inputCls = 'w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition'
 const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
 
 export default function UsersManager() {
@@ -278,7 +278,7 @@ export default function UsersManager() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por nombre o email..."
-          className="w-full border border-[#c3c6d7] rounded-lg pl-10 pr-4 h-10 text-sm text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+          className="w-full border border-[#c3c6d7] rounded-lg pl-10 pr-4 h-10 text-sm text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#003B43] transition"
         />
       </div>
 

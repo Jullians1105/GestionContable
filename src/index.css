@@ -21,7 +21,7 @@
 @layer components {
   /* Buttons */
   .btn-primary {
-    @apply bg-[#004ac6] hover:bg-[#2563eb] text-white text-xs font-semibold px-4 h-10 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:ring-offset-2 flex items-center justify-center gap-2 active:scale-[0.97];
+    @apply bg-[#004ac6] hover:bg-[#2563eb] text-white text-xs font-semibold px-4 h-10 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:ring-offset-2 flex items-center justify-center gap-2 active:scale-[0.97];
   }
   .btn-secondary {
     @apply bg-transparent border border-[#c3c6d7] hover:bg-[#e7e8ea] text-[#434655] text-xs font-semibold px-4 h-10 rounded-lg transition-all duration-200 focus:outline-none flex items-center justify-center gap-2 active:scale-[0.97];
@@ -52,7 +52,7 @@
 
   /* Form inputs */
   .input-field {
-    @apply w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-[#004ac6] hover:bg-[#f3f4f6] transition-colors duration-150;
+    @apply w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-[#003B43] hover:bg-[#f3f4f6] transition-colors duration-150;
   }
   .input-error {
     @apply border-[#EF4444] focus:ring-[#EF4444] focus:border-[#EF4444];
@@ -117,5 +117,99 @@
   .gc-etapa-fade {
     display: inline-block;
     animation: gc-etapa-fade-kf 220ms ease-out;
+  }
+
+  /* Columna 2 del sidebar (Sidebar.jsx) al expandir/colapsar con hover o pin: el ancho, el
+     borde y la sombra animan a la velocidad de siempre (200ms, sin retraso) — eso es lo que
+     se sentía bien ("el barrido"). El fondo blanco es lo único distinto: se pone opaco mucho
+     más rápido (80ms) que el resto, así el logo del Header (que invade este hueco cuando está
+     colapsada, ver Header.jsx) queda tapado casi de inmediato, antes de que el título del
+     módulo empiece a aparecer encima — sin esto, título y logo se ven superpuestos un
+     instante mientras el fondo todavía está transparente. */
+  .sidebar-nav-expand {
+    transition-property: width, border-color, box-shadow, background-color;
+    transition-duration: 200ms, 200ms, 200ms, 80ms;
+    transition-timing-function: ease-in-out;
+  }
+
+  /* Ícono + título del módulo activo, dentro del header de la Columna 2 (mismo hueco que
+     invade el logo de Header.jsx cuando está colapsada) — el ancho se despliega normal
+     (200ms), pero la opacidad va rápido (80ms) como el fondo de arriba: si el texto tardara
+     lo mismo que el ancho en aparecer/desaparecer, se alcanza a ver superpuesto con el logo
+     un instante, tanto al entrar como al salir del hover. */
+  .sidebar-title-reveal {
+    transition-property: max-width, opacity;
+    transition-duration: 200ms, 80ms;
+    transition-timing-function: ease-in-out;
+  }
+
+  /* LoginPage.jsx — entrada del logo/formulario y las 3 manchas de fondo animadas del panel
+     verde. Vivían en un <style> insertado en el propio componente y no se veían animar en el
+     navegador; movidas acá (el mismo archivo donde sí funcionan gc-etapa-fade/sidebar-*
+     arriba) para descartar que el problema fuera ese mecanismo en tiempo de ejecución. */
+  @keyframes loginFadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .login-fade {
+    animation: loginFadeUp 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .login-fade-delay-0 { animation-delay: 80ms; }
+  .login-fade-delay-1 { animation-delay: 120ms; }
+
+  /* Mismo espíritu que numbi.ai (.numbi-motion-backdrop / __glow: blur grande + gradiente
+     radial + transform animado, sin gate de prefers-reduced-motion — ver el porqué más
+     abajo). Ahora el fondo oscuro ocupa toda la pantalla (ya no un panel angosto), así que
+     a diferencia del intento anterior, sí tiene sentido mover las bolas en vw/vh como hace
+     Numbi: recorren toda la página, no un recuadro. Colores propios de la marca (teal claro
+     + dorado) en vez del verde de Numbi.
+     Sin gate de prefers-reduced-motion a propósito (Numbi tampoco lo tiene): en Windows
+     Server la opción "Mostrar animaciones" del sistema suele venir apagada por defecto
+     (pensado para escritorio remoto/rendimiento, no elegido por el usuario), y Chrome mapea
+     eso directo a prefers-reduced-motion — con ese gate puesto, esta animación se apagaba
+     sola sin que nadie la hubiera pedido así. */
+  .login-motion-backdrop {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .login-motion-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: min(60vw, 44rem);
+    aspect-ratio: 1;
+    border-radius: 9999px;
+    filter: blur(80px);
+    opacity: 0.8;
+    will-change: transform;
+  }
+  /* Un solo tono: verde teal claro (tinte alto sobre el mismo teal de marca), no dorado. */
+  .login-motion-glow--teal-light {
+    background: radial-gradient(circle, rgba(94,199,190,0.9), rgba(94,199,190,0.22) 52%, transparent 72%);
+    animation: loginOrbitClockwise 26s ease-in-out infinite;
+  }
+  .login-motion-glow--teal-soft {
+    background: radial-gradient(circle, rgba(150,224,216,0.85), rgba(150,224,216,0.2) 52%, transparent 72%);
+    animation: loginOrbitClockwiseOffset 26s ease-in-out infinite;
+  }
+  /* Recorren las 4 esquinas en orden, pegadas al borde (arriba → derecha → abajo →
+     izquierda). El -50% (relativo al propio tamaño de la bola, por eso va sumado dentro del
+     mismo calc()) centra la bola justo en cada esquina de la pantalla, así que en cada parada
+     queda exactamente la mitad recortada por el borde, no toda ella adentro. */
+  @keyframes loginOrbitClockwise {
+    0%   { transform: translate(calc(-50% + 0vw), calc(-50% + 0vh)); }
+    25%  { transform: translate(calc(-50% + 100vw), calc(-50% + 0vh)); }
+    50%  { transform: translate(calc(-50% + 100vw), calc(-50% + 100vh)); }
+    75%  { transform: translate(calc(-50% + 0vw), calc(-50% + 100vh)); }
+    100% { transform: translate(calc(-50% + 0vw), calc(-50% + 0vh)); }
+  }
+  @keyframes loginOrbitClockwiseOffset {
+    0%   { transform: translate(calc(-50% + 100vw), calc(-50% + 100vh)); }
+    25%  { transform: translate(calc(-50% + 0vw), calc(-50% + 100vh)); }
+    50%  { transform: translate(calc(-50% + 0vw), calc(-50% + 0vh)); }
+    75%  { transform: translate(calc(-50% + 100vw), calc(-50% + 0vh)); }
+    100% { transform: translate(calc(-50% + 100vw), calc(-50% + 100vh)); }
   }
 }

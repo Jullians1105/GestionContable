@@ -1414,7 +1414,7 @@ export default function DianClasificacionPage() {
             </span>
             <div className="w-48 h-1.5 rounded-full bg-[#e5e7eb] overflow-hidden">
               <div
-                className="h-full rounded-full bg-[#E5A70C] transition-all duration-300"
+                className="h-full rounded-full bg-[#16a34a] transition-all duration-300"
                 style={{ width: `${filasRecibido.length ? (completasCount / filasRecibido.length) * 100 : 0}%` }}
               />
             </div>

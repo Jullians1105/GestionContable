@@ -845,7 +845,7 @@ export default function FondoEmprenderPagosPage() {
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div>
         <div className="flex items-center gap-2 mb-0.5">
-          <span className="material-symbols-outlined text-2xl text-[#E5A70C]">payments</span>
+          <span className="material-symbols-outlined text-2xl text-[#003B43]">payments</span>
           <h1 className="text-xl font-bold text-[#191c1e]">Pagos Fondo Emprender</h1>
         </div>
         <p className="text-sm text-[#6b7280]">
@@ -940,7 +940,7 @@ export default function FondoEmprenderPagosPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar empresa..."
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
           />
         </div>
       </div>

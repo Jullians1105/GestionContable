@@ -14,7 +14,7 @@ const ROLE_BADGE = {
   viewer: "bg-[#edeef0] text-[#434655]",
 }
 
-const inputCls = "w-full border border-[#c3c6d7] rounded-lg pl-9 pr-3 h-10 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#004ac6]"
+const inputCls = "w-full border border-[#c3c6d7] rounded-lg pl-9 pr-3 h-10 text-[14px] text-[#191c1e] bg-white focus:outline-none focus:ring-2 focus:ring-[#003B43]"
 
 function MemberPicker({ allUsers, members, onAdd, onClose }) {
   const [search, setSearch] = useState("")

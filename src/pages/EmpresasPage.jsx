@@ -381,7 +381,7 @@ export default function EmpresasPage() {
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar por nombre, NIT o cédula…"
-            className="w-full pl-10 pr-8 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+            className="w-full pl-10 pr-8 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]/30"
           />
           {busqueda && (
             <button

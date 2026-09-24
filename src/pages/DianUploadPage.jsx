@@ -166,7 +166,7 @@ export default function DianUploadPage() {
       {/* Encabezado */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#E5A70C]">upload_file</span>
+          <span className="material-symbols-outlined text-3xl text-[#003B43]">upload_file</span>
           <h1 className="text-2xl font-bold text-[#191c1e]">
             Cargar reporte DIAN
           </h1>

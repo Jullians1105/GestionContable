@@ -59,6 +59,13 @@ export default function Dashboard() {
     else addToast("No tienes permiso para crear tareas", "error")
   }
 
+  // Efecto de tarjetas apiladas (dash-stack) — controlado por estado en vez de :hover puro de
+  // CSS: con :hover, la sombra se quedaba "pegada" en su posición desplazada después de pasar
+  // el mouse varias veces (bug de CSS/navegador, no se resolvía ni con will-change ni con
+  // backface-visibility). Con onMouseEnter/Leave + este estado, la posición de cada tarjeta
+  // depende directamente de si React cree que está hovereada — no puede quedar desincronizada.
+  const [hoveredCard, setHoveredCard] = useState(null)
+
   const [quickNote, setQuickNote] = useState("")
   const [savingNote, setSavingNote] = useState(false)
 
@@ -160,22 +167,28 @@ export default function Dashboard() {
           los números en IBM Plex Mono y el efecto de tarjetas apiladas + animación de entrada. */}
       <style>{`
         @keyframes dashCardIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .dash-stack { animation: dashCardIn 480ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+        .dash-stack { animation: dashCardIn 480ms cubic-bezier(0.16, 1, 0.3, 1) both; isolation: isolate; }
         .dash-stack-shadow { transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1); }
-        .dash-stack:hover .dash-stack-shadow { transform: translate(0.875rem, 0.875rem); }
         .dash-stack-front { transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1); }
-        .dash-stack:hover .dash-stack-front { transform: translateY(-2px); }
       `}</style>
       <div className="grid grid-cols-1 lg:grid-cols-[1.25fr_0.85fr_260px] gap-5 items-start">
         <div className="flex flex-col gap-5">
           {/* ── Accesos directos ── */}
-          <div className="dash-stack relative" style={{ animationDelay: "0ms" }}>
+          <div
+            className="dash-stack relative"
+            style={{ animationDelay: "0ms" }}
+            onMouseEnter={() => setHoveredCard("accesos")}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
             <div
-              className="dash-stack-shadow absolute inset-0 translate-x-2.5 translate-y-2.5 rounded-2xl"
-              style={{ background: "#a9c9c3" }}
+              className="dash-stack-shadow absolute inset-0 rounded-2xl"
+              style={{ background: "#7FB8AE", transform: hoveredCard === "accesos" ? "translate3d(0.875rem, 0.875rem, 0)" : "translate3d(0.625rem, 0.625rem, 0)" }}
               aria-hidden="true"
             />
-            <div className="dash-stack-front relative bg-white rounded-2xl border border-[#e2e4ef] p-5">
+            <div
+              className="dash-stack-front relative bg-white rounded-2xl border border-[#e2e4ef] p-5"
+              style={{ transform: hoveredCard === "accesos" ? "translate3d(0, -2px, 0)" : "translate3d(0, 0, 0)" }}
+            >
               <LedgerHeading>Accesos directos</LedgerHeading>
               {/* Filas tipo "índice", sin tarjeta ni ícono flotante. El número de referencia se
                   cambió por una flecha — el número no comunicaba nada (no hay un orden real
@@ -186,7 +199,7 @@ export default function Dashboard() {
                   <Link
                     key={item.to}
                     to={item.to}
-                    className="group flex items-center gap-3.5 py-6 border-b border-[#e2e4ef] sm:odd:pr-4 sm:even:pl-4 sm:odd:border-r sm:[&:nth-last-child(-n+2)]:border-b-0 hover:bg-[#eef3ff] transition-colors"
+                    className="group flex items-center gap-3.5 py-6 border-b border-[#e2e4ef] sm:odd:pr-4 sm:even:pl-4 sm:odd:border-r sm:[&:nth-last-child(-n+2)]:border-b-0 hover:bg-[#E3EEEE] transition-colors"
                   >
                     <span className="w-11 h-11 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: item.bg }}>
                       <span className="material-symbols-outlined text-xl" style={{ color: item.accent }}>{item.icon}</span>
@@ -212,32 +225,46 @@ export default function Dashboard() {
           {/* ── Nueva tarea ── mismo modal que ya abre el "+" del Sidebar (TaskModal), no uno
               nuevo — mismo chequeo de permiso canCreateTask. Arriba de "Tu progreso", más alta
               para que tenga presencia propia y no se sienta como un botón perdido. */}
-          <div className="dash-stack relative" style={{ animationDelay: "90ms" }}>
+          <div
+            className="dash-stack relative"
+            style={{ animationDelay: "90ms" }}
+            onMouseEnter={() => setHoveredCard("nuevaTarea")}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
             <div
-              className="dash-stack-shadow absolute inset-0 translate-x-2.5 translate-y-2.5 rounded-2xl"
-              style={{ background: "#b7c0d4" }}
+              className="dash-stack-shadow absolute inset-0 rounded-2xl"
+              style={{ background: "#6FA89E", transform: hoveredCard === "nuevaTarea" ? "translate3d(0.875rem, 0.875rem, 0)" : "translate3d(0.625rem, 0.625rem, 0)" }}
               aria-hidden="true"
             />
             <button
               onClick={handleNewTask}
-              className="dash-stack-front relative w-full flex items-center justify-center gap-3 bg-white rounded-2xl border border-[#e2e4ef] py-8 hover:bg-[#eef3ff] transition-colors"
+              className="dash-stack-front relative w-full flex items-center justify-center gap-3 bg-white rounded-2xl border border-[#e2e4ef] py-8 hover:bg-[#E3EEEE] transition-colors"
+              style={{ transform: hoveredCard === "nuevaTarea" ? "translate3d(0, -2px, 0)" : "translate3d(0, 0, 0)" }}
             >
-              <span className="material-symbols-outlined text-2xl" style={{ color: "#004ac6" }}>add_circle</span>
+              <span className="material-symbols-outlined text-2xl" style={{ color: "#003B43" }}>add_circle</span>
               <span className="text-base font-bold text-[#191c1e]">Nueva tarea</span>
             </button>
           </div>
 
           {/* ── Tu progreso ── fusionada con "Por prioridad" en una sola tarjeta. */}
-          <div className="dash-stack relative" style={{ animationDelay: "150ms" }}>
+          <div
+            className="dash-stack relative"
+            style={{ animationDelay: "150ms" }}
+            onMouseEnter={() => setHoveredCard("progreso")}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
             <div
-              className="dash-stack-shadow absolute inset-0 translate-x-2.5 translate-y-2.5 rounded-2xl"
-              style={{ background: "#a8bcdb" }}
+              className="dash-stack-shadow absolute inset-0 rounded-2xl"
+              style={{ background: "#7FB8AE", transform: hoveredCard === "progreso" ? "translate3d(0.875rem, 0.875rem, 0)" : "translate3d(0.625rem, 0.625rem, 0)" }}
               aria-hidden="true"
             />
-            <div className="dash-stack-front relative bg-white rounded-2xl border border-[#e2e4ef] p-6">
+            <div
+              className="dash-stack-front relative bg-white rounded-2xl border border-[#e2e4ef] p-6"
+              style={{ transform: hoveredCard === "progreso" ? "translate3d(0, -2px, 0)" : "translate3d(0, 0, 0)" }}
+            >
               <LedgerHeading
                 action={
-                  <Link to="/tasks" className="text-xs font-semibold text-[#004ac6] hover:opacity-80 flex items-center gap-1 transition-opacity">
+                  <Link to="/tasks" className="text-xs font-semibold text-[#003B43] hover:opacity-80 flex items-center gap-1 transition-opacity">
                     Ver tareas
                     <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
                   </Link>
@@ -255,12 +282,12 @@ export default function Dashboard() {
                 </span>
               </div>
               <div className="h-2 rounded-sm bg-[#f0f2f8] overflow-hidden mt-3">
-                <div className="h-full rounded-sm transition-all" style={{ width: `${completionPct}%`, background: "#004ac6" }} />
+                <div className="h-full rounded-sm transition-all" style={{ width: `${completionPct}%`, background: "#16a34a" }} />
               </div>
 
               <div className="grid grid-cols-3 gap-2.5 mt-4">
                 {PROGRESS_SEGMENTS.map((seg) => (
-                  <div key={seg.key} className="rounded-lg border border-[#e2e4ef] bg-[#eef3ff] px-3 py-2.5">
+                  <div key={seg.key} className="rounded-lg border border-[#e2e4ef] bg-[#E3EEEE] px-3 py-2.5">
                     <span className="block text-lg font-bold leading-tight text-[#191c1e]" style={MONO}>
                       {stats[seg.key]}
                     </span>
@@ -293,13 +320,21 @@ export default function Dashboard() {
 
         <div className="flex flex-col gap-5">
           {/* ── Notas rápidas ── */}
-          <div className="dash-stack relative" style={{ animationDelay: "160ms" }}>
+          <div
+            className="dash-stack relative"
+            style={{ animationDelay: "160ms" }}
+            onMouseEnter={() => setHoveredCard("notas")}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
             <div
-              className="dash-stack-shadow absolute inset-0 translate-x-2.5 translate-y-2.5 rounded-2xl"
-              style={{ background: "#cdb787" }}
+              className="dash-stack-shadow absolute inset-0 rounded-2xl"
+              style={{ background: "#A9C9C3", transform: hoveredCard === "notas" ? "translate3d(0.875rem, 0.875rem, 0)" : "translate3d(0.625rem, 0.625rem, 0)" }}
               aria-hidden="true"
             />
-            <div className="dash-stack-front relative bg-white rounded-2xl border border-[#e2e4ef] p-5">
+            <div
+              className="dash-stack-front relative bg-white rounded-2xl border border-[#e2e4ef] p-5"
+              style={{ transform: hoveredCard === "notas" ? "translate3d(0, -2px, 0)" : "translate3d(0, 0, 0)" }}
+            >
               <LedgerHeading>Notas rápidas</LedgerHeading>
               <textarea
                 value={quickNote}
@@ -312,10 +347,10 @@ export default function Dashboard() {
                 }}
                 placeholder="Escribe algo para guardarlo en Mis Notas…"
                 rows={3}
-                className="w-full resize-none rounded-lg bg-[#eef3ff] border border-[#e2e4ef] focus:border-[#8890b5] outline-none p-3 text-sm text-[#191c1e] placeholder:text-[#8890b5] transition-colors"
+                className="w-full resize-none rounded-lg bg-[#E3EEEE] border border-[#e2e4ef] focus:border-[#8890b5] outline-none p-3 text-sm text-[#191c1e] placeholder:text-[#8890b5] transition-colors"
               />
               <div className="flex items-center justify-between mt-3">
-                <Link to="/notas" className="text-xs font-semibold text-[#004ac6] hover:opacity-80 flex items-center gap-1 transition-opacity">
+                <Link to="/notas" className="text-xs font-semibold text-[#003B43] hover:opacity-80 flex items-center gap-1 transition-opacity">
                   Ver Mis Notas
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
                 </Link>
@@ -323,7 +358,7 @@ export default function Dashboard() {
                   onClick={handleQuickNote}
                   disabled={!quickNote.trim() || savingNote}
                   className="h-8 px-3.5 rounded-lg text-xs font-semibold text-white transition disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
-                  style={{ background: "#004ac6" }}
+                  style={{ background: "#003B43" }}
                 >
                   {savingNote ? "Guardando…" : "Guardar"}
                 </button>
@@ -334,13 +369,21 @@ export default function Dashboard() {
           {/* ── Pendientes rápidos ── mismo patrón exacto que "Notas rápidas", pero crea una
               tarea personal (api.createPersonalTask) en vez de una nota — acá sí en un solo
               paso, el backend de personal-tasks ya acepta el título directo en el POST. */}
-          <div className="dash-stack relative" style={{ animationDelay: "230ms" }}>
+          <div
+            className="dash-stack relative"
+            style={{ animationDelay: "230ms" }}
+            onMouseEnter={() => setHoveredCard("pendientes")}
+            onMouseLeave={() => setHoveredCard(null)}
+          >
             <div
-              className="dash-stack-shadow absolute inset-0 translate-x-2.5 translate-y-2.5 rounded-2xl"
-              style={{ background: "#a8bcdb" }}
+              className="dash-stack-shadow absolute inset-0 rounded-2xl"
+              style={{ background: "#4E8F84", transform: hoveredCard === "pendientes" ? "translate3d(0.875rem, 0.875rem, 0)" : "translate3d(0.625rem, 0.625rem, 0)" }}
               aria-hidden="true"
             />
-            <div className="dash-stack-front relative bg-white rounded-2xl border border-[#e2e4ef] p-5">
+            <div
+              className="dash-stack-front relative bg-white rounded-2xl border border-[#e2e4ef] p-5"
+              style={{ transform: hoveredCard === "pendientes" ? "translate3d(0, -2px, 0)" : "translate3d(0, 0, 0)" }}
+            >
               <LedgerHeading>Pendientes rápidos</LedgerHeading>
               <textarea
                 value={quickPending}
@@ -353,7 +396,7 @@ export default function Dashboard() {
                 }}
                 placeholder="Escribe un pendiente para guardarlo en Mis Pendientes…"
                 rows={3}
-                className="w-full resize-none rounded-lg bg-[#eef3ff] border border-[#e2e4ef] focus:border-[#8890b5] outline-none p-3 text-sm text-[#191c1e] placeholder:text-[#8890b5] transition-colors"
+                className="w-full resize-none rounded-lg bg-[#E3EEEE] border border-[#e2e4ef] focus:border-[#8890b5] outline-none p-3 text-sm text-[#191c1e] placeholder:text-[#8890b5] transition-colors"
               />
 
               {/* Si ya hay pendientes guardados, se listan acá mismo — con checkbox para
@@ -381,7 +424,7 @@ export default function Dashboard() {
               )}
 
               <div className="flex items-center justify-between mt-3">
-                <Link to="/pendientes" className="text-xs font-semibold text-[#004ac6] hover:opacity-80 flex items-center gap-1 transition-opacity">
+                <Link to="/pendientes" className="text-xs font-semibold text-[#003B43] hover:opacity-80 flex items-center gap-1 transition-opacity">
                   Ver Mis Pendientes
                   <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_forward</span>
                 </Link>
@@ -389,7 +432,7 @@ export default function Dashboard() {
                   onClick={handleQuickPending}
                   disabled={!quickPending.trim() || savingPending}
                   className="h-8 px-3.5 rounded-lg text-xs font-semibold text-white transition disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
-                  style={{ background: "#004ac6" }}
+                  style={{ background: "#003B43" }}
                 >
                   {savingPending ? "Guardando…" : "Guardar"}
                 </button>

@@ -37,7 +37,7 @@ export default function DeleteRequestModal({ taskTitle, onSubmit, onClose }) {
           placeholder="¿Por qué debería eliminarse esta tarea?"
           rows={3}
           autoFocus
-          className="w-full border border-[#c3c6d7] rounded-lg px-3 py-2 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition resize-none mb-4"
+          className="w-full border border-[#c3c6d7] rounded-lg px-3 py-2 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition resize-none mb-4"
         />
         <div className="flex justify-end gap-3">
           <button type="button" onClick={onClose} className="h-10 px-4 rounded-lg border border-[#c3c6d7] text-sm font-semibold text-[#434655] hover:bg-[#edeef0] transition">

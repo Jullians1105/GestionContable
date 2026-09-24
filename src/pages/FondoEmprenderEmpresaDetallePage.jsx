@@ -576,7 +576,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                               }}
                               placeholder="Notas adicionales..."
                               rows={2}
-                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#eef3ff] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#eef3ff] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
                             />
                           )}
                         </div>
@@ -671,7 +671,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     }}
                     placeholder="Notas adicionales..."
                     rows={2}
-                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#eef3ff] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#eef3ff] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
                   />
                 </div>
               )}

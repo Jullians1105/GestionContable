@@ -23,7 +23,7 @@ const EMPTY_TASK = {
 }
 
 const labelCls = 'block text-xs font-semibold text-[#434655] mb-1.5'
-const inputCls = 'w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
+const inputCls = 'w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition'
 const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
 
 export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = false }) {
@@ -129,7 +129,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
           onChange={(e) => handleChange('description', e.target.value)}
           placeholder="Descripción detallada..."
           rows={3}
-          className="w-full border border-[#c3c6d7] rounded-lg px-3 py-2 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition resize-none"
+          className="w-full border border-[#c3c6d7] rounded-lg px-3 py-2 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition resize-none"
         />
       </div>
 
@@ -215,7 +215,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
                   onChange={e => setAssigneeSearch(e.target.value)}
                   placeholder="Buscar persona..."
                   autoFocus
-                  className="w-full h-8 pl-7 pr-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+                  className="w-full h-8 pl-7 pr-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition"
                 />
               </div>
             </div>
@@ -310,7 +310,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
               type="time"
               value={form.dueTime}
               onChange={(e) => handleChange('dueTime', e.target.value)}
-              className="border border-[#c3c6d7] rounded-lg px-3 h-9 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+              className="border border-[#c3c6d7] rounded-lg px-3 h-9 text-sm text-[#191c1e] bg-[#edeef0] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition"
             />
           </div>
         </>
@@ -354,7 +354,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
             onChange={(e) => setSubtaskInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask(e)}
             placeholder="Agregar subtarea..."
-            className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+            className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition"
           />
           <button
             type="button"

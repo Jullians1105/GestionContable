@@ -266,7 +266,7 @@ export default function FondoEmprenderEmpresasPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="material-symbols-outlined text-2xl text-[#E5A70C]">corporate_fare</span>
+            <span className="material-symbols-outlined text-2xl text-[#003B43]">corporate_fare</span>
             <h1 className="text-xl font-bold text-[#191c1e]">Empresas</h1>
           </div>
           <p className="text-sm text-[#6b7280]">
@@ -379,7 +379,7 @@ export default function FondoEmprenderEmpresasPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar empresa..."
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
           />
         </div>
 
@@ -631,7 +631,7 @@ export default function FondoEmprenderEmpresasPage() {
                           autoFocus
                           value={editForm.name}
                           onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                          className="px-3 py-1.5 text-sm rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+                          className="px-3 py-1.5 text-sm rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
                         />
                       </div>
 
@@ -678,7 +678,7 @@ export default function FondoEmprenderEmpresasPage() {
                           value={editForm.monthlyFee}
                           onChange={e => setEditForm(f => ({ ...f, monthlyFee: e.target.value }))}
                           placeholder="—"
-                          className="px-3 py-1.5 text-sm rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30 w-36"
+                          className="px-3 py-1.5 text-sm rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 w-36"
                         />
                       </div>
                     </div>

@@ -62,7 +62,7 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
             type="datetime-local"
             value={reminderInput}
             onChange={(e) => setReminderInput(e.target.value)}
-            className="flex-1 h-8 px-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-xs text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+            className="flex-1 h-8 px-2 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-xs text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition"
           />
           <button onClick={handleSaveReminder} className="h-8 px-2.5 rounded-lg text-xs font-semibold text-white hover:opacity-90 transition" style={{ background: '#2563eb' }}>
             Guardar
@@ -83,7 +83,7 @@ function PersonalTaskCard({ task, onToggleTask, onDeleteTask, onAddItem, onToggl
           <div className="h-1.5 bg-[#edeef0] rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-300"
-              style={{ width: `${pct}%`, background: '#E5A70C' }}
+              style={{ width: `${pct}%`, background: '#16a34a' }}
             />
           </div>
           <p className="text-xs text-[#434655] mt-0.5">{completedCount}/{items.length} completado</p>

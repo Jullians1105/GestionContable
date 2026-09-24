@@ -35,7 +35,7 @@ export default function SubtaskList({ task }) {
           <div className="h-1.5 bg-[#edeef0] rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-300"
-              style={{ width: `${pct}%`, background: '#2563eb' }}
+              style={{ width: `${pct}%`, background: '#16a34a' }}
             />
           </div>
           <p className="text-xs text-[#434655] mt-0.5">{pct}% completado</p>
@@ -76,7 +76,7 @@ export default function SubtaskList({ task }) {
           value={newTitle}
           onChange={(e) => setNewTitle(e.target.value)}
           placeholder="Agregar subtarea..."
-          className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition"
+          className="flex-1 h-9 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition"
         />
         <button
           type="submit"

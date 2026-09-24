@@ -12,7 +12,7 @@ export default function ProfilePage() {
   const [savingPassword, setSavingPassword] = useState(false)
 
   const cardCls = 'bg-white rounded-2xl border border-[#c3c6d7] p-6'
-  const inputCls = 'w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#004ac6] transition'
+  const inputCls = 'w-full h-10 px-3 rounded-lg border border-[#c3c6d7] bg-[#edeef0] text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43] transition'
 
   const handleSaveProfile = async (e) => {
     e.preventDefault()

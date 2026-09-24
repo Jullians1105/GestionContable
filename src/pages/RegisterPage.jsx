@@ -46,7 +46,7 @@ export default function RegisterPage() {
         value={form[name]}
         onChange={(e) => { setForm({ ...form, [name]: e.target.value }); setErrors({ ...errors, [name]: '' }) }}
         placeholder={placeholder}
-        className={`w-full h-10 px-3 rounded-lg border bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#004ac6] focus:border-transparent transition ${errors[name] ? 'border-[#EF4444]' : 'border-[#c3c6d7]'}`}
+        className={`w-full h-10 px-3 rounded-lg border bg-[#edeef0] text-sm text-[#191c1e] placeholder-[#888] focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-transparent transition ${errors[name] ? 'border-[#EF4444]' : 'border-[#c3c6d7]'}`}
       />
       {errors[name] && <p className="text-xs text-[#EF4444] mt-1">{errors[name]}</p>}
     </div>

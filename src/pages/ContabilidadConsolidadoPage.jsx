@@ -370,7 +370,7 @@ export default function ContabilidadConsolidadoPage() {
       {/* ── Encabezado ─────────────────────────────────────────────────── */}
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#E5A70C]">query_stats</span>
+          <span className="material-symbols-outlined text-3xl text-[#003B43]">query_stats</span>
           <h1 className="text-2xl font-bold text-[#191c1e]">Consolidado</h1>
         </div>
         <p className="text-sm text-[#6b7280]">

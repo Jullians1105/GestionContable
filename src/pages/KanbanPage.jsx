@@ -49,7 +49,7 @@ function KanbanCard({ task, members, isDragging }) {
       {subtasks.length > 0 && (
         <div className="mb-2">
           <div className="h-1 bg-[#edeef0] rounded-full overflow-hidden">
-            <div className="h-full rounded-full" style={{ width: `${Math.round((completed / subtasks.length) * 100)}%`, background: '#2563eb' }} />
+            <div className="h-full rounded-full" style={{ width: `${Math.round((completed / subtasks.length) * 100)}%`, background: '#16a34a' }} />
           </div>
           <p className="text-[10px] text-[#888] mt-0.5">{completed}/{subtasks.length} subtareas</p>
         </div>

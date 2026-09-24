@@ -156,7 +156,7 @@ export default function TercerosPage() {
     <div className="max-w-[1100px] mx-auto mt-8 mb-16">
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#E5A70C]">location_on</span>
+          <span className="material-symbols-outlined text-3xl text-[#003B43]">location_on</span>
           <h1 className="text-2xl font-bold text-[#191c1e]">Importar Terceros</h1>
         </div>
         <p className="text-sm text-[#6b7280]">
@@ -226,8 +226,8 @@ export default function TercerosPage() {
             <button
               onClick={procesar}
               disabled={archivos.length === 0 || !tipoOperacion || estado === 'procesando'}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-[#20160A] transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: '#E5A70C' }}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: '#003B43' }}
             >
               {estado === 'procesando' ? (
                 <>

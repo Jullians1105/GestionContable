@@ -428,7 +428,7 @@ export default function ExogenasUploadPage() {
       {/* Encabezado */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#E5A70C]">request_quote</span>
+          <span className="material-symbols-outlined text-3xl text-[#003B43]">request_quote</span>
           <h1 className="text-2xl font-bold text-[#191c1e]">Exógenas</h1>
         </div>
         <p className="text-sm text-[#6b7280]">
@@ -519,8 +519,8 @@ export default function ExogenasUploadPage() {
             <button
               onClick={analizar}
               disabled={!puedeAnalizar}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-[#20160A] transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: '#E5A70C' }}
+              className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: '#003B43' }}
             >
               {estado === 'analizando' ? (
                 <>

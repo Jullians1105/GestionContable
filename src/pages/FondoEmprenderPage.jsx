@@ -1583,7 +1583,7 @@ export default function FondoEmprenderPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="material-symbols-outlined text-2xl text-[#E5A70C]">table_chart</span>
+            <span className="material-symbols-outlined text-2xl text-[#003B43]">table_chart</span>
             <h1 className="text-xl font-bold text-[#191c1e]">Fondo Emprender</h1>
           </div>
           <p className="text-sm text-[#6b7280]">Seguimiento contable mensual</p>
@@ -1716,7 +1716,7 @@ export default function FondoEmprenderPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar empresa..."
-            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30"
+            className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
           />
         </div>
 
@@ -2106,7 +2106,7 @@ export default function FondoEmprenderPage() {
             }}
             onBlur={e => handleNoteBlur(openCell.companyId, openCell.procId, e.target.value)}
             placeholder="Nota opcional..."
-            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#004ac6]/30 resize-none"
+            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
             style={{ minHeight: 52, overflowY: 'hidden' }}
           />
           <div className="mt-2 flex items-center gap-2">
@@ -2268,7 +2268,7 @@ export default function FondoEmprenderPage() {
               value={procesoModal.name}
               onChange={e => setProcesoModal(m => ({ ...m, name: e.target.value }))}
               onKeyDown={e => { if (e.key === 'Enter') submitProcesoModal() }}
-              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] outline-none focus:border-[#004ac6] bg-white text-[#191c1e]"
+              className="w-full px-3 py-2 mb-4 text-sm rounded-lg border border-[#e2e4ef] outline-none focus:border-[#003B43] bg-white text-[#191c1e]"
             />
 
             {procesoModal.mode === 'create' && (
@@ -2312,7 +2312,7 @@ export default function FondoEmprenderPage() {
                     min={1}
                     value={procesoModal.porMeses}
                     onChange={e => setProcesoModal(m => ({ ...m, porMeses: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
-                    className="w-16 px-2 py-1 text-xs rounded border border-[#e2e4ef] outline-none focus:border-[#004ac6] bg-white text-[#191c1e]"
+                    className="w-16 px-2 py-1 text-xs rounded border border-[#e2e4ef] outline-none focus:border-[#003B43] bg-white text-[#191c1e]"
                   />
                   <span className="text-xs text-[#8890b5]">
                     meses — hasta {(() => {

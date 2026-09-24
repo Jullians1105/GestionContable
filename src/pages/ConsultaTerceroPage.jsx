@@ -78,7 +78,7 @@ export default function ConsultaTerceroPage() {
     <div className="max-w-[760px] mx-auto mt-8 mb-16">
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#E5A70C]">person_search</span>
+          <span className="material-symbols-outlined text-3xl text-[#003B43]">person_search</span>
           <h1 className="text-2xl font-bold text-[#191c1e]">Consulta Tercero</h1>
         </div>
         <p className="text-sm text-[#6b7280]">
@@ -107,8 +107,8 @@ export default function ConsultaTerceroPage() {
           <button
             type="submit"
             disabled={!documento.trim() || estado === 'buscando'}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-[#20160A] transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: '#E5A70C' }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: '#003B43' }}
           >
             {estado === 'buscando' ? (
               <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">

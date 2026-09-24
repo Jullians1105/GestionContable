@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useTasks } from '../hooks/useTasks'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useAuth } from '../context/AuthContext'
@@ -8,6 +8,7 @@ import { getInitials, getAvatarColor, ROLE_LABELS, normalizeAssignedTo } from '.
 import { buildSearchableSections, filtrarSecciones } from '../utils/searchSections'
 import { moduleForPath } from '../config/navigation'
 import NotificationBell from './Notifications/NotificationBell'
+import logoTexto from '../assets/logo-texto.png'
 
 export default function Header({ onMenuToggle }) {
   const [search, setSearch] = useState('')
@@ -67,7 +68,7 @@ export default function Header({ onMenuToggle }) {
   ).filter((t) => t.status !== 'completed').length
 
   return (
-    <header className="fixed top-0 right-0 left-0 lg:left-[var(--sidebar-w,112px)] h-16 z-40 bg-white border-b border-[#c3c6d7] shadow-sm flex items-center justify-between px-4 gap-3 transition-[left] duration-200">
+    <header className="fixed top-0 right-0 left-0 lg:left-16 h-16 z-40 bg-white border-b border-[#c3c6d7] shadow-sm flex items-center justify-between px-4 gap-4">
       <button
         onClick={onMenuToggle}
         className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg hover:bg-[#edeef0] transition text-[#434655] flex-shrink-0"
@@ -75,8 +76,12 @@ export default function Header({ onMenuToggle }) {
         <span className="material-symbols-outlined text-xl">menu</span>
       </button>
 
+      <Link to="/" className="flex-shrink-0 hidden sm:block relative top-[2px] left-[-5px]">
+        <img src={logoTexto} alt="Gestcon" className="h-7 w-auto" />
+      </Link>
+
       <form onSubmit={handleSearch} className="relative flex-1 min-w-0 max-w-md">
-        <div className="relative focus-within:ring-2 focus-within:ring-[#004ac6] rounded-lg transition-all">
+        <div className="relative focus-within:ring-2 focus-within:ring-[#003B43] rounded-lg transition-all">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#434655]" style={{ fontSize: 18 }}>search</span>
           <input
             type="text"
