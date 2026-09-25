@@ -271,21 +271,21 @@ export default function DianExportacionPage() {
 
       {/* ── Conflicto de guardado permanente ─────────────────────────────── */}
       {conflictoGuardado && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl shadow-sm p-5 mb-5">
+        <div className="bg-[#E3EEEE] border border-[#003B43]/40 rounded-2xl shadow-sm p-5 mb-5">
           <div className="flex items-start gap-3">
-            <span className="material-symbols-outlined text-amber-500 text-xl flex-shrink-0 mt-0.5">warning</span>
+            <span className="material-symbols-outlined text-[#003B43] text-xl flex-shrink-0 mt-0.5">warning</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-amber-800">
+              <p className="text-sm font-semibold text-[#003B43]">
                 Ya hay datos guardados para {conflictoGuardado.periodos.length === 1 ? 'este mes' : 'estos meses'} de esta empresa
               </p>
               <div className="mt-2 space-y-1">
                 {conflictoGuardado.periodos.map((p) => (
-                  <p key={`${p.anio}-${p.mes}`} className="text-xs text-amber-700">
+                  <p key={`${p.anio}-${p.mes}`} className="text-xs text-[#003B43]/80">
                     {MESES_ES[p.mes - 1]} {p.anio}: {p.existentes} ya guardada{p.existentes !== 1 ? 's' : ''}, {p.enElReporte} en este reporte
                   </p>
                 ))}
               </div>
-              <p className="text-xs text-amber-700 mt-2">
+              <p className="text-xs text-[#003B43]/80 mt-2">
                 <strong>Actualizar</strong> agrega lo nuevo y actualiza lo que cambió, conservando lo demás.{' '}
                 <strong>Reemplazar</strong> borra ese mes por completo y lo carga de nuevo con este reporte.
               </p>
@@ -293,21 +293,21 @@ export default function DianExportacionPage() {
                 <button
                   onClick={() => handleDescargar('actualizar')}
                   disabled={aplicandoModo != null}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#E5A70C] text-[#20160A] disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#003B43] text-white disabled:opacity-50"
                 >
                   {aplicandoModo === 'actualizar' ? 'Actualizando…' : 'Actualizar'}
                 </button>
                 <button
                   onClick={() => handleDescargar('reemplazar')}
                   disabled={aplicandoModo != null}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-amber-300 text-amber-800 disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#003B43]/40 text-[#003B43] disabled:opacity-50"
                 >
                   {aplicandoModo === 'reemplazar' ? 'Reemplazando…' : 'Reemplazar'}
                 </button>
                 <button
                   onClick={() => setConflictoGuardado(null)}
                   disabled={aplicandoModo != null}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-amber-700 hover:underline disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#003B43]/80 hover:underline disabled:opacity-50"
                 >
                   Cancelar
                 </button>
@@ -323,7 +323,7 @@ export default function DianExportacionPage() {
           <div className="flex flex-col items-center gap-4 py-2">
             {status === 'idle' && (
               <>
-                <span className="material-symbols-outlined text-5xl text-green-500">download</span>
+                <span className="material-symbols-outlined text-5xl text-[#003B43]">download</span>
                 <p className="text-sm text-[#6b7280] text-center">
                   El archivo se generará con todos los cálculos finales.
                 </p>
@@ -356,7 +356,7 @@ export default function DianExportacionPage() {
               onClick={() => handleDescargar()}
               disabled={status === 'loading'}
               className="flex items-center gap-2.5 px-8 py-3 rounded-xl text-base font-bold text-white transition active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-              style={{ background: '#16a34a' }}
+              style={{ background: '#003B43' }}
             >
               <span className="material-symbols-outlined text-xl">download</span>
               {status === 'error' ? 'Reintentar descarga' : 'DESCARGAR EXCEL'}
@@ -368,7 +368,7 @@ export default function DianExportacionPage() {
         <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-4 mb-5">
           <div className="flex flex-col items-center gap-3">
             <div className="flex items-center gap-2.5 min-w-0">
-              <span className="material-symbols-outlined text-2xl text-green-500 flex-shrink-0">check_circle</span>
+              <span className="material-symbols-outlined text-2xl text-[#E5A70C] flex-shrink-0">check_circle</span>
               <p className="text-sm font-semibold text-[#434655] truncate">{filename}</p>
             </div>
 
@@ -376,14 +376,14 @@ export default function DianExportacionPage() {
               <button
                 onClick={handleDescargarDeNuevo}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition active:scale-[0.97] hover:opacity-90"
-                style={{ background: '#16a34a' }}
+                style={{ background: '#003B43' }}
               >
                 <span className="material-symbols-outlined text-lg">download</span>
                 Descargar de nuevo
               </button>
               <button
                 onClick={() => navigate('/dian/upload')}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-[#d1d5db] text-[#434655] hover:bg-[#f3f4f6] transition active:scale-[0.97]"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold border border-[#003B43] text-[#003B43] hover:bg-[#003B43]/5 transition active:scale-[0.97]"
               >
                 <span className="material-symbols-outlined text-base">upload_file</span>
                 Procesar otro reporte

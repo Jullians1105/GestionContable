@@ -300,8 +300,8 @@ export default function FondoEmprenderEmpresasPage() {
           title="Total empresas"
           value={summary.total}
           icon="corporate_fare"
-          borderColor="#004ac6"
-          iconColor="#004ac6"
+          borderColor="#003B43"
+          iconColor="#003B43"
           sub={`${summary.pct}% completadas`}
           subColor="#434655"
         />
@@ -397,7 +397,7 @@ export default function FondoEmprenderEmpresasPage() {
               onClick={toggleMacroPanel}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition ${
                 appliedMacroFilter
-                  ? 'border-[#004ac6] text-[#004ac6] bg-[#eef3ff]'
+                  ? 'border-[#003B43] text-[#003B43] bg-[#003B43]/10'
                   : 'border-[#e2e4ef] text-[#6b7280] hover:bg-[#f3f4f6]'
               }`}
             >
@@ -443,7 +443,7 @@ export default function FondoEmprenderEmpresasPage() {
                             className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-semibold text-left transition-all duration-150 ${
                               active ? 'text-white' : 'text-[#6b7280]'
                             }`}
-                            style={{ background: active ? '#004ac6' : 'transparent' }}
+                            style={{ background: active ? '#003B43' : 'transparent' }}
                           >
                             <span className="material-symbols-outlined flex-shrink-0" style={{ fontSize: 15 }}>
                               {active ? 'check_box' : 'check_box_outline_blank'}
@@ -500,7 +500,7 @@ export default function FondoEmprenderEmpresasPage() {
                     onClick={aplicarMacroFilter}
                     disabled={macroDraft.length === 0}
                     className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-40 transition active:scale-[0.97]"
-                    style={{ background: '#2563eb' }}
+                    style={{ background: '#003B43' }}
                   >
                     <span className="material-symbols-outlined" style={{ fontSize: 15 }}>search</span>
                     Buscar
@@ -513,7 +513,7 @@ export default function FondoEmprenderEmpresasPage() {
 
         {appliedMacroFilter && (
           <div className="flex items-center gap-1.5 text-xs text-[#434655] justify-end">
-            <span className="material-symbols-outlined flex-shrink-0" style={{ fontSize: 14, color: '#004ac6' }}>info</span>
+            <span className="material-symbols-outlined flex-shrink-0" style={{ fontSize: 14, color: '#003B43' }}>info</span>
             Mostrando <span className="font-bold text-[#191c1e]">{filtered.length}</span> empresa{filtered.length !== 1 ? 's' : ''} con{' '}
             <span className="font-semibold">{appliedMacroFilter.macros.map(id => MACRO_PROCESSES.find(m => m.id === id)?.name).join(', ')}</span> en estado{' '}
             <span className="font-semibold" style={{ color: ESTADO_OPTIONS.find(o => o.key === appliedMacroFilter.estado)?.color }}>
@@ -535,7 +535,7 @@ export default function FondoEmprenderEmpresasPage() {
               <div key={company.id}>
                 {/* ── Company row ─────────────────────────────────────── */}
                 <div
-                  className={`flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 hover:bg-[#eef3ff] transition-colors group cursor-pointer${
+                  className={`flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-3 hover:bg-[#f3f4f6] transition-colors group cursor-pointer${
                     idx > 0 ? ' border-t border-[#f0f2f8]' : ''
                   }`}
                   onClick={() => navigate(`/fondo-emprender/empresas/${company.id}?anio=${year}&mes=${month + 1}`)}
@@ -589,8 +589,8 @@ export default function FondoEmprenderEmpresasPage() {
                       title={isEditing ? 'Cerrar edición' : 'Editar empresa'}
                       className={`p-1.5 rounded-lg transition ${
                         isEditing
-                          ? 'text-[#004ac6] bg-[#eef3ff]'
-                          : 'text-[#c3c6d7] hover:text-[#004ac6]'
+                          ? 'text-[#003B43] bg-[#003B43]/10'
+                          : 'text-[#c3c6d7] hover:text-[#003B43]'
                       }`}
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
@@ -608,7 +608,7 @@ export default function FondoEmprenderEmpresasPage() {
 
                   {/* Arrow */}
                   <span
-                    className="material-symbols-outlined text-[#c3c6d7] group-hover:text-[#004ac6] transition flex-shrink-0"
+                    className="material-symbols-outlined text-[#c3c6d7] group-hover:text-[#003B43] transition flex-shrink-0"
                     style={{ fontSize: 18 }}
                   >
                     chevron_right
@@ -618,7 +618,7 @@ export default function FondoEmprenderEmpresasPage() {
                 {/* ── Inline edit panel ────────────────────────────────── */}
                 {isEditing && (
                   <div
-                    className="px-5 py-4 bg-[#eef3ff] border-t border-[#e2e4ef] flex flex-col gap-3"
+                    className="px-5 py-4 bg-[#003B43]/10 border-t border-[#e2e4ef] flex flex-col gap-3"
                     onClick={e => e.stopPropagation()}
                   >
                     <div className="flex flex-wrap gap-3">
@@ -650,14 +650,14 @@ export default function FondoEmprenderEmpresasPage() {
                                 onClick={() => setEditForm(f => ({ ...f, categoria: key }))}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border-2 transition-all"
                                 style={{
-                                  borderColor: active ? '#004ac6' : '#e2e4ef',
-                                  background:  active ? '#eef3ff' : 'transparent',
-                                  color:       active ? '#004ac6' : '#6b7280',
+                                  borderColor: active ? '#003B43' : '#e2e4ef',
+                                  background:  active ? '#003B431a' : 'transparent',
+                                  color:       active ? '#003B43' : '#6b7280',
                                 }}
                               >
                                 <span
                                   className="w-1.5 h-1.5 rounded-full"
-                                  style={{ background: active ? '#004ac6' : '#d1d5db' }}
+                                  style={{ background: active ? '#003B43' : '#d1d5db' }}
                                 />
                                 {label}
                               </button>
@@ -694,7 +694,7 @@ export default function FondoEmprenderEmpresasPage() {
                         onClick={() => handleEditar(company.id)}
                         disabled={!editForm.name.trim()}
                         className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50 transition active:scale-[0.97]"
-                        style={{ background: '#2563eb' }}
+                        style={{ background: '#003B43' }}
                       >
                         Guardar
                       </button>

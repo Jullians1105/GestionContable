@@ -199,7 +199,7 @@ function SortableProcessHeader({ proc, rowSpan, editable, groupColor, hasTopBord
               onClick={(e) => onFilterClick(proc.id, e)}
               className={`flex items-center justify-center rounded transition-colors ${
                 hasFilter
-                  ? 'text-[#004ac6] bg-[#eef3ff]'
+                  ? 'text-[#003B43] bg-[#003B43]/10'
                   : 'text-[#b0b4c8] hover:text-[#6b7280] hover:bg-[#edeef0]'
               }`}
               style={{ width: 20, height: 14 }}
@@ -365,7 +365,7 @@ function GroupHeaderCell({ grupo, procesos, collapsed, editable, paletteIndex, o
               if (e.key === 'Escape') setEditingGroup(null)
             }}
             onBlur={saveEditGroup}
-            className="w-full px-1 py-0.5 text-[11px] rounded border border-[#004ac6] outline-none bg-white text-[#191c1e]"
+            className="w-full px-1 py-0.5 text-[11px] rounded border border-[#003B43] outline-none bg-white text-[#191c1e]"
           />
         </div>
       ) : showAsSingleCell ? (
@@ -1380,7 +1380,7 @@ export default function FondoEmprenderPage() {
                 if (e.key === 'Enter')  e.target.blur()
                 if (e.key === 'Escape') { codigoCancelRef.current = true; e.target.blur() }
               }}
-              className="w-full h-7 px-1 rounded border border-[#004ac6] bg-white text-xs font-semibold text-center text-[#191c1e] outline-none"
+              className="w-full h-7 px-1 rounded border border-[#003B43] bg-white text-xs font-semibold text-center text-[#191c1e] outline-none"
             />
           </div>
         ) : canEditStructure ? (
@@ -1626,7 +1626,7 @@ export default function FondoEmprenderPage() {
                   ? 'text-white'
                   : 'text-[#6b7280] border border-[#e2e4ef] hover:bg-[#f3f4f6]')
               }
-              style={editMode ? { background: '#2563eb' } : undefined}
+              style={editMode ? { background: '#003B43' } : undefined}
               title="Crear, renombrar, borrar o reordenar grupos y procesos"
             >
               <span className="material-symbols-outlined text-lg">{editMode ? 'lock_open' : 'edit'}</span>
@@ -1646,12 +1646,12 @@ export default function FondoEmprenderPage() {
                   }}
                   onBlur={() => { if (!newGroupName.trim()) setAddingGroup(false); else handleAddGroup() }}
                   placeholder="Nombre del grupo..."
-                  className="px-3 py-2 text-sm rounded-xl border border-[#004ac6] outline-none bg-white text-[#191c1e]"
+                  className="px-3 py-2 text-sm rounded-xl border border-[#003B43] outline-none bg-white text-[#191c1e]"
                 />
               ) : (
                 <button
                   onClick={() => setAddingGroup(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#004ac6] border border-[#004ac6] hover:bg-[#2563eb]/5 transition active:scale-[0.97]"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#003B43] border border-[#003B43] hover:bg-[#003B43]/5 transition active:scale-[0.97]"
                   title="Agrupar procesos relacionados en una sola columna con sub-columnas"
                 >
                   <span className="material-symbols-outlined text-lg">create_new_folder</span>
@@ -1661,7 +1661,7 @@ export default function FondoEmprenderPage() {
               <button
                 onClick={openCreateProcesoModal}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
-                style={{ background: '#2563eb' }}
+                style={{ background: '#003B43' }}
               >
                 <span className="material-symbols-outlined text-lg">add_column_right</span>
                 Nuevo proceso
@@ -1724,7 +1724,7 @@ export default function FondoEmprenderPage() {
         {activeColumnFilterCount > 0 && (
           <button
             onClick={() => setColumnFilters({})}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold flex-shrink-0 transition hover:opacity-80 bg-[#eef3ff] text-[#004ac6]"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold flex-shrink-0 transition hover:opacity-80 bg-[#003B43]/10 text-[#003B43]"
             title="Quitar todos los filtros de columna"
           >
             <span className="material-symbols-outlined" style={{ fontSize: 15 }}>filter_alt</span>
@@ -2044,7 +2044,7 @@ export default function FondoEmprenderPage() {
           <DragOverlay>
             {activeDragProc && (
               <div
-                className="px-3 py-1.5 rounded-lg shadow-lg text-xs font-semibold bg-white text-[#191c1e] border border-[#004ac6]"
+                className="px-3 py-1.5 rounded-lg shadow-lg text-xs font-semibold bg-white text-[#191c1e] border border-[#003B43]"
               >
                 {activeDragProc.name}
               </div>
@@ -2144,7 +2144,7 @@ export default function FondoEmprenderPage() {
             {columnFilters[openFilter.procId] && (
               <button
                 onClick={() => clearColumnFilter(openFilter.procId)}
-                className="text-[10px] font-semibold text-[#004ac6] hover:underline flex-shrink-0"
+                className="text-[10px] font-semibold text-[#003B43] hover:underline flex-shrink-0"
               >
                 Limpiar
               </button>
@@ -2167,8 +2167,8 @@ export default function FondoEmprenderPage() {
                   style={{
                     width: 15, height: 15,
                     borderWidth: 1.5, borderStyle: 'solid',
-                    borderColor: noneChecked ? undefined : '#004ac6',
-                    background: noneChecked ? 'transparent' : '#004ac6',
+                    borderColor: noneChecked ? undefined : '#003B43',
+                    background: noneChecked ? 'transparent' : '#003B43',
                   }}
                 >
                   {!noneChecked && (
@@ -2300,7 +2300,7 @@ export default function FondoEmprenderPage() {
                     type="radio"
                     checked={procesoModal.hastaMode === opt.value}
                     onChange={() => setProcesoModal(m => ({ ...m, hastaMode: opt.value }))}
-                    className="accent-[#004ac6]"
+                    className="accent-[#003B43]"
                   />
                   {opt.label}
                 </label>
@@ -2335,7 +2335,7 @@ export default function FondoEmprenderPage() {
                 onClick={submitProcesoModal}
                 disabled={!procesoModal.name.trim()}
                 className="flex-1 py-2 text-xs font-semibold rounded-lg text-white transition disabled:opacity-40"
-                style={{ background: '#2563eb' }}
+                style={{ background: '#003B43' }}
               >
                 {procesoModal.mode === 'create' ? 'Crear' : 'Guardar'}
               </button>

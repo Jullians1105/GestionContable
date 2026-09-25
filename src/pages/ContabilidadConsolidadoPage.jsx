@@ -105,11 +105,11 @@ function TendenciaChart({ resumenAnual, tab, mes, cuatrimestre }) {
   // la página otra vez (eso ya se probó y se revirtió por no combinar con el resto en azul).
   const col = {
     base: '#e2e4ef',
-    banda: '#004ac6',
-    compras: '#004ac6',
+    banda: '#003B43',
+    compras: '#003B43',
     ventas: '#E5A70C',
     lbl: '#9ca3af',
-    lblOn: '#004ac6',
+    lblOn: '#003B43',
     halo: '#ffffff',
   }
   const gradId = {
@@ -123,7 +123,7 @@ function TendenciaChart({ resumenAnual, tab, mes, cuatrimestre }) {
       <div className="flex items-center justify-between mb-3">
         <span className="text-xs font-bold text-[#8890b5] uppercase tracking-wide">Tendencia — año</span>
         <div className="flex items-center gap-4 text-xs text-[#6b7280]">
-          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#2563eb]" />Compras</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#003B43]" />Compras</span>
           <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: '#E5A70C' }} />Ventas</span>
         </div>
       </div>
@@ -481,7 +481,7 @@ export default function ContabilidadConsolidadoPage() {
               <TendenciaChart resumenAnual={resumenAnual} tab={tab} mes={mes} cuatrimestre={cuatrimestre} />
               {data && (
                 <div className={`bg-white rounded-2xl border border-[#e2e4ef] shadow-sm overflow-hidden lg:w-72 flex-shrink-0 transition-opacity duration-150 ${cargando ? 'opacity-50' : 'opacity-100'}`}>
-                  <TotalGroupHeader label="Compras" color="#004ac6" />
+                  <TotalGroupHeader label="Compras" color="#003B43" />
                   <div className="divide-y divide-[#e2e4ef] border-b border-[#e2e4ef]">
                     <TotalRow icon="payments" label="Base (sin IVA)" value={fmt(data.totales.compras.base)} grande />
                     <TotalRow icon="receipt_long" label="# Facturas" value={data.totales.compras.cantidad} />
@@ -553,8 +553,8 @@ export default function ContabilidadConsolidadoPage() {
                 <button
                   onClick={handleExportar}
                   disabled={exportando || data.documentos.length === 0}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 shadow-sm shadow-green-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:ring-green-600"
-                  style={{ background: '#15803d' }}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 shadow-sm shadow-black/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-white focus-visible:ring-[#003B43]"
+                  style={{ background: '#003B43' }}
                 >
                   <span className={`material-symbols-outlined text-lg ${exportando ? 'animate-spin' : ''}`}>
                     {exportando ? 'progress_activity' : 'download'}

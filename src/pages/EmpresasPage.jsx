@@ -302,7 +302,7 @@ export default function EmpresasPage() {
   if (cargando) {
     return (
       <div className="max-w-5xl mx-auto mt-20 text-center">
-        <svg className="animate-spin h-10 w-10 text-[#004ac6] mx-auto" viewBox="0 0 24 24" fill="none">
+        <svg className="animate-spin h-10 w-10 text-[#003B43] mx-auto" viewBox="0 0 24 24" fill="none">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
@@ -451,7 +451,7 @@ export default function EmpresasPage() {
                   <Fragment key={empresa.id}>
                     <tr
                       onClick={() => toggleExpandir(empresa)}
-                      className={`transition cursor-pointer ${expandido ? 'bg-[#eef3ff]' : 'hover:bg-[#f8f9ff]'}`}
+                      className={`transition cursor-pointer ${expandido ? 'bg-[#003B43]/10' : 'hover:bg-[#f3f4f6]'}`}
                     >
                       <td className={`px-5 py-3 border-l-4 ${expandido ? 'border-[#003B43]' : 'border-transparent'}`}>
                         <span className={`font-semibold ${empresa.activa ? 'text-[#191c1e]' : 'text-[#9ca3af] line-through'}`}>
@@ -566,7 +566,7 @@ export default function EmpresasPage() {
                             {/* ── Identidad ── */}
                             <div className="w-full sm:w-96 flex-shrink-0">
                               <div className="flex items-center gap-2 mb-3">
-                                <span className="material-symbols-outlined text-[#004ac6]" style={{ fontSize: 16 }}>badge</span>
+                                <span className="material-symbols-outlined text-[#003B43]" style={{ fontSize: 16 }}>badge</span>
                                 <span className="text-xs font-bold text-[#191c1e]">Información</span>
                                 {!puedeEditar && (
                                   <span className="text-[10px] font-semibold bg-[#f3f4f6] text-[#9ca3af] px-1.5 py-0.5 rounded uppercase">Solo admin</span>
@@ -835,13 +835,13 @@ export default function EmpresasPage() {
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => confirmarFusion(fusionando.empresaA, fusionando.empresaB)}
-                className="text-left px-4 py-2.5 rounded-xl border border-[#e2e4ef] hover:border-[#004ac6] transition text-sm font-medium"
+                className="text-left px-4 py-2.5 rounded-xl border border-[#e2e4ef] hover:border-[#003B43] transition text-sm font-medium"
               >
                 {fusionando.empresaA.name}
               </button>
               <button
                 onClick={() => confirmarFusion(fusionando.empresaB, fusionando.empresaA)}
-                className="text-left px-4 py-2.5 rounded-xl border border-[#e2e4ef] hover:border-[#004ac6] transition text-sm font-medium"
+                className="text-left px-4 py-2.5 rounded-xl border border-[#e2e4ef] hover:border-[#003B43] transition text-sm font-medium"
               >
                 {fusionando.empresaB.name}
               </button>

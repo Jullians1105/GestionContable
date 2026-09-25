@@ -859,7 +859,7 @@ export default function FondoEmprenderPagosPage() {
           title="Total empresas"
           value={stats.total}
           icon="corporate_fare"
-          borderColor="#004ac6" iconColor="#004ac6"
+          borderColor="#003B43" iconColor="#003B43"
           sub={activeTab !== 'todas' ? activeTab : 'todas las categorías'}
           subColor="#434655"
         />
@@ -1079,13 +1079,13 @@ export default function FondoEmprenderPagosPage() {
                     <Fragment key={m.ym}>
                       <th
                         style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, padding: '4px 6px', width: 100, maxWidth: 100 }}
-                        className="bg-[#eef3ff] text-[#8890b5] border-b-2 border-l-2 border-[#e2e4ef]"
+                        className="bg-[#f8f9fc] text-[#8890b5] border-b-2 border-l-2 border-[#e2e4ef]"
                       >
                         Envío
                       </th>
                       <th
                         style={{ textAlign: 'center', fontSize: 11, fontWeight: 500, padding: '4px 6px', width: 100, maxWidth: 100 }}
-                        className="bg-[#eef3ff] text-[#8890b5] border-b-2 border-[#e2e4ef]"
+                        className="bg-[#f8f9fc] text-[#8890b5] border-b-2 border-[#e2e4ef]"
                       >
                         Resultado
                       </th>

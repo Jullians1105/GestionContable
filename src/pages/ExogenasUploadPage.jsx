@@ -122,7 +122,7 @@ function FormatoCard({ formato, checked, onToggle }) {
       {disponible ? (
         <span
           className="absolute top-3 right-3 material-symbols-outlined text-lg"
-          style={{ color: checked ? '#E5A70C' : '#c3c6d7' }}
+          style={{ color: checked ? '#003B43' : '#c3c6d7' }}
         >
           {checked ? 'check_circle' : 'radio_button_unchecked'}
         </span>
@@ -131,7 +131,7 @@ function FormatoCard({ formato, checked, onToggle }) {
           Próximamente
         </span>
       )}
-      <span className="material-symbols-outlined text-2xl" style={{ color: !disponible ? '#9ca3af' : checked ? '#E5A70C' : '#003B43' }}>
+      <span className="material-symbols-outlined text-2xl" style={{ color: !disponible ? '#9ca3af' : '#003B43' }}>
         {icon}
       </span>
       <div>
@@ -189,7 +189,7 @@ function Dropzone({ label, hint, icon, file, onFile, onClear }) {
           <span className="material-symbols-outlined text-sm">close</span>
         </button>
       )}
-      <span className="material-symbols-outlined text-3xl" style={{ color: file ? '#16a34a' : '#E5A70C' }}>
+      <span className="material-symbols-outlined text-3xl" style={{ color: file ? '#16a34a' : '#003B43' }}>
         {file ? 'check_circle' : icon}
       </span>
       <p className="text-sm font-semibold text-[#434655]">{label}</p>
@@ -696,7 +696,7 @@ export default function ExogenasUploadPage() {
                   onClick={descargaCombinada ? descargarDeNuevo : generar}
                   disabled={generando}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-60"
-                  style={{ background: '#16a34a' }}
+                  style={{ background: '#003B43' }}
                 >
                   {generando ? (
                     <>
