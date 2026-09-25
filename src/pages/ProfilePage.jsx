@@ -84,7 +84,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="flex justify-end">
-              <button type="submit" disabled={savingProfile} className="h-10 px-4 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50" style={{ background: '#2563eb' }}>
+              <button type="submit" disabled={savingProfile} className="h-10 px-4 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50" style={{ background: '#003B43' }}>
                 {savingProfile ? 'Guardando...' : 'Guardar cambios'}
               </button>
             </div>
@@ -110,7 +110,7 @@ export default function ProfilePage() {
               </div>
             </div>
             <div className="flex justify-end">
-              <button type="submit" disabled={savingPassword} className="h-10 px-4 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50" style={{ background: '#2563eb' }}>
+              <button type="submit" disabled={savingPassword} className="h-10 px-4 rounded-lg text-sm font-semibold text-white hover:opacity-90 transition disabled:opacity-50" style={{ background: '#003B43' }}>
                 {savingPassword ? 'Guardando...' : 'Actualizar contraseña'}
               </button>
             </div>
