@@ -101,7 +101,7 @@ export default function ConsultaTerceroPage() {
               value={documento}
               onChange={(e) => setDocumento(e.target.value)}
               placeholder="Ej. 901939874"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C]/30 focus:border-[#E5A70C]"
+              className="w-full pl-9 pr-3 py-2.5 rounded-xl border-2 border-[#d1d5db] bg-white text-sm text-[#191c1e] focus:outline-none focus:border-[#003B43]"
             />
           </div>
           <button
@@ -144,7 +144,7 @@ export default function ConsultaTerceroPage() {
         <div>
           <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-6 mb-4">
             <div className="flex items-start gap-3 pb-4 mb-1 border-b border-[#e2e4ef]">
-              <span className="material-symbols-outlined text-2xl text-[#E5A70C] mt-0.5">corporate_fare</span>
+              <span className="material-symbols-outlined text-2xl text-[#003B43] mt-0.5">corporate_fare</span>
               <div>
                 <p className="text-base font-bold text-[#191c1e]">{tercero.razon_social}</p>
                 <p className="text-xs text-[#6b7280]">NIT {tercero.nit}</p>
@@ -174,9 +174,9 @@ export default function ConsultaTerceroPage() {
             </div>
           </div>
 
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
-            <span className="material-symbols-outlined text-amber-600 text-xl flex-shrink-0 mt-0.5">info</span>
-            <p className="text-xs text-amber-800">
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-[#E3EEEE] border-2 border-[#003B43]/40">
+            <span className="material-symbols-outlined text-[#003B43] text-xl flex-shrink-0 mt-0.5">info</span>
+            <p className="text-xs text-[#003B43]">
               Estos datos fueron extraídos de facturas electrónicas, no de un RUT verificado — pueden
               no reflejar la información tributaria más reciente o correcta del tercero.
             </p>

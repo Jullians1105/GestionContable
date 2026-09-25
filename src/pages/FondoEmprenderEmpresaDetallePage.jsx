@@ -285,7 +285,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
       <div>
         <Link
           to={`/fondo-emprender/empresas?anio=${anio}&mes=${mes}`}
-          className="inline-flex items-center gap-1 text-sm text-[#6b7280] hover:text-[#004ac6] transition"
+          className="inline-flex items-center gap-1 text-sm text-[#6b7280] hover:text-[#003B43] transition"
         >
           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_back</span>
           Empresas
@@ -366,7 +366,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     <Link
                       to="/fondo-emprender"
                       className="underline underline-offset-2 font-medium"
-                      style={{ color: '#004ac6' }}
+                      style={{ color: '#003B43' }}
                     >
                       ir al checklist
                     </Link>
@@ -396,7 +396,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     <Link
                       to="/fondo-emprender/pagos"
                       className="underline underline-offset-2 font-medium"
-                      style={{ color: '#004ac6' }}
+                      style={{ color: '#003B43' }}
                     >
                       ir a pagos
                     </Link>
@@ -412,7 +412,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     <Link
                       to="/fondo-emprender"
                       className="underline underline-offset-2 font-medium"
-                      style={{ color: '#004ac6' }}
+                      style={{ color: '#003B43' }}
                     >
                       ir al checklist
                     </Link>
@@ -428,7 +428,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     <Link
                       to="/fondo-emprender"
                       className="underline underline-offset-2 font-medium"
-                      style={{ color: '#004ac6' }}
+                      style={{ color: '#003B43' }}
                     >
                       ir al checklist
                     </Link>
@@ -471,7 +471,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     <Link
                       to="/fondo-emprender"
                       className="underline underline-offset-2 font-medium"
-                      style={{ color: '#004ac6' }}
+                      style={{ color: '#003B43' }}
                     >
                       ir al checklist
                     </Link>
@@ -498,7 +498,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                       return (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-[#eef3ff]"
+                          className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-[#f8f9fc]"
                         >
                           <span className="text-xs text-[#434655] truncate">
                             {item.nombre}
@@ -550,7 +550,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                             onChange={key => handleUpdateImpuesto(item, { estado: key })}
                           />
                           {tieneNota && !notaAbierta && (
-                            <div className="rounded-lg border border-[#e2e4ef] bg-[#eef3ff] px-2.5 py-1.5">
+                            <div className="rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] px-2.5 py-1.5">
                               <p className="text-[9px] font-semibold text-[#8890b5] uppercase tracking-wide mb-0.5">
                                 Nota
                               </p>
@@ -576,7 +576,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                               }}
                               placeholder="Notas adicionales..."
                               rows={2}
-                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#eef3ff] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
                             />
                           )}
                         </div>
@@ -602,7 +602,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                       return (
                         <div
                           key={tarea.id}
-                          className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-[#eef3ff]"
+                          className="flex items-start gap-2 px-2 py-1.5 rounded-lg bg-[#f8f9fc]"
                         >
                           <button
                             onClick={() => handleToggleTarea(proc.id, tarea.id, tarea.status)}
@@ -671,7 +671,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
                     }}
                     placeholder="Notas adicionales..."
                     rows={2}
-                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#eef3ff] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
                   />
                 </div>
               )}

@@ -223,19 +223,20 @@ export default function Sidebar({ open, onClose }) {
                   onScroll={updateScrollShadow}
                   className="h-full flex flex-col gap-0.5 overflow-y-auto overflow-x-hidden scrollbar-hide py-2 px-2"
                 >
-                  {navForModule.map(({ to, label, icon, end }) => (
+                  {navForModule.map(({ to, label, icon, end, matchPrefixes }) => (
                     <NavLink
                       key={to}
                       to={to}
                       end={end}
                       onClick={onClose}
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
-                          isActive
+                      className={({ isActive }) => {
+                        const active = isActive || (matchPrefixes?.some(p => location.pathname.startsWith(p)) ?? false)
+                        return `flex items-center gap-3 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${
+                          active
                             ? 'bg-[#FBEAC0] text-[#003B43]'
                             : 'text-[#434655] hover:bg-[#edeef0]'
                         }`
-                      }
+                      }}
                     >
                       <span className="relative w-8 flex items-center justify-center flex-shrink-0">
                         <span className="material-symbols-outlined text-xl text-[#003B43]">{icon}</span>

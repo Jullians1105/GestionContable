@@ -149,7 +149,7 @@ export default function NominaElectronicaEmpresasPage() {
           placeholder="Buscar empresa..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="pl-9 pr-3 py-2 text-[13px] rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#E5A70C]/30 w-full"
+          className="pl-9 pr-3 py-2 text-[13px] rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]/30 w-full"
         />
       </div>
 
@@ -200,7 +200,7 @@ export default function NominaElectronicaEmpresasPage() {
                 autoFocus
                 value={form.name}
                 onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
               />
             </div>
             <div>
@@ -208,7 +208,7 @@ export default function NominaElectronicaEmpresasPage() {
               <select
                 value={form.origen}
                 onChange={(e) => setForm(f => ({ ...f, origen: e.target.value }))}
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
               >
                 <option value="">Sin grupo</option>
                 {Object.entries(ORIGEN_LABELS).map(([value, label]) => (
@@ -221,7 +221,7 @@ export default function NominaElectronicaEmpresasPage() {
               <select
                 value={form.responsableId}
                 onChange={(e) => setForm(f => ({ ...f, responsableId: e.target.value }))}
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
               >
                 <option value="">Sin asignar</option>
                 {allUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -232,7 +232,7 @@ export default function NominaElectronicaEmpresasPage() {
               <select
                 value={form.fondoEmpresaId}
                 onChange={(e) => setForm(f => ({ ...f, fondoEmpresaId: e.target.value }))}
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
               >
                 <option value="">Sin enlazar</option>
                 {fondoList.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -243,7 +243,7 @@ export default function NominaElectronicaEmpresasPage() {
               <select
                 value={form.extEmpresaId}
                 onChange={(e) => setForm(f => ({ ...f, extEmpresaId: e.target.value }))}
-                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
+                className="w-full text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
               >
                 <option value="">Sin enlazar</option>
                 {extList.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -271,7 +271,7 @@ export default function NominaElectronicaEmpresasPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-[#E5A70C] text-[#20160A] hover:bg-[#E5A70C] transition-colors disabled:opacity-60"
+                className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-[#003B43] text-white hover:bg-[#003B43] transition-colors disabled:opacity-60"
               >
                 {saving ? 'Guardando...' : 'Guardar'}
               </button>

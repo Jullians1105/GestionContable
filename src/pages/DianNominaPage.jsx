@@ -231,7 +231,7 @@ export default function DianNominaPage() {
             value={empleados}
             onChange={(e) => setEmpleados(e.target.value)}
             placeholder="Ej. 5"
-            className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-transparent"
           />
           <p className="mt-1 text-xs text-[#9ca3af]">
             Deja en blanco o 0 si no tienes nómina
@@ -249,7 +249,7 @@ export default function DianNominaPage() {
             value={meses}
             onChange={(e) => setMeses(e.target.value)}
             placeholder="Ej. 12"
-            className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
+            className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-transparent"
           />
           <p className="mt-1 text-xs text-[#9ca3af]">
             Período de nómina a reportar
@@ -271,7 +271,7 @@ export default function DianNominaPage() {
               value={salario}
               onChange={(e) => setSalario(e.target.value)}
               placeholder={String(SMMLV_ACTUAL)}
-              className="w-full pl-7 pr-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
+              className="w-full pl-7 pr-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-transparent"
             />
           </div>
           <p className="mt-1 text-xs text-[#9ca3af]">
@@ -288,7 +288,7 @@ export default function DianNominaPage() {
             <select
               value={tarifaArl}
               onChange={(e) => setTarifaArl(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-transparent"
             >
               <option value="">Selecciona…</option>
               {OPCIONES_ARL.map((o) => (
@@ -407,7 +407,7 @@ export default function DianNominaPage() {
               <select
                 value={tasaAutorretencion}
                 onChange={(e) => setTasaAutorretencion(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#E5A70C] focus:border-transparent"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#d1d5db] bg-white text-[#191c1e] text-sm focus:outline-none focus:ring-2 focus:ring-[#003B43] focus:border-transparent"
               >
                 <option value="">Selecciona…</option>
                 {OPCIONES_AUTORRETENCION.map((o) => (
@@ -443,8 +443,8 @@ export default function DianNominaPage() {
         <button
           onClick={handleContinuar}
           disabled={!!error}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-[#20160A] transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
-          style={{ background: '#E5A70C' }}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+          style={{ background: '#003B43' }}
         >
           Generar Excel
           <span className="material-symbols-outlined text-base">table_view</span>

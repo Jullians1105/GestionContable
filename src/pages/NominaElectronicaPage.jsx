@@ -467,12 +467,12 @@ export default function NominaElectronicaPage() {
                 autoFocus
                 value={plazoDraft}
                 onChange={(e) => setPlazoDraft(e.target.value)}
-                className="text-sm px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
+                className="text-sm px-2.5 py-1.5 rounded-lg border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
               />
               <button
                 onClick={savePlazo}
                 disabled={savingPlazo}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#E5A70C] text-[#20160A] hover:bg-[#E5A70C] transition-colors disabled:opacity-60"
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#003B43] text-white hover:bg-[#003B43] transition-colors disabled:opacity-60"
               >
                 {savingPlazo ? 'Guardando...' : 'Guardar'}
               </button>
@@ -546,7 +546,7 @@ export default function NominaElectronicaPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar empresa..."
-              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30"
+              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-[#e2e4ef] bg-white text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30"
             />
           </div>
           <div className="flex items-center gap-1 bg-white border border-[#e2e4ef] rounded-xl p-1 shadow-sm">
@@ -673,7 +673,7 @@ export default function NominaElectronicaPage() {
                   style={{
                     background: active ? cfg.bg : 'transparent',
                     color: cfg.color,
-                    border: `1.5px solid ${active ? cfg.color : '#e2e4ef'}`,
+                    border: `1.5px solid ${active ? 'transparent' : '#e2e4ef'}`,
                   }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{cfg.icon}</span>
@@ -693,7 +693,7 @@ export default function NominaElectronicaPage() {
                 onBlur={(e) => handleNota(openRow.empresaId, e.target.value)}
                 placeholder="¿Qué hay que revisar?"
                 rows={2}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30 resize-none"
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
               />
             </div>
           )}
@@ -715,7 +715,7 @@ export default function NominaElectronicaPage() {
                 onBlur={(e) => handleNovedadNota(openRow.empresaId, e.target.value)}
                 placeholder="¿Cuál novedad?"
                 rows={2}
-                className="w-full mt-2 px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#E5A70C]/30 resize-none"
+                className="w-full mt-2 px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
               />
             )}
           </div>
@@ -770,11 +770,17 @@ function CompanyColumn({ title, accent, rows, onCellClick, openEmpresaId, onShow
           return (
             <div
               key={row.empresaId}
-              className={`relative flex items-center gap-1.5 pl-4 pr-2.5 py-1.5 border-b border-black/5 last:border-0 transition-colors ${isOpen ? 'ring-2 ring-inset ring-[#E5A70C]' : ''}`}
+              className="relative flex items-center gap-1.5 pl-4 pr-2.5 py-1.5 border-b border-black/5 last:border-0 transition-colors"
               style={{ background: cfg.bg }}
               onMouseEnter={hasNote ? (e) => onShowTooltip(e, tooltipContent) : undefined}
               onMouseLeave={hasNote ? onHideTooltip : undefined}
             >
+              {isOpen && (
+                <span
+                  className="absolute left-0 top-0 bottom-0 w-1 pointer-events-none"
+                  style={{ background: '#003B43' }}
+                />
+              )}
               {hasNote && <span style={NOTE_TRIANGLE} title="Tiene motivo/novedad — pasa el mouse" />}
               <span className="flex-1 truncate text-[13px] font-medium text-[#191c1e]" title={row.name}>
                 {row.name}

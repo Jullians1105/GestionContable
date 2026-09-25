@@ -24,7 +24,7 @@ function isValidFile(file) {
 function PasoLabel({ n, children }) {
   return (
     <div className="flex items-center gap-2 mb-3">
-      <span className="w-5 h-5 rounded-full bg-[#E5A70C] text-[#20160A] text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+      <span className="w-5 h-5 rounded-full bg-[#003B43] text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
         {n}
       </span>
       <span className="text-xs font-semibold text-[#434655] uppercase tracking-wide">
@@ -250,7 +250,7 @@ export default function DianUploadPage() {
                   onChange={onFileChange}
                 />
 
-                <span className="material-symbols-outlined text-5xl text-[#E5A70C]" aria-hidden>
+                <span className="material-symbols-outlined text-5xl text-[#003B43]" aria-hidden>
                   {isDragOver ? 'file_download' : 'upload_file'}
                 </span>
 

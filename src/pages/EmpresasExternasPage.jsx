@@ -1343,10 +1343,10 @@ export default function EmpresasExternasPage() {
               className={
                 'flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition active:scale-[0.97] ' +
                 (editMode
-                  ? 'text-[#20160A]'
+                  ? 'text-white'
                   : 'text-[#6b7280] border border-[#e2e4ef] hover:bg-[#f3f4f6]')
               }
-              style={editMode ? { background: '#E5A70C' } : undefined}
+              style={editMode ? { background: '#003B43' } : undefined}
               title="Renombrar, borrar o reordenar procesos"
             >
               <span className="material-symbols-outlined text-lg">{editMode ? 'lock_open' : 'edit'}</span>
@@ -1366,12 +1366,12 @@ export default function EmpresasExternasPage() {
                   }}
                   onBlur={() => { if (!newGroupName.trim()) setAddingGroup(false); else handleAddGroup() }}
                   placeholder="Nombre del grupo..."
-                  className="px-3 py-2 text-sm rounded-xl border border-[#E5A70C] outline-none bg-white text-[#191c1e]"
+                  className="px-3 py-2 text-sm rounded-xl border border-[#003B43] outline-none bg-white text-[#191c1e]"
                 />
               ) : (
                 <button
                   onClick={() => setAddingGroup(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#946000] border border-[#E5A70C] hover:bg-[#E5A70C]/10 transition active:scale-[0.97]"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#003B43] border border-[#003B43] hover:bg-[#003B43]/10 transition active:scale-[0.97]"
                   title="Agrupar procesos relacionados en una sola columna con sub-columnas"
                 >
                   <span className="material-symbols-outlined text-lg">create_new_folder</span>
@@ -1380,8 +1380,8 @@ export default function EmpresasExternasPage() {
               )}
               <button
                 onClick={openCreateProcesoModal}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-[#20160A] hover:opacity-90 transition active:scale-[0.97]"
-                style={{ background: '#E5A70C' }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white hover:opacity-90 transition active:scale-[0.97]"
+                style={{ background: '#003B43' }}
               >
                 <span className="material-symbols-outlined text-lg">add_column_right</span>
                 Nuevo proceso

@@ -40,13 +40,16 @@ export const MODULE_TITLES = {
 }
 
 export const DIAN_NAV = [
-  { to: '/dian/upload',     label: 'Contabilidad',     icon: 'upload_file',   end: true },
+  { to: '/dian/upload',     label: 'Contabilidad',     icon: 'upload_file',   end: true,
+    matchPrefixes: ['/dian/clasificacion', '/dian/nomina/', '/dian/exportacion'] },
   { to: '/dian/consolidado', label: 'Consolidado',     icon: 'query_stats',   end: true },
   { to: '/exogenas/upload', label: 'Exógenas',          icon: 'request_quote', end: true },
   { to: '/dian/terceros',   label: 'Importar Terceros', icon: 'location_on',   end: true },
   { to: '/dian/consulta-tercero', label: 'Consulta Tercero', icon: 'person_search', end: true },
   { to: '/empresas-externas', label: 'Empresas Externas', icon: 'table_chart', end: true },
-  { to: '/dian/nomina-electronica', label: 'Seguimiento Nómina', icon: 'badge', end: true },
+  // Sin `end: true` a propósito — tiene una sub-página real (/dian/nomina-electronica/empresas,
+  // ver NominaElectronicaPage.jsx) y debe seguir marcado como activo ahí también.
+  { to: '/dian/nomina-electronica', label: 'Seguimiento Nómina', icon: 'badge' },
 ]
 
 export const EMPRESAS_MAESTRO_NAV = [

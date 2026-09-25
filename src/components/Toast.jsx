@@ -12,7 +12,7 @@ const COLORS = {
   success: { bg: '#10B981', ring: '#d1fae5' },
   error: { bg: '#EF4444', ring: '#ffdad6' },
   warning: { bg: '#FBBF24', ring: '#fef3c7' },
-  info: { bg: '#004ac6', ring: '#dbeafe' },
+  info: { bg: '#003B43', ring: '#E3EEEE' },
 }
 
 export default function Toast() {
