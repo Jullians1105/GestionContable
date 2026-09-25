@@ -61,6 +61,29 @@ find "${BACKUP_DIR}" -name "backup_*.tar.gz" -mtime "+${KEEP_DAYS}" -delete
 TOTAL=$(find "${BACKUP_DIR}" -name "backup_*.tar.gz" | wc -l)
 echo "  ✔ ${TOTAL} backup(s) almacenado(s)"
 
+# 7. Copia fuera del servidor (Google Drive) — en segundo plano, para no retrasar
+# el resto del deploy (git pull / docker compose build / up). El local ya quedó
+# guardado arriba; esto es una copia extra por si la máquina se pierde entera.
+# GDRIVE_KEEP_DAYS controla cuánto se guarda ALLÁ (independiente de KEEP_DAYS,
+# que es solo para el disco local) — con más espacio disponible en Drive no hace
+# falta rotar tan seguido.
+GDRIVE_REMOTE="gdrive:GestconBackups"
+GDRIVE_KEEP_DAYS=30
+RCLONE="${HOME}/bin/rclone"
+if [ -x "${RCLONE}" ]; then
+  echo "▶ Subiendo copia a Google Drive (segundo plano)..."
+  nohup bash -c "
+    '${RCLONE}' copy '${BACKUP_DIR}/backup_${TIMESTAMP}.tar.gz' '${GDRIVE_REMOTE}' \
+      --log-file '${BACKUP_DIR}/rclone.log' --log-level INFO
+    '${RCLONE}' delete --min-age ${GDRIVE_KEEP_DAYS}d '${GDRIVE_REMOTE}' \
+      --log-file '${BACKUP_DIR}/rclone.log' --log-level INFO
+  " >/dev/null 2>&1 &
+  disown
+  echo "  ✔ subida iniciada (no bloquea el resto del deploy — ver ${BACKUP_DIR}/rclone.log)"
+else
+  echo "  ⚠ rclone no encontrado en ${RCLONE} — se omite la copia a Google Drive"
+fi
+
 echo ""
 echo "✅ Backup completado: ${BACKUP_DIR}/backup_${TIMESTAMP}.tar.gz"
 echo "════════════════════════════════════════"
