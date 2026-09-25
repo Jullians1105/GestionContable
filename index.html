@@ -12,6 +12,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Gestcon" />
     <title>Gestcon</title>
+    <!-- Fondo base antes de que cargue el CSS/JS de la app — evita el flash de blanco por
+         defecto del navegador mientras se descarga el bundle (mismo teal del login, que es
+         la pantalla que ve casi todo el mundo en una carga en frío). -->
+    <style>html, body { background: #003B43; }</style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=IBM+Plex+Mono:wght@500;600;700&family=Fraunces:ital,wght@0,400;0,500;1,400&family=Poppins:wght@800;900&display=swap" rel="stylesheet" />
