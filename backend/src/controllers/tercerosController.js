@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const { extraerTerceroDePdf, describirRegimenFiscal, DocumentoNoFacturaError } = require('../services/terceros');
+const { extraerTerceroDePdf, describirRegimenFiscal, DocumentoNoFacturaError, FormatoNoReconocidoError } = require('../services/terceros');
 const { limpiarIdentificacion } = require('../services/exogenas/utils/dian');
 
 const TIPOS_OPERACION = ['compras', 'ventas'];
@@ -105,18 +105,27 @@ const uploadTerceros = async (req, res, next) => {
         if (err instanceof DocumentoNoFacturaError) {
           omitidosNoFactura += 1;
         } else {
-          errores.push({ archivo: archivo.originalname, error: err.message });
+          errores.push({
+            archivo: archivo.originalname,
+            error: err.message,
+            formatoNoReconocido: err instanceof FormatoNoReconocidoError,
+          });
         }
       }
     }
 
     const actualizados = terceros.filter((t) => !t.esNuevo && t.cambios.length > 0);
+    // Si el layout de la DIAN cambió de verdad, esto se dispara para varios archivos del mismo
+    // lote a la vez — el frontend usa este conteo para mostrar un aviso aparte, más visible que
+    // la lista genérica de errores por archivo (pedido explícito del usuario, 2026-09-28).
+    const erroresFormato = errores.filter((e) => e.formatoNoReconocido).length;
 
     res.status(200).json({
       totalArchivos: archivos.length,
       procesados: terceros.length,
       terceros,
       errores,
+      erroresFormato,
       omitidosNoFactura,
       actualizados: actualizados.length,
     });

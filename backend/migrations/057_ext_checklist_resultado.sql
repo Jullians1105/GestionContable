@@ -12,5 +12,5 @@
 -- confundiría con un resultado real de $0.
 
 ALTER TABLE ext_checklist_meses
-  ADD COLUMN resultado_tipo  VARCHAR(10) CHECK (resultado_tipo IN ('utilidad', 'perdida')),
-  ADD COLUMN resultado_valor NUMERIC(14, 2);
+  ADD COLUMN IF NOT EXISTS resultado_tipo  VARCHAR(10) CHECK (resultado_tipo IN ('utilidad', 'perdida')),
+  ADD COLUMN IF NOT EXISTS resultado_valor NUMERIC(14, 2);

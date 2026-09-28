@@ -260,10 +260,13 @@ export default function ContabilidadConsolidadoPage() {
   // ── Empresa ──────────────────────────────────────────────────────────────
   const [empresas, setEmpresas] = useState([])
   const [empresaId, setEmpresaId] = useState(searchParams.get('empresaId') || '')
+  const { addToast } = useToast()
 
   useEffect(() => {
-    api.getContabEmpresas().then(setEmpresas).catch(() => {})
-  }, [])
+    api.getContabEmpresas().then(setEmpresas).catch((err) => {
+      addToast(err.message || 'No se pudieron cargar las empresas. Recarga la página.', 'error')
+    })
+  }, [addToast])
 
   // ── Período ──────────────────────────────────────────────────────────────
   const hoy = new Date()
@@ -300,14 +303,16 @@ export default function ContabilidadConsolidadoPage() {
   const [resumenAnual, setResumenAnual] = useState([])
   useEffect(() => {
     if (!empresaId) { setResumenAnual([]); return }
-    api.getContabResumenAnual(empresaId, anio).then(setResumenAnual).catch(() => setResumenAnual([]))
-  }, [empresaId, anio])
+    api.getContabResumenAnual(empresaId, anio).then(setResumenAnual).catch((err) => {
+      setResumenAnual([])
+      addToast(err.message || 'No se pudo cargar el gráfico de tendencia.', 'error')
+    })
+  }, [empresaId, anio, addToast])
 
   // ── Consolidado ──────────────────────────────────────────────────────────
   const [data, setData] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState('')
-  const { addToast } = useToast()
 
   // No se limpia `data` antes de que llegue la respuesta nueva (ni en éxito ni en error) —
   // antes cada cambio de período desmontaba tarjetas/tablas para mostrar un spinner y las

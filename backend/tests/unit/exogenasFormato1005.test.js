@@ -32,12 +32,25 @@ describe('utils/dian', () => {
     expect(inferirTipoDocumento('900123456', 'ACME SAS')).toBe(31);
   });
 
-  test('inferirTipoDocumento detecta jurídica por heurística de NIT (9+ dígitos, empieza en 8/9)', () => {
+  test('inferirTipoDocumento detecta jurídica por conteo de dígitos (exactamente 9, sin palabra clave)', () => {
     expect(inferirTipoDocumento('912345678', 'SIN PALABRA CLAVE CONOCIDA')).toBe(31);
   });
 
-  test('inferirTipoDocumento cae en persona natural por defecto', () => {
+  // Ver docs/nit-vs-cedula-rangos.md — a diferencia de la heurística anterior ("9+ dígitos y
+  // empieza en 8/9"), un NIT que no empiece en 8/9 ahora sí se detecta bien.
+  test('inferirTipoDocumento detecta jurídica aunque el NIT no empiece en 8 o 9', () => {
+    expect(inferirTipoDocumento('712345678', 'SIN PALABRA CLAVE CONOCIDA')).toBe(31);
+  });
+
+  test('inferirTipoDocumento cae en persona natural por defecto (cédula antigua, 8 dígitos o menos)', () => {
     expect(inferirTipoDocumento('80123456', 'JUAN PEREZ')).toBe(13);
+  });
+
+  // Cédula NUIP (desde el año 2000): 10 dígitos exactos — nunca es NIT de persona jurídica
+  // (el NIT jurídico tiene siempre 9), aunque empiece en 8 o 9 como podía pasar con la
+  // heurística anterior.
+  test('inferirTipoDocumento detecta persona natural con cédula NUIP de 10 dígitos', () => {
+    expect(inferirTipoDocumento('9012345678', 'SIN PALABRA CLAVE CONOCIDA')).toBe(13);
   });
 
   test('esNotaCredito reconoce las variantes de nota crédito', () => {

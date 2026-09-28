@@ -48,7 +48,7 @@ const badge = (color, texto) => <span className={BADGE_ESTILOS[color]}>{texto}</
 const CONFIG_FORMATO = {
   '1001': {
     hojaToken: 'COMPRAS',
-    aviso: 'CPT (Concepto) y PAGO salen de lo ya clasificado en Contabilidad para la empresa/año elegidos — si un tercero no tiene compras clasificadas ahí, esas dos columnas quedan vacías para él. El resto de columnas de dinero (PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM) todavía no están definidas y siempre quedan vacías. La dirección/DPTO/MUN/PAIS se toman de los terceros ya guardados en "Importar Terceros"; si un tercero no está ahí, esas también quedan vacías.',
+    aviso: 'CPT (Concepto) y PAGO salen de lo ya clasificado en Contabilidad para la empresa/año elegidos — si un tercero no tiene compras clasificadas ahí, esas dos columnas quedan vacías para él. El resto de columnas de dinero (PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM) por el momento se calculan de forma manual — quedan vacías en el Excel, complétalas aparte. La dirección/DPTO/MUN/PAIS se toman de los terceros ya guardados en "Importar Terceros"; si un tercero no está ahí, esas también quedan vacías.',
     campos: [
       { key: 'pago', totalKey: 'totalPago', label: 'PAGO', statTitle: 'Total pagado', statSub: 'Suma de la Base clasificada en Contabilidad' },
     ],
@@ -83,7 +83,7 @@ const CONFIG_FORMATO = {
   },
   '1007': {
     hojaToken: 'VENTAS',
-    aviso: 'El concepto (CPT) todavía no está definido — esa columna queda vacía en el Excel generado. El país (PAIS) se toma de los terceros ya guardados en "Importar Terceros"; si un cliente no está ahí, también queda vacío. Antes de generar cada exógena, sube las facturas de los clientes de este TOKEN para completarlo.',
+    aviso: 'El concepto (CPT) por el momento se coloca de forma manual — queda vacío en el Excel generado, complétalo aparte. El país (PAIS) se toma de los terceros ya guardados en "Importar Terceros"; si un cliente no está ahí, también queda vacío. Antes de generar cada exógena, sube las facturas de los clientes de este TOKEN para completarlo.',
     campos: [
       { key: 'ibru', totalKey: 'totalIbru', label: 'IBRU', statTitle: 'Total ingresos brutos', statSub: 'IBRU acumulado de todos los terceros' },
       { key: 'dev', totalKey: 'totalDev', label: 'DEV', statTitle: 'Total devoluciones', statSub: 'DEV acumulado de todos los terceros' },

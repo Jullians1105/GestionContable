@@ -332,6 +332,27 @@ export default function TercerosPage() {
             </div>
           )}
 
+          {resultado.erroresFormato > 0 && (
+            // Sin colapsar a propósito, a diferencia del resto de errores — esta es la señal de
+            // que el layout del PDF de la DIAN pudo haber cambiado (la extracción se calibró
+            // contra una sola factura de muestra), no un archivo puntual con problemas. Se
+            // separa del cuadro rojo genérico de abajo para que no se pierda entre archivos
+            // corruptos u otros errores comunes.
+            <div className="mb-4 flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-[#003B43]/40">
+              <span className="material-symbols-outlined text-[#003B43] text-xl flex-shrink-0 mt-0.5">warning</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[#003B43]">
+                  {resultado.erroresFormato === 1
+                    ? 'Un archivo no tiene el formato esperado de factura DIAN'
+                    : `${resultado.erroresFormato} archivos no tienen el formato esperado de factura DIAN`}
+                </p>
+                <p className="text-xs text-[#003B43]/80 mt-0.5">
+                  Puede ser un PDF distinto al esperado, o que la DIAN cambió el diseño del documento — revisa manualmente el o los archivos marcados abajo antes de asumir que son un error aislado.
+                </p>
+              </div>
+            </div>
+          )}
+
           {resultado.errores.length > 0 && (
             // Colapsado por default — un lote grande puede traer muchos errores y no queremos
             // un cuadro rojo gigante tapando la pantalla; el conteo en el título ya avisa.
@@ -354,7 +375,14 @@ export default function TercerosPage() {
               {erroresAbiertos && (
                 <ul className="px-4 pb-4 text-xs text-red-700 space-y-1">
                   {resultado.errores.map((e, i) => (
-                    <li key={i}><span className="font-semibold">{e.archivo}:</span> {e.error}</li>
+                    <li key={i}>
+                      <span className="font-semibold">{e.archivo}:</span> {e.error}
+                      {e.formatoNoReconocido && (
+                        <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-amber-200 text-amber-900">
+                          Formato no reconocido
+                        </span>
+                      )}
+                    </li>
                   ))}
                 </ul>
               )}
