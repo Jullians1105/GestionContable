@@ -39,13 +39,20 @@ function calcularDV(numero) {
 }
 
 // El TOKEN no trae columna explícita de tipo de identificación (NIT vs. cédula) — se infiere.
+// Primera señal: nombre con palabra clave de empresa. Segunda señal (cuando el nombre no da
+// ninguna pista): conteo de dígitos — los tres rangos no se superponen entre sí, ver
+// docs/nit-vs-cedula-rangos.md para las fuentes (Registraduría Nacional + DIAN-RUT/Dian.com.co,
+// verificado 2026-09-28): hasta 8 dígitos = cédula antigua, exactamente 9 = NIT de persona
+// jurídica (800.000.000-899.999.999 y ascendente desde 900.000.000), exactamente 10 = cédula
+// NUIP (vigente desde el año 2000). Reemplaza la heurística anterior ("9+ dígitos y empieza en
+// 8 o 9"), que clasificaba mal un NIT que no empezara en 8/9, o un número de 10+ dígitos que sí.
 function inferirTipoDocumento(identificacion, nombre) {
   const nombreNorm = ` ${normalizarTexto(nombre)} `;
   const match = EMPRESA_KEYWORDS.some((kw) => nombreNorm.includes(` ${kw} `));
   if (match) return 31;
 
   const digitos = limpiarIdentificacion(identificacion);
-  if (digitos.length >= 9 && (digitos[0] === '8' || digitos[0] === '9')) return 31;
+  if (digitos.length === 9) return 31;
 
   return 13;
 }
