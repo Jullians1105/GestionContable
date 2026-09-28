@@ -4,7 +4,8 @@
 // quedan pendientes de definir con el usuario — no se inventan, así que esas columnas se dejan
 // en blanco en el Excel generado:
 // - CPT (concepto): varía según el tipo de ingreso (operacional, no operacional, rendimientos
-//   financieros...), sin regla confirmada todavía.
+//   financieros...). Confirmado con el usuario (2026-09-28) que por el momento lo colocan a
+//   mano — no es un pendiente de definir, es la forma de trabajo actual del equipo.
 // - PAIS (país de residencia/domicilio del tercero): se toma de `terceros` (mismo dato que
 //   alimenta "Consulta Tercero" en el 1001) vía `enriquecerConPais` — si el NIT del cliente
 //   todavía no tiene una factura importada en "Importar Terceros", no hay de dónde sacarlo y

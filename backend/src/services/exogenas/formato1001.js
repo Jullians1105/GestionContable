@@ -9,8 +9,9 @@
 //   empresa/año), agrupado por tercero+concepto, sumando la Base como PAGO. Si el usuario no
 //   pasa `contabEmpresaId`/`anio`, o un tercero no tiene documentos clasificados ahí, esas dos
 //   columnas quedan en blanco para él — igual que antes.
-// - El resto de columnas de dinero (PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM): fuente sin
-//   confirmar todavía (hoy es un cálculo manual, según el usuario) — siguen en blanco.
+// - El resto de columnas de dinero (PNDED, IDED, INDED, RETP, RETA, COMUN, NDOM): confirmado con
+//   el usuario (2026-09-28) que por el momento las calculan a mano — siguen en blanco a
+//   propósito, no es un pendiente de definir, es la forma de trabajo actual del equipo.
 const ExcelJS = require('exceljs');
 const db = require('../../config/database');
 const { normalizeXlsxBuffer } = require('./utils/normalizeXlsx');
