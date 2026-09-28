@@ -557,6 +557,9 @@ const uploadDian = async (req, res, next) => {
     // Mismo criterio: filas sin fecha de emisión utilizable quedan fuera del guardado
     // permanente por mes en silencio (ver agruparFilasPorPeriodo) — se avisa apenas se sube.
     const filasSinFecha = calcularFilasSinFechaValida(filas);
+    // Mismo criterio: filas sin CUFE/CUDE quedan fuera del guardado permanente en silencio
+    // (ver guardarDocumentosPermanentes) — se avisa apenas se sube.
+    const filasSinCufe = calcularFilasSinCufeValido(filas);
 
     // Persistir borrador con campos de clasificación incluidos (expira en 14 días).
     // Se guarda también el archivo normalizado (solo prefijos XML corregidos, NINGÚN
@@ -575,6 +578,7 @@ const uploadDian = async (req, res, next) => {
       empresaNombre: empresa?.name ?? null,
       documentosNoContabilizados,
       filasSinFecha,
+      filasSinCufe,
     });
   } catch (err) {
     next(err);
@@ -698,6 +702,7 @@ const getBorrador = async (req, res, next) => {
       documentosNoContabilizados: calcularDocumentosNoContabilizados(filas),
       periodosExistentes,
       filasSinFecha: calcularFilasSinFechaValida(filas),
+      filasSinCufe: calcularFilasSinCufeValido(filas),
     });
   } catch (err) {
     next(err);
@@ -782,6 +787,19 @@ const calcularFilasSinFechaValida = (filas) =>
       fechaEmisionCruda: f.fechaEmision ?? null,
     }));
 
+// Filas con relevancia contable pero sin CUFE/CUDE — sin esa llave natural no hay forma de
+// identificar el documento entre subidas (ver guardarDocumentosPermanentes) y queda fuera del
+// guardado permanente en silencio. Mismo patrón que calcularFilasSinFechaValida, pedido por el
+// usuario tras revisar ese mismo hallazgo en una auditoría del módulo.
+const calcularFilasSinCufeValido = (filas) =>
+  filas
+    .filter((f) => TIPOS_CONTABILIZADOS.has(f.tipoDocumento) && !f.cufe)
+    .map((f) => ({
+      tipoDocumento: f.tipoDocumento,
+      prefijo: f.prefijo,
+      folio: f.folio,
+    }));
+
 // Anomalías de calidad de datos en el reporte — no cambian ningún cálculo, solo alertan
 // para que el usuario audite antes de confiar en las cifras.
 // anomaliasRevisadas: array de `tipo` marcados manualmente como revisados (persistido en
@@ -833,6 +851,15 @@ const calcularAnomalias = (filas, anomaliasRevisadas = []) => {
       tipo: 'Fecha de emisión ausente o irreconocible',
       detalle: `${filasSinFecha.length} fila(s) sin fecha de emisión utilizable — no se pueden ` +
         'ubicar en ningún mes calendario y quedan fuera del guardado permanente',
+    });
+  }
+
+  const filasSinCufe = calcularFilasSinCufeValido(filas);
+  if (filasSinCufe.length > 0) {
+    anomalias.push({
+      tipo: 'CUFE/CUDE ausente',
+      detalle: `${filasSinCufe.length} fila(s) sin CUFE/CUDE — no se pueden identificar de forma ` +
+        'única entre subidas y quedan fuera del guardado permanente',
     });
   }
 
@@ -2165,22 +2192,6 @@ const exportarBorrador = async (req, res, next) => {
           error: `${sinConcepto.length} fila(s) sin concepto. Clasifica todas antes de exportar.`,
         });
       }
-
-      // ── 2b. Guardado permanente — solo si el borrador tiene empresa asociada ──
-      // Se hace ANTES de generar el Excel (no después): así, si hay un conflicto con datos
-      // ya guardados de un mes anterior, se avisa sin haber gastado el trabajo de armar el
-      // libro. El Excel se sigue generando igual después, esto no lo reemplaza.
-      const modoGuardado = req.body.modo; // 'actualizar' | 'reemplazar' | undefined
-      const guardado = await guardarDocumentosPermanentes({
-        empresaId, filas, nombreArchivo: nombreArchivoOriginal, userId: req.user.userId, modo: modoGuardado,
-      });
-      if (guardado.requiereConfirmacion) {
-        return res.status(409).json({
-          error: 'Ya hay datos guardados para uno o más meses de esta empresa. Elige cómo continuar.',
-          requiereConfirmacionGuardado: true,
-          periodos: guardado.periodos,
-        });
-      }
     }
 
     // ── 3. Retenciones por proveedor (para la hoja RETENCIONES_POR_PROVEEDOR) ──
@@ -2356,9 +2367,39 @@ const exportarBorrador = async (req, res, next) => {
     }
     buildMetadatos(wb.addWorksheet('METADATOS'), meta, userEmail, filas, documentosNoContabilizados, anomalias);
 
-    // ── 9. Escribir buffer y enviar ────────────────────────────────────────
+    // ── 9. Escribir buffer ──────────────────────────────────────────────────
     const buffer = await corregirTablaRoundtrip(await wb.xlsx.writeBuffer());
 
+    // ── 9b. Guardado permanente — solo si el borrador tiene empresa asociada ──
+    // Se hace DESPUÉS de generar el Excel (no antes): así nunca queda guardado algo que el
+    // usuario no llegó a descargar. Antes era al revés (ver historial) — si la generación del
+    // Excel fallaba después de guardar, el usuario se quedaba sin archivo pero con datos ya
+    // guardados, y un reintento chocaba con un aviso de "ya hay datos guardados" que no tenía
+    // forma de explicarse a sí mismo. Con este orden, si el guardado mismo falla (más raro que
+    // un fallo de generación), se avisa explícitamente en vez de fallar en silencio.
+    if (empresaId) {
+      let guardado;
+      try {
+        guardado = await guardarDocumentosPermanentes({
+          empresaId, filas, nombreArchivo: nombreArchivoOriginal, userId: req.user.userId, modo: req.body.modo,
+        });
+      } catch (errGuardado) {
+        console.error(`[DIAN] Error guardando documentos permanentes del borrador ${id} tras generar el Excel`, errGuardado);
+        return res.status(500).json({
+          error: 'El Excel se generó correctamente pero no se pudo guardar en el consolidado de Contabilidad. ' +
+            'No se descargó ningún archivo — inténtalo de nuevo.',
+        });
+      }
+      if (guardado.requiereConfirmacion) {
+        return res.status(409).json({
+          error: 'Ya hay datos guardados para uno o más meses de esta empresa. Elige cómo continuar.',
+          requiereConfirmacionGuardado: true,
+          periodos: guardado.periodos,
+        });
+      }
+    }
+
+    // ── 9c. Enviar ──────────────────────────────────────────────────────────
     const mesAnio       = periodoDesde ? periodoDesde.slice(0, 7) : new Date().toISOString().slice(0, 7);
     const nombreSan     = empresaNombre.replace(/[^A-Za-z0-9]/g, '_').replace(/_+/g, '_').replace(/_$/, '').slice(0, 20);
     const filename      = `Contabilidad_${nombreSan}_${mesAnio}.xlsx`;
@@ -2483,7 +2524,7 @@ module.exports = {
   uploadDian, patchBorrador, getBorrador, patchNomina, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada,
   // Funciones puras (no tocan DB ni request). Se exportan para poder testear directamente
   // las reglas contables sin montar un borrador completo — ver tests/unit/dianController.test.js
-  calcularAnomalias, calcularDocumentosNoContabilizados, calcularFilasSinFechaValida,
+  calcularAnomalias, calcularDocumentosNoContabilizados, calcularFilasSinFechaValida, calcularFilasSinCufeValido,
   calcularResumenPeriodo, agruparPorMes,
   TASAS_AUTORRETENCION, CLASES_IVA, CONCEPTOS,
 };

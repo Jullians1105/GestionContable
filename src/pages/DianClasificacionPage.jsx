@@ -650,6 +650,10 @@ export default function DianClasificacionPage() {
   // calendario y queda fuera del guardado permanente en silencio (ver agruparFilasPorPeriodo en
   // dianController.js). Pedido explícito del usuario (2026-09-12).
   const [filasSinFecha, setFilasSinFecha] = useState([])
+  // Filas con relevancia contable pero sin CUFE/CUDE — sin esa llave natural no hay forma de
+  // identificar el documento entre subidas (ver guardarDocumentosPermanentes en
+  // dianController.js) y queda fuera del guardado permanente en silencio.
+  const [filasSinCufe, setFilasSinCufe] = useState([])
 
   useEffect(() => {
     let cancelado = false
@@ -664,6 +668,7 @@ export default function DianClasificacionPage() {
         setDocumentosNoReconocidos((data.documentosNoContabilizados ?? []).filter((d) => !d.esConocido))
         setPeriodosExistentes(data.periodosExistentes ?? [])
         setFilasSinFecha(data.filasSinFecha ?? [])
+        setFilasSinCufe(data.filasSinCufe ?? [])
       })
       .catch((err) => {
         if (cancelado) return
@@ -1168,6 +1173,34 @@ export default function DianClasificacionPage() {
               {filasSinFecha.map((f, i) => (
                 <li key={i} className="text-xs text-[#003B43]">
                   <b>{f.tipoDocumento ?? '(sin tipo)'}</b> {f.prefijo}{f.folio ?? ''} — fecha: {f.fechaEmisionCruda ? `"${f.fechaEmisionCruda}"` : '(vacía)'}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* ── Filas sin CUFE/CUDE — sin esa llave natural no hay forma de identificar el
+          documento entre subidas, así que quedan fuera del guardado permanente en silencio
+          si hay empresa asociada. No bloquea nada, es solo para que se note antes de exportar. ── */}
+      {filasSinCufe.length > 0 && (
+        <div className="mb-5 flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-[#003B43]/40">
+          <span className="material-symbols-outlined text-[#003B43] text-xl flex-shrink-0 mt-0.5">tag</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[#003B43]">
+              {filasSinCufe.length === 1
+                ? 'Hay una fila sin CUFE/CUDE'
+                : `Hay ${filasSinCufe.length} filas sin CUFE/CUDE`}
+            </p>
+            <p className="text-xs text-[#003B43]/80 mt-0.5">
+              {empresaId
+                ? 'No se pueden identificar de forma única entre subidas — no quedarán guardadas en el consolidado mensual de esta empresa.'
+                : 'No se pueden identificar de forma única entre subidas — revisa el archivo original si esperabas que trajeran CUFE/CUDE.'}
+            </p>
+            <ul className="mt-2 flex flex-col gap-1">
+              {filasSinCufe.map((f, i) => (
+                <li key={i} className="text-xs text-[#003B43]">
+                  <b>{f.tipoDocumento ?? '(sin tipo)'}</b> {f.prefijo}{f.folio ?? ''}
                 </li>
               ))}
             </ul>
