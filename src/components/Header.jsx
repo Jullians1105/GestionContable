@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useTasks } from '../hooks/useTasks'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
@@ -23,6 +23,15 @@ export default function Header({ onMenuToggle }) {
   const enModuloTareas = moduleForPath(location.pathname) === 'tasks'
   const { connected } = useSocket()
   const isOnline = useOnlineStatus()
+  // El socket tarda un instante en conectar apenas carga la página (importa la librería,
+  // hace el handshake) — `connected` arranca en `false` ese ratito aunque todo esté bien.
+  // Antes eso mostraba "Sin conexión" en rojo los primeros instantes de cada carga, que es
+  // ruido, no una alerta real. Con `everConnected`, mientras el socket nunca se conectó
+  // todavía, el badge confía solo en `navigator.onLine` (asume "En línea"); una vez conectó
+  // la primera vez, ahí sí una desconexión real (se cae el server, red, etc.) se refleja.
+  const [everConnected, setEverConnected] = useState(false)
+  useEffect(() => { if (connected) setEverConnected(true) }, [connected])
+  const showOnline = isOnline && (connected || !everConnected)
   const navigate = useNavigate()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const blurTimerRef = useRef(null)
@@ -134,17 +143,17 @@ export default function Header({ onMenuToggle }) {
         <div
           className="flex items-center gap-1.5 text-xs font-semibold px-2 sm:px-2.5 py-1 rounded-full flex-shrink-0"
           style={{
-            background: connected && isOnline ? '#f0fdf4' : '#fef2f2',
-            color:      connected && isOnline ? '#22c55e' : '#ef4444',
+            background: showOnline ? '#f0fdf4' : '#fef2f2',
+            color:      showOnline ? '#22c55e' : '#ef4444',
           }}
-          title={!isOnline ? 'Sin conexión a internet' : !connected ? 'Sin conexión con el servidor' : 'Conectado'}
+          title={!isOnline ? 'Sin conexión a internet' : !showOnline ? 'Sin conexión con el servidor' : 'Conectado'}
         >
           <span
             className="w-2 h-2 rounded-full flex-shrink-0"
-            style={{ background: connected && isOnline ? '#22c55e' : '#ef4444' }}
+            style={{ background: showOnline ? '#22c55e' : '#ef4444' }}
           />
           <span className="hidden sm:inline">
-            {connected && isOnline ? 'En línea' : 'Sin conexión'}
+            {showOnline ? 'En línea' : 'Sin conexión'}
           </span>
         </div>
 
