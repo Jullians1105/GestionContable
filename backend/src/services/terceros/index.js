@@ -376,6 +376,13 @@ function conCodigoDane(p) {
 // si algo hubiera fallado — se resumen en un solo conteo (ver tercerosController.js).
 class DocumentoNoFacturaError extends Error {}
 
+// El layout se confirmó contra UNA sola factura real de muestra (ver cabecera del archivo) — si
+// la DIAN llega a cambiar el diseño del PDF, esta es la señal de alarma. Se distingue de un error
+// cualquiera (PDF corrupto, archivo que no es un PDF) para que el controller/frontend puedan
+// avisarlo de forma más visible que un error genérico de archivo — pedido explícito del usuario
+// tras revisar este riesgo (2026-09-28): "avisar que el formato no coincide y revisar".
+class FormatoNoReconocidoError extends Error {}
+
 // El título del documento va en las primeras líneas del PDF (confirmado contra una factura real
 // de muestra: "FACTURA ELECTRÓNICA DE VENTA"). Se usa para descartar notas crédito y documentos
 // soporte SIN intentar extraer nada — su layout no está verificado (a diferencia del de
@@ -397,7 +404,11 @@ async function extraerPartesDePdf(buffer) {
   const idxEmisor = text.indexOf('Datos del Emisor');
   const idxAdquiriente = text.indexOf('Datos del Adquiriente');
   if (idxEmisor === -1 || idxAdquiriente === -1) {
-    throw new Error('El PDF no tiene el formato esperado de factura electrónica DIAN (no se encontraron las secciones de Emisor/Adquiriente).');
+    throw new FormatoNoReconocidoError(
+      'El PDF no tiene el formato esperado de factura electrónica DIAN (no se encontraron las ' +
+      'secciones de Emisor/Adquiriente). Si esto empieza a pasar con más facturas, es posible que ' +
+      'la DIAN haya cambiado el diseño del PDF — revisa manualmente este archivo.'
+    );
   }
   const idxDetalles = text.indexOf('Detalles de Productos');
 
@@ -421,12 +432,16 @@ async function extraerTerceroDePdf(buffer, tipoOperacion) {
   const contraparte = tipoOperacion === 'compras' ? emisor : adquiriente;
   if (!contraparte) {
     const lado = tipoOperacion === 'compras' ? 'del vendedor (Emisor)' : 'del comprador (Adquiriente)';
-    throw new Error(`No se pudieron extraer los datos ${lado} de este PDF.`);
+    throw new FormatoNoReconocidoError(
+      `No se pudieron extraer los datos ${lado} de este PDF — las secciones esperadas están, pero ` +
+      'faltó el NIT o la razón social dentro de ellas. Puede ser que la DIAN haya cambiado el ' +
+      'diseño de esa parte del PDF — revisa manualmente este archivo.'
+    );
   }
   return contraparte;
 }
 
 module.exports = {
   extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, mapearCodigoPais, normalizarDireccion,
-  limpiarParaDian, describirRegimenFiscal, DocumentoNoFacturaError,
+  limpiarParaDian, describirRegimenFiscal, DocumentoNoFacturaError, FormatoNoReconocidoError,
 };

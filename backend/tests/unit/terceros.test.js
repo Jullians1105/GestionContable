@@ -6,7 +6,10 @@ jest.mock('../../src/config/database');
 
 const pdfParse = require('pdf-parse');
 const db = require('../../src/config/database');
-const { extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, mapearCodigoPais, normalizarDireccion, limpiarParaDian } = require('../../src/services/terceros');
+const {
+  extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, mapearCodigoPais, normalizarDireccion,
+  limpiarParaDian, FormatoNoReconocidoError,
+} = require('../../src/services/terceros');
 const { uploadTerceros, consultarTercero } = require('../../src/controllers/tercerosController');
 
 // Texto real extraído (pdf-parse) de docs/PDF-901939874-AAC2.pdf — factura de muestra de
@@ -255,10 +258,24 @@ describe('extraerPartesDePdf', () => {
     });
   });
 
-  test('lanza error si dice ser factura pero no tiene las secciones esperadas', async () => {
+  test('lanza FormatoNoReconocidoError si dice ser factura pero no tiene las secciones esperadas', async () => {
     pdfParse.mockResolvedValue({ text: 'FACTURA ELECTRÓNICA DE VENTA\nun PDF sin las secciones esperadas' });
     await expect(extraerPartesDePdf(Buffer.from('fake-pdf')))
       .rejects.toThrow(/formato esperado/);
+    await expect(extraerPartesDePdf(Buffer.from('fake-pdf')))
+      .rejects.toBeInstanceOf(FormatoNoReconocidoError);
+  });
+
+  // Caso distinto al de arriba: las secciones "Datos del Emisor"/"Datos del Adquiriente" SÍ
+  // están, pero dentro de ellas no aparece ni el NIT ni la razón social — mismo tipo de error
+  // (posible cambio de layout de la DIAN en esa parte del PDF), detectado más abajo en
+  // extraerTerceroDePdf.
+  test('extraerTerceroDePdf lanza FormatoNoReconocidoError si las secciones están pero faltan NIT/razón social', async () => {
+    pdfParse.mockResolvedValue({
+      text: 'FACTURA ELECTRÓNICA DE VENTA\nDatos del Emisor\nsin nada útil acá\nDatos del Adquiriente\ntampoco acá',
+    });
+    await expect(extraerTerceroDePdf(Buffer.from('fake-pdf'), 'compras'))
+      .rejects.toBeInstanceOf(FormatoNoReconocidoError);
   });
 
   test('descarta notas crédito y documentos soporte sin intentar extraer nada (pedido explícito del usuario)', async () => {
@@ -380,7 +397,12 @@ describe('uploadTerceros', () => {
     await uploadTerceros(req, res, jest.fn());
 
     const body = res.json.mock.calls[0][0];
-    expect(body.errores).toEqual([{ archivo: 'malo.pdf', error: expect.stringMatching(/formato esperado/) }]);
+    expect(body.errores).toEqual([{
+      archivo: 'malo.pdf',
+      error: expect.stringMatching(/formato esperado/),
+      formatoNoReconocido: true,
+    }]);
+    expect(body.erroresFormato).toBe(1);
     expect(body.procesados).toBe(1);
     expect(body.omitidosNoFactura).toBe(0);
   });
