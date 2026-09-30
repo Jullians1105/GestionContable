@@ -16,7 +16,11 @@ export function getMesHabilitadoNE(now = new Date()) {
 // no 3: por defecto una empresa está SIN MARCAR (blanco, nadie ha avisado
 // nada); se pone en ROJO cuando avisan que ya se puede presentar (sigue
 // pendiente, solo que ahora es urgente); VERDE cuando ya se presentó; GRIS
-// cuando no aplica (bloqueada / ya no se le hace / no envía información).
+// cuando está "En espera" (este mes no se pudo hacer — no envía información,
+// etc. — con el motivo en la nota). Se arrastra sola al mes siguiente mientras
+// nadie la marque (ver backend/src/utils/nominaElectronicaArrastre.js). El
+// valor interno sigue siendo 'no_aplica' (CHECK de la tabla + sync con Fondo
+// Emprender/Externas) — solo cambió la etiqueta.
 // "Ya se puede presentar" es un flag aparte (`autorizada` en ne_meses,
 // migración 048) independiente del estado — mismo patrón que
 // fondo_pagos.autorizado. Mismo shape que STATUS en
@@ -31,7 +35,7 @@ export const ESTADOS_VISUAL = {
   sin_marcar: { label: 'Sin marcar',            icon: 'radio_button_unchecked', color: '#9ca3af', bg: '#ffffff' },
   autorizada: { label: 'Ya se puede presentar', icon: 'priority_high',          color: '#dc2626', bg: '#fecaca' },
   presentada: { label: 'Presentada',            icon: 'check_circle',          color: '#15803d', bg: '#bbf7d0' },
-  no_aplica:  { label: 'Revisar',               icon: 'do_not_disturb_on',     color: '#4b5563', bg: '#d1d5db' },
+  no_aplica:  { label: 'En espera',              icon: 'do_not_disturb_on',     color: '#4b5563', bg: '#d1d5db' },
 }
 
 // Resuelve cuál de los 4 colores de arriba le corresponde a una fila

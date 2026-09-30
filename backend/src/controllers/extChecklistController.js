@@ -3,6 +3,7 @@ const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 const { isMesHabilitado } = require('../utils/mesVencido');
 const { mapEstadoNEaChecklist } = require('../utils/nominaElectronicaSync');
+const { joinMesPrevio, selectNeEfectivo, notaConOrigen } = require('../utils/nominaElectronicaArrastre');
 
 // "Nómina electrónica" es el proceso orden 0 del catálogo ext_procesos (ver
 // migración 038) — no tiene un vínculo por id como mp3 en Fondo Emprender
@@ -20,7 +21,7 @@ const getChecklistMes = async (req, res, next) => {
       `SELECT p.id, p.name, p.orden, p.activo,
               COALESCE(i.estado, 'pending') AS estado,
               i.nota,
-              ne.id AS ne_empresa_id, nm.estado AS ne_estado, nm.nota AS ne_nota,
+              ne.id AS ne_empresa_id, ${selectNeEfectivo()},
               m.resultado_tipo, m.resultado_valor
        FROM ext_procesos p
        LEFT JOIN ext_checklist_meses m
@@ -31,6 +32,7 @@ const getChecklistMes = async (req, res, next) => {
               ON ne.ext_empresa_id = $1
        LEFT JOIN ne_meses nm
               ON nm.empresa_id = ne.id AND nm.anio = $2 AND nm.mes = $3
+       ${joinMesPrevio('$2', '$3', { emp: 'ne', mes: 'nm', prev: 'nmp' })}
        WHERE p.activo = true OR i.id IS NOT NULL
        ORDER BY p.orden`,
       [empresaId, anio, mes]
@@ -53,7 +55,7 @@ const getChecklistMes = async (req, res, next) => {
           orden:    row.orden,
           activo:   row.activo,
           estado:   linkedNE ? mapEstadoNEaChecklist(row.ne_estado) : row.estado,
-          nota:     linkedNE ? row.ne_nota : row.nota,
+          nota:     linkedNE ? notaConOrigen(row.ne_nota, row.ne_heredada_anio, row.ne_heredada_mes, anio) : row.nota,
           readonly: !!linkedNE,
           fuente:   linkedNE ? 'nomina_electronica' : undefined,
         };
@@ -78,7 +80,7 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
               p.id, p.name, p.orden, p.activo,
               COALESCE(i.estado, 'pending') AS estado,
               i.nota,
-              ne.id AS ne_empresa_id, nm.estado AS ne_estado, nm.nota AS ne_nota,
+              ne.id AS ne_empresa_id, ${selectNeEfectivo()},
               m.resultado_tipo, m.resultado_valor
        FROM ext_empresas e
        CROSS JOIN ext_procesos p
@@ -90,6 +92,7 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
               ON ne.ext_empresa_id = e.id
        LEFT JOIN ne_meses nm
               ON nm.empresa_id = ne.id AND nm.anio = $1 AND nm.mes = $2
+       ${joinMesPrevio('$1', '$2', { emp: 'ne', mes: 'nm', prev: 'nmp' })}
        WHERE p.activo = true OR i.id IS NOT NULL
        ORDER BY e.id, p.orden`,
       [anio, mes]
@@ -113,7 +116,7 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
         orden:    row.orden,
         activo:   row.activo,
         estado:   linkedNE ? mapEstadoNEaChecklist(row.ne_estado) : row.estado,
-        nota:     linkedNE ? row.ne_nota : row.nota,
+        nota:     linkedNE ? notaConOrigen(row.ne_nota, row.ne_heredada_anio, row.ne_heredada_mes, anio) : row.nota,
         readonly: !!linkedNE,
         fuente:   linkedNE ? 'nomina_electronica' : undefined,
       });

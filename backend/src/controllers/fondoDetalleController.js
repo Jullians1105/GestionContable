@@ -3,6 +3,7 @@ const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 const { isMesHabilitado } = require('../utils/mesVencido');
 const { mapEstadoNEaChecklist } = require('../utils/nominaElectronicaSync');
+const { joinMesPrevio, selectNeEfectivo } = require('../utils/nominaElectronicaArrastre');
 
 const MP_CATALOG = [
   { id: 1, nombre: 'Facturación' },
@@ -150,7 +151,7 @@ const getDetalle = async (req, res, next) => {
       ),
       db.query(
         `SELECT COALESCE(i.estado, 'pending') AS estado,
-                ne.id AS ne_empresa_id, nm.estado AS ne_estado
+                ne.id AS ne_empresa_id, ${selectNeEfectivo()}
          FROM fondo_procesos p
          LEFT JOIN fondo_checklist_meses m
                 ON m.empresa_id = $1 AND m.anio = $2 AND m.mes = $3
@@ -160,6 +161,7 @@ const getDetalle = async (req, res, next) => {
                 ON ne.fondo_empresa_id = $1
          LEFT JOIN ne_meses nm
                 ON nm.empresa_id = ne.id AND nm.anio = $2 AND nm.mes = $3
+       ${joinMesPrevio('$2', '$3', { emp: 'ne', mes: 'nm', prev: 'nmp' })}
          WHERE p.macroproceso_id = 'mp3'
          LIMIT 1`,
         [empresaId, anio, mes]
