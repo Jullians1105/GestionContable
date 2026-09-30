@@ -127,7 +127,7 @@ describe('avisarPlazoProximo', () => {
     const insertCalls = db.query.mock.calls.filter((c) => c[0].includes('INSERT INTO notifications'));
     expect(insertCalls).toHaveLength(1);
     expect(insertCalls[0][1][1]).toBe('resp-1');
-    expect(insertCalls[0][1][3]).toBe('Quedan 5 días para el plazo de Nómina Electrónica. Tienes 3 pendientes y 1 por revisar.');
+    expect(insertCalls[0][1][3]).toBe('Quedan 5 días para el plazo de Nómina Electrónica. Tienes 3 pendientes y 1 en espera.');
   });
 
   test('faltan más o menos de 5 días — no avisa', async () => {
@@ -157,7 +157,7 @@ describe('avisarPlazoVencido', () => {
 
     const insertCalls = db.query.mock.calls.filter((c) => c[0].includes('INSERT INTO notifications'));
     expect(insertCalls).toHaveLength(1);
-    expect(insertCalls[0][1][3]).toBe('Hoy vence el plazo de Nómina Electrónica. Tienes 1 pendiente y 0 por revisar.');
+    expect(insertCalls[0][1][3]).toBe('Hoy vence el plazo de Nómina Electrónica. Tienes 1 pendiente y 0 en espera.');
   });
 
   test('hoy no es la fecha límite — no avisa', async () => {

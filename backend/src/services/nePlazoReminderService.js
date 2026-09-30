@@ -9,6 +9,7 @@ const db = require('../config/database');
 const logger = require('../utils/logger');
 const { sendPushToUser } = require('./pushService');
 const { getMesHabilitado } = require('../utils/mesVencidoNominaElectronica');
+const { joinMesPrevio, SQL_HEREDADA } = require('../utils/nominaElectronicaArrastre');
 
 const MESES_ES = [
   'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
@@ -71,16 +72,17 @@ async function getFechaLimite() {
 }
 
 // Para cada responsable con empresas de Nómina Electrónica asignadas: cuántas siguen sin marcar
-// ningún estado (pendientes) y cuántas quedaron en "no aplica" (por revisar, ver
-// stats.noAplica/'revisar' en NominaElectronicaPage.jsx) para el mes habilitado. Sin fila en
+// ningún estado (pendientes) y cuántas quedaron en "no aplica" (en espera, ver
+// stats.noAplica (chip "en espera") en NominaElectronicaPage.jsx) para el mes habilitado. Sin fila en
 // ne_meses = pendiente sin marcar (mismo criterio que el resto del módulo, ver migración 045).
 async function contarPorResponsable(anio, mes) {
   const { rows } = await db.query(`
     SELECT e.responsable_id,
-           COUNT(*) FILTER (WHERE COALESCE(m.estado, 'pendiente') = 'pendiente' AND COALESCE(m.autorizada, false) = false) AS pendientes,
-           COUNT(*) FILTER (WHERE m.estado = 'no_aplica') AS por_revisar
+           COUNT(*) FILTER (WHERE NOT ${SQL_HEREDADA} AND COALESCE(m.estado, 'pendiente') = 'pendiente' AND COALESCE(m.autorizada, false) = false) AS pendientes,
+           COUNT(*) FILTER (WHERE ${SQL_HEREDADA} OR m.estado = 'no_aplica') AS por_revisar
     FROM ne_empresas e
     LEFT JOIN ne_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+    ${joinMesPrevio('$1', '$2')}
     WHERE e.responsable_id IS NOT NULL AND e.activa = true
     GROUP BY e.responsable_id
   `, [anio, mes]);
@@ -137,7 +139,7 @@ async function avisarPlazoProximo(io) {
     const { anio, mes } = getMesHabilitado(new Date());
     const responsables = await contarPorResponsable(anio, mes);
     for (const r of responsables) {
-      const mensaje = `Quedan 5 días para el plazo de Nómina Electrónica. Tienes ${r.pendientes} pendiente${r.pendientes === 1 ? '' : 's'} y ${r.porRevisar} por revisar.`;
+      const mensaje = `Quedan 5 días para el plazo de Nómina Electrónica. Tienes ${r.pendientes} pendiente${r.pendientes === 1 ? '' : 's'} y ${r.porRevisar} en espera.`;
       await notificarUsuarios(io, [r.responsableId], 'ne_plazo_proximo', mensaje);
     }
     logger.info({ responsables: responsables.length }, 'Aviso de plazo próximo (Nómina Electrónica) enviado');
@@ -158,7 +160,7 @@ async function avisarPlazoVencido(io) {
     const { anio, mes } = getMesHabilitado(new Date());
     const responsables = await contarPorResponsable(anio, mes);
     for (const r of responsables) {
-      const mensaje = `Hoy vence el plazo de Nómina Electrónica. Tienes ${r.pendientes} pendiente${r.pendientes === 1 ? '' : 's'} y ${r.porRevisar} por revisar.`;
+      const mensaje = `Hoy vence el plazo de Nómina Electrónica. Tienes ${r.pendientes} pendiente${r.pendientes === 1 ? '' : 's'} y ${r.porRevisar} en espera.`;
       await notificarUsuarios(io, [r.responsableId], 'ne_plazo_vencido', mensaje);
     }
     logger.info({ responsables: responsables.length }, 'Aviso de plazo vencido (Nómina Electrónica) enviado');

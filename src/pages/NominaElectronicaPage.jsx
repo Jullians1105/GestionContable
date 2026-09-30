@@ -374,8 +374,9 @@ export default function NominaElectronicaPage() {
   // importar el filtro activo, y terminaba mostrando un total que no cuadraba
   // con los chips de abajo (ej. "9/108" mientras el resumen, ya filtrado a
   // "Mis empresas", mostraba pendientes sobre un total mucho más chico). Las
-  // "no aplica" se excluyen del total — no es una tarea pendiente si la
-  // empresa no tiene que presentar.
+  // Las "en espera" se excluyen del total a propósito — si contaran, el
+  // avance nunca llegaría a 100% mientras haya una que no se puede hacer ese
+  // mes (se ven aparte en el chip "en espera").
   const presentacionStats = useMemo(() => {
     const aplicables = filteredRows.filter(r => r.estado !== 'no_aplica').length
     const presentadas = filteredRows.filter(r => r.estado === 'presentada').length
@@ -578,7 +579,7 @@ export default function NominaElectronicaPage() {
           {[
             { count: stats.autorizadas, label: 'ya se pueden presentar', icon: 'priority_high',        color: '#dc2626', bg: '#fecaca' },
             { count: stats.presentadas, label: 'presentadas',            icon: 'check_circle',         color: '#15803d', bg: '#bbf7d0' },
-            { count: stats.noAplica,    label: 'revisar',                icon: 'do_not_disturb_on',    color: '#4b5563', bg: '#d1d5db' },
+            { count: stats.noAplica,    label: 'en espera',               icon: 'do_not_disturb_on',    color: '#4b5563', bg: '#d1d5db' },
             { count: stats.conNovedad,  label: 'con novedad',            icon: 'sticky_note_2',        color: '#92400e', bg: '#fef3c7' },
           ].map(chip => (
             <span
@@ -691,7 +692,7 @@ export default function NominaElectronicaPage() {
                 value={motivoDraft}
                 onChange={(e) => { dirtyRef.current.nota = true; setMotivoDraft(e.target.value) }}
                 onBlur={(e) => handleNota(openRow.empresaId, e.target.value)}
-                placeholder="¿Qué hay que revisar?"
+                placeholder="¿Por qué no se pudo hacer este mes?"
                 rows={2}
                 className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
               />
@@ -763,7 +764,7 @@ function CompanyColumn({ title, accent, rows, onCellClick, openEmpresaId, onShow
           const novedad = row.tieneNovedad ? row.novedadNota?.trim() : ''
           const hasNote = !!motivo || !!novedad
           const tooltipContent = [
-            motivo && `Motivo: ${motivo}`,
+            motivo && `${row.heredadaDe ? `Observación de ${MONTHS[row.heredadaDe.mes - 1].toLowerCase()}` : 'Motivo'}: ${motivo}`,
             novedad && `Novedad: ${novedad}`,
           ].filter(Boolean).join('\n\n')
 

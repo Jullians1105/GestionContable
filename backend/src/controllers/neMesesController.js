@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 const { isMesHabilitado } = require('../utils/mesVencidoNominaElectronica');
+const { joinMesPrevio, SQL_HEREDADA } = require('../utils/nominaElectronicaArrastre');
 
 const normalizeRow = (row) => ({
   empresaId:         row.empresa_id,
@@ -16,6 +17,9 @@ const normalizeRow = (row) => ({
   tieneNovedad:      row.tiene_novedad ?? false,
   novedadNota:       row.novedad_nota ?? null,
   nota:              row.nota ?? null,
+  // De qué mes viene el "En espera" cuando no es propio (ver
+  // utils/nominaElectronicaArrastre.js) — null si el mes tiene su propia fila.
+  heredadaDe:        row.heredada_mes ? { anio: row.heredada_anio, mes: row.heredada_mes } : null,
   updatedAt:         row.updated_at,
 });
 
@@ -31,13 +35,18 @@ const getMesTodasEmpresas = async (req, res, next) => {
     const result = await db.query(
       `SELECT e.id AS empresa_id, e.name, e.origen, e.responsable_id, e.fondo_empresa_id, e.ext_empresa_id,
               u.name AS responsable_nombre,
-              COALESCE(m.estado, 'pendiente') AS estado,
+              CASE WHEN ${SQL_HEREDADA} THEN 'no_aplica' ELSE COALESCE(m.estado, 'pendiente') END AS estado,
               COALESCE(m.autorizada, false) AS autorizada,
               COALESCE(m.tiene_novedad, false) AS tiene_novedad,
-              m.novedad_nota, m.nota, m.updated_at
+              m.novedad_nota,
+              CASE WHEN ${SQL_HEREDADA} THEN p.nota ELSE m.nota END AS nota,
+              CASE WHEN ${SQL_HEREDADA} THEN p.anio END AS heredada_anio,
+              CASE WHEN ${SQL_HEREDADA} THEN p.mes  END AS heredada_mes,
+              m.updated_at
        FROM ne_empresas e
        LEFT JOIN users u ON u.id = e.responsable_id
        LEFT JOIN ne_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
+       ${joinMesPrevio('$1', '$2')}
        WHERE e.activa = true
          -- Empresa con vigente_hasta_* puesto (ver migración 059): solo aparece en
          -- los meses hasta ese límite inclusive — el mes pedido ($1,$2) no puede
@@ -88,9 +97,19 @@ const updateMes = async (req, res, next) => {
       if (notaToSave === '') notaToSave = null;
     }
 
+    // Si la fila no existe todavía, nace sembrada con el "En espera" arrastrado
+    // del mes anterior (ver utils/nominaElectronicaArrastre.js) — así marcar
+    // solo la novedad o editar la nota de una gris heredada no la vuelve
+    // pendiente por accidente; el estado solo cambia si lo piden explícito.
     await db.query(
-      `INSERT INTO ne_meses (id, empresa_id, anio, mes)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO ne_meses (id, empresa_id, anio, mes, estado, nota)
+       SELECT $1::uuid, e.id, $3::int, $4::int,
+              CASE WHEN p.estado = 'no_aplica' THEN 'no_aplica' ELSE 'pendiente' END,
+              CASE WHEN p.estado = 'no_aplica' THEN p.nota END
+       FROM ne_empresas e
+       LEFT JOIN ne_meses m ON m.empresa_id = e.id AND m.anio = $3::int AND m.mes = $4::int
+       ${joinMesPrevio('$3', '$4')}
+       WHERE e.id = $2::uuid
        ON CONFLICT (empresa_id, anio, mes) DO NOTHING`,
       [uuidv4(), empresaId, anio, mes]
     );
