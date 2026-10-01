@@ -91,18 +91,23 @@ const requireNEAdmin = async (req, res, next) => {
 // hábiles del mes, sin sábados/domingos/festivos) y prefiere que una sola persona de confianza
 // sea la responsable de mantenerla correcta en vez de repartir esa responsabilidad. Por eso
 // compara el id directo en vez de un rol/permiso — si el día de mañana cambia quién la
-// mantiene, hay que actualizar este id a mano.
-const ID_RESPONSABLE_PLAZO = 'f2a82148-64d0-44a2-a0ac-37462ed43138'; // julliansadmin@gmail.com
+// mantiene, hay que actualizar esta lista a mano. Desde 2026-10-01 son dos cuentas (pedido
+// explícito): ambas editan la fecha de cada mes y reciben el aviso para configurar la del mes
+// siguiente (ver nePlazoReminderService.avisarConfigurarPlazo).
+const IDS_RESPONSABLES_PLAZO = [
+  'f2a82148-64d0-44a2-a0ac-37462ed43138', // julliansadmin@gmail.com
+  '5e0ee191-e15b-482f-a7ff-463f8dcfea38', // diegonova@gmail.com
+];
 
 const requireNEPlazoAdmin = (req, res, next) => {
   if (!req.user) return res.status(401).json({ error: 'No autenticado' });
-  if (req.user.userId === ID_RESPONSABLE_PLAZO) return next();
+  if (IDS_RESPONSABLES_PLAZO.includes(req.user.userId)) return next();
 
   logger.warn(
     { userId: req.user.userId, path: req.path, method: req.method },
-    'requireNEPlazoAdmin — no es la cuenta autorizada para editar la fecha límite'
+    'requireNEPlazoAdmin — no es una cuenta autorizada para editar la fecha límite'
   );
-  return res.status(403).json({ error: 'Solo la cuenta responsable puede editar la fecha límite' });
+  return res.status(403).json({ error: 'Solo las cuentas responsables pueden editar la fecha límite' });
 };
 
-module.exports = { requireNEAccess, requireNEView, requireNEAdmin, requireNEPlazoAdmin };
+module.exports = { requireNEAccess, requireNEView, requireNEAdmin, requireNEPlazoAdmin, IDS_RESPONSABLES_PLAZO };

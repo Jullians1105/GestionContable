@@ -166,6 +166,38 @@ const getPosiblesDuplicados = async (req, res, next) => {
   }
 };
 
+// ── Documento (NIT / cédula) ─────────────────────────────────────────────────────
+// Limpia lo que escribe la persona: sin espacios ni puntos, y sin dígito de verificación
+// ("901.234.567-1" -> "901234567"). Todos los documentos guardados son solo dígitos y el
+// detector de duplicados (getPosiblesDuplicados) los compara con ===, así que "901.234.567" y
+// "901234567" tienen que quedar iguales. Vacío -> null; algo que no son dígitos -> lanza error.
+function limpiarDocumento(valor, etiqueta) {
+  if (valor === undefined || valor === null) return null;
+  const limpio = String(valor).replace(/[.\s]/g, '').split('-')[0];
+  if (limpio === '') return null;
+  if (!/^\d+$/.test(limpio)) {
+    const err = new Error(`${etiqueta} solo puede tener números`);
+    err.status = 400;
+    throw err;
+  }
+  return limpio;
+}
+
+// Reglas de identidad según el tipo — un solo lugar para crear y editar:
+//  - 'empresa': NIT + cédula del representante legal.
+//  - 'natural': el documento de la persona vive en `nit` (así lo lee la lista y el token DIAN) y
+//    NO hay representante. Si llega solo en cedulaRepresentante (formulario viejo, que ocultaba
+//    el campo NIT para naturales y borraba el nit al guardar) se recoge de ahí para no perderlo.
+function resolverIdentidad({ tipo, nit, cedulaRepresentante }) {
+  let nitFinal = limpiarDocumento(nit, 'El NIT / cédula');
+  let cedulaFinal = limpiarDocumento(cedulaRepresentante, 'La cédula del representante');
+  if (tipo === 'natural') {
+    if (!nitFinal && cedulaFinal) nitFinal = cedulaFinal;
+    cedulaFinal = null;
+  }
+  return { nit: nitFinal, cedulaRepresentante: cedulaFinal };
+}
+
 // ── CRUD de identidad ────────────────────────────────────────────────────────────
 const createEmpresa = async (req, res, next) => {
   try {
@@ -175,13 +207,20 @@ const createEmpresa = async (req, res, next) => {
         && !['empresa', 'natural'].includes(tipoContribuyente)) {
       return res.status(400).json({ error: "tipoContribuyente debe ser 'empresa' o 'natural'" });
     }
+    let identidad;
+    try {
+      identidad = resolverIdentidad({ tipo: tipoContribuyente, nit, cedulaRepresentante });
+    } catch (e) {
+      if (e.status === 400) return res.status(400).json({ error: e.message });
+      throw e;
+    }
     const id = uuidv4();
     const result = await db.query(
       `INSERT INTO empresas (id, name, nit, tipo_contribuyente, cedula_representante)
        VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [id, name.trim().toUpperCase(), nit ?? null, tipoContribuyente ?? null, cedulaRepresentante ?? null]
+      [id, name.trim().toUpperCase(), identidad.nit, tipoContribuyente ?? null, identidad.cedulaRepresentante]
     );
-    await auditLog(req.user.userId, 'CREATE', 'empresas', id, { name, nit, tipoContribuyente, cedulaRepresentante });
+    await auditLog(req.user.userId, 'CREATE', 'empresas', id, { name, nit: identidad.nit, tipoContribuyente, cedulaRepresentante: identidad.cedulaRepresentante });
     req.io.emit('empresas:updated', { empresaId: id });
     res.status(201).json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
@@ -210,27 +249,50 @@ const updateEmpresa = async (req, res, next) => {
     const cedulaProvided = Object.prototype.hasOwnProperty.call(req.body, 'cedulaRepresentante');
 
     await client.query('BEGIN');
+    // Se lee la fila actual para aplicar las reglas de identidad con el tipo EFECTIVO (el que
+    // llega o, si no llega, el que ya tenía) y con lo que no viene en el body tal cual está.
+    const actual = await client.query(
+      'SELECT nit, tipo_contribuyente, cedula_representante FROM empresas WHERE id = $1 FOR UPDATE',
+      [id]
+    );
+    if (!actual.rows[0]) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Empresa no encontrada' });
+    }
+    const tipoEfectivo = tipoContribuyente ?? actual.rows[0].tipo_contribuyente;
+    let identidad;
+    try {
+      identidad = resolverIdentidad({
+        tipo: tipoEfectivo,
+        nit: nitProvided ? nit : actual.rows[0].nit,
+        cedulaRepresentante: cedulaProvided ? cedulaRepresentante : actual.rows[0].cedula_representante,
+      });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      if (e.status === 400) return res.status(400).json({ error: e.message });
+      throw e;
+    }
     const result = await client.query(
       `UPDATE empresas SET
         name = COALESCE($1, name),
         activa = COALESCE($2, activa),
-        nit = CASE WHEN $4 THEN $5 ELSE nit END,
-        tipo_contribuyente = COALESCE($6, tipo_contribuyente),
-        cedula_representante = CASE WHEN $7 THEN $8 ELSE cedula_representante END
+        nit = $4,
+        tipo_contribuyente = COALESCE($5, tipo_contribuyente),
+        cedula_representante = $6
        WHERE id = $3 RETURNING *`,
-      [nombreNuevo, activa ?? null, id, nitProvided, nit ?? null, tipoContribuyente ?? null, cedulaProvided, cedulaRepresentante ?? null]
+      [nombreNuevo, activa ?? null, id, identidad.nit, tipoContribuyente ?? null, identidad.cedulaRepresentante]
     );
-    if (!result.rows[0]) {
-      await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Empresa no encontrada' });
-    }
     if (nombreNuevo) {
       for (const { tabla } of Object.values(MODULOS)) {
         await client.query(`UPDATE ${tabla} SET name = $1 WHERE empresa_id = $2`, [nombreNuevo, id]);
       }
     }
     await client.query('COMMIT');
-    await auditLog(req.user.userId, 'UPDATE', 'empresas', id, { name, activa, nit, tipoContribuyente, cedulaRepresentante });
+    await auditLog(req.user.userId, 'UPDATE', 'empresas', id, {
+      name, activa, tipoContribuyente,
+      nit: identidad.nit, cedulaRepresentante: identidad.cedulaRepresentante,
+      nitAnterior: actual.rows[0].nit, cedulaRepresentanteAnterior: actual.rows[0].cedula_representante,
+    });
     req.io.emit('empresas:updated', { empresaId: id });
     res.json(normalizeEmpresa(result.rows[0]));
   } catch (err) {

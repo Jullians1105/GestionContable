@@ -12,6 +12,17 @@ export function getMesHabilitadoNE(now = new Date()) {
   return { anio: anioActual, mes: mesActual - 1 }
 }
 
+// Ventana de acceso anticipado — duplicado de getMesAnticipado en
+// backend/src/utils/mesVencidoNominaElectronica.js: en los últimos 3 días del mes calendario,
+// el mes EN CURSO (que el resto ve habilitado recién el día 1) ya lo ven las cuentas que
+// configuran la fecha límite. Solo para ver el mes y editar su fecha; los estados siguen
+// bloqueados hasta que el mes esté habilitado. Fuera de la ventana devuelve null.
+export function getMesAnticipadoNE(now = new Date()) {
+  const ultimoDia = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  if (ultimoDia - now.getDate() > 3) return null
+  return { anio: now.getFullYear(), mes: now.getMonth() + 1 }
+}
+
 // Traducción de cómo se llevaba en el Excel — el estado real tiene 4 colores,
 // no 3: por defecto una empresa está SIN MARCAR (blanco, nadie ha avisado
 // nada); se pone en ROJO cuando avisan que ya se puede presentar (sigue

@@ -29,6 +29,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (server) server.close();
+  // Sin esto el pool de pg mantiene Jest colgado al terminar.
+  if (server) await require('../../src/config/database').pool.end();
 });
 
 describe('GET /api/tasks', () => {

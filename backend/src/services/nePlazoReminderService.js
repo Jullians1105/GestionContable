@@ -2,13 +2,15 @@
 // avisos de calendario, no de hora puntual). La fecha límite (ne_plazo.fecha_limite) sigue
 // siendo 100% manual — el usuario decidió (2026-09-21) no automatizarla por festivos porque no
 // confía en la fuente de festivos disponible; ver requireNEPlazoAdmin, que restringe quién la
-// puede editar a una sola cuenta de confianza.
+// puede editar a dos cuentas de confianza. Desde la migración 061 hay una fecha por mes
+// (ne_plazo_mes), no una global.
 const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const logger = require('../utils/logger');
 const { sendPushToUser } = require('./pushService');
-const { getMesHabilitado } = require('../utils/mesVencidoNominaElectronica');
+const { getMesHabilitado, getMesAnticipado } = require('../utils/mesVencidoNominaElectronica');
+const { IDS_RESPONSABLES_PLAZO } = require('../middleware/nominaElectronicaAccess');
 const { joinMesPrevio, SQL_HEREDADA } = require('../utils/nominaElectronicaArrastre');
 
 const MESES_ES = [
@@ -66,9 +68,25 @@ async function yaSeEnvioHoy(type) {
   return rows.length > 0;
 }
 
-async function getFechaLimite() {
-  const { rows } = await db.query('SELECT fecha_limite FROM ne_plazo WHERE id = 1');
+// Fecha límite de un mes de trabajo concreto (ne_plazo_mes, migración 061) — cada mes tiene la
+// suya, ya no hay una global.
+async function getFechaLimite(anio, mes) {
+  const { rows } = await db.query(
+    'SELECT fecha_limite FROM ne_plazo_mes WHERE anio = $1 AND mes = $2',
+    [anio, mes]
+  );
   return rows[0]?.fecha_limite ?? null;
+}
+
+// ¿Ya se envió este tipo de aviso en lo que va del mes calendario? El aviso de "mes habilitado"
+// ya no depende de que el servidor esté prendido justo el día 1 (se apaga cada noche, ver
+// docs/DEPLOY.md): sale la primera vez que corre en el mes, sea el día que sea.
+async function yaSeEnvioEsteMes(type) {
+  const { rows } = await db.query(
+    `SELECT 1 FROM notifications WHERE type = $1 AND created_at >= date_trunc('month', NOW()) LIMIT 1`,
+    [type]
+  );
+  return rows.length > 0;
 }
 
 // Para cada responsable con empresas de Nómina Electrónica asignadas: cuántas siguen sin marcar
@@ -91,16 +109,15 @@ async function contarPorResponsable(anio, mes) {
     .filter((r) => r.pendientes > 0 || r.porRevisar > 0);
 }
 
-// Día 1 del mes: avisa a quien tiene acceso al módulo (no solo a los responsables — acá es un
-// aviso general de "ya se puede empezar a trabajar el mes").
+// Una vez por mes, la primera vez que el servidor está prendido en él (normalmente el día 1):
+// avisa a quien tiene acceso al módulo (no solo a los responsables — acá es un aviso general
+// de "ya se puede empezar a trabajar el mes").
 async function avisarMesHabilitado(io) {
   try {
-    const hoy = new Date();
-    if (hoy.getDate() !== 1) return;
-    if (await yaSeEnvioHoy('ne_mes_habilitado')) return;
+    if (await yaSeEnvioEsteMes('ne_mes_habilitado')) return;
 
-    const { anio, mes } = getMesHabilitado(hoy);
-    const fechaLimite = await getFechaLimite();
+    const { anio, mes } = getMesHabilitado(new Date());
+    const fechaLimite = await getFechaLimite(anio, mes);
     const fechaLimiteISO = toISODateOnly(fechaLimite);
     const fechaStr = fechaLimiteISO
       ? (() => {
@@ -128,7 +145,8 @@ async function avisarMesHabilitado(io) {
 // 5 días antes de la fecha límite manual — por responsable, con sus propios conteos.
 async function avisarPlazoProximo(io) {
   try {
-    const fechaLimite = await getFechaLimite();
+    const { anio, mes } = getMesHabilitado(new Date());
+    const fechaLimite = await getFechaLimite(anio, mes);
     const fechaLimiteISO = toISODateOnly(fechaLimite);
     if (!fechaLimiteISO) return;
 
@@ -136,7 +154,6 @@ async function avisarPlazoProximo(io) {
     if (diasFaltantes !== 5) return;
     if (await yaSeEnvioHoy('ne_plazo_proximo')) return;
 
-    const { anio, mes } = getMesHabilitado(new Date());
     const responsables = await contarPorResponsable(anio, mes);
     for (const r of responsables) {
       const mensaje = `Quedan 5 días para el plazo de Nómina Electrónica. Tienes ${r.pendientes} pendiente${r.pendientes === 1 ? '' : 's'} y ${r.porRevisar} en espera.`;
@@ -151,13 +168,13 @@ async function avisarPlazoProximo(io) {
 // El mismo día de la fecha límite — mismo criterio, por responsable.
 async function avisarPlazoVencido(io) {
   try {
-    const fechaLimite = await getFechaLimite();
+    const { anio, mes } = getMesHabilitado(new Date());
+    const fechaLimite = await getFechaLimite(anio, mes);
     const fechaLimiteISO = toISODateOnly(fechaLimite);
     if (!fechaLimiteISO) return;
     if (hoyISO() !== fechaLimiteISO) return;
     if (await yaSeEnvioHoy('ne_plazo_vencido')) return;
 
-    const { anio, mes } = getMesHabilitado(new Date());
     const responsables = await contarPorResponsable(anio, mes);
     for (const r of responsables) {
       const mensaje = `Hoy vence el plazo de Nómina Electrónica. Tienes ${r.pendientes} pendiente${r.pendientes === 1 ? '' : 's'} y ${r.porRevisar} en espera.`;
@@ -169,13 +186,44 @@ async function avisarPlazoVencido(io) {
   }
 }
 
-function initNEPlazoCron(io) {
-  cron.schedule('0 8 * * *', () => {
-    avisarMesHabilitado(io);
-    avisarPlazoProximo(io);
-    avisarPlazoVencido(io);
-  });
-  logger.info('Cron de avisos de Nómina Electrónica inicializado (diario 8am)');
+// Últimos 3 días del mes: avisa a las cuentas que configuran la fecha límite (IDS_RESPONSABLES_PLAZO)
+// que falta la del mes en curso — el que el resto verá habilitado el día 1 (ver
+// getMesAnticipado). Se repite cada día de la ventana mientras siga sin configurar y deja de
+// avisar apenas hay fecha.
+async function avisarConfigurarPlazo(io) {
+  try {
+    const hoy = new Date();
+    const anticipado = getMesAnticipado(hoy);
+    if (!anticipado) return;
+    if (await getFechaLimite(anticipado.anio, anticipado.mes)) return;
+    if (await yaSeEnvioHoy('ne_configurar_plazo')) return;
+
+    const mensaje = `Configura la fecha límite de Nómina Electrónica de ${MESES_ES[anticipado.mes - 1]} de ${anticipado.anio}: el mes se habilita para todos el día 1.`;
+    await notificarUsuarios(io, IDS_RESPONSABLES_PLAZO, 'ne_configurar_plazo', mensaje);
+    logger.info(anticipado, 'Aviso para configurar la fecha límite (Nómina Electrónica) enviado');
+  } catch (err) {
+    logger.error({ err }, 'Error enviando aviso para configurar la fecha límite (Nómina Electrónica)');
+  }
 }
 
-module.exports = { initNEPlazoCron, avisarMesHabilitado, avisarPlazoProximo, avisarPlazoVencido, contarPorResponsable };
+function correrAvisos(io) {
+  avisarMesHabilitado(io);
+  avisarPlazoProximo(io);
+  avisarPlazoVencido(io);
+  avisarConfigurarPlazo(io);
+}
+
+// El servidor se apaga cada noche (gestion-stop) y el contenedor corre en UTC, así que un cron
+// "a las 8am" casi nunca encontraba el backend prendido y no se envió ningún aviso. Por eso los
+// avisos también se revisan al arrancar (todos son idempotentes: yaSeEnvioHoy/yaSeEnvioEsteMes),
+// y el cron queda anclado a la hora de Colombia por si el servidor sí se queda prendido.
+function initNEPlazoCron(io) {
+  cron.schedule('0 8 * * *', () => correrAvisos(io), { timezone: 'America/Bogota' });
+  logger.info('Cron de avisos de Nómina Electrónica inicializado (diario 8am Bogotá y al arrancar)');
+  correrAvisos(io);
+}
+
+module.exports = {
+  initNEPlazoCron, avisarMesHabilitado, avisarPlazoProximo, avisarPlazoVencido,
+  avisarConfigurarPlazo, contarPorResponsable,
+};
