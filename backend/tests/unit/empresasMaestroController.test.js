@@ -188,6 +188,7 @@ describe('updateEmpresa', () => {
   test('renombrar cascada el nombre nuevo a las 4 tablas de módulo', async () => {
     const client = mockClient();
     client.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ nit: null, tipo_contribuyente: 'empresa', cedula_representante: null }] }) // SELECT actual
       .mockResolvedValueOnce({ rows: [{ id: 'empresa-1', name: 'ACME SAS', activa: true }] }) // UPDATE empresas
       .mockResolvedValue({ rows: [] }); // UPDATE de cada tabla de módulo + COMMIT
     db.getClient.mockResolvedValue(client);
@@ -205,7 +206,7 @@ describe('updateEmpresa', () => {
   test('empresa inexistente responde 404 y hace rollback', async () => {
     const client = mockClient();
     client.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // UPDATE no encontró nada
+      .mockResolvedValueOnce({ rows: [] }) // SELECT actual: no existe
       .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
     db.getClient.mockResolvedValue(client);
 
@@ -214,6 +215,84 @@ describe('updateEmpresa', () => {
     await updateEmpresa(req, res, mockNext);
 
     expect(res.status).toHaveBeenCalledWith(404);
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+});
+
+describe('updateEmpresa — documento (NIT / cédula)', () => {
+  // Devuelve los parámetros con los que se hizo el UPDATE de la fila de empresas:
+  // [nombre, activa, id, nit, tipo, cedulaRepresentante]
+  async function editar(actual, body) {
+    const client = mockClient();
+    client.query.mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [actual] }) // SELECT actual
+      .mockResolvedValueOnce({ rows: [{ id: 'e1', name: 'X', activa: true }] }) // UPDATE
+      .mockResolvedValue({ rows: [] });
+    db.getClient.mockResolvedValue(client);
+    db.query.mockResolvedValue({ rows: [] });
+    const res = mockRes();
+    await updateEmpresa(baseReq({ params: { id: 'e1' }, body }), res, mockNext);
+    const upd = client.query.mock.calls.find(([sql]) => sql.includes('UPDATE empresas SET'));
+    return { res, params: upd?.[1], client };
+  }
+
+  test('persona natural: la cédula escrita en "cédula representante" (formulario viejo) queda en nit', async () => {
+    const { params } = await editar(
+      { nit: null, tipo_contribuyente: 'natural', cedula_representante: null },
+      { tipoContribuyente: 'natural', nit: null, cedulaRepresentante: '74375727' }
+    );
+    expect(params[3]).toBe('74375727');
+    expect(params[5]).toBeNull();
+  });
+
+  test('persona natural: un body sin nit conserva el que ya tenía', async () => {
+    const { params } = await editar(
+      { nit: '46670846', tipo_contribuyente: 'natural', cedula_representante: null },
+      { activa: true }
+    );
+    expect(params[3]).toBe('46670846');
+  });
+
+  test('empresa: guarda NIT y cédula del representante por separado', async () => {
+    const { params } = await editar(
+      { nit: null, tipo_contribuyente: 'empresa', cedula_representante: null },
+      { tipoContribuyente: 'empresa', nit: '901234567', cedulaRepresentante: '1052395147' }
+    );
+    expect(params[3]).toBe('901234567');
+    expect(params[5]).toBe('1052395147');
+  });
+
+  test('cambiar de empresa a natural limpia el representante pero conserva el documento', async () => {
+    const { params } = await editar(
+      { nit: '901234567', tipo_contribuyente: 'empresa', cedula_representante: '1052395147' },
+      { tipoContribuyente: 'natural' }
+    );
+    expect(params[3]).toBe('901234567');
+    expect(params[5]).toBeNull();
+  });
+
+  test('limpia puntos, espacios y dígito de verificación', async () => {
+    const { params } = await editar(
+      { nit: null, tipo_contribuyente: 'empresa', cedula_representante: null },
+      { nit: ' 901.234.567-1 ' }
+    );
+    expect(params[3]).toBe('901234567');
+  });
+
+  test('vaciar el campo explícitamente deja el documento en null (empresa)', async () => {
+    const { params } = await editar(
+      { nit: '901234567', tipo_contribuyente: 'empresa', cedula_representante: null },
+      { nit: '' }
+    );
+    expect(params[3]).toBeNull();
+  });
+
+  test('un documento con letras responde 400 y hace rollback', async () => {
+    const { res, client } = await editar(
+      { nit: null, tipo_contribuyente: 'natural', cedula_representante: null },
+      { nit: '12ab34' }
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
     expect(client.query).toHaveBeenCalledWith('ROLLBACK');
   });
 });
@@ -312,6 +391,24 @@ describe('createEmpresa', () => {
 
     expect(db.query.mock.calls[0][1]).toEqual(['mock-uuid', 'ACME', null, null, null]);
     expect(res.status).toHaveBeenCalledWith(201);
+  });
+});
+
+describe('createEmpresa — documento', () => {
+  test('persona natural: la cédula va a nit y no se guarda representante', async () => {
+    db.query.mockResolvedValue({ rows: [{ id: 'n1', name: 'JUAN' }] });
+    const res = mockRes();
+    await createEmpresa(baseReq({ body: { name: 'Juan', tipoContribuyente: 'natural', nit: '1.052.395.147', cedulaRepresentante: '999' } }), res, mockNext);
+    const insert = db.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO empresas'));
+    expect(insert[1][2]).toBe('1052395147');
+    expect(insert[1][4]).toBeNull();
+  });
+
+  test('documento con letras responde 400 sin insertar', async () => {
+    const res = mockRes();
+    await createEmpresa(baseReq({ body: { name: 'ACME', tipoContribuyente: 'empresa', nit: 'abc' } }), res, mockNext);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(db.query).not.toHaveBeenCalled();
   });
 });
 

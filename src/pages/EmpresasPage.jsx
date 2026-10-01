@@ -119,8 +119,10 @@ export default function EmpresasPage() {
       await api.createEmpresaMaestro({
         name: nombre,
         tipoContribuyente: nuevaEmpresaForm.tipoContribuyente,
-        nit: nuevaEmpresaForm.tipoContribuyente === 'empresa' ? (nuevaEmpresaForm.nit.trim() || null) : null,
-        cedulaRepresentante: nuevaEmpresaForm.cedulaRepresentante.trim() || null,
+        nit: nuevaEmpresaForm.nit.trim() || null,
+        cedulaRepresentante: nuevaEmpresaForm.tipoContribuyente === 'empresa'
+          ? (nuevaEmpresaForm.cedulaRepresentante.trim() || null)
+          : null,
       })
       setModalNuevaEmpresa(false)
       await cargar()
@@ -154,7 +156,9 @@ export default function EmpresasPage() {
     setIdentidadEdit({
       name: empresa.name,
       tipoContribuyente: empresa.tipoContribuyente || 'empresa',
-      nit: empresa.nit || '',
+      // Persona natural con la cédula en el campo del representante (caso viejo, ver migración
+      // 062): se precarga en el campo del documento para que no parezca vacío.
+      nit: empresa.nit || (empresa.tipoContribuyente === 'natural' ? empresa.cedulaRepresentante : '') || '',
       cedulaRepresentante: empresa.cedulaRepresentante || '',
     })
     const drafts = {}
@@ -172,8 +176,11 @@ export default function EmpresasPage() {
       await api.updateEmpresaMaestro(empresaId, {
         name: identidadEdit.name,
         tipoContribuyente: identidadEdit.tipoContribuyente,
-        nit: identidadEdit.tipoContribuyente === 'empresa' ? (identidadEdit.nit || null) : null,
-        cedulaRepresentante: identidadEdit.cedulaRepresentante || null,
+        // El documento (NIT o cédula) siempre va en `nit`; el representante solo existe en empresas.
+        nit: identidadEdit.nit.trim() || null,
+        cedulaRepresentante: identidadEdit.tipoContribuyente === 'empresa'
+          ? (identidadEdit.cedulaRepresentante.trim() || null)
+          : null,
       })
       await cargar()
     } catch (err) {
@@ -607,26 +614,30 @@ export default function EmpresasPage() {
                                     </p>
                                   )}
                                 </div>
+                                <div>
+                                  <label className="text-[11px] font-semibold text-[#9ca3af] uppercase block mb-1">
+                                    {identidadEdit?.tipoContribuyente === 'natural' ? 'Cédula' : 'NIT'}
+                                  </label>
+                                  <input
+                                    value={identidadEdit?.nit ?? ''}
+                                    onChange={(e) => setIdentidadEdit((prev) => ({ ...prev, nit: e.target.value }))}
+                                    disabled={!puedeEditar}
+                                    inputMode="numeric"
+                                    className="w-full px-3 py-1.5 rounded-lg border border-[#d1d5db] bg-white text-sm text-[#191c1e] disabled:bg-[#f3f4f6] disabled:text-[#6b7280]"
+                                  />
+                                </div>
                                 {identidadEdit?.tipoContribuyente !== 'natural' && (
                                   <div>
-                                    <label className="text-[11px] font-semibold text-[#9ca3af] uppercase block mb-1">NIT</label>
+                                    <label className="text-[11px] font-semibold text-[#9ca3af] uppercase block mb-1">Cédula representante</label>
                                     <input
-                                      value={identidadEdit?.nit ?? ''}
-                                      onChange={(e) => setIdentidadEdit((prev) => ({ ...prev, nit: e.target.value }))}
+                                      value={identidadEdit?.cedulaRepresentante ?? ''}
+                                      onChange={(e) => setIdentidadEdit((prev) => ({ ...prev, cedulaRepresentante: e.target.value }))}
                                       disabled={!puedeEditar}
+                                      inputMode="numeric"
                                       className="w-full px-3 py-1.5 rounded-lg border border-[#d1d5db] bg-white text-sm text-[#191c1e] disabled:bg-[#f3f4f6] disabled:text-[#6b7280]"
                                     />
                                   </div>
                                 )}
-                                <div>
-                                  <label className="text-[11px] font-semibold text-[#9ca3af] uppercase block mb-1">Cédula representante</label>
-                                  <input
-                                    value={identidadEdit?.cedulaRepresentante ?? ''}
-                                    onChange={(e) => setIdentidadEdit((prev) => ({ ...prev, cedulaRepresentante: e.target.value }))}
-                                    disabled={!puedeEditar}
-                                    className="w-full px-3 py-1.5 rounded-lg border border-[#d1d5db] bg-white text-sm text-[#191c1e] disabled:bg-[#f3f4f6] disabled:text-[#6b7280]"
-                                  />
-                                </div>
                                 {puedeEditar && (
                                   <div className="flex items-center gap-2 mt-1">
                                     <button
@@ -785,26 +796,30 @@ export default function EmpresasPage() {
                   ))}
                 </div>
               </div>
+              <div>
+                <label className="text-xs font-semibold text-[#434655] block mb-1">
+                  {nuevaEmpresaForm.tipoContribuyente === 'natural' ? 'Cédula' : 'NIT'}
+                </label>
+                <input
+                  value={nuevaEmpresaForm.nit}
+                  onChange={(e) => setNuevaEmpresaForm((prev) => ({ ...prev, nit: e.target.value }))}
+                  placeholder={nuevaEmpresaForm.tipoContribuyente === 'natural' ? 'Ej. 1052395147' : 'Ej. 901234567'}
+                  inputMode="numeric"
+                  className="w-full px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#191c1e]"
+                />
+              </div>
               {nuevaEmpresaForm.tipoContribuyente === 'empresa' && (
                 <div>
-                  <label className="text-xs font-semibold text-[#434655] block mb-1">NIT</label>
+                  <label className="text-xs font-semibold text-[#434655] block mb-1">Cédula representante legal</label>
                   <input
-                    value={nuevaEmpresaForm.nit}
-                    onChange={(e) => setNuevaEmpresaForm((prev) => ({ ...prev, nit: e.target.value }))}
-                    placeholder="Ej. 901234567"
+                    value={nuevaEmpresaForm.cedulaRepresentante}
+                    onChange={(e) => setNuevaEmpresaForm((prev) => ({ ...prev, cedulaRepresentante: e.target.value }))}
+                    placeholder="Ej. 1052395147"
+                    inputMode="numeric"
                     className="w-full px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#191c1e]"
                   />
                 </div>
               )}
-              <div>
-                <label className="text-xs font-semibold text-[#434655] block mb-1">Cédula representante legal</label>
-                <input
-                  value={nuevaEmpresaForm.cedulaRepresentante}
-                  onChange={(e) => setNuevaEmpresaForm((prev) => ({ ...prev, cedulaRepresentante: e.target.value }))}
-                  placeholder="Ej. 1052395147"
-                  className="w-full px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#191c1e]"
-                />
-              </div>
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={() => setModalNuevaEmpresa(false)} className="flex-1 py-2 rounded-lg text-sm font-semibold text-[#434655] bg-[#f3f4f6]">
