@@ -194,12 +194,17 @@ export default function Dashboard() {
                   cambió por una flecha — el número no comunicaba nada (no hay un orden real
                   entre los accesos), la flecha sí dice "ir a". Aparece siempre, no solo en
                   hover, para no perder la pista visual de que la fila es clickeable. */}
-              <div className="grid grid-cols-1 sm:grid-cols-2">
+              {/* -mx-4 + px-4 en cada fila: el fondo de hover se extiende 16px a cada lado, así el
+                  ícono (izquierda) y la flecha (derecha) quedan con aire dentro del resaltado en
+                  ambas columnas, y el contenido sigue alineado con el título de la tarjeta. Antes
+                  la columna izquierda tenía el ícono pegado al borde del resaltado y la derecha
+                  la flecha. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 -mx-4">
                 {ACCESOS.map((item) => (
                   <Link
                     key={item.to}
                     to={item.to}
-                    className="group flex items-center gap-3.5 py-6 border-b border-[#e2e4ef] sm:odd:pr-4 sm:even:pl-4 sm:odd:border-r sm:[&:nth-last-child(-n+2)]:border-b-0 hover:bg-[#E3EEEE] transition-colors"
+                    className="group flex items-center gap-3.5 px-4 py-6 border-b border-[#e2e4ef] sm:odd:border-r sm:[&:nth-last-child(-n+2)]:border-b-0 hover:bg-[#E3EEEE] transition-colors"
                   >
                     <span className="w-11 h-11 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: item.bg }}>
                       <span className="material-symbols-outlined text-xl" style={{ color: item.accent }}>{item.icon}</span>
