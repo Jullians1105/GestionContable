@@ -17,4 +17,17 @@ function isMesHabilitado(anio, mes) {
   return (anio * 100 + mes) <= (anioHabilitado * 100 + mesHabilitado);
 }
 
-module.exports = { getMesHabilitado, isMesHabilitado };
+// Ventana de acceso anticipado: en los últimos 3 días del mes calendario, el mes EN CURSO (que
+// el resto verá habilitado recién el día 1 del mes siguiente) ya se muestra a las cuentas que
+// configuran la fecha límite, para que la dejen lista antes. Fuera de esa ventana devuelve null.
+// Solo habilita ver el mes y editar su fecha límite — marcar estados sigue exigiendo
+// isMesHabilitado.
+const DIAS_ANTICIPO_PLAZO = 3;
+
+function getMesAnticipado(now = new Date()) {
+  const ultimoDia = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  if (ultimoDia - now.getDate() > DIAS_ANTICIPO_PLAZO) return null;
+  return { anio: now.getFullYear(), mes: now.getMonth() + 1 };
+}
+
+module.exports = { getMesHabilitado, isMesHabilitado, getMesAnticipado };

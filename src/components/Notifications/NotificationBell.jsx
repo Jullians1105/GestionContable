@@ -23,9 +23,10 @@ const TYPE_ICONS = {
   ne_mes_habilitado: 'event_available',
   ne_plazo_proximo:  'schedule',
   ne_plazo_vencido:  'warning',
+  ne_configurar_plazo: 'edit_calendar',
 }
 
-const NE_NOTIF_TYPES = new Set(['ne_mes_habilitado', 'ne_plazo_proximo', 'ne_plazo_vencido'])
+const NE_NOTIF_TYPES = new Set(['ne_mes_habilitado', 'ne_plazo_proximo', 'ne_plazo_vencido', 'ne_configurar_plazo'])
 
 function timeAgo(str) {
   try { return formatDistanceToNow(parseISO(str), { addSuffix: true, locale: es }) } catch { return '' }

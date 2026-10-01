@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
+const { getMesHabilitado } = require('../utils/mesVencidoNominaElectronica');
 
 // El driver `pg` parsea columnas DATE a un objeto Date de JS (no a un string
 // "YYYY-MM-DD"), y res.json() lo serializa como timestamp ISO completo con
@@ -12,13 +13,21 @@ function toDateOnlyString(value) {
   return value.toISOString().slice(0, 10);
 }
 
-// Singleton (id=1) — ver migración 050. fecha_limite puede ser NULL (nunca
-// configurado todavía), el frontend lo maneja mostrando "sin configurar".
+// Fecha límite por mes de trabajo — ver migración 061 (ne_plazo_mes). Sin ?anio&mes devuelve la
+// del mes habilitado. fecha_limite puede no existir todavía (mes sin configurar): el frontend lo
+// muestra como "sin configurar".
 const getPlazo = async (req, res, next) => {
   try {
-    const result = await db.query('SELECT fecha_limite, updated_at FROM ne_plazo WHERE id = 1');
+    const habilitado = getMesHabilitado();
+    const anio = parseInt(req.query.anio ?? habilitado.anio, 10);
+    const mes  = parseInt(req.query.mes  ?? habilitado.mes, 10);
+    const result = await db.query(
+      'SELECT fecha_limite, updated_at FROM ne_plazo_mes WHERE anio = $1 AND mes = $2',
+      [anio, mes]
+    );
     const row = result.rows[0];
     res.json({
+      anio, mes,
       fechaLimite: toDateOnlyString(row?.fecha_limite),
       updatedAt:   row?.updated_at ?? null,
     });
@@ -29,14 +38,17 @@ const getPlazo = async (req, res, next) => {
 
 const updatePlazo = async (req, res, next) => {
   try {
-    const { fechaLimite } = req.body;
+    const { anio, mes, fechaLimite } = req.body;
     const result = await db.query(
-      `UPDATE ne_plazo SET fecha_limite = $1 WHERE id = 1 RETURNING fecha_limite, updated_at`,
-      [fechaLimite ?? null]
+      `INSERT INTO ne_plazo_mes (anio, mes, fecha_limite) VALUES ($1, $2, $3)
+       ON CONFLICT (anio, mes) DO UPDATE SET fecha_limite = EXCLUDED.fecha_limite
+       RETURNING fecha_limite, updated_at`,
+      [anio, mes, fechaLimite ?? null]
     );
-    await auditLog(req.user.userId, 'UPDATE', 'ne_plazo', 1, { fechaLimite });
-    req.io.emit('nominaElectronica:updated', { tipo: 'plazo' });
+    await auditLog(req.user.userId, 'UPDATE', 'ne_plazo_mes', `${anio}-${mes}`, { anio, mes, fechaLimite });
+    req.io.emit('nominaElectronica:updated', { tipo: 'plazo', anio, mes });
     res.json({
+      anio, mes,
       fechaLimite: toDateOnlyString(result.rows[0].fecha_limite),
       updatedAt:   result.rows[0].updated_at,
     });

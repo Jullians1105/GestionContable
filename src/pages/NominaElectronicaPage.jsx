@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
-import { ESTADOS_VISUAL, resolveEstadoVisual, ORIGEN_LABELS, ORIGEN_ACCENTS, MONTHS, getMesHabilitadoNE, formatFechaLimite, getPlazoColor } from '../data/nominaElectronica'
+import { ESTADOS_VISUAL, resolveEstadoVisual, ORIGEN_LABELS, ORIGEN_ACCENTS, MONTHS, getMesHabilitadoNE, getMesAnticipadoNE, formatFechaLimite, getPlazoColor } from '../data/nominaElectronica'
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
 import { useAuth } from '../context/AuthContext'
@@ -50,30 +50,38 @@ const PLAZO_ZONE_CLASS = {
 // el comentario en middleware/nominaElectronicaAccess.js). Si el backend rechaza (403) porque
 // esto se desincroniza, igual no deja guardar — esto es solo para no mostrarle a nadie más un
 // botón "Editar" que le va a fallar.
-const ID_RESPONSABLE_PLAZO = 'f2a82148-64d0-44a2-a0ac-37462ed43138'
+const IDS_RESPONSABLES_PLAZO = [
+  'f2a82148-64d0-44a2-a0ac-37462ed43138', // julliansadmin@gmail.com
+  '5e0ee191-e15b-482f-a7ff-463f8dcfea38', // diegonova@gmail.com
+]
 
 export default function NominaElectronicaPage() {
   const { isAdmin, user } = useAuth()
   const puedeGestionarCatalogo = isAdmin() || user?.permissions?.modulos?.nominaElectronica?.canGestionar === true
-  const puedeEditarPlazo = user?.id === ID_RESPONSABLE_PLAZO
+  const puedeEditarPlazo = IDS_RESPONSABLES_PLAZO.includes(user?.id)
   const { socket } = useSocket()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const habilitado = getMesHabilitadoNE()
   const habilitadoYM = toYM(habilitado.anio, habilitado.mes)
+  // Últimos 3 días del mes: las cuentas que configuran la fecha límite ya ven el mes en curso
+  // (solo lectura + su fecha), antes de que se habilite para todos el día 1.
+  const anticipado = puedeEditarPlazo ? getMesAnticipadoNE() : null
+  const techoYM = anticipado ? toYM(anticipado.anio, anticipado.mes) : habilitadoYM
 
   const [ym, setYm] = useState(() => {
     const anio = parseInt(searchParams.get('anio') ?? '', 10)
     const mes  = parseInt(searchParams.get('mes') ?? '', 10)
     if (mes >= 1 && mes <= 12 && anio >= 2000) {
       const v = toYM(anio, mes)
-      if (v >= START_YM && v <= habilitadoYM) return v
+      if (v >= START_YM && v <= techoYM) return v
     }
     return habilitadoYM
   })
   const { anio, mes } = fromYM(ym)
   const atFloor   = ym <= START_YM
-  const atCeiling = ym >= habilitadoYM
+  const atCeiling = ym >= techoYM
+  const soloPlazo = ym > habilitadoYM // mes aún no habilitado: se ve, pero no se marcan estados
 
   const [rows,    setRows]    = useState([])
   const [loading, setLoading] = useState(true)
@@ -119,10 +127,10 @@ export default function NominaElectronicaPage() {
 
   const fetchPlazo = useCallback(async () => {
     try {
-      const data = await api.getNEPlazo()
+      const data = await api.getNEPlazo(anio, mes)
       setPlazo(data)
     } catch { /* no crítico — el aviso simplemente no aparece */ }
-  }, [])
+  }, [anio, mes])
 
   useEffect(() => { fetchPlazo() }, [fetchPlazo])
 
@@ -134,7 +142,7 @@ export default function NominaElectronicaPage() {
   async function savePlazo() {
     setSavingPlazo(true)
     try {
-      const data = await api.updateNEPlazo(plazoDraft || null)
+      const data = await api.updateNEPlazo(anio, mes, plazoDraft || null)
       setPlazo(data)
       setEditandoPlazo(false)
     } catch (err) {
@@ -262,6 +270,7 @@ export default function NominaElectronicaPage() {
   function nextMonth() { if (!atCeiling) setYm(nextYM(ym)) }
 
   function handleCellClick(empresaId, e) {
+    if (soloPlazo) return // el backend igual lo rechazaría (mes no habilitado)
     // Defensivo: si por lo que sea quedó algo sin flushear de la celda
     // anterior (no debería, el mousedown de afuera ya lo hizo), no se
     // arrastra al abrir una celda nueva.
@@ -440,6 +449,13 @@ export default function NominaElectronicaPage() {
           )}
         </div>
       </div>
+
+      {soloPlazo && (
+        <div className="flex items-center gap-2 rounded-xl border border-[#e2e4ef] bg-[#f9fafb] px-3 py-2 text-xs text-[#4b5563]">
+          <span className="material-symbols-outlined text-base">lock_clock</span>
+          Este mes se habilita para todos el día 1. Por ahora solo puedes configurar su fecha límite.
+        </div>
+      )}
 
       {/* ── Fila superior: aviso de plazo (ancho justo a su texto) + barra de
           progreso de responsables ocupando el resto — antes el aviso de plazo

@@ -363,9 +363,9 @@ export const api = {
   },
 
   // Nómina Electrónica — Plazo de presentación (editado a mano)
-  getNEPlazo: () => request('/nomina-electronica/plazo'),
-  updateNEPlazo: (fechaLimite) =>
-    request('/nomina-electronica/plazo', { method: 'PUT', body: JSON.stringify({ fechaLimite }) }),
+  getNEPlazo: (anio, mes) => request(`/nomina-electronica/plazo?${new URLSearchParams({ anio, mes })}`),
+  updateNEPlazo: (anio, mes, fechaLimite) =>
+    request('/nomina-electronica/plazo', { method: 'PUT', body: JSON.stringify({ anio, mes, fechaLimite }) }),
 
   // DIAN
   uploadDian: (formData) =>
