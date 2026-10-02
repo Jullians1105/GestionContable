@@ -276,3 +276,63 @@ describe('fechaActualizacionFuente', () => {
     expect(await fechaActualizacionFuente()).toBeNull();
   });
 });
+
+describe('consultarRues — reintentos con pausa (búsqueda)', () => {
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+  afterAll(() => {
+    delete global.fetch;
+  });
+
+  test('un 503 seguido de una respuesta buena sale bien con 1 reintento (el caso real que vio el usuario)', async () => {
+    global.fetch
+      .mockResolvedValueOnce(respuesta({}, { ok: false, status: 503 }))
+      .mockResolvedValueOnce(respuesta([fila()]));
+    const r = await consultarRues(['900123456'], { timeoutMs: 4000, reintentos: 1, pausaMs: 5 });
+    expect(r.get('900123456').consulta).toBe('encontrado');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('sin reintentos (el comportamiento anterior) el mismo 503 dejaba la consulta en error', async () => {
+    global.fetch.mockResolvedValueOnce(respuesta({}, { ok: false, status: 503 }));
+    const r = await consultarRues(['900123456'], { timeoutMs: 4000, reintentos: 0 });
+    expect(r.get('900123456')).toEqual({ consulta: 'error' });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('espera la pausa antes de reintentar', async () => {
+    global.fetch
+      .mockResolvedValueOnce(respuesta({}, { ok: false, status: 503 }))
+      .mockResolvedValueOnce(respuesta([fila()]));
+    const t0 = Date.now();
+    await consultarRues(['900123456'], { reintentos: 1, pausaMs: 120 });
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(110);
+  });
+
+  test('una consulta que se cuelga se corta por tiempo y se reintenta; si el reintento responde, sale bien', async () => {
+    global.fetch
+      .mockImplementationOnce((url, { signal }) => new Promise((resolver, rechazar) => {
+        signal.addEventListener('abort', () => rechazar(new Error('abortado')));
+      }))
+      .mockResolvedValueOnce(respuesta([fila()]));
+    const t0 = Date.now();
+    const r = await consultarRues(['900123456'], { timeoutMs: 40, reintentos: 1, pausaMs: 5 });
+    expect(r.get('900123456').consulta).toBe('encontrado');
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(Date.now() - t0).toBeLessThan(1000);
+  });
+
+  test('si los dos intentos fallan, queda en error (nunca lanza)', async () => {
+    global.fetch.mockResolvedValue(respuesta({}, { ok: false, status: 503 }));
+    const r = await consultarRues(['900123456'], { reintentos: 1, pausaMs: 5 });
+    expect(r.get('900123456')).toEqual({ consulta: 'error' });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('un error 4xx (distinto de 429) no se reintenta aunque haya reintentos disponibles', async () => {
+    global.fetch.mockResolvedValue(respuesta({}, { ok: false, status: 400 }));
+    await consultarRues(['900123456'], { reintentos: 1, pausaMs: 5 });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+});
