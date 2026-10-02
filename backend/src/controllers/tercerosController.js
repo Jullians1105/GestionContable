@@ -1,7 +1,7 @@
 const db = require('../config/database');
 const { extraerTerceroDePdf, describirRegimenFiscal, DocumentoNoFacturaError, FormatoNoReconocidoError } = require('../services/terceros');
 const { limpiarIdentificacion } = require('../services/exogenas/utils/dian');
-const { consultarRues, clasificarEstado } = require('../services/terceros/ruesService');
+const { consultarRues, clasificarEstado, fechaActualizacionFuente } = require('../services/terceros/ruesService');
 const { nombresSeParecen } = require('../utils/nombresSeParecen');
 const logger = require('../utils/logger');
 
@@ -301,22 +301,31 @@ const consultarTercero = async (req, res, next) => {
       // responde, se muestra lo último guardado y se avisa que puede estar desactualizado.
       let fila = rows[0];
       let ruesDesactualizado = false;
-      const resultadoRues = (await consultarRues([nit], OPCIONES_BUSQUEDA)).get(nit);
+      // La fecha de la última "foto" del RUES se pregunta en paralelo (y se recuerda una hora): sirve
+      // para mostrar qué tan al día está el dato, que NO es "de hoy" sino el de esa foto.
+      const [consultas, fuente] = await Promise.all([consultarRues([nit], OPCIONES_BUSQUEDA), fechaActualizacionFuente()]);
+      const resultadoRues = consultas.get(nit);
       if (resultadoRues?.consulta === 'error') {
         ruesDesactualizado = true;
       } else if (resultadoRues) {
         fila = (await guardarVerificacion(nit, resultadoRues)) ?? fila;
       }
-      return res.status(200).json({ ...armarRespuestaTercero(fila), ruesDesactualizado });
+      return res.status(200).json({
+        ...armarRespuestaTercero(fila), ruesDesactualizado, ruesFuenteActualizadaAl: fuente ? fuente.toISOString() : null,
+      });
     }
 
     // No está guardado (nunca llegó una factura suya): se consulta el RUES en vivo y, si
     // aparece, se muestra marcado como "solo RUES" y SIN guardar — a propósito no hay forma de
     // guardar un tercero sin factura: sin dirección/país el registro no sirve para la exógena.
     // Los terceros se crean al subir una factura (y ahí se verifican solos).
-    const resultado = (await consultarRues([nit], OPCIONES_BUSQUEDA)).get(nit);
+    const [consultasVivo, fuenteVivo] = await Promise.all([consultarRues([nit], OPCIONES_BUSQUEDA), fechaActualizacionFuente()]);
+    const resultado = consultasVivo.get(nit);
     if (resultado?.consulta === 'encontrado') {
-      return res.status(200).json(armarRespuestaTercero(filaDesdeRues(nit, resultado.datos), { guardado: false }));
+      return res.status(200).json({
+        ...armarRespuestaTercero(filaDesdeRues(nit, resultado.datos), { guardado: false }),
+        ruesFuenteActualizadaAl: fuenteVivo ? fuenteVivo.toISOString() : null,
+      });
     }
     return res.status(404).json({
       error: resultado?.consulta === 'error'

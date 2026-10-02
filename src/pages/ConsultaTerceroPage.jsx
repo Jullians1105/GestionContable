@@ -113,8 +113,13 @@ export default function ConsultaTerceroPage() {
 
   const hayFactura = tercero ? tercero.origen !== 'rues' : false
   const hayRues = tercero ? tercero.rues_consulta === 'encontrado' : false
+  // Fecha de la última "foto" de los datos del RUES (el dato NO es de hoy: Confecámaras lo publica de
+  // vez en cuando). Se muestra para que "consultado ahora" no se confunda con "dato de ahora".
+  const fechaFuente = tercero?.ruesFuenteActualizadaAl
+    ? new Date(tercero.ruesFuenteActualizadaAl).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : null
   const fechaRues = tercero?.rues_consultado_at
-    ? new Date(tercero.rues_consultado_at).toLocaleDateString('es-CO')
+    ? new Date(tercero.rues_consultado_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
     : null
   // Cada búsqueda consulta el RUES; si no respondió, se muestra lo último guardado y se avisa.
   const alertas = tercero
@@ -266,10 +271,12 @@ export default function ConsultaTerceroPage() {
               chip="RUES"
               chipClases="bg-[#E3EEEE] text-[#003B43]"
               subtitulo={tercero.guardado === false
-                ? 'Consulta en vivo · se guarda al subir una factura de este tercero'
+                ? (fechaFuente ? `Datos del RUES al ${fechaFuente}` : 'Consulta en vivo')
                 : (tercero.ruesDesactualizado
-                  ? `Última verificación: ${fechaRues ?? 'nunca'}`
-                  : 'Consultado ahora en el registro mercantil (RUES)')}
+                  ? `Última verificación: ${fechaRues ?? 'nunca'}${fechaFuente ? ` · datos del RUES al ${fechaFuente}` : ''}`
+                  : (fechaFuente
+                    ? `Datos del RUES al ${fechaFuente} · consultado ahora`
+                    : 'Consultado ahora en el registro mercantil (RUES)'))}
             >
               {hayRues ? (
                 <div className="divide-y divide-[#f0f2f8]">

@@ -53,6 +53,16 @@ function getNEPerm(user, key) {
   return user.permissions?.modulos?.nominaElectronica?.[key] ?? false
 }
 
+// Directorio de empresas (/empresas). El administrador siempre puede actualizar la matrícula
+// (RUES); este permiso se lo da a otros usuarios — validado en el backend, ver empresasAccess.js.
+const EMPRESAS_PERMS = [
+  { key: 'canActualizarMatricula', icon: 'sync', label: 'Actualizar matrícula (RUES)' },
+]
+
+function getEmpresasPerm(user, key) {
+  return user.permissions?.modulos?.empresas?.[key] ?? false
+}
+
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Administrador' },
   { value: 'leader', label: 'Líder' },
@@ -242,6 +252,23 @@ export default function UsersManager() {
     }
   }
 
+  const handleToggleEmpresasPerm = async (user, key) => {
+    const currentModulos = user.permissions?.modulos ?? {}
+    const current = currentModulos.empresas?.[key] ?? false
+    const updated = {
+      ...(user.permissions ?? {}),
+      modulos: {
+        ...currentModulos,
+        empresas: { ...currentModulos.empresas, [key]: !current },
+      },
+    }
+    try {
+      await updateMember(user.id, { permissions: updated })
+    } catch (err) {
+      addToast(err.message || 'Error al actualizar permisos de Empresas', 'error')
+    }
+  }
+
   const handleDelete = async (userId) => {
     try {
       await deleteMember(userId)
@@ -324,13 +351,18 @@ export default function UsersManager() {
                   Nómina Electrónica
                 </th>
               )}
+              {showPermCols && (
+                <th className="px-4 py-3 text-xs font-semibold text-[#434655] text-left hidden lg:table-cell">
+                  Empresas
+                </th>
+              )}
               <th className="px-4 py-3 text-xs font-semibold text-[#434655] text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#edeef0]">
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={showPermCols ? 7 : 4} className="text-center py-10 text-sm text-[#434655]">
+                <td colSpan={showPermCols ? 8 : 4} className="text-center py-10 text-sm text-[#434655]">
                   No se encontraron usuarios
                 </td>
               </tr>
@@ -476,6 +508,31 @@ export default function UsersManager() {
                       </td>
                     )}
 
+                    {/* ── Empresas (directorio) perms ────────────────── */}
+                    {showPermCols && (
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {EMPRESAS_PERMS.map(({ key, icon, label }) => {
+                            const active = getEmpresasPerm(user, key)
+                            return (
+                              <button
+                                key={key}
+                                title={label}
+                                onClick={() => handleToggleEmpresasPerm(user, key)}
+                                className="w-6 h-6 rounded flex items-center justify-center transition hover:scale-110"
+                                style={{
+                                  background: active ? '#dcfce7' : '#f3f4f6',
+                                  color:      active ? '#16a34a' : '#9ca3af',
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{icon}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </td>
+                    )}
+
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         {showPermCols && (
@@ -524,7 +581,7 @@ export default function UsersManager() {
                   </tr>
                   {isExpanded && (
                     <tr className="bg-[#eef3ff]">
-                      <td colSpan={showPermCols ? 7 : 4} className="px-6 py-4 space-y-4">
+                      <td colSpan={showPermCols ? 8 : 4} className="px-6 py-4 space-y-4">
                         {/* Gestor de Tareas */}
                         <div>
                           <p className="text-xs font-semibold text-[#434655] mb-3 flex items-center gap-1.5">
@@ -649,6 +706,31 @@ export default function UsersManager() {
                                   type="checkbox"
                                   checked={getNEPerm(user, key)}
                                   onChange={() => handleToggleNEPerm(user, key)}
+                                  className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
+                                />
+                                <span className="material-symbols-outlined text-[#8890b5]" style={{ fontSize: 13 }}>{icon}</span>
+                                <span className="text-xs text-[#191c1e]">{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Empresas (directorio) */}
+                        <div>
+                          <p className="text-xs font-semibold text-[#434655] mb-3 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">contacts</span>
+                            Empresas
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {EMPRESAS_PERMS.map(({ key, icon, label }) => (
+                              <label
+                                key={key}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-[#c3c6d7] cursor-pointer hover:border-[#004ac6] transition select-none"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={getEmpresasPerm(user, key)}
+                                  onChange={() => handleToggleEmpresasPerm(user, key)}
                                   className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
                                 />
                                 <span className="material-symbols-outlined text-[#8890b5]" style={{ fontSize: 13 }}>{icon}</span>
