@@ -120,14 +120,18 @@ Bugs reales encontrados durante esta reconciliación, por si se repite un trabaj
   RESTAURANTE, VILLA, CLUB, FINCA, HACIENDA, CONSTRUCCIONES, CONTROLES) no se filtran — genera
   ruido real pero manejable con el botón "No es duplicado". No filtrar más palabras sin que el
   usuario lo pida explícitamente (ya pasó una vez con "ASOCIACION").
-- Migrar los 4 puntos de creación actuales (Fondo Emprender, Empresas Externas, Nómina
-  Electrónica, combobox de Contabilidad) para que busquen/creen contra el directorio maestro en
-  vez de crear directo en su propia tabla — sigue sin hacerse, es el único paso del plan original
-  que quedó fuera. Sin esto, alguien puede seguir creando una empresa duplicada desde esas 4
-  pantallas sin pasar por el directorio.
-- Edición de NIT/cédula desde el directorio: hoy se escribe directo en la base de datos cuando
-  hace falta corregir algo puntual (no hay UI para eso todavía). Si se vuelve frecuente, valdría
-  la pena agregar un formulario en `EmpresasPage.jsx`.
+- ~~Migrar los 4 puntos de creación (Fondo Emprender, Empresas Externas, Nómina Electrónica,
+  combobox de Contabilidad) para que pasen por el directorio maestro~~ — **HECHO** (verificado
+  contra el código y producción el 2026-10-02; este documento lo daba por pendiente y estaba
+  desactualizado). Los routers de los 4 módulos ya **no tienen ninguna ruta `POST` de creación**:
+  las empresas se crean solo en `/empresas` (`createEmpresa` en `empresasMaestroController.js`)
+  y de ahí se "habilitan" por módulo (`POST /api/empresas/:id/habilitar`), que es lo único que
+  inserta en `fondo_empresas`, `ext_empresas`, `ne_empresas` y `contab_empresas`. En producción
+  ninguna fila de esas 4 tablas queda sin `empresa_id` (67 + 35 + 114 + 52 filas, 162 empresas
+  en el directorio).
+- ~~Edición de NIT/cédula desde el directorio~~ — **HECHO**: `EmpresasPage.jsx` tiene el
+  formulario de edición de identidad (nombre, tipo de contribuyente y NIT/cédula) y llama a
+  `PUT /api/empresas/:id`; ya no hace falta tocar la base de datos para corregirlos.
 
 ---
 
