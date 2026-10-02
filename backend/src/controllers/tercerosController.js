@@ -13,9 +13,12 @@ const DIAS_REVERIFICACION = 30;
 // Tope por llamada del repaso por lote: ~19 s por cada 861 documentos medido en producción.
 const MAX_LOTE_VERIFICACION = 2000;
 let verificacionLoteEnCurso = false;
-// En la búsqueda hay una persona esperando: se espera menos que en los procesos en segundo plano
-// (que sí reintentan y esperan hasta 10 s). Si no alcanza, se muestra lo último guardado.
-const OPCIONES_BUSQUEDA = { timeoutMs: 6000, reintentos: 0 };
+// En la búsqueda hay una persona esperando: por intento se espera menos que en los procesos en
+// segundo plano (que esperan hasta 10 s). El servicio de datos abiertos (datos.gov.co) falla de forma
+// INTERMITENTE (el 2026-10-02: ~1 de cada 10 consultas daba 503 o se colgaba), así que se reintenta
+// una vez tras una pausa corta: un 503 responde en < 0,5 s, el reintento casi no se nota. Peor caso
+// ≈ 4 s + 0,3 s + 4 s. Si aun así no responde, se muestra lo último guardado con el aviso.
+const OPCIONES_BUSQUEDA = { timeoutMs: 4000, reintentos: 1, pausaMs: 300 };
 
 const necesitaVerificacion = (fila) =>
   !fila.rues_consultado_at

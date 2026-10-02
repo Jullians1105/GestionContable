@@ -93,7 +93,7 @@ function aDatos(registro) {
   };
 }
 
-async function pedirLote(documentos, { timeoutMs = TIMEOUT_MS, reintentos = REINTENTOS } = {}) {
+async function pedirLote(documentos, { timeoutMs = TIMEOUT_MS, reintentos = REINTENTOS, pausaMs = 0 } = {}) {
   const lista = documentos.map((d) => `'${d}'`).join(',');
   const params = new URLSearchParams({
     $select: CAMPOS.join(','),
@@ -105,6 +105,9 @@ async function pedirLote(documentos, { timeoutMs = TIMEOUT_MS, reintentos = REIN
 
   let ultimoError;
   for (let intento = 0; intento <= reintentos; intento += 1) {
+    // Una pausa corta antes de reintentar: si el servicio está saturado (503), pegarle de nuevo al
+    // instante suele fallar otra vez.
+    if (intento > 0 && pausaMs > 0) await new Promise((resolver) => setTimeout(resolver, pausaMs));
     const controlador = new AbortController();
     const temporizador = setTimeout(() => controlador.abort(), timeoutMs);
     try {
@@ -129,7 +132,7 @@ async function pedirLote(documentos, { timeoutMs = TIMEOUT_MS, reintentos = REIN
 // Recibe documentos (NIT/cédula, con o sin formato) y devuelve un Map documento -> resultado:
 //   { consulta: 'encontrado', datos } | { consulta: 'no_encontrado' } | { consulta: 'error' }
 // Los documentos inválidos (vacíos, ceros) se omiten del Map: no se pueden consultar.
-// `opciones` ({ timeoutMs, reintentos }) permite una consulta más impaciente cuando hay una persona
+// `opciones` ({ timeoutMs, reintentos, pausaMs }) permite una consulta más impaciente cuando hay una persona
 // esperando en pantalla (la búsqueda), frente a los procesos en segundo plano.
 async function consultarRues(documentos, opciones) {
   const unicos = [...new Set(documentos.map(normalizarDocumento).filter(Boolean))];

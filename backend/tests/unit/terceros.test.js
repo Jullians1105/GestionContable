@@ -649,10 +649,10 @@ describe('consultarTercero', () => {
     expect(cuerpo.alertas.map((a) => a.codigo)).toContain('matricula_cancelada');
   });
 
-  test('en la búsqueda espera poco al RUES (hay alguien mirando la pantalla)', async () => {
+  test('en la búsqueda espera poco por intento pero reintenta una vez (el servicio falla de forma intermitente)', async () => {
     db.query.mockResolvedValue({ rows: [{ nit: '901939874', razon_social: 'X', tiene_pdf: true }] });
     await consultarTercero({ params: { nit: '901939874' } }, mockRes(), jest.fn());
-    expect(consultarRues).toHaveBeenCalledWith(['901939874'], { timeoutMs: 6000, reintentos: 0 });
+    expect(consultarRues).toHaveBeenCalledWith(['901939874'], { timeoutMs: 4000, reintentos: 1, pausaMs: 300 });
   });
 
   test('si el RUES no responde, muestra lo último guardado, avisa que puede estar desactualizado y no escribe', async () => {
