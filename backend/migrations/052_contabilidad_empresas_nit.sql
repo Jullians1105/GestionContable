@@ -15,7 +15,7 @@
 -- sobre uno más reciente y real.
 
 UPDATE contab_empresas SET nit = '901790075' WHERE name = 'ACCADEMIA DELLA PASTA TUNJA S.A.S' AND nit IS NULL;
-UPDATE contab_empresas SET nit = '901800656' WHERE name = 'AYC GANADERIA LAS MARIAS S.A.S (RST)' AND nit IS NULL;
+UPDATE contab_empresas SET nit = '901800656' WHERE name = 'AYC GANADERIA LAS MARIAS S.A.S' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901628937' WHERE name = 'CAFE EL LANCERO' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '902062338' WHERE name = 'CARGO GROUP' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901794612' WHERE name = 'CATACAKES PASTELERIA CREATIVA' AND nit IS NULL;
@@ -25,7 +25,7 @@ UPDATE contab_empresas SET nit = '901786191' WHERE name = 'COMPAÑIA DE DANZA VI
 UPDATE contab_empresas SET nit = '901445854' WHERE name = 'CONSTRUCCIONES EL MOLINO' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '826001659' WHERE name = 'CONTROLES INDUSTRIALES' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901797513' WHERE name = 'DAYMON' AND nit IS NULL;
-UPDATE contab_empresas SET nit = '901796876' WHERE name = 'ECM INGENIERIA COL S.A.S (RST)' AND nit IS NULL;
+UPDATE contab_empresas SET nit = '901796876' WHERE name = 'ECM INGENIERIA COL S.A.S' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901795146' WHERE name = 'ECOVAPOR MULTISERVICIOS' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '900746343' WHERE name = 'ENCOFRADOS BOYACA' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901792223' WHERE name = 'ESCUELA MINERO SIDERURGICA' AND nit IS NULL;
@@ -33,7 +33,7 @@ UPDATE contab_empresas SET nit = '901793974' WHERE name = 'ESSENZA ACCESORIOS S.
 UPDATE contab_empresas SET nit = '901178092' WHERE name = 'FE ROOM' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901816250' WHERE name = 'FINCA AGROPECUARIA SAN RAFAEL S.A.S' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901798011' WHERE name = 'FOUR HILLS TENNIS CLUB' AND nit IS NULL;
-UPDATE contab_empresas SET nit = '901792586' WHERE name = 'FRUTIN HELADO ARTESANAL DESDE 1965 (RST)' AND nit IS NULL;
+UPDATE contab_empresas SET nit = '901792586' WHERE name = 'FRUTIN HELADO ARTESANAL DESDE 1965' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901782992' WHERE name = 'FUNDACION NUESTRA SEÑORA DE BELENCITO' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901993850' WHERE name = 'FUNDACION SUBMERCE CULTURA Y FUTURO' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901918843' WHERE name = 'GANADERIA F.M&L SAS' AND nit IS NULL;
@@ -41,7 +41,7 @@ UPDATE contab_empresas SET nit = '901603900' WHERE name = 'GRANOMIEL' AND nit IS
 UPDATE contab_empresas SET nit = '901814240' WHERE name = 'HACIENDA PINZON' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901557533' WHERE name = 'HELICESOLUCIONESINTEGRALES' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901793944' WHERE name = 'HERENCIA PASTRY' AND nit IS NULL;
-UPDATE contab_empresas SET nit = '901792613' WHERE name = 'HONGOS DEL BOSQUE S.A.S (RST)' AND nit IS NULL;
+UPDATE contab_empresas SET nit = '901792613' WHERE name = 'HONGOS DEL BOSQUE S.A.S' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901559102' WHERE name = 'INGEOMESA' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901607418' WHERE name = 'INVERSIONES OLITRANS' AND nit IS NULL;
 UPDATE contab_empresas SET nit = '901452221' WHERE name = 'IPSUM' AND nit IS NULL;
