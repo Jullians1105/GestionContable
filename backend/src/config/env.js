@@ -28,6 +28,9 @@ module.exports = {
   SMTP_USER: process.env.SMTP_USER || '',
   SMTP_PASS: process.env.SMTP_PASS || '',
 
+  // Opcional: app token gratuito de datos.gov.co (Socrata) para consultar el RUES con cupo propio.
+  SOCRATA_APP_TOKEN: process.env.SOCRATA_APP_TOKEN || '',
+
   SHOW_RESET_TOKEN: process.env.SHOW_RESET_TOKEN === 'true',
 
   VAPID_EMAIL:       process.env.VAPID_EMAIL       || '',

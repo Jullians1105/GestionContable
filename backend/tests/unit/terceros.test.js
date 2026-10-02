@@ -3,6 +3,12 @@
 // true y revienta el require. Con la factory, Jest nunca carga el módulo real.
 jest.mock('pdf-parse', () => jest.fn());
 jest.mock('../../src/config/database');
+// Nunca pegarle al RUES real desde los tests: se conserva la lógica pura (clasificarEstado) y solo
+// se simula la consulta de red.
+jest.mock('../../src/services/terceros/ruesService', () => ({
+  ...jest.requireActual('../../src/services/terceros/ruesService'),
+  consultarRues: jest.fn(),
+}));
 
 const pdfParse = require('pdf-parse');
 const db = require('../../src/config/database');
@@ -10,6 +16,7 @@ const {
   extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, mapearCodigoPais, normalizarDireccion,
   limpiarParaDian, FormatoNoReconocidoError,
 } = require('../../src/services/terceros');
+const { consultarRues } = require('../../src/services/terceros/ruesService');
 const { uploadTerceros, consultarTercero } = require('../../src/controllers/tercerosController');
 
 // Texto real extraído (pdf-parse) de docs/PDF-901939874-AAC2.pdf — factura de muestra de
@@ -325,6 +332,8 @@ describe('uploadTerceros', () => {
   beforeEach(() => {
     pdfParse.mockReset();
     db.query.mockReset();
+    // La subida verifica contra el RUES en segundo plano; acá no interesa ese resultado.
+    consultarRues.mockReset().mockResolvedValue(new Map());
   });
 
   test('rechaza un tipoOperacion inválido o ausente', async () => {
@@ -492,7 +501,10 @@ describe('uploadTerceros', () => {
 });
 
 describe('consultarTercero', () => {
-  beforeEach(() => db.query.mockReset());
+  beforeEach(() => {
+    db.query.mockReset();
+    consultarRues.mockReset().mockResolvedValue(new Map());
+  });
 
   test('devuelve el tercero, incluyendo régimen fiscal/responsabilidad/teléfono/correo', async () => {
     const fila = {
@@ -516,7 +528,11 @@ describe('consultarTercero', () => {
 
     expect(db.query.mock.calls[0][1][0]).toBe('9019398740'); // limpiarIdentificacion solo quita no-dígitos
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ ...fila, regimen_fiscal_descripcion: 'No responsable' });
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      ...fila, regimen_fiscal_descripcion: 'No responsable', origen: 'pdf', guardado: true,
+    }));
+    expect(consultarRues).toHaveBeenCalledTimes(1); // cada búsqueda consulta el RUES
+    expect(res.json.mock.calls[0][0].ruesDesactualizado).toBe(false);
   });
 
   test('describe el régimen fiscal con la tabla de códigos DIAN, o null si no se reconoce', async () => {
@@ -531,12 +547,105 @@ describe('consultarTercero', () => {
     expect(res2.json.mock.calls[0][0].regimen_fiscal_descripcion).toBeNull();
   });
 
-  test('responde 404 si no hay ningún tercero con ese documento', async () => {
+  test('responde 404 si no está guardado y tampoco aparece en el RUES', async () => {
     db.query.mockResolvedValue({ rows: [] });
+    consultarRues.mockResolvedValue(new Map([['999999999', { consulta: 'no_encontrado' }]]));
     const req = { params: { nit: '999999999' } };
     const res = mockRes();
     await consultarTercero(req, res, jest.fn());
     expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json.mock.calls[0][0].ruesNoDisponible).toBe(false);
+  });
+
+  test('si no está guardado pero el RUES lo tiene, lo muestra como "solo RUES" sin guardarlo', async () => {
+    db.query.mockResolvedValue({ rows: [] });
+    consultarRues.mockResolvedValue(new Map([['900123456', {
+      consulta: 'encontrado',
+      datos: {
+        razonSocial: 'EMPRESA EJEMPLO SAS', estado: 'ACTIVA', ciiu: '4711',
+        representanteLegal: 'JUAN PEREZ', organizacionJuridica: 'SOCIEDADES POR ACCIONES SIMPLIFICADAS SAS',
+        ultimoAnoRenovado: new Date().getFullYear(),
+      },
+    }]]));
+    const res = mockRes();
+    await consultarTercero({ params: { nit: '900123456' } }, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(200);
+    const cuerpo = res.json.mock.calls[0][0];
+    expect(cuerpo).toMatchObject({ origen: 'rues', guardado: false, razon_social_oficial: 'EMPRESA EJEMPLO SAS' });
+    expect(cuerpo.razon_social_factura).toBeNull();
+    expect(db.query).toHaveBeenCalledTimes(1); // solo el SELECT: un GET no escribe
+  });
+
+  test('distingue "el RUES no respondió" de "no existe" en el 404', async () => {
+    db.query.mockResolvedValue({ rows: [] });
+    consultarRues.mockResolvedValue(new Map([['999999999', { consulta: 'error' }]]));
+    const res = mockRes();
+    await consultarTercero({ params: { nit: '999999999' } }, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json.mock.calls[0][0].ruesNoDisponible).toBe(true);
+  });
+
+  test('un tercero guardado con datos del RUES responde origen "ambos" y el nombre oficial del RUES', async () => {
+    db.query.mockResolvedValue({ rows: [{
+      nit: '901939874', razon_social: 'ASOCIACION AVICOLA CHICAMOCHA', tiene_pdf: true,
+      rues_consulta: 'encontrado', rues_razon_social: 'ASOCIACION AVICOLA CHICAMOCHA ASOAVICHI',
+      rues_estado: 'ACTIVA', rues_ultimo_ano_renovado: new Date().getFullYear(),
+    }] });
+    const res = mockRes();
+    await consultarTercero({ params: { nit: '901939874' } }, res, jest.fn());
+    expect(res.json.mock.calls[0][0]).toMatchObject({
+      origen: 'ambos',
+      razon_social_oficial: 'ASOCIACION AVICOLA CHICAMOCHA ASOAVICHI',
+      razon_social_factura: 'ASOCIACION AVICOLA CHICAMOCHA',
+    });
+  });
+
+  test('al buscar un tercero guardado se consulta el RUES, se actualiza la fila y se responde con lo nuevo', async () => {
+    const vieja = { nit: '901939874', razon_social: 'ASOCIACION AVICOLA CHICAMOCHA', tiene_pdf: true, rues_consulta: 'encontrado', rues_razon_social: 'NOMBRE VIEJO', rues_estado: 'ACTIVA', rues_ultimo_ano_renovado: 2025 };
+    const nueva = { ...vieja, rues_razon_social: 'ASOCIACION AVICOLA CHICAMOCHA ASOAVICHI', rues_estado: 'CANCELADA' };
+    db.query
+      .mockResolvedValueOnce({ rows: [vieja] }) // SELECT
+      .mockResolvedValueOnce({ rows: [nueva] }); // UPDATE rues_*
+    consultarRues.mockResolvedValue(new Map([['901939874', {
+      consulta: 'encontrado',
+      datos: { razonSocial: 'ASOCIACION AVICOLA CHICAMOCHA ASOAVICHI', estado: 'CANCELADA', ciiu: null, representanteLegal: null, organizacionJuridica: null, ultimoAnoRenovado: 2025, representanteDocumento: null, representanteTipoDocumento: null },
+    }]]));
+    const res = mockRes();
+    await consultarTercero({ params: { nit: '901939874' } }, res, jest.fn());
+    expect(db.query).toHaveBeenCalledTimes(2);
+    expect(db.query.mock.calls[1][0]).toMatch(/UPDATE terceros/);
+    // Solo escribe columnas rues_*: ni la dirección ni el nombre de la factura (razon_social a secas).
+    expect(db.query.mock.calls[1][0]).not.toMatch(/direccion|(^|[\s,(])razon_social\s*=/);
+    const cuerpo = res.json.mock.calls[0][0];
+    expect(cuerpo.rues_estado).toBe('CANCELADA');
+    expect(cuerpo.ruesDesactualizado).toBe(false);
+    expect(cuerpo.alertas.map((a) => a.codigo)).toContain('matricula_cancelada');
+  });
+
+  test('en la búsqueda espera poco al RUES (hay alguien mirando la pantalla)', async () => {
+    db.query.mockResolvedValue({ rows: [{ nit: '901939874', razon_social: 'X', tiene_pdf: true }] });
+    await consultarTercero({ params: { nit: '901939874' } }, mockRes(), jest.fn());
+    expect(consultarRues).toHaveBeenCalledWith(['901939874'], { timeoutMs: 6000, reintentos: 0 });
+  });
+
+  test('si el RUES no responde, muestra lo último guardado, avisa que puede estar desactualizado y no escribe', async () => {
+    const fila = { nit: '901939874', razon_social: 'X', tiene_pdf: true, rues_consulta: 'encontrado', rues_razon_social: 'X', rues_estado: 'ACTIVA', rues_ultimo_ano_renovado: new Date().getFullYear() };
+    db.query.mockResolvedValue({ rows: [fila] });
+    consultarRues.mockResolvedValue(new Map([['901939874', { consulta: 'error' }]]));
+    const res = mockRes();
+    await consultarTercero({ params: { nit: '901939874' } }, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json.mock.calls[0][0]).toMatchObject({ ruesDesactualizado: true, rues_estado: 'ACTIVA' });
+    expect(db.query).toHaveBeenCalledTimes(1); // solo el SELECT: no se pisa el dato anterior
+  });
+
+  test('un documento que el RUES no puede consultar (muy corto) no marca "desactualizado"', async () => {
+    db.query.mockResolvedValue({ rows: [{ nit: '12345', razon_social: 'X', tiene_pdf: true }] });
+    consultarRues.mockResolvedValue(new Map()); // el servicio omite los documentos inválidos
+    const res = mockRes();
+    await consultarTercero({ params: { nit: '12345' } }, res, jest.fn());
+    expect(res.json.mock.calls[0][0].ruesDesactualizado).toBe(false);
+    expect(db.query).toHaveBeenCalledTimes(1);
   });
 
   test('responde 400 si el documento queda vacío tras limpiar', async () => {

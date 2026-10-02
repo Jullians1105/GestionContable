@@ -1,8 +1,146 @@
 const db = require('../config/database');
 const { extraerTerceroDePdf, describirRegimenFiscal, DocumentoNoFacturaError, FormatoNoReconocidoError } = require('../services/terceros');
 const { limpiarIdentificacion } = require('../services/exogenas/utils/dian');
+const { consultarRues, clasificarEstado } = require('../services/terceros/ruesService');
+const { nombresSeParecen } = require('../utils/nombresSeParecen');
+const logger = require('../utils/logger');
 
 const TIPOS_OPERACION = ['compras', 'ventas'];
+
+// Pasado este tiempo desde la última verificación contra el RUES se vuelve a consultar (en la
+// subida de PDFs y en el repaso por lote) — el estado de una matrícula cambia poco.
+const DIAS_REVERIFICACION = 30;
+// Tope por llamada del repaso por lote: ~19 s por cada 861 documentos medido en producción.
+const MAX_LOTE_VERIFICACION = 2000;
+let verificacionLoteEnCurso = false;
+// En la búsqueda hay una persona esperando: se espera menos que en los procesos en segundo plano
+// (que sí reintentan y esperan hasta 10 s). Si no alcanza, se muestra lo último guardado.
+const OPCIONES_BUSQUEDA = { timeoutMs: 6000, reintentos: 0 };
+
+const necesitaVerificacion = (fila) =>
+  !fila.rues_consultado_at
+  || Date.now() - new Date(fila.rues_consultado_at).getTime() > DIAS_REVERIFICACION * 86400000;
+
+// De dónde salen los datos de un tercero: 'pdf' (solo factura), 'rues' (creado desde el RUES,
+// sin factura) o 'ambos'. Se calcula, no se guarda, para que no se desincronice.
+function origenDe(fila) {
+  const hayRues = fila.rues_consulta === 'encontrado';
+  if (hayRues && fila.tiene_pdf) return 'ambos';
+  if (hayRues) return 'rues';
+  return 'pdf';
+}
+
+// Avisos para mostrar junto al tercero. `nivel`: 'rojo' (revisar), 'ambar' (atención), 'gris'
+// (informativo). No bloquean nada, solo señalan.
+function calcularAlertas(fila, anioActual = new Date().getFullYear()) {
+  const alertas = [];
+  if (fila.rues_consulta === 'no_encontrado') {
+    alertas.push({
+      codigo: 'no_en_rues', nivel: 'gris',
+      mensaje: 'No aparece en el RUES (puede ser persona natural sin matrícula mercantil o extranjero).',
+    });
+    return alertas;
+  }
+  if (fila.rues_consulta !== 'encontrado') return alertas;
+
+  const clase = clasificarEstado(fila.rues_estado);
+  if (clase === 'cancelada') {
+    alertas.push({
+      codigo: 'matricula_cancelada', nivel: 'rojo',
+      mensaje: `La matrícula mercantil figura como "${fila.rues_estado}" en el RUES.`,
+    });
+  } else if (clase === 'activa' && fila.rues_ultimo_ano_renovado && fila.rues_ultimo_ano_renovado < anioActual - 1) {
+    alertas.push({
+      codigo: 'sin_renovar', nivel: 'ambar',
+      mensaje: `Matrícula activa, pero la última renovación registrada es de ${fila.rues_ultimo_ano_renovado}.`,
+    });
+  }
+  if (fila.tiene_pdf && !nombresSeParecen(fila.razon_social, fila.rues_razon_social)) {
+    alertas.push({
+      codigo: 'nombre_distinto', nivel: 'ambar',
+      mensaje: 'El nombre en la factura no coincide con el del RUES (puede ser un nombre comercial o un error de la factura).',
+    });
+  }
+  return alertas;
+}
+
+// Respuesta de "Consulta Tercero": todo lo guardado + el origen de los datos + avisos. El nombre
+// "oficial" es el del RUES si existe (registro oficial); el de la factura queda aparte.
+function armarRespuestaTercero(fila, { guardado = true } = {}) {
+  const hayRues = fila.rues_consulta === 'encontrado';
+  return {
+    ...fila,
+    guardado,
+    origen: origenDe(fila),
+    razon_social_oficial: hayRues ? fila.rues_razon_social : fila.razon_social,
+    razon_social_factura: fila.tiene_pdf ? fila.razon_social : null,
+    regimen_fiscal_descripcion: describirRegimenFiscal(fila.regimen_fiscal),
+    alertas: calcularAlertas(fila),
+  };
+}
+
+// Fila "virtual" (sin guardar) construida a partir de una consulta en vivo al RUES.
+function filaDesdeRues(nit, datos) {
+  return {
+    nit,
+    razon_social: datos.razonSocial,
+    tiene_pdf: false,
+    rues_consulta: 'encontrado',
+    rues_consultado_at: new Date().toISOString(),
+    rues_razon_social: datos.razonSocial,
+    rues_estado: datos.estado,
+    rues_ciiu: datos.ciiu,
+    rues_representante_legal: datos.representanteLegal,
+    rues_representante_documento: datos.representanteDocumento,
+    rues_representante_tipo_documento: datos.representanteTipoDocumento,
+    rues_organizacion_juridica: datos.organizacionJuridica,
+    rues_ultimo_ano_renovado: datos.ultimoAnoRenovado,
+  };
+}
+
+// Guarda en un tercero YA existente el resultado de la consulta al RUES. Los errores de red no
+// se guardan: así no se pisa un dato bueno anterior y el tercero queda pendiente de reintento.
+async function guardarVerificacion(nit, resultado) {
+  if (resultado.consulta === 'encontrado') {
+    const d = resultado.datos;
+    const { rows } = await db.query(
+      `UPDATE terceros SET
+         rues_consulta = 'encontrado', rues_consultado_at = NOW(),
+         rues_razon_social = $2, rues_estado = $3, rues_ciiu = $4,
+         rues_representante_legal = $5, rues_organizacion_juridica = $6,
+         rues_ultimo_ano_renovado = $7,
+         rues_representante_documento = $8, rues_representante_tipo_documento = $9
+       WHERE nit = $1 RETURNING *`,
+      [nit, d.razonSocial, d.estado, d.ciiu, d.representanteLegal, d.organizacionJuridica, d.ultimoAnoRenovado,
+        d.representanteDocumento, d.representanteTipoDocumento]
+    );
+    return rows[0] ?? null;
+  }
+  const { rows } = await db.query(
+    `UPDATE terceros SET
+       rues_consulta = 'no_encontrado', rues_consultado_at = NOW(),
+       rues_razon_social = NULL, rues_estado = NULL, rues_ciiu = NULL,
+       rues_representante_legal = NULL, rues_organizacion_juridica = NULL,
+       rues_ultimo_ano_renovado = NULL,
+       rues_representante_documento = NULL, rues_representante_tipo_documento = NULL
+     WHERE nit = $1 RETURNING *`,
+    [nit]
+  );
+  return rows[0] ?? null;
+}
+
+// Consulta el RUES para una lista de documentos de terceros ya guardados y guarda el resultado.
+async function verificarYGuardar(nits) {
+  const resultados = await consultarRues(nits);
+  const conteo = { verificados: 0, noEncontrados: 0, errores: 0, omitidos: new Set(nits).size - resultados.size };
+  for (const [nit, resultado] of resultados) {
+    if (resultado.consulta === 'error') { conteo.errores += 1; continue; }
+    const fila = await guardarVerificacion(nit, resultado);
+    if (!fila) continue;
+    if (resultado.consulta === 'encontrado') conteo.verificados += 1; else conteo.noEncontrados += 1;
+  }
+  return conteo;
+}
 
 // Columnas que le importan al usuario para saber "qué cambió" cuando un NIT ya existía — no se
 // incluyen created_at/updated_at/actualizado_por, que siempre "cambian" y no dicen nada útil.
@@ -24,7 +162,9 @@ const CAMPOS_COMPARABLES = [
 // ver si una factura vieja/desactualizada sobrescribió un dato bueno por uno peor, en vez de
 // asumir a ciegas que "la más reciente siempre tiene razón".
 function calcularCambios(antes, despues) {
-  if (!antes) return [];
+  // Si el tercero venía solo del RUES (sin factura), la primera factura no "cambia" nada: es la
+  // primera vez que se tienen datos de factura.
+  if (!antes || antes.tiene_pdf === false) return [];
   const cambios = [];
   for (const { columna, etiqueta } of CAMPOS_COMPARABLES) {
     if (antes[columna] !== despues[columna]) {
@@ -57,6 +197,7 @@ const uploadTerceros = async (req, res, next) => {
     const terceros = [];
     const errores = [];
     let omitidosNoFactura = 0;
+    const nitsPorVerificar = new Set();
 
     for (const archivo of archivos) {
       try {
@@ -84,7 +225,8 @@ const uploadTerceros = async (req, res, next) => {
              responsabilidad_tributaria  = COALESCE(EXCLUDED.responsabilidad_tributaria, terceros.responsabilidad_tributaria),
              telefono                    = COALESCE(EXCLUDED.telefono, terceros.telefono),
              correo                      = COALESCE(EXCLUDED.correo, terceros.correo),
-             actualizado_por             = EXCLUDED.actualizado_por
+             actualizado_por             = EXCLUDED.actualizado_por,
+             tiene_pdf                   = TRUE
            RETURNING *`,
           [
             t.nit, t.razonSocial, t.direccion, t.municipio, t.codigoMunicipioDane,
@@ -94,6 +236,7 @@ const uploadTerceros = async (req, res, next) => {
         );
 
         const cambios = calcularCambios(antes, rows[0]);
+        if (necesitaVerificacion(rows[0])) nitsPorVerificar.add(rows[0].nit);
         terceros.push({
           ...rows[0],
           archivo: archivo.originalname,
@@ -112,6 +255,13 @@ const uploadTerceros = async (req, res, next) => {
           });
         }
       }
+    }
+
+    // Verificación contra el RUES en segundo plano: no alarga la respuesta de la subida, y si el
+    // servicio del RUES falla, la subida no se ve afectada (el tercero queda pendiente de reintento).
+    if (nitsPorVerificar.size > 0) {
+      verificarYGuardar([...nitsPorVerificar]).catch((err) =>
+        logger.warn({ err: err.message }, 'Verificación RUES en segundo plano falló'));
     }
 
     const actualizados = terceros.filter((t) => !t.esNuevo && t.cambios.length > 0);
@@ -145,17 +295,67 @@ const consultarTercero = async (req, res, next) => {
     }
 
     const { rows } = await db.query('SELECT * FROM terceros WHERE nit = $1', [nit]);
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'No hay ningún tercero guardado con ese documento.' });
+    if (rows.length > 0) {
+      // Ya guardado: se consulta el RUES en cada búsqueda para mostrar siempre la última versión, y
+      // se actualiza la fila (solo las columnas rues_*, nunca los datos de factura). Si el RUES no
+      // responde, se muestra lo último guardado y se avisa que puede estar desactualizado.
+      let fila = rows[0];
+      let ruesDesactualizado = false;
+      const resultadoRues = (await consultarRues([nit], OPCIONES_BUSQUEDA)).get(nit);
+      if (resultadoRues?.consulta === 'error') {
+        ruesDesactualizado = true;
+      } else if (resultadoRues) {
+        fila = (await guardarVerificacion(nit, resultadoRues)) ?? fila;
+      }
+      return res.status(200).json({ ...armarRespuestaTercero(fila), ruesDesactualizado });
     }
 
-    res.status(200).json({
-      ...rows[0],
-      regimen_fiscal_descripcion: describirRegimenFiscal(rows[0].regimen_fiscal),
+    // No está guardado (nunca llegó una factura suya): se consulta el RUES en vivo y, si
+    // aparece, se muestra marcado como "solo RUES" y SIN guardar — a propósito no hay forma de
+    // guardar un tercero sin factura: sin dirección/país el registro no sirve para la exógena.
+    // Los terceros se crean al subir una factura (y ahí se verifican solos).
+    const resultado = (await consultarRues([nit], OPCIONES_BUSQUEDA)).get(nit);
+    if (resultado?.consulta === 'encontrado') {
+      return res.status(200).json(armarRespuestaTercero(filaDesdeRues(nit, resultado.datos), { guardado: false }));
+    }
+    return res.status(404).json({
+      error: resultado?.consulta === 'error'
+        ? 'No hay ningún tercero guardado con ese documento y el RUES no respondió.'
+        : 'No hay ningún tercero guardado con ese documento, y tampoco aparece en el RUES.',
+      ruesNoDisponible: resultado?.consulta === 'error',
     });
   } catch (err) {
     next(err);
   }
 };
 
-module.exports = { uploadTerceros, consultarTercero, TIPOS_OPERACION };
+// Repaso por lote: verifica contra el RUES los terceros guardados que nunca se verificaron o cuya
+// verificación tiene más de DIAS_REVERIFICACION días (o todos, con `forzar`). Solo admin/líder.
+const verificarRuesLote = async (req, res, next) => {
+  if (verificacionLoteEnCurso) {
+    return res.status(409).json({ error: 'Ya hay una verificación en curso. Espera a que termine.' });
+  }
+  verificacionLoteEnCurso = true;
+  try {
+    const forzar = req.body?.forzar === true;
+    const { rows } = await db.query(
+      `SELECT nit FROM terceros
+       WHERE $1::boolean OR rues_consultado_at IS NULL
+          OR rues_consultado_at < NOW() - make_interval(days => $2)
+       ORDER BY rues_consultado_at NULLS FIRST
+       LIMIT $3`,
+      [forzar, DIAS_REVERIFICACION, MAX_LOTE_VERIFICACION]
+    );
+    const conteo = await verificarYGuardar(rows.map((r) => r.nit));
+    res.status(200).json({ pendientes: rows.length, ...conteo });
+  } catch (err) {
+    next(err);
+  } finally {
+    verificacionLoteEnCurso = false;
+  }
+};
+
+module.exports = {
+  uploadTerceros, consultarTercero, verificarRuesLote, TIPOS_OPERACION,
+  calcularAlertas, origenDe, armarRespuestaTercero,
+};

@@ -2,48 +2,82 @@ import { useState, useCallback } from 'react'
 import { api } from '../services/api'
 import { useToast } from '../context/ToastContext'
 
-// Campo simple de la tarjeta de resultado: etiqueta + valor, con "—" si no hay dato (puede pasar
-// si el PDF no traía ese campo, o si el tercero se guardó antes de la migración 043).
-// `copiable`: agrega un botón para copiar el valor al portapapeles (Dirección/Teléfono/Correo,
-// los que el usuario más pega en otro lado) — no tiene sentido para valores cortos como
-// Municipio/Departamento que ya se leen de un vistazo.
-function Campo({ icon, label, value, copiable }) {
+// Estilos de cada tipo de aviso (mismos colores de estado que el resto de la app).
+const ESTILOS_ALERTA = {
+  rojo: { caja: 'bg-red-50 border-red-200', texto: 'text-red-700', icono: 'error' },
+  ambar: { caja: 'bg-amber-50 border-amber-200', texto: 'text-amber-800', icono: 'warning' },
+  gris: { caja: 'bg-[#f0f2f8] border-[#e2e4ef]', texto: 'text-[#6b7280]', icono: 'info' },
+}
+
+const TEXTO_ORIGEN = {
+  ambos: 'Factura + RUES',
+  pdf: 'Solo factura',
+  rues: 'Solo RUES (sin factura)',
+}
+
+// Fila compacta de la tarjeta: ícono + etiqueta + valor en una sola línea (para que la tarjeta
+// entre en pantalla sin scroll), con "—" si no hay dato.
+// `copiable`: agrega un botón para copiar el valor (Dirección/Teléfono/Correo, los que más se
+// pegan en otro lado). `valorCopia`: lo que se copia cuando difiere de lo que se muestra (ej. el
+// documento del representante se muestra con su tipo, pero se copia solo el número).
+function Campo({ icon, label, value, copiable, valorCopia }) {
   const { addToast } = useToast()
   const [copiado, setCopiado] = useState(false)
 
   const copiar = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(value)
+      await navigator.clipboard.writeText(valorCopia ?? value)
       setCopiado(true)
       addToast('Copiado al portapapeles', 'success', 1800)
       setTimeout(() => setCopiado(false), 1500)
     } catch {
       addToast('No se pudo copiar', 'error')
     }
-  }, [value, addToast])
+  }, [value, valorCopia, addToast])
 
   return (
-    <div className="flex items-start gap-3 py-3">
-      <span className="material-symbols-outlined text-lg text-[#9ca3af] mt-0.5">{icon}</span>
-      <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af]">{label}</p>
-        <div className="flex items-center gap-2">
-          <p className="text-sm text-[#191c1e] break-words">{value || '—'}</p>
-          {copiable && value && (
-            <button
-              type="button"
-              onClick={copiar}
-              aria-label={`Copiar ${label.toLowerCase()}`}
-              title={`Copiar ${label.toLowerCase()}`}
-              className="flex-shrink-0 text-[#9ca3af] hover:text-[#003B43] transition active:scale-90"
-            >
-              <span className="material-symbols-outlined text-base">
-                {copiado ? 'check' : 'content_copy'}
-              </span>
-            </button>
-          )}
+    <div className="grid grid-cols-[18px_120px_1fr_auto] items-center gap-x-2 py-1.5">
+      <span className="material-symbols-outlined text-base text-[#9ca3af]">{icon}</span>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#9ca3af] leading-tight">{label}</p>
+      <p className="text-sm text-[#191c1e] break-words min-w-0">{value || '—'}</p>
+      {copiable && value ? (
+        <button
+          type="button"
+          onClick={copiar}
+          aria-label={`Copiar ${label.toLowerCase()}`}
+          title={`Copiar ${label.toLowerCase()}`}
+          className="text-[#9ca3af] hover:text-[#003B43] transition active:scale-90"
+        >
+          <span className="material-symbols-outlined text-base">{copiado ? 'check' : 'content_copy'}</span>
+        </button>
+      ) : <span />}
+    </div>
+  )
+}
+
+// Una de las dos columnas de la tarjeta: título + etiqueta de fuente + (opcional) acción a la derecha.
+function Columna({ titulo, chip, chipClases, subtitulo, children }) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-start justify-between gap-3 mb-1 pb-2 border-b border-[#e2e4ef]">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-bold text-[#191c1e]">{titulo}</h2>
+            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase ${chipClases}`}>{chip}</span>
+          </div>
+          {subtitulo && <p className="text-[11px] text-[#9ca3af] mt-0.5">{subtitulo}</p>}
         </div>
       </div>
+      {children}
+    </div>
+  )
+}
+
+function Vacio({ icon, children }) {
+  return (
+    <div className="flex items-start gap-2 py-4 text-xs text-[#9ca3af]">
+      <span className="material-symbols-outlined text-base flex-shrink-0">{icon}</span>
+      <p>{children}</p>
     </div>
   )
 }
@@ -53,12 +87,14 @@ export default function ConsultaTerceroPage() {
   const [estado, setEstado] = useState('idle') // idle | buscando | encontrado | no-encontrado | error
   const [tercero, setTercero] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [ruesNoDisponible, setRuesNoDisponible] = useState(false)
 
   const consultar = useCallback(async (e) => {
     e.preventDefault()
     if (!documento.trim()) return
     setEstado('buscando')
     setErrorMsg('')
+    setRuesNoDisponible(false)
     try {
       const data = await api.consultarTercero(documento.trim())
       setTercero(data)
@@ -66,6 +102,7 @@ export default function ConsultaTerceroPage() {
     } catch (err) {
       if (err.status === 404) {
         setTercero(null)
+        setRuesNoDisponible(err.ruesNoDisponible === true)
         setEstado('no-encontrado')
       } else {
         setErrorMsg(err.message || 'Error al consultar el documento')
@@ -74,23 +111,37 @@ export default function ConsultaTerceroPage() {
     }
   }, [documento])
 
+  const hayFactura = tercero ? tercero.origen !== 'rues' : false
+  const hayRues = tercero ? tercero.rues_consulta === 'encontrado' : false
+  const fechaRues = tercero?.rues_consultado_at
+    ? new Date(tercero.rues_consultado_at).toLocaleDateString('es-CO')
+    : null
+  // Cada búsqueda consulta el RUES; si no respondió, se muestra lo último guardado y se avisa.
+  const alertas = tercero
+    ? [
+      ...(tercero.alertas ?? []),
+      ...(tercero.ruesDesactualizado ? [{
+        codigo: 'rues_desactualizado',
+        nivel: 'ambar',
+        mensaje: `No se pudo consultar el RUES en este momento. Los datos del RUES son los de la última verificación${fechaRues ? ` (${fechaRues})` : ''} y pueden estar desactualizados.`,
+      }] : []),
+    ]
+    : []
+
   return (
-    <div className="max-w-[760px] mx-auto mt-8 mb-16">
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="material-symbols-outlined text-3xl text-[#003B43]">person_search</span>
-          <h1 className="text-2xl font-bold text-[#191c1e]">Consulta Tercero</h1>
+    <div className="max-w-[1000px] mx-auto mt-4 mb-6">
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-2xl text-[#003B43]">person_search</span>
+          <h1 className="text-xl font-bold text-[#191c1e]">Consulta Tercero</h1>
         </div>
-        <p className="text-sm text-[#6b7280]">
-          Busca por NIT o documento entre los terceros ya guardados a partir de facturas electrónicas
-          subidas en &ldquo;Importar Terceros&rdquo;.
+        <p className="text-xs text-[#6b7280]">
+          Busca por NIT o documento entre los terceros guardados (facturas y RUES). Si no está guardado, lo busca en el RUES.
         </p>
       </div>
 
-      <form onSubmit={consultar} className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-6 mb-6">
-        <label htmlFor="documento" className="block text-sm font-bold text-[#191c1e] mb-2">
-          NIT o documento
-        </label>
+      <form onSubmit={consultar} className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-3 mb-4">
+        <label htmlFor="documento" className="sr-only">NIT o documento</label>
         <div className="flex gap-3">
           <div className="relative flex-1">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-lg text-[#9ca3af]">badge</span>
@@ -100,14 +151,14 @@ export default function ConsultaTerceroPage() {
               inputMode="numeric"
               value={documento}
               onChange={(e) => setDocumento(e.target.value)}
-              placeholder="Ej. 901939874"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl border-2 border-[#d1d5db] bg-white text-sm text-[#191c1e] focus:outline-none focus:border-[#003B43]"
+              placeholder="NIT o documento. Ej. 901939874"
+              className="w-full pl-9 pr-3 py-2 rounded-xl border-2 border-[#d1d5db] bg-white text-sm text-[#191c1e] focus:outline-none focus:border-[#003B43]"
             />
           </div>
           <button
             type="submit"
             disabled={!documento.trim() || estado === 'buscando'}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white transition active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: '#003B43' }}
           >
             {estado === 'buscando' ? (
@@ -127,8 +178,9 @@ export default function ConsultaTerceroPage() {
         <div className="flex items-start gap-3 p-4 rounded-xl bg-[#f0f2f8] border border-[#e2e4ef]">
           <span className="material-symbols-outlined text-[#9ca3af] text-xl flex-shrink-0 mt-0.5">search_off</span>
           <p className="text-sm text-[#6b7280]">
-            No hay ningún tercero guardado con ese documento. Solo aparecen terceros ya extraídos de
-            facturas subidas en &ldquo;Datos de Terceros&rdquo;.
+            {ruesNoDisponible
+              ? 'No hay ningún tercero guardado con ese documento y el RUES no respondió en este momento. Intenta de nuevo en unos minutos.'
+              : 'No hay ningún tercero guardado con ese documento y tampoco aparece en el RUES (puede ser una persona natural sin matrícula mercantil o un extranjero). Aparecerá aquí cuando se suba una factura suya en "Datos de Terceros".'}
           </p>
         </div>
       )}
@@ -141,45 +193,110 @@ export default function ConsultaTerceroPage() {
       )}
 
       {estado === 'encontrado' && tercero && (
-        <div>
-          <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-6 mb-4">
-            <div className="flex items-start gap-3 pb-4 mb-1 border-b border-[#e2e4ef]">
-              <span className="material-symbols-outlined text-2xl text-[#003B43] mt-0.5">corporate_fare</span>
-              <div>
-                <p className="text-base font-bold text-[#191c1e]">{tercero.razon_social}</p>
-                <p className="text-xs text-[#6b7280]">NIT {tercero.nit}</p>
-              </div>
+        <div className="bg-white rounded-2xl border border-[#e2e4ef] shadow-sm p-5">
+          {/* Arriba: el nombre */}
+          <div className="flex items-start gap-3 pb-3">
+            <span className="material-symbols-outlined text-2xl text-[#003B43] mt-0.5">corporate_fare</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-lg font-bold text-[#191c1e] leading-tight break-words">{tercero.razon_social_oficial}</p>
+              <p className="text-xs text-[#6b7280] mt-0.5">
+                NIT {tercero.nit}
+                {tercero.razon_social_factura && tercero.razon_social_factura !== tercero.razon_social_oficial && (
+                  <span> · En la factura: <span className="font-semibold">{tercero.razon_social_factura}</span></span>
+                )}
+              </p>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
-              <div className="divide-y divide-[#e2e4ef]">
-                <Campo icon="public" label="Departamento" value={tercero.departamento} />
-                <Campo icon="map" label="Municipio" value={tercero.municipio} />
-                <Campo icon="location_on" label="Dirección" value={tercero.direccion} copiable />
-                <Campo icon="call" label="Teléfono" value={tercero.telefono} copiable />
-              </div>
-              <div className="divide-y divide-[#e2e4ef]">
-                <Campo icon="mail" label="Correo" value={tercero.correo} copiable />
-                <Campo
-                  icon="gavel"
-                  label="Régimen fiscal"
-                  value={tercero.regimen_fiscal && (
-                    tercero.regimen_fiscal_descripcion
-                      ? `${tercero.regimen_fiscal} — ${tercero.regimen_fiscal_descripcion}`
-                      : tercero.regimen_fiscal
-                  )}
-                />
-                <Campo icon="account_balance" label="Responsabilidad tributaria" value={tercero.responsabilidad_tributaria} />
-              </div>
-            </div>
+            <span
+              title="De dónde salen los datos de este tercero"
+              className="flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#E3EEEE] text-[#003B43]"
+            >
+              {TEXTO_ORIGEN[tercero.origen] ?? 'Solo factura'}
+            </span>
           </div>
 
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-[#E3EEEE] border-2 border-[#003B43]/40">
-            <span className="material-symbols-outlined text-[#003B43] text-xl flex-shrink-0 mt-0.5">info</span>
-            <p className="text-xs text-[#003B43]">
-              Estos datos fueron extraídos de facturas electrónicas, no de un RUT verificado — pueden
-              no reflejar la información tributaria más reciente o correcta del tercero.
-            </p>
+          {alertas.length > 0 && (
+            <div className="flex flex-wrap gap-2 pb-3">
+              {alertas.map((alerta) => {
+                const estilo = ESTILOS_ALERTA[alerta.nivel] ?? ESTILOS_ALERTA.gris
+                return (
+                  <div key={alerta.codigo} className={`flex items-start gap-2 px-3 py-2 rounded-xl border ${estilo.caja} flex-1 min-w-[260px]`}>
+                    <span className={`material-symbols-outlined text-base flex-shrink-0 ${estilo.texto}`}>{estilo.icono}</span>
+                    <p className={`text-xs font-semibold ${estilo.texto}`}>{alerta.mensaje}</p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Abajo: izquierda = facturas, derecha = RUES */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5 pt-3 border-t border-[#e2e4ef]">
+            <Columna
+              titulo="Datos de las facturas"
+              chip="Factura"
+              chipClases="bg-[#f0f2f8] text-[#6b7280]"
+              subtitulo="Extraídos de facturas electrónicas, no de un RUT verificado"
+            >
+              {hayFactura ? (
+                <div className="divide-y divide-[#f0f2f8]">
+                  <Campo icon="public" label="Departamento" value={tercero.departamento} />
+                  <Campo icon="map" label="Municipio" value={tercero.municipio} />
+                  <Campo icon="location_on" label="Dirección" value={tercero.direccion} copiable />
+                  <Campo icon="call" label="Teléfono" value={tercero.telefono} copiable />
+                  <Campo icon="mail" label="Correo" value={tercero.correo} copiable />
+                  <Campo
+                    icon="gavel"
+                    label="Régimen fiscal"
+                    value={tercero.regimen_fiscal && (
+                      tercero.regimen_fiscal_descripcion
+                        ? `${tercero.regimen_fiscal} — ${tercero.regimen_fiscal_descripcion}`
+                        : tercero.regimen_fiscal
+                    )}
+                  />
+                  <Campo icon="account_balance" label="Responsabilidad tributaria" value={tercero.responsabilidad_tributaria} />
+                </div>
+              ) : (
+                <Vacio icon="receipt_long">
+                  Sin factura. La dirección, el teléfono y los datos tributarios aparecerán cuando se suba una factura de este tercero en &ldquo;Datos de Terceros&rdquo;.
+                </Vacio>
+              )}
+            </Columna>
+
+            <Columna
+              titulo="Datos del RUES"
+              chip="RUES"
+              chipClases="bg-[#E3EEEE] text-[#003B43]"
+              subtitulo={tercero.guardado === false
+                ? 'Consulta en vivo · se guarda al subir una factura de este tercero'
+                : (tercero.ruesDesactualizado
+                  ? `Última verificación: ${fechaRues ?? 'nunca'}`
+                  : 'Consultado ahora en el registro mercantil (RUES)')}
+            >
+              {hayRues ? (
+                <div className="divide-y divide-[#f0f2f8]">
+                  <Campo icon="verified" label="Matrícula" value={tercero.rues_estado} />
+                  <Campo icon="event_available" label="Última renovación" value={tercero.rues_ultimo_ano_renovado && String(tercero.rues_ultimo_ano_renovado)} />
+                  <Campo icon="work" label="Actividad (CIIU)" value={tercero.rues_ciiu} />
+                  <Campo icon="person" label="Representante legal" value={tercero.rues_representante_legal} />
+                  <Campo
+                    icon="badge"
+                    label="Doc. representante"
+                    value={tercero.rues_representante_documento && (
+                      tercero.rues_representante_tipo_documento
+                        ? `${tercero.rues_representante_tipo_documento} ${tercero.rues_representante_documento}`
+                        : tercero.rues_representante_documento
+                    )}
+                    valorCopia={tercero.rues_representante_documento ?? undefined}
+                    copiable
+                  />
+                </div>
+              ) : (
+                <Vacio icon={tercero.rues_consulta === 'no_encontrado' ? 'search_off' : 'help'}>
+                  {tercero.rues_consulta === 'no_encontrado'
+                    ? 'No aparece en el RUES (puede ser persona natural sin matrícula mercantil o extranjero).'
+                    : 'No se pudo consultar el RUES para este documento.'}
+                </Vacio>
+              )}
+            </Columna>
           </div>
         </div>
       )}

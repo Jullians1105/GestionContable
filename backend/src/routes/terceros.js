@@ -1,9 +1,11 @@
 const { Router } = require('express');
 const multer = require('multer');
 const { body } = require('express-validator');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
-const { uploadTerceros, consultarTercero, TIPOS_OPERACION } = require('../controllers/tercerosController');
+const {
+  uploadTerceros, consultarTercero, verificarRuesLote, TIPOS_OPERACION,
+} = require('../controllers/tercerosController');
 
 const router = Router();
 
@@ -73,10 +75,36 @@ router.post('/upload',
 
 /**
  * @openapi
+ * /api/terceros/verificar-rues-lote:
+ *   post:
+ *     tags: [Terceros]
+ *     summary: Verificar contra el RUES los terceros pendientes (admin/líder)
+ *     description: Consulta el conjunto de datos abierto del RUES para los terceros guardados que nunca se verificaron o cuya verificación tiene más de 30 días. Con `forzar: true` repasa todos. Devuelve conteos; no modifica direcciones ni datos de factura.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               forzar: { type: boolean }
+ *     responses:
+ *       200:
+ *         description: Conteo de verificados, no encontrados y errores.
+ *       403:
+ *         description: Permisos insuficientes.
+ *       409:
+ *         description: Ya hay una verificación en curso.
+ */
+router.post('/verificar-rues-lote', roleMiddleware('admin', 'leader'), verificarRuesLote);
+
+/**
+ * @openapi
  * /api/terceros/{nit}:
  *   get:
  *     tags: [Terceros]
- *     summary: Consultar un tercero guardado por NIT/documento ("Consulta Tercero")
+ *     summary: Consultar un tercero por NIT/documento ("Consulta Tercero"); si está guardado, actualiza sus datos del RUES
  *     description: Devuelve todos los datos guardados del tercero, incluyendo régimen fiscal, responsabilidad tributaria, teléfono y correo — estos 4 solo se exponen acá, nunca en el resumen de /upload.
  *     security:
  *       - bearerAuth: []
