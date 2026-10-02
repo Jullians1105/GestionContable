@@ -505,6 +505,24 @@ export const api = {
         const body = await res.json().catch(() => ({ error: res.statusText }))
         const err = new Error(body.error || `Error ${res.status}`)
         err.status = res.status
+        err.ruesNoDisponible = body.ruesNoDisponible === true
+        throw err
+      }
+      return res.json()
+    }),
+
+  // Repaso por lote (admin/líder): verifica contra el RUES los terceros pendientes, o todos con
+  // forzar = true. Devuelve { pendientes, verificados, noEncontrados, errores, omitidos }.
+  verificarTercerosRuesLote: (forzar = false) =>
+    fetchWithAuth('/terceros/verificar-rues-lote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ forzar }),
+    }).then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: res.statusText }))
+        const err = new Error(body.error || `Error ${res.status}`)
+        err.status = res.status
         throw err
       }
       return res.json()
