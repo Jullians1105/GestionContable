@@ -143,6 +143,41 @@ export default function EmpresasPage() {
   const [moduloFiltro, setModuloFiltro] = useState('todas')
   // Filtro por situación de la matrícula mercantil ('todas' o una clave de SITUACIONES_MATRICULA).
   const [matriculaFiltro, setMatriculaFiltro] = useState('todas')
+  // Menú del filtro de matrícula (ícono junto al título de la columna). Guarda dónde dibujarlo, porque se
+  // posiciona con coordenadas de la ventana (position: fixed) para que la tarjeta de la tabla, que
+  // recorta lo que se sale (overflow-hidden), no lo corte.
+  const [menuMatricula, setMenuMatricula] = useState(null) // { top, left } | null
+  // Tooltip del ícono de información junto al título de la columna: de dónde salen los datos y de qué
+  // fecha son (la última "foto" que publicó el RUES, no la de hoy).
+  const [tooltipFuente, setTooltipFuente] = useState(null) // { top, left } | null
+  const mostrarTooltipFuente = (e) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    setTooltipFuente({ top: r.bottom + 8, left: Math.max(8, Math.min(r.left - 8, window.innerWidth - 328)) })
+  }
+  const textoFuente = ruesFuente
+    ? `Matrícula: datos del RUES al ${new Date(ruesFuente).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+    : 'Matrícula: estado según el RUES (no se pudo saber la fecha de los datos)'
+  const abrirMenuMatricula = (e) => {
+    if (menuMatricula) { setMenuMatricula(null); return }
+    const r = e.currentTarget.getBoundingClientRect()
+    setMenuMatricula({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 232)) })
+  }
+  useEffect(() => {
+    if (!menuMatricula) return undefined
+    const cerrar = () => setMenuMatricula(null)
+    const alHacerClic = (e) => { if (!e.target.closest('[data-filtro-matricula]')) cerrar() }
+    const alTeclear = (e) => { if (e.key === 'Escape') cerrar() }
+    document.addEventListener('mousedown', alHacerClic)
+    document.addEventListener('keydown', alTeclear)
+    window.addEventListener('scroll', cerrar, true)
+    window.addEventListener('resize', cerrar)
+    return () => {
+      document.removeEventListener('mousedown', alHacerClic)
+      document.removeEventListener('keydown', alTeclear)
+      window.removeEventListener('scroll', cerrar, true)
+      window.removeEventListener('resize', cerrar)
+    }
+  }, [menuMatricula])
 
   const matriculaCounts = useMemo(() => {
     const counts = {}
@@ -502,17 +537,6 @@ export default function EmpresasPage() {
             </button>
           )}
         </div>
-        <select
-          value={matriculaFiltro}
-          onChange={(e) => setMatriculaFiltro(e.target.value)}
-          title="Filtrar por el estado de la matrícula mercantil (RUES)"
-          className="py-2.5 pl-3 pr-8 rounded-xl border border-[#d1d5db] bg-white text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#003B43]/30"
-        >
-          <option value="todas">Matrícula: todas</option>
-          {['sin_renovar', 'cancelada', 'por_renovar', 'no_encontrada', 'sin_verificar', 'al_dia'].map((s) => (
-            <option key={s} value={s}>{SITUACIONES_MATRICULA[s].label} ({matriculaCounts[s] ?? 0})</option>
-          ))}
-        </select>
         {puedeActualizarMatricula && (
           <button
             onClick={actualizarMatricula}
@@ -538,11 +562,18 @@ export default function EmpresasPage() {
         )}
       </div>
 
-      {ruesFuente && (
-        <p className="mb-3 -mt-1 text-xs text-[#6b7280] flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-sm text-[#9ca3af]">info</span>
-          Matrícula: datos del RUES al <b className="text-[#434655]">{new Date(ruesFuente).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })}</b>
-        </p>
+      {matriculaFiltro !== 'todas' && (
+        <div className="mb-3 -mt-1 flex items-center gap-2">
+          <button
+            onClick={() => setMatriculaFiltro('todas')}
+            title="Quitar el filtro"
+            className="flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full text-xs font-semibold bg-[#E3EEEE] text-[#003B43] hover:bg-[#d3e4e4] transition"
+          >
+            Matrícula: {SITUACIONES_MATRICULA[matriculaFiltro]?.label}
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+          </button>
+          <span className="text-xs text-[#9ca3af]">{empresasFiltradas.length} de {empresas.length} empresas</span>
+        </div>
       )}
 
       {resumenMatricula && (
@@ -582,7 +613,79 @@ export default function EmpresasPage() {
                 <th className="px-5 py-2.5 font-bold w-[30%]">Empresa</th>
                 <th className="px-5 py-2.5 font-bold w-44">Documento</th>
                 <th className="px-5 py-2.5 font-bold w-24">Módulos</th>
-                <th className="px-3 py-2.5 font-bold w-44" title="Estado de la matrícula mercantil según el RUES">Matrícula</th>
+                <th className="px-3 py-2.5 font-bold w-44">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onMouseEnter={mostrarTooltipFuente}
+                      onMouseLeave={() => setTooltipFuente(null)}
+                      onFocus={mostrarTooltipFuente}
+                      onBlur={() => setTooltipFuente(null)}
+                      aria-label={textoFuente}
+                      className="w-5 h-5 -ml-1 rounded-full flex items-center justify-center text-[#9ca3af] hover:text-[#003B43] focus:text-[#003B43] focus:outline-none transition"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>info</span>
+                    </button>
+                    Matrícula
+                    <button
+                      type="button"
+                      data-filtro-matricula
+                      onClick={abrirMenuMatricula}
+                      title="Filtrar por matrícula"
+                      aria-label="Filtrar por matrícula"
+                      className={`relative w-6 h-6 rounded-md flex items-center justify-center transition ${
+                        matriculaFiltro !== 'todas' ? 'bg-[#003B43] text-white' : 'text-[#9ca3af] hover:bg-[#e8eaf2] hover:text-[#434655]'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>filter_list</span>
+                    </button>
+                  </div>
+                  {tooltipFuente && (
+                    <div
+                      role="tooltip"
+                      style={{ position: 'fixed', top: tooltipFuente.top, left: tooltipFuente.left, zIndex: 50 }}
+                      className="pointer-events-none px-3 py-2 rounded-lg bg-[#06272E] text-white text-xs leading-snug shadow-lg normal-case tracking-normal font-medium whitespace-nowrap"
+                    >
+                      {textoFuente}
+                    </div>
+                  )}
+                  {menuMatricula && (
+                    <div
+                      data-filtro-matricula
+                      role="menu"
+                      style={{ position: 'fixed', top: menuMatricula.top, left: menuMatricula.left, zIndex: 50 }}
+                      className="w-56 py-1.5 bg-white rounded-xl border border-[#e2e4ef] shadow-lg normal-case tracking-normal font-normal"
+                    >
+                      <p className="px-3.5 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">Filtrar por matrícula</p>
+                      {[
+                        { key: 'todas', label: 'Todas', count: empresas.length },
+                        ...['sin_renovar', 'cancelada', 'por_renovar', 'no_encontrada', 'sin_verificar', 'al_dia']
+                          .map((k) => ({ key: k, label: SITUACIONES_MATRICULA[k].label, count: matriculaCounts[k] ?? 0, color: SITUACIONES_MATRICULA[k].color })),
+                      ].map(({ key, label, count, color }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={matriculaFiltro === key}
+                          onClick={() => { setMatriculaFiltro(key); setMenuMatricula(null) }}
+                          className={`w-full flex items-center gap-2 px-3.5 py-2 text-sm text-left transition hover:bg-[#f3f4f6] ${
+                            matriculaFiltro === key ? 'font-bold text-[#003B43] bg-[#E3EEEE]/60' : 'text-[#191c1e]'
+                          }`}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ background: color ?? '#d1d5db' }}
+                          />
+                          <span className="flex-1">{label}</span>
+                          <span className="text-xs tabular-nums text-[#9ca3af]">{count}</span>
+                          {matriculaFiltro === key && (
+                            <span className="material-symbols-outlined text-[#003B43]" style={{ fontSize: 16 }}>check</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </th>
                 <th className="px-3 py-2.5 font-bold w-48">Token DIAN</th>
                 <th className="w-10"></th>
               </tr>

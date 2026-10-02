@@ -55,13 +55,49 @@ function Campo({ icon, label, value, copiable, valorCopia }) {
   )
 }
 
-// Una de las dos columnas de la tarjeta: título + etiqueta de fuente + (opcional) acción a la derecha.
-function Columna({ titulo, chip, chipClases, subtitulo, children }) {
+// Ícono de información: al pasar el mouse (o enfocarlo con el teclado) muestra `texto` al instante.
+// El tooltip nativo (title) tarda ~1 s en salir y no se puede estilizar.
+function IconoInfo({ texto }) {
+  const [pos, setPos] = useState(null) // { top, left } | null
+  const mostrar = (e) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    setPos({ top: r.bottom + 8, left: Math.max(8, Math.min(r.left - 8, window.innerWidth - 408)) })
+  }
+  return (
+    <>
+      <button
+        type="button"
+        onMouseEnter={mostrar}
+        onMouseLeave={() => setPos(null)}
+        onFocus={mostrar}
+        onBlur={() => setPos(null)}
+        aria-label={texto}
+        className="w-5 h-5 -ml-1 rounded-full flex items-center justify-center text-[#9ca3af] hover:text-[#003B43] focus:text-[#003B43] focus:outline-none transition"
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: 16 }}>info</span>
+      </button>
+      {pos && (
+        <div
+          role="tooltip"
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 50 }}
+          className="pointer-events-none max-w-[400px] px-3 py-2 rounded-lg bg-[#06272E] text-white text-xs leading-snug shadow-lg font-medium"
+        >
+          {texto}
+        </div>
+      )}
+    </>
+  )
+}
+
+// Una de las dos columnas de la tarjeta: (ícono de información opcional) + título + etiqueta de fuente.
+// `subtitulo` es una línea fija debajo del título; `info` va como tooltip del ícono a la izquierda.
+function Columna({ titulo, chip, chipClases, subtitulo, info, children }) {
   return (
     <div className="min-w-0">
       <div className="flex items-start justify-between gap-3 mb-1 pb-2 border-b border-[#e2e4ef]">
         <div>
           <div className="flex items-center gap-2">
+            {info && <IconoInfo texto={info} />}
             <h2 className="text-sm font-bold text-[#191c1e]">{titulo}</h2>
             <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide uppercase ${chipClases}`}>{chip}</span>
           </div>
@@ -270,7 +306,7 @@ export default function ConsultaTerceroPage() {
               titulo="Datos del RUES"
               chip="RUES"
               chipClases="bg-[#E3EEEE] text-[#003B43]"
-              subtitulo={tercero.guardado === false
+              info={tercero.guardado === false
                 ? (fechaFuente ? `Datos del RUES al ${fechaFuente}` : 'Consulta en vivo')
                 : (tercero.ruesDesactualizado
                   ? `Última verificación: ${fechaRues ?? 'nunca'}${fechaFuente ? ` · datos del RUES al ${fechaFuente}` : ''}`
