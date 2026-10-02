@@ -77,7 +77,7 @@ GestionTareasOficina/
 │   │   ├── config/               # env.js, database.js (pg-pool)
 │   │   ├── controllers/          # 27 controladores (ver tabla de endpoints)
 │   │   ├── middleware/           # auth.js, roles vía controllers, fondoAccess.js,
-│   │   │                        # nominaElectronicaAccess.js, groupAccess.js, errorHandler.js,
+│   │   │                        # nominaElectronicaAccess.js, empresasAccess.js, groupAccess.js, errorHandler.js,
 │   │   │                        # validation.js, security.js
 │   │   ├── routes/               # 30 routers (1 por recurso), documentados con swagger-jsdoc inline
 │   │   ├── socket/events.js      # setupSocket — JWT en handshake, rooms, online/offline
@@ -85,8 +85,8 @@ GestionTareasOficina/
 │   │   │                        # nePlazoReminderService, borradorCleanupService, dianTokenService,
 │   │   │                        # terceros/ (extracción de PDF + ruesService), exogenas/ (formatos 1001/1005/1006/1007)
 │   │   └── utils/                 # jwt.js, logger.js, auditLog.js, email.js
-│   ├── migrations/                # SQL numerado 001–063 + run.js (ver "Base de datos")
-│   ├── tests/                     # unit/ (34 suites, 562 tests), integration/, e2e/ (vacío)
+│   ├── migrations/                # SQL numerado 001–064 + run.js (ver "Base de datos")
+│   ├── tests/                     # unit/ (37 suites, 606 tests), integration/, e2e/ (vacío)
 │   ├── Dockerfile                 # multi-stage sobre node:20-slim, usuario no-root, HEALTHCHECK, Google Chrome + Xvfb (token DIAN)
 │   ├── docker-entrypoint.sh       # arranca Xvfb en segundo plano antes de Node
 │   └── jest.config.js             # coverageThreshold 70% lines/functions
@@ -233,7 +233,7 @@ Cliente HTTP único. Maneja JWT en memoria + refresh automático en 401, y expon
 | `/api/nomina-electronica/plazo` | `nePlazoController` | fecha límite por mes (editable solo por cuentas de confianza) |
 | `/api/contabilidad/empresas` | `contabEmpresasController` | CRUD del catálogo de empresas de Contabilidad (borrar solo admin) |
 | `/api/contabilidad` | `contabConsolidadoController` | `GET /periodos`, `GET /consolidado`, `GET /consolidado/resumen-anual`, `GET /consolidado/exportar` (Excel) |
-| `/api/empresas` | `empresasMaestroController` | directorio maestro: CRUD, `GET /duplicados`, `POST /fusionar`, `POST /duplicados/descartar`, `POST /:id/habilitar`, `POST /:id/generar-token-dian` |
+| `/api/empresas` | `empresasMaestroController` | directorio maestro: CRUD, `GET /duplicados`, `POST /fusionar`, `POST /duplicados/descartar`, `POST /:id/habilitar`, `POST /:id/generar-token-dian`, `POST /verificar-matricula` (admin, o quien tenga el permiso `empresas.canActualizarMatricula`: consulta el RUES y actualiza la matrícula mercantil de las empresas), `GET /rues-fuente` (fecha de la última actualización de los datos del RUES) |
 | `/api/exogenas` | `exogenasController` | `POST /upload`, `GET /borradores/:id`, `POST /borradores/:id/generar`, `POST /generar-combinado` (formatos 1001, 1005, 1006, 1007) |
 | `/api/terceros` | `tercerosController` | `POST /upload` (PDFs de factura), `GET /:nit` (Consulta Tercero + RUES), `POST /verificar-rues-lote` (admin/líder) |
 | `/api/dian` | `dianController` | wizard de 4 pasos: upload de reporte DIAN, clasificación de retención, nómina/autorretención, export a Excel (ver detalle abajo) |
@@ -246,6 +246,7 @@ Cliente HTTP único. Maneja JWT en memoria + refresh automático en 401, y expon
   - `requireFondoAccess`: exige `permissions.modulos.fondoEmprender.canEditar === true` (o rol admin). Bloquea `viewer` sin consultar BD.
   - `requireFondoAutorizarPagos`: exige `permissions.modulos.fondoEmprender.canAutorizarPagos === true` (o rol admin). Permiso separado de `canEditar` — quien registra pagos no necesariamente puede autorizar su envío a la fiduciaria.
 - `middleware/nominaElectronicaAccess.js` — guards propios de Nómina Electrónica, sobre `permissions.modulos.nominaElectronica.{canEditar, canVerTodo, canGestionar}`: `requireNEAccess` (escribir estados), `requireNEView` (leer), `requireNEAdmin` (catálogo de empresas) y `requireNEPlazoAdmin` (la fecha límite solo la editan las cuentas listadas en `IDS_RESPONSABLES_PLAZO`).
+- `middleware/empresasAccess.js` — `requireEmpresasMatricula` protege `POST /api/empresas/verificar-matricula` ("Actualizar matrícula" del RUES): el administrador siempre puede; los demás roles, excepto viewer, solo con `permissions.modulos.empresas.canActualizarMatricula === true`, que se activa por persona en la pantalla **Usuarios** (columna y panel "Empresas"). Esa ruta se declara **antes** del filtro admin/líder del router de empresas porque ese filtro no mira permisos por usuario.
 - Directorio de empresas, Terceros y Consulta Tercero: lectura y "generar token" abiertos a cualquier usuario autenticado; escribir en el directorio exige admin o líder, y `POST /api/terceros/verificar-rues-lote` también.
 - `middleware/groupAccess.js`, `validation.js`, `security.js` (incluye `validateUUIDParam`, `validateProductionEnv`), `errorHandler.js` (`notFound` + handler global).
 
@@ -276,6 +277,7 @@ Los permisos de Fondo Emprender son independientes de este rol base — se otorg
 | `reminderService.js` | `*/30 * * * *` (cada 30 min) | Recordatorios de vencimiento: sin `due_time` → vence hoy/mañana; con `due_time` → vence en las próximas 2h. Marca `reminder_sent_at` para no repetir. Envía notificación in-app + Web Push |
 | `reminderService.js` (segundo cron) | `*/5 * * * *` (cada 5 min) | Recordatorios de **tareas personales** (`personal_tasks.reminder_at`): a una hora puntual elegida por la persona, por eso necesita más precisión que el de vencimiento |
 | `nePlazoReminderService.js` | `0 8 * * *` zona `America/Bogota`, **y también al arrancar** | Avisos de Nómina Electrónica: mes habilitado, plazo próximo (5 días), plazo vencido y "configura la fecha límite". Todos son idempotentes (`yaSeEnvioHoy` / `yaSeEnvioEsteMes`), por eso pueden repetirse al arrancar sin duplicar. La fecha límite es manual a propósito (no se calcula por festivos) |
+| `empresasRuesService.js` | Al arrancar y `0 6 * * *` zona `America/Bogota` | Pregunta primero la **fecha de la última "foto" de los datos del RUES** (`ruesService.js#fechaActualizacionFuente`, ficha de metadatos de 2,6 KB) y consulta solo a las empresas **activas** del directorio nunca verificadas o verificadas **antes** de esa fecha; si la foto no cambió, no consulta nada (si no se puede saber la fecha, cae al criterio de 7 días). Guarda el estado de su matrícula mercantil (solo columnas `rues_*`). Un fallo del RUES no se guarda. También se lanza en segundo plano al crear una empresa o cambiarle el NIT/cédula, y a mano con "Actualizar matrícula" |
 | `borradorCleanupService.js` | Al arrancar y `0 10 * * *` | Borra los borradores vencidos de `calculo_borradores` (Contabilidad) y `exogenas_borradores` (Exógenas), que guardan el Excel original (BYTEA) y expiran a los 14 días |
 | `pushService.js` | — | Helper de envío Web Push (VAPID), usado por los crons de recordatorios y por eventos puntuales |
 
@@ -401,6 +403,7 @@ Unifica bajo una sola identidad las empresas de Fondo Emprender, Empresas Extern
 - **Tabla `empresas`**: solo identidad (`name`, `nit`, `tipo_contribuyente`, `cedula_representante`, `activa`) y qué módulos tiene habilitados. Las 4 tablas de módulo siguen siendo dueñas de sus propios campos y tienen un `empresa_id` **nullable** hacia ella. Renombrar solo se hace desde el directorio (`PUT /api/empresas/:id`), con cascada a las tablas de módulo.
 - **Persona natural**: su cédula vive en `empresas.nit` (la lista y el token DIAN la leen de ahí).
 - **Vigencia de cada empresa** (mig. 059–060): las 4 tablas de módulo (`fondo_empresas`, `ne_empresas`, `ext_empresas`, `contab_empresas`) tienen `vigente_hasta_anio` / `vigente_hasta_mes`; `NULL` = sin restricción. Una empresa que sale deja de aparecer en los meses siguientes, pero su histórico no se borra. El filtro por vigencia también afecta contadores y progreso.
+- **Matrícula mercantil de los propios clientes (RUES, mig. 064)**: columna "Matrícula" y filtro en `/empresas`, con una línea que dice **"datos del RUES al <fecha>"** (la de la última foto, no la de hoy). El **RUES no entrega una fecha de vencimiento**: entrega el estado, el último año renovado y la fecha de esa renovación; el plazo lo pone la ley (renovación anual hasta el **31 de marzo**, según el Código de Comercio) y se **calcula al leer** (`ruesService.js#calcularSituacionMatricula`, `plazoLimite`). Situaciones: `al_dia`, `por_renovar` (ene–mar, renovó el año pasado), `sin_renovar`, `cancelada` ("cancelada por traslado de domicilio" no cuenta), `no_encontrada`, `sin_dato`, `otro` y `sin_verificar`. Mismas fuentes y reglas que Terceros (ver ese módulo); cuando cambia el NIT/cédula de una empresa se limpia lo anterior en el mismo `UPDATE` y se vuelve a consultar. Una prueba con las 162 empresas reales (2026-10-02) dio 143 al día, 9 sin renovar, 2 canceladas y 3 que no aparecen. Es un aviso para revisar, no una prueba: los datos abiertos tienen retraso y manda el certificado de la Cámara de Comercio.
 - **Posibles duplicados**: mismo NIT, o nombre con una palabra significativa en común (se ignoran figuras jurídicas y "ASOCIACION"/"FUNDACION"); se puede **fusionar** o marcar **"No es duplicado"** (`empresas_duplicados_descartados`, mig. 056). Ojo: `fusionar` mueve habilitaciones de módulo pero **no copia** NIT/tipo/cédula.
 - **Permisos**: escribir en el directorio, admin y líder; leer y generar token, cualquier usuario autenticado.
 - **Generación del token de acceso a la DIAN** (`services/dianTokenService.js`): automatiza el login de `catalogo-vpfe.dian.gov.co` con **Google Chrome real** (el WAF de Cloudflare bloquea el Chromium de Playwright) sobre un **perfil persistente "calentado"** una sola vez con una verificación real. El perfil vive en el servidor (`${HOME}/dian-perfil-real-chrome`, montado por *bind mount* en `/app/dian-perfil`, no como volumen nombrado, para no perderlo). El contenedor no tiene pantalla: `docker-entrypoint.sh` arranca **Xvfb** antes de Node. Hay una cola con concurrencia máxima `DIAN_TOKEN_MAX_CONCURRENTE` (5 en `docker-compose.yml`): las demás solicitudes esperan turno. El servidor es modesto (2 núcleos); con 3 o 5 generaciones simultáneas el CPU se satura pero no falla. Esta pieza está excluida de la cobertura de tests (integración real con el navegador).
@@ -419,6 +422,7 @@ Base de datos de terceros (proveedores y clientes) con **dos fuentes**: las fact
 
 ### Fuente 2: RUES (migración 063)
 - **De dónde sale**: conjunto de datos abierto `c82u-588k` de datos.gov.co ("Personas Naturales, Personas Jurídicas y Entidades Sin Ánimo de Lucro"), publicado por **Confecámaras**, API SODA/Socrata, sin credenciales. **Licencia CC BY-SA 4.0**: uso comercial permitido; exige atribución, y *CompartirIgual* solo aplicaría si se redistribuyeran datos derivados a terceros (uso interno no lo activa). Se decidió **no** mostrar la atribución en pantalla. El servicio propio de RUES (`ruesapi.rues.org.co`) responde 403 y pide credenciales; no se usa.
+- **Frecuencia de actualización (importante)**: Confecámaras publica este conjunto como una **"foto" de vez en cuando, no a diario**, y **no declara con qué frecuencia**. El 2026-10-02 la última actualización era del **2026-09-04** (la renovación más reciente era de ese día, con ~3.000 por día hábil hasta el 3/09 y solo 421 el 4/09: foto tomada a media mañana). Consultar a diario devuelve lo mismo hasta que publiquen otra, por eso el sistema pregunta la fecha de la foto (`dataUpdatedAt` de `/api/views/metadata/v1/c82u-588k`, recordada 1 hora; si falla, no insiste por 5 min) y la **muestra en pantalla** ("Datos del RUES al 04/09/2026"): "consultado hoy" no significa "dato de hoy". Una renovación posterior a la foto aparece como "sin renovar" hasta la siguiente publicación; ante la duda, manda el certificado de la Cámara de Comercio. `GET /api/terceros/:nit` devuelve `ruesFuenteActualizadaAl`.
 - **Qué trae** y se guarda en columnas `rues_*` de `terceros`: razón social oficial, estado de la matrícula, último año renovado, CIIU principal, tipo de organización jurídica, representante legal y su **documento** (número y tipo). **No trae** dirección, país ni datos tributarios: esos solo salen de la factura. Se consulta por `numero_identificacion` (el campo mezcla NITs y cédulas).
 - **Cliente** (`services/terceros/ruesService.js`): consulta en **lotes de 100** con `$where=numero_identificacion in(...)`, `fetch` nativo y `X-App-Token` opcional (`SOCRATA_APP_TOKEN`). El documento se normaliza a solo dígitos **antes** de armar la consulta (el filtro es texto SoQL: evita inyección) y se descartan los de menos de 5 o más de 15 dígitos y los de solo ceros (el conjunto tiene cientos de miles de filas con `0000000000000`). Nunca lanza excepciones por red: cada documento queda `encontrado`, `no_encontrado` o `error`.
 - **Tiempos**: en segundo plano, 10 s por lote y 1 reintento (4xx distintos de 429 no se reintentan); en la búsqueda, 6 s y sin reintento (`OPCIONES_BUSQUEDA`). Medido: ~0,5–0,8 s por consulta y ~19 s para 861 documentos.
@@ -529,6 +533,7 @@ Una búsqueda **sí escribe** (la fecha y los datos del RUES de un tercero que y
 | 061_ne_plazo_mes | Fecha límite de Nómina Electrónica **por mes** (`ne_plazo_mes`), reemplaza al singleton `ne_plazo` |
 | 062_empresas_natural_documento_en_nit | Directorio: la cédula de una persona natural pasa a `empresas.nit` (corrige filas con NIT vacío) |
 | 063_terceros_rues | `terceros`: `tiene_pdf` y las columnas `rues_*` de la verificación contra el RUES (ver "Módulo Terceros y RUES") |
+| 064_empresas_rues | `empresas`: `rues_consulta`, `rues_consultado_at`, `rues_estado`, `rues_ultimo_ano_renovado`, `rues_fecha_renovacion` — estado de la matrícula mercantil de los propios clientes (ver "Directorio maestro de empresas y token DIAN") |
 
 ### Tablas principales (fuera de las evidentes por nombre)
 
@@ -551,7 +556,7 @@ ext_empresas              → catálogo Empresas Externas: name, responsable_id,
 ext_procesos              → catálogo de 11 procesos del checklist de Empresas Externas
 ext_checklist_items       → estado por empresa/proceso/mes (pending|in_progress|done|na)
 terceros                  → una fila por NIT: datos de factura (dirección, DANE, país, régimen…) + columnas rues_* (verificación RUES) + tiene_pdf
-empresas                  → directorio maestro: identidad (nit, tipo_contribuyente, cedula_representante); las 4 tablas de módulo apuntan con empresa_id nullable
+empresas                  → directorio maestro: identidad (nit, tipo_contribuyente, cedula_representante); las 4 tablas de módulo apuntan con empresa_id nullable; más columnas rues_* con el estado de la matrícula mercantil (mig. 064)
 ne_empresas / ne_meses    → Nómina Electrónica: catálogo y estado mensual (pendiente | presentada | no_aplica = "En espera"); ne_plazo_mes = fecha límite por mes
 contab_empresas / contab_periodos / contab_documentos → Contabilidad por empresa: catálogo, meses guardados y una fila por documento (CUFE) con retención/IVA/concepto
 exogenas_borradores       → borradores de exógenas (Excel original BYTEA, expiran a 14 días); calculo_borradores hace lo mismo para el wizard DIAN
@@ -599,11 +604,11 @@ Root `.env` (para `docker-compose.yml`): `PORT`, `CLIENT_URL`, `DB_PORT/NAME/USE
 
 ```
 backend/tests/
-├── unit/         → 34 suites / 562 tests: authController, taskController, groupController,
+├── unit/         → 37 suites / 606 tests: authController, taskController, groupController,
 │                   statsController, middleware, routes, helpers, validators, groupAccess,
 │                   fondo* (Checklist, Empresas, Procesos, ProcesoGrupos),
 │                   personalTask/personalNote, ext* (Empresas, Checklist),
-│                   dianController, contabEmpresas/contabConsolidado, empresasMaestro,
+│                   dianController, contabEmpresas/contabConsolidado, empresasMaestro + empresasMaestroMatricula + empresasRuesService,
 │                   exogenasController + exogenasFormato1001/1005/1006/1007 + exogenasIndex,
 │                   terceros (extracción de PDF y Consulta Tercero), tercerosRues, ruesService,
 │                   nePlazoReminderService, nominaElectronicaAccess, borradorCleanupService,
@@ -619,7 +624,7 @@ cypress/e2e/
 └── 03-permissions.cy.js  → 8 tests (viewer/member/admin)
 ```
 
-Cobertura backend (medida el 2026-10-02 con `jest --coverage`): **76,2 % líneas, 74,7 % funciones, 75,3 % statements, 65,3 % branches** (umbral configurado: 70 % líneas y funciones). Quedan **excluidos del cálculo**, con el motivo en `backend/jest.config.js`: `index.js`, `fondo*` y `ext*` (controllers/rutas pesados en SQL, con tests propios), `pushService`, `recurringTaskService`, `reminderService`, `dianController` (el camino de exportación usa un `import()` ESM que Jest no puede interceptar) y `dianTokenService` (Chrome real contra la DIAN).
+Cobertura backend (medida el 2026-10-02 con `jest --coverage`): **76,8 % líneas, 74,6 % funciones, 76,0 % statements, 67,1 % branches** (umbral configurado: 70 % líneas y funciones). Quedan **excluidos del cálculo**, con el motivo en `backend/jest.config.js`: `index.js`, `fondo*` y `ext*` (controllers/rutas pesados en SQL, con tests propios), `pushService`, `recurringTaskService`, `reminderService`, `dianController` (el camino de exportación usa un `import()` ESM que Jest no puede interceptar) y `dianTokenService` (Chrome real contra la DIAN).
 
 **Huecos conocidos de tests**: no hay tests de los controladores de Nómina Electrónica (`neEmpresas`, `neMeses`, `nePlazo`), del frontend (React), ni del permiso admin/líder de `POST /api/terceros/verificar-rues-lote`. Los tests de Terceros y del RUES **nunca** consultan el RUES real (se mockea `ruesService`).
 

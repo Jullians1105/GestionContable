@@ -1,9 +1,12 @@
 jest.mock('../../src/config/database');
 jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
 jest.mock('../../src/services/dianTokenService');
+// Nunca consultar el RUES real desde estos tests: la verificación de matrículas se simula.
+jest.mock('../../src/services/empresasRuesService');
 
 const db = require('../../src/config/database');
 const dianTokenService = require('../../src/services/dianTokenService');
+const empresasRues = require('../../src/services/empresasRuesService');
 const {
   getDirectorio, getPosiblesDuplicados, createEmpresa, updateEmpresa, habilitarModulo,
   deshabilitarModulo, fusionar, descartarDuplicado, generarTokenDian,

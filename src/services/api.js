@@ -308,6 +308,12 @@ export const api = {
   fusionarEmpresas: (empresaIdA, empresaIdB) => request('/empresas/fusionar', { method: 'POST', body: JSON.stringify({ empresaIdA, empresaIdB }) }),
   descartarDuplicadoEmpresa: (empresaIdA, empresaIdB) => request('/empresas/duplicados/descartar', { method: 'POST', body: JSON.stringify({ empresaIdA, empresaIdB }) }),
   generarTokenDian: (id) => request(`/empresas/${id}/generar-token-dian`, { method: 'POST' }),
+  // Consulta el RUES y actualiza la matrícula mercantil de las empresas (admin/líder). Por defecto
+  // solo las pendientes (nunca verificadas o con más de 7 días); con forzar = true, todas.
+  // Fecha de la última actualización de los datos del RUES (la "foto" que publica Confecámaras de vez
+  // en cuando). { actualizadaAl: ISO | null }
+  getRuesFuente: () => request('/empresas/rues-fuente'),
+  verificarMatriculaEmpresas: (forzar = false) => request('/empresas/verificar-matricula', { method: 'POST', body: JSON.stringify({ forzar }) }),
 
   // Empresas Externas — Catálogo de procesos (checklist)
   getExtProcesos: (incluirInactivos) => {

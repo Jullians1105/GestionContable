@@ -13,13 +13,21 @@ const env = require('../../config/env');
 const logger = require('../../utils/logger');
 
 const RUES_URL = 'https://www.datos.gov.co/resource/c82u-588k.json';
+// Ficha de metadatos del conjunto (2,6 KB): trae `dataUpdatedAt`, la fecha de la última "foto" de
+// los datos. El conjunto lo publica Confecámaras de vez en cuando, NO a diario (el 2026-10-02 su
+// última actualización era del 2026-09-04) y no declara con qué frecuencia lo hace: consultarlo a
+// diario devuelve lo mismo hasta que publiquen una foto nueva.
+const FUENTE_URL = 'https://www.datos.gov.co/api/views/metadata/v1/c82u-588k';
+const FUENTE_TTL_MS = 60 * 60 * 1000; // la fecha se vuelve a preguntar como máximo cada hora
+const FUENTE_REINTENTO_MS = 5 * 60 * 1000; // si la ficha no responde, no insistir antes de 5 min
+let fuenteCache = { fecha: null, leidoEn: 0, fallaEn: 0 };
 const TAMANO_LOTE = 100;
 const TIMEOUT_MS = 10000;
 const REINTENTOS = 1;
 const CAMPOS = [
   'numero_identificacion', 'razon_social', 'estado_matricula', 'codigo_categoria_matricula',
   'ultimo_ano_renovado', 'cod_ciiu_act_econ_pri', 'organizacion_juridica', 'representante_legal',
-  'num_identificacion_representante_legal', 'clase_identificacion_rl',
+  'num_identificacion_representante_legal', 'clase_identificacion_rl', 'fecha_renovacion',
 ];
 
 // El conjunto trae cientos de miles de filas con documento "0000000000000" (sin dato): consultar
@@ -61,9 +69,18 @@ const documentoRepresentante = (valor) => {
   return digitos && !/^0+$/.test(digitos) ? digitos : null;
 };
 
+// El RUES trae las fechas como 'YYYYMMDD' (y '0' / '00000000' cuando no hay dato) → 'YYYY-MM-DD' o null.
+const fechaIso = (valor) => {
+  const s = String(valor ?? '').trim();
+  if (!/^\d{8}$/.test(s) || /^0+$/.test(s)) return null;
+  const iso = `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+  return Number.isNaN(Date.parse(iso)) ? null : iso;
+};
+
 function aDatos(registro) {
   const anio = Number(registro.ultimo_ano_renovado);
   return {
+    fechaRenovacion: fechaIso(registro.fecha_renovacion),
     razonSocial: String(registro.razon_social).trim(),
     estado: registro.estado_matricula ?? null,
     ciiu: registro.cod_ciiu_act_econ_pri || null,
@@ -142,4 +159,70 @@ async function consultarRues(documentos, opciones) {
   return resultados;
 }
 
-module.exports = { consultarRues, normalizarDocumento, clasificarEstado, elegirRegistro, TAMANO_LOTE };
+// Situación de la matrícula mercantil de una empresa, a partir de lo que dice el RUES. El RUES no
+// entrega fecha de vencimiento: la ley fija la renovación anual dentro de los tres primeros meses
+// (hasta el 31 de marzo), así que el plazo se calcula acá.
+//   al_dia        activa y renovada este año
+//   por_renovar   activa, todavía dentro del plazo de este año (ene–mar) y renovó el año pasado
+//   sin_renovar   activa y venció el plazo sin renovar
+//   sin_dato      activa pero el RUES no trae el año de la última renovación
+//   cancelada     matrícula cancelada
+//   otro          cualquier otro estado (ej. "no matriculado")
+//   no_encontrada no aparece en el RUES (persona natural sin matrícula, entidad sin registro, etc.)
+//   sin_verificar todavía no se ha consultado
+function calcularSituacionMatricula({ consulta, estado, ultimoAnoRenovado }, hoy = new Date()) {
+  if (consulta === 'no_encontrado') return 'no_encontrada';
+  if (consulta !== 'encontrado') return 'sin_verificar';
+
+  const clase = clasificarEstado(estado);
+  if (clase === 'cancelada') return 'cancelada';
+  if (clase !== 'activa') return 'otro';
+
+  const anio = hoy.getFullYear();
+  const ultimo = Number(ultimoAnoRenovado) || 0;
+  if (!ultimo) return 'sin_dato';
+  if (ultimo >= anio) return 'al_dia';
+  const dentroDelPlazo = hoy.getMonth() <= 2; // enero, febrero o marzo
+  return dentroDelPlazo && ultimo >= anio - 1 ? 'por_renovar' : 'sin_renovar';
+}
+
+// Fecha (Date) de la última actualización de los datos del RUES, o null si no se pudo saber. Sirve
+// para saber si vale la pena volver a consultar y para mostrarle al usuario qué tan al día está el
+// dato (que NO es "de hoy": es el de la última foto que publicó Confecámaras).
+// Nunca lanza: si la ficha no responde devuelve la última fecha conocida (o null) y no vuelve a
+// intentarlo por unos minutos, para no demorar cada búsqueda cuando datos.gov.co está caído.
+async function fechaActualizacionFuente({ timeoutMs = 5000 } = {}) {
+  const ahora = Date.now();
+  if (fuenteCache.fecha && ahora - fuenteCache.leidoEn < FUENTE_TTL_MS) return fuenteCache.fecha;
+  if (fuenteCache.fallaEn && ahora - fuenteCache.fallaEn < FUENTE_REINTENTO_MS) return fuenteCache.fecha;
+
+  const controlador = new AbortController();
+  const temporizador = setTimeout(() => controlador.abort(), timeoutMs);
+  try {
+    const headers = { Accept: 'application/json' };
+    if (env.SOCRATA_APP_TOKEN) headers['X-App-Token'] = env.SOCRATA_APP_TOKEN;
+    const res = await fetch(FUENTE_URL, { headers, signal: controlador.signal });
+    if (!res.ok) throw new Error(`RUES (ficha) respondió ${res.status}`);
+    const cuerpo = await res.json();
+    // "2026-09-04T19:15:35+0000" → se normaliza el desfase a "+00:00" para que cualquier motor lo lea.
+    const texto = String(cuerpo?.dataUpdatedAt ?? '').replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+    const fecha = new Date(texto);
+    if (!texto || Number.isNaN(fecha.getTime())) throw new Error('La ficha del RUES no trae dataUpdatedAt válido');
+    fuenteCache = { fecha, leidoEn: ahora, fallaEn: 0 };
+    return fecha;
+  } catch (err) {
+    logger.warn({ err: err.message }, 'No se pudo leer la fecha de actualización del RUES');
+    fuenteCache = { ...fuenteCache, fallaEn: ahora };
+    return fuenteCache.fecha;
+  } finally {
+    clearTimeout(temporizador);
+  }
+}
+
+// Solo para los tests: vacía lo recordado de la ficha.
+const reiniciarCacheFuente = () => { fuenteCache = { fecha: null, leidoEn: 0, fallaEn: 0 }; };
+
+module.exports = {
+  consultarRues, normalizarDocumento, clasificarEstado, elegirRegistro, calcularSituacionMatricula,
+  fechaActualizacionFuente, reiniciarCacheFuente, TAMANO_LOTE,
+};

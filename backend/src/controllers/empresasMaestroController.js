@@ -9,6 +9,8 @@ const db = require('../config/database');
 const auditLog = require('../utils/auditLog');
 const { palabrasSignificativas } = require('../utils/nombresSeParecen');
 const dianTokenService = require('../services/dianTokenService');
+const { calcularSituacionMatricula, fechaActualizacionFuente } = require('../services/terceros/ruesService');
+const empresasRues = require('../services/empresasRuesService');
 
 // Un módulo = una tabla de habilitación. `insertar` arma el INSERT con lo mínimo de cada una.
 const MODULOS = {
@@ -50,6 +52,34 @@ const MODULOS = {
   },
 };
 
+// Una columna DATE llega de `pg` como Date a medianoche local: se pasa a 'YYYY-MM-DD' con los
+// getters locales para no correr el día por zona horaria.
+const fechaSolo = (valor) => {
+  if (!valor) return null;
+  if (typeof valor === 'string') return valor.slice(0, 10);
+  const mm = String(valor.getMonth() + 1).padStart(2, '0');
+  const dd = String(valor.getDate()).padStart(2, '0');
+  return `${valor.getFullYear()}-${mm}-${dd}`;
+};
+
+// Estado de la matrícula mercantil según el RUES (migración 064). `situacion` y `plazoLimite` se
+// calculan al leer (el RUES no entrega fecha de vencimiento: la ley fija el 31 de marzo).
+const normalizeMatricula = (row, hoy = new Date()) => {
+  const situacion = calcularSituacionMatricula({
+    consulta: row.rues_consulta ?? null,
+    estado: row.rues_estado ?? null,
+    ultimoAnoRenovado: row.rues_ultimo_ano_renovado ?? null,
+  }, hoy);
+  return {
+    situacion,
+    estado: row.rues_estado ?? null,
+    ultimoAnoRenovado: row.rues_ultimo_ano_renovado ?? null,
+    fechaRenovacion: fechaSolo(row.rues_fecha_renovacion),
+    consultadoAt: row.rues_consultado_at ?? null,
+    plazoLimite: situacion === 'por_renovar' || situacion === 'sin_renovar' ? `${hoy.getFullYear()}-03-31` : null,
+  };
+};
+
 const normalizeEmpresa = (row) => ({
   id: row.id,
   name: row.name,
@@ -59,6 +89,7 @@ const normalizeEmpresa = (row) => ({
   activa: row.activa,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  matricula: normalizeMatricula(row),
 });
 
 // ── Directorio ───────────────────────────────────────────────────────────────────
@@ -67,6 +98,7 @@ const getDirectorio = async (req, res, next) => {
     const { rows } = await db.query(`
       SELECT
         e.id, e.name, e.nit, e.tipo_contribuyente, e.cedula_representante, e.activa, e.created_at, e.updated_at,
+        e.rues_consulta, e.rues_consultado_at, e.rues_estado, e.rues_ultimo_ano_renovado, e.rues_fecha_renovacion,
         fe.id AS fondo_id, fe.categoria AS fondo_categoria, fe.monthly_fee AS fondo_monthly_fee,
         fe.vigente_hasta_anio AS fondo_vigente_hasta_anio, fe.vigente_hasta_mes AS fondo_vigente_hasta_mes,
         ee.id AS ext_id, ee.responsable_id AS ext_responsable_id,
@@ -222,6 +254,8 @@ const createEmpresa = async (req, res, next) => {
     );
     await auditLog(req.user.userId, 'CREATE', 'empresas', id, { name, nit: identidad.nit, tipoContribuyente, cedulaRepresentante: identidad.cedulaRepresentante });
     req.io.emit('empresas:updated', { empresaId: id });
+    // Matrícula mercantil según el RUES, en segundo plano: no demora ni afecta la creación.
+    if (identidad.nit) empresasRues.verificarEnSegundoPlano({ ids: [id], forzar: true });
     res.status(201).json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
     next(err);
@@ -278,9 +312,19 @@ const updateEmpresa = async (req, res, next) => {
         activa = COALESCE($2, activa),
         nit = $4,
         tipo_contribuyente = COALESCE($5, tipo_contribuyente),
-        cedula_representante = $6
+        cedula_representante = $6,
+        -- Si cambia el documento ($7), lo que se sabía de la matrícula ya no corresponde: se limpia
+        -- en esta misma sentencia y se vuelve a consultar. El cambio se calcula en JS y se pasa
+        -- como parámetro aparte: reutilizar $4 en una comparación hace que PostgreSQL le deduzca
+        -- dos tipos distintos (error 42P08).
+        rues_consulta = CASE WHEN $7::boolean THEN NULL ELSE rues_consulta END,
+        rues_consultado_at = CASE WHEN $7::boolean THEN NULL ELSE rues_consultado_at END,
+        rues_estado = CASE WHEN $7::boolean THEN NULL ELSE rues_estado END,
+        rues_ultimo_ano_renovado = CASE WHEN $7::boolean THEN NULL ELSE rues_ultimo_ano_renovado END,
+        rues_fecha_renovacion = CASE WHEN $7::boolean THEN NULL ELSE rues_fecha_renovacion END
        WHERE id = $3 RETURNING *`,
-      [nombreNuevo, activa ?? null, id, identidad.nit, tipoContribuyente ?? null, identidad.cedulaRepresentante]
+      [nombreNuevo, activa ?? null, id, identidad.nit, tipoContribuyente ?? null, identidad.cedulaRepresentante,
+        (identidad.nit ?? null) !== (actual.rows[0].nit ?? null)]
     );
     if (nombreNuevo) {
       for (const { tabla } of Object.values(MODULOS)) {
@@ -294,6 +338,9 @@ const updateEmpresa = async (req, res, next) => {
       nitAnterior: actual.rows[0].nit, cedulaRepresentanteAnterior: actual.rows[0].cedula_representante,
     });
     req.io.emit('empresas:updated', { empresaId: id });
+    if (identidad.nit && identidad.nit !== actual.rows[0].nit) {
+      empresasRues.verificarEnSegundoPlano({ ids: [id], forzar: true });
+    }
     res.json(normalizeEmpresa(result.rows[0]));
   } catch (err) {
     await client.query('ROLLBACK');
@@ -459,8 +506,36 @@ const generarTokenDian = async (req, res, next) => {
   }
 };
 
+// Fecha de la última actualización de los datos del RUES (la "foto" que publica Confecámaras, de
+// vez en cuando). La pantalla la muestra para que nadie confunda "verificado hoy" con "dato de hoy".
+// Abierto a cualquier autenticado. `actualizadaAl` es null si no se pudo saber.
+const getRuesFuente = async (_req, res, next) => {
+  try {
+    const fecha = await fechaActualizacionFuente();
+    res.json({ actualizadaAl: fecha ? fecha.toISOString() : null });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// "Actualizar matrícula": consulta el RUES para las empresas del directorio y guarda el estado de
+// su matrícula mercantil. Por defecto solo las pendientes (nunca verificadas o con más de 7 días);
+// con `forzar: true`, todas. Admin/líder (ver rutas).
+const verificarMatricula = async (req, res, next) => {
+  try {
+    const resumen = await empresasRues.verificarEmpresas({ forzar: req.body?.forzar === true });
+    req.io?.emit('empresas:updated', { tipo: 'matricula' });
+    res.json(resumen);
+  } catch (err) {
+    if (err.codigo === 'EN_CURSO') return res.status(409).json({ error: err.message });
+    next(err);
+  }
+};
+
 module.exports = {
   MODULOS,
+  verificarMatricula,
+  getRuesFuente,
   getDirectorio,
   getPosiblesDuplicados,
   createEmpresa,

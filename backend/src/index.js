@@ -75,6 +75,8 @@ if (env.NODE_ENV !== 'test') {
   initNEPlazoCron(io);
   const { initBorradorCleanupCron } = require('./services/borradorCleanupService');
   initBorradorCleanupCron();
+  const { initEmpresasRuesCron } = require('./services/empresasRuesService');
+  initEmpresasRuesCron();
 }
 
 // Inyectar io en todas las requests

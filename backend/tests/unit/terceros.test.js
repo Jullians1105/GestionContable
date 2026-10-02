@@ -8,6 +8,7 @@ jest.mock('../../src/config/database');
 jest.mock('../../src/services/terceros/ruesService', () => ({
   ...jest.requireActual('../../src/services/terceros/ruesService'),
   consultarRues: jest.fn(),
+  fechaActualizacionFuente: jest.fn(),
 }));
 
 const pdfParse = require('pdf-parse');
@@ -16,7 +17,7 @@ const {
   extraerPartesDePdf, extraerTerceroDePdf, mapearCodigoDane, mapearCodigoPais, normalizarDireccion,
   limpiarParaDian, FormatoNoReconocidoError,
 } = require('../../src/services/terceros');
-const { consultarRues } = require('../../src/services/terceros/ruesService');
+const { consultarRues, fechaActualizacionFuente } = require('../../src/services/terceros/ruesService');
 const { uploadTerceros, consultarTercero } = require('../../src/controllers/tercerosController');
 
 // Texto real extraído (pdf-parse) de docs/PDF-901939874-AAC2.pdf — factura de muestra de
@@ -504,6 +505,32 @@ describe('consultarTercero', () => {
   beforeEach(() => {
     db.query.mockReset();
     consultarRues.mockReset().mockResolvedValue(new Map());
+    fechaActualizacionFuente.mockReset().mockResolvedValue(null);
+  });
+
+  test('incluye la fecha de la última actualización de los datos del RUES (la "foto"), guardado o no', async () => {
+    fechaActualizacionFuente.mockResolvedValue(new Date('2026-09-04T19:15:35Z'));
+    db.query.mockResolvedValueOnce({ rows: [{ nit: '901939874', razon_social: 'X', tiene_pdf: true }] });
+    const res1 = mockRes();
+    await consultarTercero({ params: { nit: '901939874' } }, res1, jest.fn());
+    expect(res1.json.mock.calls[0][0].ruesFuenteActualizadaAl).toBe('2026-09-04T19:15:35.000Z');
+
+    db.query.mockResolvedValueOnce({ rows: [] });
+    consultarRues.mockResolvedValue(new Map([['900123456', {
+      consulta: 'encontrado',
+      datos: { razonSocial: 'EMPRESA EJEMPLO SAS', estado: 'ACTIVA', ciiu: null, representanteLegal: null, organizacionJuridica: null, ultimoAnoRenovado: 2026 },
+    }]]));
+    const res2 = mockRes();
+    await consultarTercero({ params: { nit: '900123456' } }, res2, jest.fn());
+    expect(res2.json.mock.calls[0][0]).toMatchObject({ guardado: false, ruesFuenteActualizadaAl: '2026-09-04T19:15:35.000Z' });
+  });
+
+  test('si no se puede saber la fecha de la foto, ruesFuenteActualizadaAl es null y la búsqueda sigue funcionando', async () => {
+    db.query.mockResolvedValueOnce({ rows: [{ nit: '901939874', razon_social: 'X', tiene_pdf: true }] });
+    const res = mockRes();
+    await consultarTercero({ params: { nit: '901939874' } }, res, jest.fn());
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json.mock.calls[0][0].ruesFuenteActualizadaAl).toBeNull();
   });
 
   test('devuelve el tercero, incluyendo régimen fiscal/responsabilidad/teléfono/correo', async () => {

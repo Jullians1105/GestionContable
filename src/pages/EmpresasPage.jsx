@@ -27,6 +27,59 @@ const MODULO_UPDATE = {
   contab: (id, data) => api.updateContabEmpresa(id, data),
 }
 
+// Estado de la matrícula mercantil según el RUES (calculado en el backend, ver
+// ruesService.js#calcularSituacionMatricula). El RUES no entrega fecha de vencimiento: la
+// renovación es anual y vence el 31 de marzo (plazoLimite).
+const SITUACIONES_MATRICULA = {
+  al_dia:        { label: 'Al día',        color: '#16a34a', icon: 'check_circle' },
+  por_renovar:   { label: 'Por renovar',   color: '#d97706', icon: 'schedule' },
+  sin_renovar:   { label: 'Sin renovar',   color: '#b45309', icon: 'warning' },
+  cancelada:     { label: 'Cancelada',     color: '#dc2626', icon: 'cancel' },
+  no_encontrada: { label: 'No aparece',    color: '#9ca3af', icon: 'search_off' },
+  sin_dato:      { label: 'Activa',        color: '#6b7280', icon: 'help' },
+  otro:          { label: 'Otro estado',   color: '#6b7280', icon: 'help' },
+  sin_verificar: { label: 'Sin verificar', color: '#9ca3af', icon: 'pending' },
+}
+
+// 'YYYY-MM-DD' → 'DD/MM/YYYY'. Se corta el texto (sin pasar por Date) para que la zona horaria no corra el día.
+const formatearFecha = (iso) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : '')
+
+function MatriculaCelda({ matricula }) {
+  const info = SITUACIONES_MATRICULA[matricula?.situacion] ?? SITUACIONES_MATRICULA.sin_verificar
+  const m = matricula ?? {}
+  let detalle = ''
+  let ayuda = 'Estado de la matrícula mercantil según el RUES (registro mercantil de las Cámaras de Comercio)'
+  if (m.situacion === 'al_dia') {
+    detalle = m.fechaRenovacion ? `Renovó el ${formatearFecha(m.fechaRenovacion)}` : `Renovó en ${m.ultimoAnoRenovado}`
+  } else if (m.situacion === 'por_renovar') {
+    detalle = `Vence el ${formatearFecha(m.plazoLimite)}`
+    ayuda = `Renovó por última vez en ${m.ultimoAnoRenovado}. La renovación de este año vence el ${formatearFecha(m.plazoLimite)}.`
+  } else if (m.situacion === 'sin_renovar') {
+    detalle = `Última: ${m.fechaRenovacion ? formatearFecha(m.fechaRenovacion) : m.ultimoAnoRenovado}`
+    ayuda = `Su última renovación registrada es de ${m.ultimoAnoRenovado}. La de este año venció el ${formatearFecha(m.plazoLimite)}. Conviene confirmarlo con el certificado de la Cámara de Comercio: los datos del RUES pueden tener retraso.`
+  } else if (m.situacion === 'cancelada') {
+    detalle = m.ultimoAnoRenovado ? `Última renovación: ${m.ultimoAnoRenovado}` : ''
+    ayuda = `La matrícula figura como "${m.estado}" en el RUES.`
+  } else if (m.situacion === 'no_encontrada') {
+    ayuda = 'No aparece en el RUES (persona natural sin matrícula mercantil, entidad sin registro mercantil o NIT mal escrito).'
+  } else if (m.situacion === 'otro') {
+    detalle = m.estado ?? ''
+  } else if (m.situacion === 'sin_dato') {
+    detalle = 'Sin año de renovación'
+  } else {
+    ayuda = 'Todavía no se ha consultado el RUES para esta empresa (o no tiene NIT).'
+  }
+  return (
+    <div title={ayuda} className="flex items-start gap-1.5 leading-tight">
+      <span className="material-symbols-outlined flex-shrink-0 mt-px" style={{ fontSize: 16, color: info.color }}>{info.icon}</span>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold" style={{ color: info.color }}>{info.label}</p>
+        {detalle && <p className="text-[11px] text-[#6b7280] truncate">{detalle}</p>}
+      </div>
+    </div>
+  )
+}
+
 const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
@@ -35,13 +88,19 @@ const ANIO_ACTUAL = new Date().getFullYear()
 const ANIOS_VIGENCIA = [ANIO_ACTUAL - 1, ANIO_ACTUAL, ANIO_ACTUAL + 1, ANIO_ACTUAL + 2]
 
 export default function EmpresasPage() {
-  const { isAdmin } = useAuth()
+  const { user, isAdmin } = useAuth()
   // Solo admin: crear/editar identidad, vigencia por módulo, habilitar módulos, fusionar.
   // "Generar token DIAN" es la única acción abierta a cualquier usuario autenticado (ver
   // generarToken más abajo) — es operativa del día a día, no administración del directorio.
   const puedeEditar = isAdmin()
+  // "Actualizar matrícula" (RUES): el administrador siempre, y quien tenga el permiso que se da desde
+  // Usuarios (modulos.empresas.canActualizarMatricula). El servidor lo valida igual (empresasAccess.js).
+  const puedeActualizarMatricula = puedeEditar
+    || (user?.role !== 'viewer' && user?.permissions?.modulos?.empresas?.canActualizarMatricula === true)
 
   const [empresas, setEmpresas]     = useState([])
+  // Fecha (ISO) de la última actualización de los datos del RUES, o null si no se pudo saber.
+  const [ruesFuente, setRuesFuente]   = useState(null)
   const [duplicados, setDuplicados] = useState([])
   const [cargando, setCargando]     = useState(true)
   const [error, setError]           = useState('')
@@ -49,9 +108,15 @@ export default function EmpresasPage() {
   const cargar = useCallback(async () => {
     setError('')
     try {
-      const [dir, dup] = await Promise.all([api.getEmpresasDirectorio(), api.getEmpresasDuplicados()])
+      const [dir, dup, fuente] = await Promise.all([
+        api.getEmpresasDirectorio(),
+        api.getEmpresasDuplicados(),
+        // La fecha del RUES es solo informativa: si falla, la pantalla funciona igual sin mostrarla.
+        api.getRuesFuente().catch(() => null),
+      ])
       setEmpresas(dir)
       setDuplicados(dup)
+      setRuesFuente(fuente?.actualizadaAl ?? null)
     } catch (err) {
       setError(err.message || 'No se pudo cargar el directorio de empresas')
     } finally {
@@ -76,6 +141,74 @@ export default function EmpresasPage() {
 
   const [busqueda, setBusqueda] = useState('')
   const [moduloFiltro, setModuloFiltro] = useState('todas')
+  // Filtro por situación de la matrícula mercantil ('todas' o una clave de SITUACIONES_MATRICULA).
+  const [matriculaFiltro, setMatriculaFiltro] = useState('todas')
+  // Menú del filtro de matrícula (ícono junto al título de la columna). Guarda dónde dibujarlo, porque se
+  // posiciona con coordenadas de la ventana (position: fixed) para que la tarjeta de la tabla, que
+  // recorta lo que se sale (overflow-hidden), no lo corte.
+  const [menuMatricula, setMenuMatricula] = useState(null) // { top, left } | null
+  // Tooltip del ícono de información junto al título de la columna: de dónde salen los datos y de qué
+  // fecha son (la última "foto" que publicó el RUES, no la de hoy).
+  const [tooltipFuente, setTooltipFuente] = useState(null) // { top, left } | null
+  const mostrarTooltipFuente = (e) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    setTooltipFuente({ top: r.bottom + 8, left: Math.max(8, Math.min(r.left - 8, window.innerWidth - 328)) })
+  }
+  const textoFuente = ruesFuente
+    ? `Matrícula: datos del RUES al ${new Date(ruesFuente).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
+    : 'Matrícula: estado según el RUES (no se pudo saber la fecha de los datos)'
+  const abrirMenuMatricula = (e) => {
+    if (menuMatricula) { setMenuMatricula(null); return }
+    const r = e.currentTarget.getBoundingClientRect()
+    setMenuMatricula({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 232)) })
+  }
+  useEffect(() => {
+    if (!menuMatricula) return undefined
+    const cerrar = () => setMenuMatricula(null)
+    const alHacerClic = (e) => { if (!e.target.closest('[data-filtro-matricula]')) cerrar() }
+    const alTeclear = (e) => { if (e.key === 'Escape') cerrar() }
+    document.addEventListener('mousedown', alHacerClic)
+    document.addEventListener('keydown', alTeclear)
+    window.addEventListener('scroll', cerrar, true)
+    window.addEventListener('resize', cerrar)
+    return () => {
+      document.removeEventListener('mousedown', alHacerClic)
+      document.removeEventListener('keydown', alTeclear)
+      window.removeEventListener('scroll', cerrar, true)
+      window.removeEventListener('resize', cerrar)
+    }
+  }, [menuMatricula])
+
+  const matriculaCounts = useMemo(() => {
+    const counts = {}
+    empresas.forEach((e) => {
+      const s = e.matricula?.situacion ?? 'sin_verificar'
+      counts[s] = (counts[s] ?? 0) + 1
+    })
+    return counts
+  }, [empresas])
+
+  // "Actualizar matrícula": consulta el RUES ahora mismo para todas las empresas (el backend ya lo
+  // hace solo cada día; esto es para cuando se necesita el dato fresco ya).
+  const [actualizandoMatricula, setActualizandoMatricula] = useState(false)
+  const [resumenMatricula, setResumenMatricula] = useState('')
+  const actualizarMatricula = async () => {
+    setActualizandoMatricula(true)
+    setResumenMatricula('')
+    try {
+      const r = await api.verificarMatriculaEmpresas(true)
+      await cargar()
+      setResumenMatricula(
+        `Actualizado: ${r.verificadas} verificadas, ${r.noEncontradas} no aparecen en el RUES`
+        + `${r.errores ? `, ${r.errores} con error (se reintentan solas)` : ''}`
+        + `${r.sinDocumento ? `, ${r.sinDocumento} sin NIT/cédula válido` : ''}.`,
+      )
+    } catch (err) {
+      setResumenMatricula(err.message || 'No se pudo actualizar la matrícula')
+    } finally {
+      setActualizandoMatricula(false)
+    }
+  }
 
   const moduloCounts = useMemo(() => {
     const counts = { todas: empresas.length, fondo: 0, ext: 0, ne: 0, contab: 0 }
@@ -89,12 +222,13 @@ export default function EmpresasPage() {
     const q = busqueda.trim().toLowerCase()
     return empresas.filter((e) => {
       if (moduloFiltro !== 'todas' && !e.modulos[moduloFiltro]) return false
+      if (matriculaFiltro !== 'todas' && (e.matricula?.situacion ?? 'sin_verificar') !== matriculaFiltro) return false
       if (!q) return true
       return e.name.toLowerCase().includes(q)
         || e.nit?.toLowerCase().includes(q)
         || e.cedulaRepresentante?.toLowerCase().includes(q)
     })
-  }, [empresas, busqueda, moduloFiltro])
+  }, [empresas, busqueda, moduloFiltro, matriculaFiltro])
 
   const stats = useMemo(() => ({ total: empresas.length }), [empresas])
 
@@ -255,10 +389,13 @@ export default function EmpresasPage() {
   // para que la espera (puede tardar bastante: hasta 2 min esperando que Cloudflare valide) no
   // se sienta colgada. La última etapa ("Esperando verificación…") se queda fija hasta que el
   // request de verdad responda, porque esa es la parte de duración variable.
+  // `texto` es corto a propósito: el botón tiene ANCHO FIJO (ver más abajo) y un texto largo lo hacía
+  // crecer hasta taparle la flecha de la derecha a la fila. `detalle` es la explicación completa y
+  // sale como tooltip del botón mientras genera.
   const ETAPAS_TOKEN = [
-    { ms: 0,    texto: 'Entrando a la DIAN…' },
-    { ms: 2500, texto: 'Pegando documentos…' },
-    { ms: 5500, texto: 'Esperando verificación…' },
+    { ms: 0,    texto: 'Entrando…',    detalle: 'Entrando a la DIAN…' },
+    { ms: 2500, texto: 'Pegando…',     detalle: 'Pegando los documentos…' },
+    { ms: 5500, texto: 'Verificando…', detalle: 'Esperando la verificación de la DIAN…' },
   ]
 
   const generarToken = async (empresaId) => {
@@ -382,7 +519,7 @@ export default function EmpresasPage() {
 
       {/* ── Buscar + crear ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <div className="relative w-64 flex-shrink-0">
+        <div className="relative w-72 flex-shrink-0">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#9ca3af] text-lg">search</span>
           <input
             value={busqueda}
@@ -400,6 +537,19 @@ export default function EmpresasPage() {
             </button>
           )}
         </div>
+        {puedeActualizarMatricula && (
+          <button
+            onClick={actualizarMatricula}
+            disabled={actualizandoMatricula}
+            title="Consulta el RUES ahora y actualiza el estado de la matrícula de todas las empresas"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-[#003B43] bg-[#E3EEEE] hover:bg-[#d3e4e4] transition active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className={`material-symbols-outlined text-lg ${actualizandoMatricula ? 'animate-spin' : ''}`}>
+              {actualizandoMatricula ? 'progress_activity' : 'sync'}
+            </span>
+            Actualizar matrícula
+          </button>
+        )}
         {puedeEditar && (
           <button
             onClick={abrirModalNuevaEmpresa}
@@ -411,6 +561,27 @@ export default function EmpresasPage() {
           </button>
         )}
       </div>
+
+      {matriculaFiltro !== 'todas' && (
+        <div className="mb-3 -mt-1 flex items-center gap-2">
+          <button
+            onClick={() => setMatriculaFiltro('todas')}
+            title="Quitar el filtro"
+            className="flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full text-xs font-semibold bg-[#E3EEEE] text-[#003B43] hover:bg-[#d3e4e4] transition"
+          >
+            Matrícula: {SITUACIONES_MATRICULA[matriculaFiltro]?.label}
+            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>close</span>
+          </button>
+          <span className="text-xs text-[#9ca3af]">{empresasFiltradas.length} de {empresas.length} empresas</span>
+        </div>
+      )}
+
+      {resumenMatricula && (
+        <p className="mb-3 -mt-1 text-xs text-[#6b7280] flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-sm text-[#16a34a]">check_circle</span>
+          {resumenMatricula}
+        </p>
+      )}
 
       {/* ── Filtro por módulo ───────────────────────────────────────────── */}
       <div className="flex items-center gap-6 mb-6 border-b border-[#e2e4ef]">
@@ -439,9 +610,82 @@ export default function EmpresasPage() {
           <table className="w-full text-sm border-collapse table-fixed">
             <thead>
               <tr className="bg-[#f8f9fc] border-b border-[#e2e4ef] text-left text-[12px] font-bold text-[#434655] uppercase tracking-wide">
-                <th className="px-5 py-2.5 font-bold w-[38%]">Empresa</th>
-                <th className="px-5 py-2.5 font-bold w-52">Documento</th>
-                <th className="px-5 py-2.5 font-bold w-28">Módulos</th>
+                <th className="px-5 py-2.5 font-bold w-[30%]">Empresa</th>
+                <th className="px-5 py-2.5 font-bold w-44">Documento</th>
+                <th className="px-5 py-2.5 font-bold w-24">Módulos</th>
+                <th className="px-3 py-2.5 font-bold w-44">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onMouseEnter={mostrarTooltipFuente}
+                      onMouseLeave={() => setTooltipFuente(null)}
+                      onFocus={mostrarTooltipFuente}
+                      onBlur={() => setTooltipFuente(null)}
+                      aria-label={textoFuente}
+                      className="w-5 h-5 -ml-1 rounded-full flex items-center justify-center text-[#9ca3af] hover:text-[#003B43] focus:text-[#003B43] focus:outline-none transition"
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>info</span>
+                    </button>
+                    Matrícula
+                    <button
+                      type="button"
+                      data-filtro-matricula
+                      onClick={abrirMenuMatricula}
+                      title="Filtrar por matrícula"
+                      aria-label="Filtrar por matrícula"
+                      className={`relative w-6 h-6 rounded-md flex items-center justify-center transition ${
+                        matriculaFiltro !== 'todas' ? 'bg-[#003B43] text-white' : 'text-[#9ca3af] hover:bg-[#e8eaf2] hover:text-[#434655]'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined" style={{ fontSize: 16 }}>filter_list</span>
+                    </button>
+                  </div>
+                  {tooltipFuente && (
+                    <div
+                      role="tooltip"
+                      style={{ position: 'fixed', top: tooltipFuente.top, left: tooltipFuente.left, zIndex: 50 }}
+                      className="pointer-events-none px-3 py-2 rounded-lg bg-[#06272E] text-white text-xs leading-snug shadow-lg normal-case tracking-normal font-medium whitespace-nowrap"
+                    >
+                      {textoFuente}
+                    </div>
+                  )}
+                  {menuMatricula && (
+                    <div
+                      data-filtro-matricula
+                      role="menu"
+                      style={{ position: 'fixed', top: menuMatricula.top, left: menuMatricula.left, zIndex: 50 }}
+                      className="w-56 py-1.5 bg-white rounded-xl border border-[#e2e4ef] shadow-lg normal-case tracking-normal font-normal"
+                    >
+                      <p className="px-3.5 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wide text-[#9ca3af]">Filtrar por matrícula</p>
+                      {[
+                        { key: 'todas', label: 'Todas', count: empresas.length },
+                        ...['sin_renovar', 'cancelada', 'por_renovar', 'no_encontrada', 'sin_verificar', 'al_dia']
+                          .map((k) => ({ key: k, label: SITUACIONES_MATRICULA[k].label, count: matriculaCounts[k] ?? 0, color: SITUACIONES_MATRICULA[k].color })),
+                      ].map(({ key, label, count, color }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={matriculaFiltro === key}
+                          onClick={() => { setMatriculaFiltro(key); setMenuMatricula(null) }}
+                          className={`w-full flex items-center gap-2 px-3.5 py-2 text-sm text-left transition hover:bg-[#f3f4f6] ${
+                            matriculaFiltro === key ? 'font-bold text-[#003B43] bg-[#E3EEEE]/60' : 'text-[#191c1e]'
+                          }`}
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ background: color ?? '#d1d5db' }}
+                          />
+                          <span className="flex-1">{label}</span>
+                          <span className="text-xs tabular-nums text-[#9ca3af]">{count}</span>
+                          {matriculaFiltro === key && (
+                            <span className="material-symbols-outlined text-[#003B43]" style={{ fontSize: 16 }}>check</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </th>
                 <th className="px-3 py-2.5 font-bold w-48">Token DIAN</th>
                 <th className="w-10"></th>
               </tr>
@@ -514,19 +758,24 @@ export default function EmpresasPage() {
                           ))}
                         </div>
                       </td>
+                      <td className="px-3 py-3">
+                        <MatriculaCelda matricula={empresa.matricula} />
+                      </td>
                       <td className="px-3 py-3 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => generarToken(empresa.id)}
                             disabled={generandoTokenId === empresa.id || !empresa.tipoContribuyente}
-                            title={!empresa.tipoContribuyente ? 'Completa el tipo de contribuyente primero' : 'Generar token DIAN'}
-                            className="flex items-center gap-1.5 px-5 py-2 rounded-full text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200 active:scale-[0.96] whitespace-nowrap"
+                            title={generandoTokenId === empresa.id
+                              ? (ETAPAS_TOKEN.find((e) => e.texto === tokenEtapa)?.detalle ?? 'Generando token…')
+                              : (!empresa.tipoContribuyente ? 'Completa el tipo de contribuyente primero' : 'Generar token DIAN')}
+                            className="flex items-center justify-center gap-1.5 w-[148px] px-3 py-2 rounded-full text-sm font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-200 active:scale-[0.96] whitespace-nowrap"
                             style={{ background: '#003B43' }}
                           >
                             {generandoTokenId === empresa.id && (
                               <span className="material-symbols-outlined animate-spin flex-shrink-0" style={{ fontSize: 15 }}>progress_activity</span>
                             )}
-                            <span key={generandoTokenId === empresa.id ? tokenEtapa : 'idle'} className="gc-etapa-fade">
+                            <span key={generandoTokenId === empresa.id ? tokenEtapa : 'idle'} className="gc-etapa-fade min-w-0 truncate">
                               {generandoTokenId === empresa.id ? tokenEtapa : 'Generar Token'}
                             </span>
                           </button>
@@ -541,7 +790,7 @@ export default function EmpresasPage() {
 
                     {resultadoToken?.empresaId === empresa.id && (
                       <tr>
-                        <td colSpan={5} className="px-5 py-0">
+                        <td colSpan={6} className="px-5 py-0">
                           <div
                             className="flex items-start gap-2 px-3.5 py-2.5 my-2 rounded-lg text-xs"
                             style={resultadoToken.success
@@ -566,7 +815,7 @@ export default function EmpresasPage() {
 
                     {expandido && (
                       <tr>
-                        <td colSpan={5} className="bg-[#fafbff] border-l-4 border-[#003B43] px-5 py-5">
+                        <td colSpan={6} className="bg-[#fafbff] border-l-4 border-[#003B43] px-5 py-5">
                           {accionError && <p className="text-xs text-red-500 mb-3">{accionError}</p>}
 
                           <div className="flex gap-8 flex-wrap items-start">
