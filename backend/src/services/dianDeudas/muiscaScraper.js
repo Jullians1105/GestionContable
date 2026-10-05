@@ -251,12 +251,13 @@ async function leerObligaciones(page) {
     const anio = /A[ñn]o Gravable\s+(\d{4})/i.exec(modal)?.[1];
     const periodo = /Per[ií]odo\s+(\d{1,2})/i.exec(modal)?.[1];
     const total = parsearValor(/Total Deuda \(\$\)\s+([\d.,]+)/i.exec(modal)?.[1]);
-    if (!tipo || !anio || !periodo || total == null) {
+    const valorBase = parsearValor(valorBaseTxt);
+    if (!tipo || !anio || !periodo || total == null || valorBase == null) {
       throw new Error(`No se pudo leer el cuadro de liquidación de la obligación ${obligacion}`);
     }
     deudas.push({
       tipoObligacion: tipo, anio: Number(anio), periodo: Number(periodo), obligacion,
-      valorBase: parsearValor(valorBaseTxt), valorTotal: total,
+      valorBase, valorTotal: total,
     });
   }
   return deudas;
@@ -267,9 +268,12 @@ const FILA_RECIBO = /^(\d{8,})\s+(.+?)\s+(\d{4})\s+(\d{1,2})\s+(\d{8})\s+([\d.,]
 async function leerFilasRecibos(page) {
   const filas = await leer(page, () => page.evaluate(() => [...document.querySelectorAll('tr')]
     .map((tr) => tr.innerText.replace(/\s+/g, ' ').trim()).filter((t) => /^\d{8,}\s/.test(t))));
-  return filas.map((t) => FILA_RECIBO.exec(t)).filter(Boolean).map((m) => ({
+  const recibos = filas.map((t) => FILA_RECIBO.exec(t)).filter(Boolean).map((m) => ({
     numero: m[1], concepto: m[2], anio: Number(m[3]), periodo: Number(m[4]), fechaLimite: m[5], total: parsearValor(m[6]),
   }));
+  // Un recibo con valor ilegible no se puede comparar: mejor fallar que dar por "no pagada" una deuda ya pagada.
+  if (recibos.some((r) => r.total == null)) throw new Error('Formato numérico inesperado en los recibos pagados');
+  return recibos;
 }
 
 // Asuntos > Recibos de pago > Consulta de Recibos de pago, filtrando Pagado + Electrónico por cada

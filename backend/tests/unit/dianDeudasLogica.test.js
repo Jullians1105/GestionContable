@@ -34,6 +34,13 @@ describe('parsearValor', () => {
     expect(parsearValor('$ 1.000')).toBe(1000);
     expect(parsearValor('0')).toBe(0);
   });
+  it('rechaza el formato inglés (miles con coma) en vez de leerlo mal', () => {
+    expect(parsearValor('1,414,000')).toBeNull();
+    expect(parsearValor('332,000')).toBeNull();   // antes se leía como 332
+    expect(parsearValor('17,609,000.00')).toBeNull();
+    expect(parsearValor('1,5')).toBe(1.5);        // coma decimal colombiana: sigue valiendo
+    expect(parsearValor('1.414.000')).toBe(1414000);
+  });
   it('devuelve null si no hay número', () => {
     expect(parsearValor('')).toBeNull();
     expect(parsearValor(null)).toBeNull();
