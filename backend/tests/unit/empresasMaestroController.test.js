@@ -63,6 +63,29 @@ describe('getDirectorio', () => {
     expect(empresa.modulos.fondo).toEqual({ id: 'f1', categoria: 'contable', monthlyFee: 150000, vigenteHastaAnio: null, vigenteHastaMes: null });
     expect(empresa.modulos.ext).toBeNull();
   });
+
+  test('expone el estado de la clave DIAN y la periodicidad, pero NUNCA la clave', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [{
+        id: 'a', name: 'ACME', nit: '900123456', tipo_contribuyente: 'empresa', cedula_representante: '111',
+        activa: true, created_at: '2026-01-01', updated_at: '2026-01-01',
+        dian_tiene_clave: true, dian_clave_estado: 'verificada', dian_clave_verificada_at: '2026-10-05T10:00:00Z', iva_periodicidad: 'bimestral',
+        dian_clave_cifrada: 'v1:no-debe-salir',
+      }, {
+        id: 'b', name: 'OTRA', nit: null, tipo_contribuyente: null, cedula_representante: null,
+        activa: true, created_at: '2026-01-01', updated_at: '2026-01-01',
+      }],
+    });
+
+    const res = mockRes();
+    await getDirectorio(baseReq(), res, mockNext);
+
+    const [conClave, sinClave] = res.json.mock.calls[0][0];
+    expect(conClave.dian).toEqual({ tieneClave: true, claveEstado: 'verificada', claveVerificadaAt: '2026-10-05T10:00:00Z', ivaPeriodicidad: 'bimestral' });
+    expect(sinClave.dian).toEqual({ tieneClave: false, claveEstado: null, claveVerificadaAt: null, ivaPeriodicidad: null });
+    expect(JSON.stringify(res.json.mock.calls[0][0])).not.toContain('no-debe-salir');
+    expect(db.query.mock.calls[0][0]).not.toMatch(/e\.dian_clave_cifrada\s*,/);
+  });
 });
 
 describe('getPosiblesDuplicados', () => {

@@ -90,6 +90,13 @@ const normalizeEmpresa = (row) => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   matricula: normalizeMatricula(row),
+  // Clave DIAN (ver dianDeudasService.js): solo el ESTADO — la clave, ni cifrada, nunca sale por la API.
+  dian: {
+    tieneClave: row.dian_tiene_clave === true,
+    claveEstado: row.dian_clave_estado ?? null,
+    claveVerificadaAt: row.dian_clave_verificada_at ?? null,
+    ivaPeriodicidad: row.iva_periodicidad ?? null,
+  },
 });
 
 // ── Directorio ───────────────────────────────────────────────────────────────────
@@ -99,6 +106,7 @@ const getDirectorio = async (req, res, next) => {
       SELECT
         e.id, e.name, e.nit, e.tipo_contribuyente, e.cedula_representante, e.activa, e.created_at, e.updated_at,
         e.rues_consulta, e.rues_consultado_at, e.rues_estado, e.rues_ultimo_ano_renovado, e.rues_fecha_renovacion,
+        (e.dian_clave_cifrada IS NOT NULL) AS dian_tiene_clave, e.dian_clave_estado, e.dian_clave_verificada_at, e.iva_periodicidad,
         fe.id AS fondo_id, fe.categoria AS fondo_categoria, fe.monthly_fee AS fondo_monthly_fee,
         fe.vigente_hasta_anio AS fondo_vigente_hasta_anio, fe.vigente_hasta_mes AS fondo_vigente_hasta_mes,
         ee.id AS ext_id, ee.responsable_id AS ext_responsable_id,

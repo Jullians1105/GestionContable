@@ -50,6 +50,8 @@ export const DIAN_NAV = [
   // Sin `end: true` a propósito — tiene una sub-página real (/dian/nomina-electronica/empresas,
   // ver NominaElectronicaPage.jsx) y debe seguir marcado como activo ahí también.
   { to: '/dian/nomina-electronica', label: 'Seguimiento Nómina', icon: 'badge' },
+  // Al final a propósito: Dashboard.jsx referencia las entradas anteriores por índice (DIAN_NAV[4]...).
+  { to: '/dian/deudas', label: 'Deudas DIAN', icon: 'account_balance_wallet', end: true },
 ]
 
 export const EMPRESAS_MAESTRO_NAV = [

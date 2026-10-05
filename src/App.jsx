@@ -44,6 +44,7 @@ import ContabilidadConsolidadoPage from './pages/ContabilidadConsolidadoPage'
 import ExogenasUploadPage from './pages/ExogenasUploadPage'
 import TercerosPage from './pages/TercerosPage'
 import ConsultaTerceroPage from './pages/ConsultaTerceroPage'
+import DeudasDianPage from './pages/DeudasDianPage'
 import RecurringTasksPage from './pages/RecurringTasksPage'
 import EmpresasExternasPage from './pages/EmpresasExternasPage'
 import EmpresasPage from './pages/EmpresasPage'
@@ -129,6 +130,7 @@ function Layout() {
             <Route path="/dian/nomina-electronica/empresas"   element={<NominaElectronicaEmpresasPage />} />
             <Route path="/dian/terceros"                     element={<TercerosPage />} />
             <Route path="/dian/consulta-tercero"             element={<ConsultaTerceroPage />} />
+            <Route path="/dian/deudas"                       element={<DeudasDianPage />} />
             <Route path="/tasks/recurrentes" element={<RecurringTasksPage />} />
           </Routes>
         </div>

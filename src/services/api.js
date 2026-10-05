@@ -315,6 +315,22 @@ export const api = {
   getRuesFuente: () => request('/empresas/rues-fuente'),
   verificarMatriculaEmpresas: (forzar = false) => request('/empresas/verificar-matricula', { method: 'POST', body: JSON.stringify({ forzar }) }),
 
+  // Deudas vencidas DIAN — revisión mensual contra MUISCA (ver dianDeudasController.js).
+  // `mes` = 'YYYY-MM' (por defecto el actual). La clave DIAN nunca vuelve del servidor.
+  getDeudasDian: (mes) => request(`/dian-deudas${mes ? `?mes=${mes}` : ''}`),
+  getDeudasDianProgreso: () => request('/dian-deudas/progreso'),
+  revisarDeudasDian: (empresaId) => request(`/dian-deudas/empresas/${empresaId}/revisar`, { method: 'POST' }),
+  revisarTodasDeudasDian: (soloPendientes = true) => request('/dian-deudas/revisar-todas', { method: 'POST', body: JSON.stringify({ soloPendientes }) }),
+  guardarClaveDian: (empresaId, clave) => request(`/dian-deudas/empresas/${empresaId}/clave`, { method: 'PUT', body: JSON.stringify({ clave }) }),
+  // Claves DIAN guardadas, descifradas: { claves: { [empresaId]: clave }, sinDescifrar }. Para mostrarlas/copiarlas (presentación
+  // manual); el servidor responde 403 a los "viewer".
+  getClavesDian: () => request('/dian-deudas/claves', { method: 'POST' }),
+  quitarClaveDian: (empresaId) => request(`/dian-deudas/empresas/${empresaId}/clave`, { method: 'DELETE' }),
+  setIvaPeriodicidadDian: (empresaId, ivaPeriodicidad) => request(`/dian-deudas/empresas/${empresaId}/dian-config`, { method: 'PUT', body: JSON.stringify({ ivaPeriodicidad }) }),
+  getCorreoDeudaDian: (revisionId) => request(`/dian-deudas/revisiones/${revisionId}/correo`),
+  marcarCorreoDeudaDian: (revisionId, enviado) => request(`/dian-deudas/revisiones/${revisionId}/correo-enviado`, { method: 'PUT', body: JSON.stringify({ enviado }) }),
+  resolverDetalleDeudaDian: (detalleId, estado) => request(`/dian-deudas/detalle/${detalleId}`, { method: 'PATCH', body: JSON.stringify({ estado }) }),
+
   // Empresas Externas — Catálogo de procesos (checklist)
   getExtProcesos: (incluirInactivos) => {
     const qs = incluirInactivos ? '?incluirInactivos=true' : ''
