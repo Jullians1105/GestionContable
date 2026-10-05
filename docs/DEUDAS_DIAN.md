@@ -81,6 +81,20 @@ con la X y se falla; el «sí» del cuadro de Liquidación (el que genera el rec
   y **no se incluye en el correo** hasta que una persona la mire en la DIAN.
 - Diagnóstico: `DIAN_DEUDAS_DEBUG=1` deja en el log cada paso de la lectura (sin datos sensibles).
 
+## Perfil fijo del navegador (no cambiar sin volver a probar)
+Las revisiones usan siempre el MISMO perfil, en cualquier equipo (`PERFIL_NAVEGADOR` en `dianDeudasService.js`): ventana
+1280×900, idioma `es-ES`, cabecera `Accept-Language: es-ES,es;q=0.9`, zona `America/Bogota` y user agent de Chrome en Windows.
+Es exactamente lo que manda el navegador de la máquina de desarrollo, donde se probó todo; así lo probado aquí se comporta
+igual en el servidor (Linux, en inglés/UTC por defecto) y no aparecen diferencias de a poco.
+- **Por qué:** con el idioma del contenedor (inglés) la DIAN sirve una página rota (cientos de 404 y la tabla de obligaciones
+  vacía → «Consolidado de obligaciones» nunca aparece). Y no vale cualquier español: con `es-419` y `es-CO` la pantalla de
+  **recibos pagados** muestra los números con comas (`2,347,000`); con `es-ES` usa puntos en todas las pantallas.
+- **Red de seguridad:** si un número llega con comas de miles, el lector **falla** en vez de adivinar (`332,000` se leería
+  como 332). Si aparece ese error, lo primero es revisar el perfil.
+- **Regla:** cambiar cualquier valor del perfil exige volver a probar contra la DIAN real, incluida una empresa con deuda,
+  una con deuda no vencida y una del régimen SIMPLE.
+- Diagnóstico: `DIAN_DEUDAS_DEBUG=1` deja en el log cada paso de la lectura.
+
 ## Reglas de seguridad (no negociables)
 - Nunca se pulsa **"sí"** en el cuadro de liquidación (generaría un recibo F490 y enviaría un correo): solo se lee y se
   cierra con la X.

@@ -212,18 +212,35 @@ describe('navegador de las revisiones (sin ventana)', () => {
     expect(chromium.launch).toHaveBeenCalledTimes(2);
   });
 
-  it('se presenta en español de Latinoamérica y hora de Bogotá (el servidor viene en inglés/UTC y la DIAN sirve una página rota)', async () => {
+  it('usa el PERFIL FIJO probado en desarrollo: es-ES, cabecera Accept-Language, hora de Bogotá, ventana 1280x900', async () => {
     await servicio.revisarEmpresa(EMPRESA_ID, { userId: 'u1' });
     const opciones = navegador.newContext.mock.calls[0][0];
-    expect(opciones.locale).toBe('es-419');
-    expect(opciones.timezoneId).toBe('America/Bogota');
+    expect(opciones).toMatchObject({
+      locale: 'es-ES',   // es-419 / es-CO dan números con coma en recibos pagados
+      timezoneId: 'America/Bogota',
+      extraHTTPHeaders: { 'Accept-Language': 'es-ES,es;q=0.9' },
+      viewport: { width: 1280, height: 900 },
+    });
   });
 
-  it('se presenta con un user agent normal (sin "Headless")', async () => {
-    await servicio.revisarEmpresa(EMPRESA_ID, { userId: 'u1' });
+  it('el perfil es idéntico en cualquier sistema: se presenta como Chrome normal en Windows aunque el servidor sea Linux', async () => {
+    const original = Object.getOwnPropertyDescriptor(process, 'platform');
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    try {
+      servicio._reiniciarEstado();
+      await servicio.revisarEmpresa(EMPRESA_ID, { userId: 'u1' });
+    } finally {
+      Object.defineProperty(process, 'platform', original);
+    }
     const { userAgent } = navegador.newContext.mock.calls[0][0];
+    expect(userAgent).toMatch(/\(Windows NT 10\.0; Win64; x64\)/);
     expect(userAgent).toMatch(/Chrome\/154\.0\.8037\.93/);
-    expect(userAgent).not.toMatch(/Headless/i);
+    expect(userAgent).not.toMatch(/Headless|Linux|X11/i);
+  });
+
+  it('el perfil está congelado: nadie lo cambia por accidente en tiempo de ejecución', () => {
+    expect(Object.isFrozen(servicio.PERFIL_NAVEGADOR)).toBe(true);
+    expect(Object.isFrozen(servicio.PERFIL_NAVEGADOR.extraHTTPHeaders)).toBe(true);
   });
 
   it('si Chrome no se puede lanzar, falla esa revisión pero el siguiente intento vuelve a probar', async () => {
