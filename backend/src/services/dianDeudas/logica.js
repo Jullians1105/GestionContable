@@ -25,6 +25,9 @@ function clasificarConcepto(texto) {
 function parsearValor(texto) {
   const limpio = String(texto ?? '').replace(/[^\d.,-]/g, '');
   if (!limpio) return null;
+  // Miles con COMA (1,414,000 / 332,000): es el formato inglés. Se rechaza en vez de adivinar, porque "332,000" se
+  // leería como 332 (coma decimal) y se guardaría un valor mil veces menor sin avisar.
+  if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(limpio)) return null;
   const numero = Number(limpio.replace(/\./g, '').replace(',', '.'));
   return Number.isFinite(numero) ? numero : null;
 }
