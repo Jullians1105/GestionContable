@@ -1,3 +1,6 @@
+// .env.local (ignorado por git, no existe en producción) va PRIMERO: dotenv no pisa lo ya definido, así que sirve para
+// valores propios de cada máquina de desarrollo (p. ej. DIAN_CLAVES_KEY) sin tocar el .env que sí está versionado.
+require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env.local') });
 require('dotenv').config();
 
 module.exports = {

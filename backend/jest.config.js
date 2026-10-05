@@ -30,6 +30,10 @@ module.exports = {
     // sin ganar confianza real (la unica verificacion que importa es contra el sitio real,
     // ver docs/ESTADO_EMPRESAS_DIRECTORIO.md). Mismo criterio que dianController.js arriba.
     '!src/services/dianTokenService.js',
+    // muiscaScraper.js: igual que dianTokenService.js, automatiza un Chrome real contra MUISCA (sitio real
+    // de la DIAN). Sus reglas de negocio están en dianDeudas/logica.js, que sí tiene tests; la
+    // orquestación, en dianDeudasService.js, probada con el scraper simulado.
+    '!src/services/dianDeudas/muiscaScraper.js',
   ],
   coverageThreshold: { global: { lines: 70, functions: 70 } },
   maxWorkers: 1,

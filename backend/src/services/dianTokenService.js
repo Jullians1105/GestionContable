@@ -237,4 +237,5 @@ async function generarToken({ tipo, nit, cedulaRepresentante }) {
   return encolar(() => ejecutarFlujo({ tipo, nit, cedulaRepresentante }));
 }
 
-module.exports = { generarToken };
+// CHROME_PATH lo reutiliza dianDeudasService para su propio Chrome (sin ventana, aparte del de acá).
+module.exports = { generarToken, CHROME_PATH };

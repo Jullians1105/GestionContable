@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo, Fragment } from 'react'
 import { api } from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import ClaveDianModal from '../components/ClaveDianModal'
+import CopiarDatosDian, { useClavesDian } from '../components/CopiarDatosDian'
 
 // Ver empresasMaestroController.js — 'fondo'/'ext'/'ne'/'contab' son las claves que usa el
 // backend para MODULOS, no se inventan acá.
@@ -93,6 +95,9 @@ export default function EmpresasPage() {
   // "Generar token DIAN" es la única acción abierta a cualquier usuario autenticado (ver
   // generarToken más abajo) — es operativa del día a día, no administración del directorio.
   const puedeEditar = isAdmin()
+  // La clave DIAN se carga/cambia por admin y líder (el servidor lo valida igual, routes/dianDeudas.js).
+  const clavesDian = useClavesDian()
+  const puedeGestionarClaveDian = user?.role === 'admin' || user?.role === 'leader'
   // "Actualizar matrícula" (RUES): el administrador siempre, y quien tenga el permiso que se da desde
   // Usuarios (modulos.empresas.canActualizarMatricula). El servidor lo valida igual (empresasAccess.js).
   const puedeActualizarMatricula = puedeEditar
@@ -139,7 +144,9 @@ export default function EmpresasPage() {
     } catch { /* portapapeles no disponible — no hay nada más que hacer acá */ }
   }
 
-  const [busqueda, setBusqueda] = useState('')
+  // `?buscar=` llega desde Deudas DIAN ("Cargar clave"): deja filtrada la empresa a la que hay que cargarle la clave.
+  const [busqueda, setBusqueda] = useState(() => new URLSearchParams(window.location.search).get('buscar') ?? '')
+  const [claveDianDeId, setClaveDianDeId] = useState(null)
   const [moduloFiltro, setModuloFiltro] = useState('todas')
   // Filtro por situación de la matrícula mercantil ('todas' o una clave de SITUACIONES_MATRICULA).
   const [matriculaFiltro, setMatriculaFiltro] = useState('todas')
@@ -902,6 +909,48 @@ export default function EmpresasPage() {
                               </div>
                             </div>
 
+                            {/* ── Clave DIAN ── */}
+                            <div className="w-full sm:w-64 flex-shrink-0">
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-[#003B43]" style={{ fontSize: 16 }}>key</span>
+                                <span className="text-xs font-bold text-[#191c1e]">Clave DIAN</span>
+                              </div>
+                              {(() => {
+                                const d = empresa.dian
+                                // La clave rechazada por la DIAN no se guarda: "invalida" puede venir SIN clave guardada.
+                                const estado = d?.claveEstado === 'invalida'
+                                  ? { texto: 'La DIAN rechazó la clave', color: '#b45309', icono: 'key_off' }
+                                  : !d?.tieneClave
+                                    ? { texto: 'Sin clave guardada', color: '#6b7280', icono: 'lock' }
+                                    : { texto: `Verificada${d.claveVerificadaAt ? ` el ${formatearFecha(d.claveVerificadaAt.slice(0, 10))}` : ''}`, color: '#16a34a', icono: 'verified_user' }
+                                return (
+                                  <div className="flex flex-col gap-2">
+                                    <p className="flex items-center gap-1.5 text-sm font-semibold" style={{ color: estado.color }}>
+                                      <span className="material-symbols-outlined" style={{ fontSize: 17 }}>{estado.icono}</span>
+                                      {estado.texto}
+                                    </p>
+                                    <p className="text-xs text-[#6b7280]">
+                                      IVA: {d?.ivaPeriodicidad === 'bimestral' ? 'bimestral' : d?.ivaPeriodicidad === 'cuatrimestral' ? 'cuatrimestral' : 'sin definir'}
+                                    </p>
+                                    {puedeGestionarClaveDian && (
+                                      <button
+                                        onClick={() => setClaveDianDeId(empresa.id)}
+                                        className="self-start flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#003B43] text-[#003B43] hover:bg-[#003B43]/10 transition"
+                                      >
+                                        <span className="material-symbols-outlined" style={{ fontSize: 15 }}>key</span>
+                                        {d?.tieneClave ? 'Cambiar clave' : 'Cargar clave'}
+                                      </button>
+                                    )}
+                                    {!empresa.tipoContribuyente && (
+                                      <p className="text-[11px] text-amber-700">Define primero el tipo y la cédula del representante.</p>
+                                    )}
+                                    <CopiarDatosDian empresa={empresa} clave={clavesDian[empresa.id]} />
+                                    <p className="text-[11px] text-[#9ca3af]">Se usa en Deudas DIAN. Se guarda cifrada en la base de datos.</p>
+                                  </div>
+                                )
+                              })()}
+                            </div>
+
                             {/* ── Módulos ── */}
                             <div className="flex-1 min-w-[280px]">
                               <p className="text-xs font-bold text-[#191c1e] mb-3">Módulos habilitados</p>
@@ -1114,6 +1163,18 @@ export default function EmpresasPage() {
           </div>
         </div>
       )}
+
+      {claveDianDeId && (() => {
+        const e = empresas.find((x) => x.id === claveDianDeId)
+        if (!e) return null
+        return (
+          <ClaveDianModal
+            empresa={{ id: e.id, name: e.name, tipoContribuyente: e.tipoContribuyente, tieneClave: e.dian?.tieneClave, claveEstado: e.dian?.claveEstado, ivaPeriodicidad: e.dian?.ivaPeriodicidad }}
+            onClose={() => setClaveDianDeId(null)}
+            onCambio={cargar}
+          />
+        )
+      })()}
     </div>
   )
 }
