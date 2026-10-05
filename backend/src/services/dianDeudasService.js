@@ -89,24 +89,31 @@ async function getNavegador() {
   }
 }
 
-// El modo headless anuncia "HeadlessChrome" en el user agent; se presenta como el Chrome normal que es.
-const userAgentNormal = (version) => {
-  const so = process.platform === 'win32' ? 'Windows NT 10.0; Win64; x64' : 'X11; Linux x86_64';
-  return `Mozilla/5.0 (${so}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
-};
+// PERFIL FIJO del navegador de las revisiones: el MISMO en cualquier equipo (Windows de desarrollo, contenedor Linux del
+// servidor). Es exactamente lo que el navegador de la máquina de desarrollo manda a la DIAN —medido: Chrome en Windows,
+// navigator.language es-ES, Accept-Language "es-ES,es;q=0.9", zona America/Bogota—, que es donde se probó todo. Así lo
+// probado aquí se comporta igual en el servidor por construcción, y no se descubren diferencias de a poco.
+// Por qué importa: el contenedor del servidor viene en inglés/UTC y la DIAN, al ver un navegador en inglés, sirve una
+// página rota (cientos de 404, tabla de obligaciones vacía: «Consolidado de obligaciones» nunca aparece). Y NO vale
+// cualquier español: con es-419 y es-CO la pantalla de recibos pagados formatea con COMAS (2,347,000) y con es-ES usa
+// PUNTOS (2.347.000) en todas las pantallas (visto en vivo).
+// Cambiar CUALQUIER valor de este perfil exige volver a probar contra la DIAN real (incluida una empresa con deuda).
+const PERFIL_NAVEGADOR = Object.freeze({
+  viewport: Object.freeze({ width: 1280, height: 900 }),
+  locale: 'es-ES',
+  timezoneId: 'America/Bogota',
+  extraHTTPHeaders: Object.freeze({ 'Accept-Language': 'es-ES,es;q=0.9' }),
+});
+// El modo headless anuncia "HeadlessChrome" en el user agent; se presenta como el Chrome normal que es (en Windows,
+// igual que en la máquina de desarrollo, sea cual sea el sistema del servidor).
+const userAgentNormal = (version) => `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
 
 // Corre `fn(context)` en la cola, con un contexto de navegador aislado que siempre se cierra, y un
 // tope de tiempo por empresa (si la DIAN se queda colgada no se traba la cola).
 function conContextoAislado(fn) {
   return encolar(async () => {
     const browser = await getNavegador();
-    // Idioma y zona EXPLÍCITOS: el contenedor del servidor viene en inglés/UTC y la DIAN, al ver un navegador en
-    // inglés, sirve una página rota (cientos de 404 y la tabla de obligaciones vacía: «Consolidado de obligaciones»
-    // nunca aparece). Tiene que ser es-ES: con es-419 y es-CO la DIAN formatea los números con COMAS (2,347,000) en
-    // la pantalla de recibos pagados (visto en vivo), y con es-ES usa puntos (2.347.000) en todas las pantallas.
-    const context = await browser.newContext({
-      viewport: { width: 1280, height: 900 }, userAgent: userAgentNormal(browser.version()), locale: 'es-ES', timezoneId: 'America/Bogota',
-    });
+    const context = await browser.newContext({ ...PERFIL_NAVEGADOR, userAgent: userAgentNormal(browser.version()) });
     let temporizador;
     try {
       return await Promise.race([
@@ -362,5 +369,6 @@ async function revisarTodas({ userId, soloPendientes = true, io = null } = {}) {
 module.exports = {
   ErrorDeudas, revisarEmpresa, revisarTodas, getProgreso, guardarClave, quitarClave, claves,
   // solo para pruebas
+  PERFIL_NAVEGADOR,
   _reiniciarEstado: () => { enRevision.clear(); progreso = progresoInicial(); navegador = null; },
 };
