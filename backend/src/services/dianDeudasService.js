@@ -102,10 +102,10 @@ function conContextoAislado(fn) {
     const browser = await getNavegador();
     // Idioma y zona EXPLÍCITOS: el contenedor del servidor viene en inglés/UTC y la DIAN, al ver un navegador en
     // inglés, sirve una página rota (cientos de 404 y la tabla de obligaciones vacía: «Consolidado de obligaciones»
-    // nunca aparece). es-419 (no es-CO: con es-CO la DIAN formatea los números con comas, 1,414,000) da la página
-    // y los números como los espera el lector (1.414.000).
+    // nunca aparece). Tiene que ser es-ES: con es-419 y es-CO la DIAN formatea los números con COMAS (2,347,000) en
+    // la pantalla de recibos pagados (visto en vivo), y con es-ES usa puntos (2.347.000) en todas las pantallas.
     const context = await browser.newContext({
-      viewport: { width: 1280, height: 900 }, userAgent: userAgentNormal(browser.version()), locale: 'es-419', timezoneId: 'America/Bogota',
+      viewport: { width: 1280, height: 900 }, userAgent: userAgentNormal(browser.version()), locale: 'es-ES', timezoneId: 'America/Bogota',
     });
     let temporizador;
     try {

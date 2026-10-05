@@ -212,10 +212,10 @@ describe('navegador de las revisiones (sin ventana)', () => {
     expect(chromium.launch).toHaveBeenCalledTimes(2);
   });
 
-  it('se presenta en español de Latinoamérica y hora de Bogotá (el servidor viene en inglés/UTC y la DIAN sirve una página rota)', async () => {
+  it('se presenta en español de España (números con punto) y hora de Bogotá (el servidor viene en inglés/UTC y la DIAN sirve una página rota)', async () => {
     await servicio.revisarEmpresa(EMPRESA_ID, { userId: 'u1' });
     const opciones = navegador.newContext.mock.calls[0][0];
-    expect(opciones.locale).toBe('es-419');
+    expect(opciones.locale).toBe('es-ES');   // es-419 / es-CO dan números con coma en recibos pagados
     expect(opciones.timezoneId).toBe('America/Bogota');
   });
 
