@@ -311,7 +311,8 @@ const getProgreso = () => ({ ...progreso, empresasActuales: [...progreso.empresa
 
 // Dispara la revisión en segundo plano y devuelve de inmediato cuántas empresas entran. Solo las que
 // tienen clave guardada y no marcada como inválida; con soloPendientes (por defecto) se saltan las ya
-// revisadas este mes.
+// revisadas HOY (hora de Bogotá), no las del mes: así se puede retomar un lote interrumpido o reintentar solo los
+// errores, pero la revisión de fin de mes NO se salta por tener una de hace días (que ya tiene los intereses viejos).
 async function revisarTodas({ userId, soloPendientes = true, io = null } = {}) {
   if (progreso.enCurso) throw new ErrorDeudas('EN_CURSO', 'Ya hay una revisión de todas las empresas en curso.', 409);
   const mes = mesActualBogota();
@@ -321,7 +322,8 @@ async function revisarTodas({ userId, soloPendientes = true, io = null } = {}) {
        AND e.tipo_contribuyente IS NOT NULL
        AND ($2::boolean = FALSE OR NOT EXISTS (
          SELECT 1 FROM dian_deudas_revisiones r
-         WHERE r.empresa_id = e.id AND r.mes = $1 AND r.estado IN ('al_dia', 'con_deuda')))
+         WHERE r.empresa_id = e.id AND r.mes = $1 AND r.estado IN ('al_dia', 'con_deuda')
+           AND r.revisado_at >= (date_trunc('day', now() AT TIME ZONE 'America/Bogota') AT TIME ZONE 'America/Bogota')))
      ORDER BY e.name`,
     [mes, soloPendientes]
   );

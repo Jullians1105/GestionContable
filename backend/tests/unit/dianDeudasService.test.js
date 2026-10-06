@@ -362,12 +362,14 @@ describe('revisarTodas', () => {
     expect(io.emit.mock.calls.filter(([e]) => e === 'dianDeudas:revisada')).toHaveLength(4);
   });
 
-  it('por defecto salta las ya revisadas este mes y las de clave inválida (lo dice el SQL)', async () => {
+  it('por defecto salta las ya revisadas HOY (hora de Bogotá, no todo el mes) y las de clave inválida (lo dice el SQL)', async () => {
     db.query.mockResolvedValue({ rows: [] });
     await servicio.revisarTodas({ userId: 'u1' });
     const [sql, params] = db.query.mock.calls[0];
     expect(sql).toMatch(/dian_clave_estado IS DISTINCT FROM 'invalida'/);
     expect(sql).toMatch(/NOT EXISTS/);
+    // la revisión de hace días NO cuenta: sin esto, la de fin de mes se saltaría todo lo revisado antes en el mes
+    expect(sql).toMatch(/r\.revisado_at >= \(date_trunc\('day', now\(\) AT TIME ZONE 'America\/Bogota'\) AT TIME ZONE 'America\/Bogota'\)/);
     expect(params[1]).toBe(true);
     await servicio.revisarTodas({ userId: 'u1', soloPendientes: false });
     expect(db.query.mock.calls[1][1][1]).toBe(false);

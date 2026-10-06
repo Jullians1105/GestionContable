@@ -13,6 +13,9 @@ Deudas DIAN** (`/dian/deudas`).
    y lee las dos filas: **DEUDA VENCIDA** (con **intereses a la fecha**, del cuadro de Liquidación) y **DEUDA NO VENCIDA**
    (aún dentro del plazo, sin intereses; se marca «No vencida»). Cada obligación se compara con los **recibos pagados
    electrónicos** (Asuntos → Recibos de pago) del mismo año.
+   **«Revisar todas» salta solo las empresas ya revisadas HOY** (hora de Bogotá): sirve para retomar un lote interrumpido o
+   reintentar solo los errores, pero a fin de mes revisa todas aunque ya tuvieran una revisión de días antes (esa tiene
+   intereses viejos). Desmarcando la casilla se revisan todas siempre.
 3. Cruce con recibos: mismo concepto + año + periodo + valor → **Pagada** (la DIAN a veces tarda en reflejarlo);
    mismo concepto/año/periodo pero valor distinto → **Revisar** (lo resuelve una persona); sin recibo → **Se debe**.
 4. El resultado del mes queda guardado (una revisión por empresa y mes; volver a revisar la reemplaza). Un fallo
