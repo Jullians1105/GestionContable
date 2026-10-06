@@ -44,6 +44,9 @@ const moverMes = (mes, delta) => {
 }
 const etiquetaMes = (mes) => `${MESES[Number(mes.slice(5, 7)) - 1]} ${mes.slice(0, 4)}`
 
+// ¿Esa fecha es de HOY? Igual que el servidor: "Revisar todas" salta solo las revisadas hoy, no las de días atrás.
+const esDeHoy = (iso) => !!iso && new Date(iso).toDateString() === new Date().toDateString()
+
 const pesos = (v) => `$${Math.round(Number(v) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')}`
 const fechaHora = (iso) => {
   if (!iso) return ''
@@ -136,7 +139,7 @@ function LoteModal({ empresas, onClose, onConfirmar }) {
   const [enviando, setEnviando] = useState(false)
 
   const aRevisar = useMemo(() => empresas.filter((e) => (
-    e.tieneClave && e.claveEstado !== 'invalida' && (!soloPendientes || !['al_dia', 'con_deuda'].includes(e.estado))
+    e.tieneClave && e.claveEstado !== 'invalida' && (!soloPendientes || !(['al_dia', 'con_deuda'].includes(e.estado) && esDeHoy(e.revisadoAt)))
   )).length, [empresas, soloPendientes])
   const minutos = Math.max(1, Math.round((aRevisar * SEGUNDOS_POR_EMPRESA) / 2 / 60))
 
@@ -152,7 +155,7 @@ function LoteModal({ empresas, onClose, onConfirmar }) {
       </p>
       <label className="flex items-center gap-2 text-xs font-semibold text-[#434655] cursor-pointer mb-4">
         <input type="checkbox" checked={soloPendientes} onChange={(e) => setSoloPendientes(e.target.checked)} />
-        Saltar las que ya se revisaron este mes
+        Saltar las que ya se revisaron hoy
       </label>
       <p className="text-[11px] text-[#6b7280] mb-4">
         Las empresas con clave rechazada se saltan siempre (hay que cargar una nueva). Un lote usa el mismo navegador que el generador de token.
