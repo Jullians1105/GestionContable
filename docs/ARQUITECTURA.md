@@ -95,7 +95,7 @@ GestionTareasOficina/
 ├── cypress/                      # E2E: 3 suites (login, tasks, permissions)
 ├── docs/                          # Ver "Documentación relacionada" al final
 ├── scripts/                       # backup.sh (BD + .env + certs, y copia a Google Drive), restore.sh, setup-cron.sh, gestion-start/stop.sh, deploy-n8n.sh, start/stop-dev.sh, reset-db.sh
-├── docker-compose.yml             # 5 servicios: postgres, mailhog, backend, frontend, migrate
+├── docker-compose.yml             # 4 servicios: postgres, backend, frontend, migrate
 ├── Dockerfile                     # Frontend: build Vite → nginx (multi-stage)
 ├── nginx.conf                     # Proxy /api/ y /socket.io/ al backend + try_files SPA
 └── package.json                   # Scripts raíz: dev, build, start (concurrently front+back)
@@ -117,8 +117,7 @@ BrowserRouter
                └─ GroupProvider
                   └─ NotificationProvider
                      └─ TagProvider
-                        └─ Routes (públicas: /login, /register, /forgot-password,
-                                           /reset-password)
+                        └─ Routes (pública: /login; las cuentas las crea un admin)
                            └─ Layout (todo lo demás, requiere isAuthenticated)
 ```
 
@@ -207,7 +206,7 @@ Cliente HTTP único. Maneja JWT en memoria + refresh automático en 401, y expon
 
 | Prefijo | Controlador | Alcance |
 |---|---|---|
-| `/api/auth` | `authController` | register, login, refresh, logout, me, forgot/reset-password |
+| `/api/auth` | `authController` | login, refresh, logout, me (sin registro público ni recuperación por correo: un admin cambia la contraseña desde Equipo) |
 | `/api/tasks` | `taskController` | CRUD tareas, subtareas, comentarios, historial, búsqueda, templates recurrentes, asignados múltiples (`task_assignees`), solicitudes de borrado (`task_delete_requests`) |
 | `/api/tasks/:id/fondo-link` | `fondoLinksController` (montado sobre `/api/tasks`) | vincula una tarea a un macroproceso o checklist de Fondo Emprender |
 | `/api/personal-tasks` | `personalTaskController` | tareas personales del usuario (no compartidas), con sub-items |
@@ -571,8 +570,7 @@ login_attempts            → detección de fuerza bruta (OWASP hardening)
 ### Docker Compose (`docker-compose.yml`) — 5 servicios
 
 ```
-postgres  → postgres:16-alpine, healthcheck pg_isready, volumen postgres_data
-mailhog   → SMTP de pruebas (1025 SMTP, 8025 UI) — dev/staging únicamente
+postgres  → postgres:16-alpine, healthcheck pg_isready, volumen postgres_data (puerto solo en 127.0.0.1; el backend también)
 backend   → build multi-stage, depende de postgres (healthy) + migrate (completado)
 frontend  → build multi-stage (Vite → nginx), depende de backend, expone 80/443
 migrate   → corre `node migrations/run.js --seed` y termina (restart: "no")

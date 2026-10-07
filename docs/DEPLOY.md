@@ -90,9 +90,8 @@ docker compose ps
 Salida esperada:
 ```
 NAME                 STATUS          PORTS
-gestcon_postgres    running (healthy)   0.0.0.0:5432->5432/tcp
-gestcon_mailhog     running             0.0.0.0:1025->1025/tcp
-gestcon_backend     running (healthy)   0.0.0.0:3000->3000/tcp
+gestcon_postgres    running (healthy)   127.0.0.1:5432->5432/tcp
+gestcon_backend     running (healthy)   127.0.0.1:3000->3000/tcp
 gestcon_frontend    running             0.0.0.0:5173->80/tcp
 ```
 

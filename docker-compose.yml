@@ -12,7 +12,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: ${DB_NAME:-gestcon}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      # Solo localhost: la base de datos no debe verse desde la red de la oficina
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,14 +21,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  mailhog:
-    image: mailhog/mailhog:latest
-    container_name: gestcon_mailhog
-    restart: unless-stopped
-    ports:
-      - "1025:1025"
-      - "8025:8025"
 
   backend:
     build:
@@ -38,16 +31,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      mailhog:
-        condition: service_started
       migrate:
         condition: service_completed_successfully
     env_file: .env
     environment:
       NODE_ENV: production
       DB_HOST: postgres
-      SMTP_HOST: mailhog
-      SMTP_PORT: 1025
       # dianTokenService.js — perfil de Chrome PERSISTENTE (ver Dockerfile, se calienta una
       # sola vez con una verificación real de Cloudflare, ver ESTADO_EMPRESAS_DIRECTORIO.md).
       # Ruta dentro del contenedor; el volumen de abajo la hace sobrevivir a cada rebuild.
@@ -57,7 +46,8 @@ services:
       # mas, solo reparte los mismos nucleos entre mas solicitudes (cada una tarda ~10-15s mas).
       DIAN_TOKEN_MAX_CONCURRENTE: '5'
     ports:
-      - "${PORT:-3000}:3000"
+      # Solo localhost: el acceso de usuarios es por nginx (frontend), no directo al backend
+      - "127.0.0.1:${PORT:-3000}:3000"
     volumes:
       - ./backend/migrations:/app/migrations:ro
       # dianController.js hace require('../../../shared/salaryConstants.json') y
