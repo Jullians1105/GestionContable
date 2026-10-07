@@ -218,8 +218,9 @@ export default function EmpresasPage() {
   }
 
   const moduloCounts = useMemo(() => {
-    const counts = { todas: empresas.length, fondo: 0, ext: 0, ne: 0, contab: 0 }
+    const counts = { todas: empresas.length, fondo: 0, ext: 0, ne: 0, contab: 0, naturales: 0 }
     empresas.forEach((e) => {
+      if (e.tipoContribuyente === 'natural') counts.naturales += 1
       Object.keys(MODULOS_INFO).forEach((m) => { if (e.modulos[m]) counts[m] += 1 })
     })
     return counts
@@ -228,7 +229,9 @@ export default function EmpresasPage() {
   const empresasFiltradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     return empresas.filter((e) => {
-      if (moduloFiltro !== 'todas' && !e.modulos[moduloFiltro]) return false
+      // 'naturales' no es un módulo: filtra por tipo de contribuyente (personas naturales).
+      if (moduloFiltro === 'naturales') { if (e.tipoContribuyente !== 'natural') return false }
+      else if (moduloFiltro !== 'todas' && !e.modulos[moduloFiltro]) return false
       if (matriculaFiltro !== 'todas' && (e.matricula?.situacion ?? 'sin_verificar') !== matriculaFiltro) return false
       if (!q) return true
       return e.name.toLowerCase().includes(q)
@@ -632,7 +635,7 @@ export default function EmpresasPage() {
 
       {/* ── Filtro por módulo ───────────────────────────────────────────── */}
       <div className="flex items-center gap-6 mb-6 border-b border-[#e2e4ef]">
-        {[{ key: 'todas', label: 'Todas' }, ...Object.entries(MODULOS_INFO).map(([key, info]) => ({ key, label: info.label }))].map(({ key, label }) => (
+        {[{ key: 'todas', label: 'Todas' }, ...Object.entries(MODULOS_INFO).map(([key, info]) => ({ key, label: info.label })), { key: 'naturales', label: 'Naturales' }].map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setModuloFiltro(key)}
