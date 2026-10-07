@@ -1,6 +1,6 @@
 import { createContext, useState, useCallback, useContext, useEffect } from 'react'
 import { api } from '../services/api'
-import { generateId, today } from '../utils/helpers'
+import { generateId } from '../utils/helpers'
 import { storage } from '../utils/storage'
 import { SAMPLE_MEMBERS } from '../utils/sampleData'
 import { getEffectivePermissions } from '../utils/permissions'
@@ -97,33 +97,6 @@ export function AuthProvider({ children }) {
     setToken(null)
   }, [useRealBackend])
 
-  const register = useCallback(async (name, email, password) => {
-    const hasBackend = await checkBackend()
-    if (hasBackend) {
-      try {
-        await api.register({ name, email, password })
-        return { success: true }
-      } catch (err) {
-        return { success: false, error: err.message }
-      }
-    }
-    // Fallback localStorage
-    const members = storage.getMembers() ?? SAMPLE_MEMBERS
-    if (members.find((m) => m.email.toLowerCase() === email.toLowerCase())) {
-      return { success: false, error: 'Ya existe un usuario con ese email' }
-    }
-    const newMember = {
-      id: generateId('user'),
-      name, email, password,
-      role: 'member',
-      groupIds: [],
-      preferences: { theme: 'light', notifications: true },
-      createdAt: today(),
-    }
-    storage.saveMembers([...members, newMember])
-    return { success: true }
-  }, [])
-
   const requestPasswordReset = useCallback(async (email) => {
     const hasBackend = await checkBackend()
     if (hasBackend) {
@@ -206,7 +179,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, token, isAuthenticated, useRealBackend,
-      login, logout, register, requestPasswordReset, confirmPasswordReset, updateCurrentUser, canEdit, isAdmin, isLeader, hasPermission,
+      login, logout, requestPasswordReset, confirmPasswordReset, updateCurrentUser, canEdit, isAdmin, isLeader, hasPermission,
     }}>
       {children}
     </AuthContext.Provider>

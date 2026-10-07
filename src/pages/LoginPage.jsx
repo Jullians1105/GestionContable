@@ -104,12 +104,6 @@ export default function LoginPage() {
               </form>
             </div>
 
-            <p className="text-sm text-center text-[#6b7280] mt-8">
-              ¿No tienes cuenta?{' '}
-              <Link to="/register" className="font-semibold text-[#003B43] hover:opacity-80 transition-opacity">
-                Regístrate
-              </Link>
-            </p>
           </div>
         </div>
       </div>

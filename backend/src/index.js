@@ -120,7 +120,6 @@ const authLimiter = rateLimit({
 });
 app.use('/api/', limiter);
 app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
 
 // Swagger — solo en desarrollo (A05: no exponer docs en producción)
 if (env.NODE_ENV !== 'production') {

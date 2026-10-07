@@ -15,7 +15,7 @@ jest.mock('../../src/config/env', () => ({
 const bcrypt = require('bcrypt');
 const db = require('../../src/config/database');
 const jwtUtils = require('../../src/utils/jwt');
-const { register, login, refresh, logout, me, updateMe, forgotPassword, resetPassword } = require('../../src/controllers/authController');
+const { login, refresh, logout, me, updateMe, forgotPassword, resetPassword } = require('../../src/controllers/authController');
 
 function mockRes() {
   const res = {};
@@ -43,43 +43,6 @@ beforeEach(() => {
   jwtUtils.signRefresh.mockReturnValue('mock-refresh-token');
   jwtUtils.verify.mockReturnValue({ userId: 'mock-uuid', email: 'test@test.com', role: 'member' });
   jwtUtils.verifyRefresh.mockReturnValue({ userId: 'mock-uuid' });
-});
-
-describe('register', () => {
-  test('crea usuario y retorna 201 con tokens', async () => {
-    db.query
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [baseUser] })
-      .mockResolvedValueOnce({ rows: [] });
-    bcrypt.hash.mockResolvedValue('hashed');
-
-    const req = { body: { email: 'test@test.com', password: 'password123', name: 'Test User' } };
-    const res = mockRes();
-    await register(req, res, mockNext);
-
-    expect(res.status).toHaveBeenCalledWith(201);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ token: 'mock-token', refreshToken: 'mock-refresh-token' }));
-  });
-
-  test('retorna 409 si el email ya existe', async () => {
-    db.query.mockResolvedValueOnce({ rows: [baseUser] });
-
-    const req = { body: { email: 'test@test.com', password: 'password123', name: 'Test User' } };
-    const res = mockRes();
-    await register(req, res, mockNext);
-
-    expect(res.status).toHaveBeenCalledWith(409);
-  });
-
-  test('llama a next en caso de error de BD', async () => {
-    db.query.mockRejectedValueOnce(new Error('DB error'));
-
-    const req = { body: { email: 'test@test.com', password: 'password123', name: 'Test User' } };
-    const res = mockRes();
-    await register(req, res, mockNext);
-
-    expect(mockNext).toHaveBeenCalledWith(expect.any(Error));
-  });
 });
 
 describe('login', () => {

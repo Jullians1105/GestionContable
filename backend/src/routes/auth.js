@@ -1,44 +1,10 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { register, login, refresh, logout, me, updateMe, forgotPassword, resetPassword } = require('../controllers/authController');
+const { login, refresh, logout, me, updateMe, forgotPassword, resetPassword } = require('../controllers/authController');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 
 const router = Router();
-
-/**
- * @openapi
- * /api/auth/register:
- *   post:
- *     tags: [Auth]
- *     summary: Registrar nuevo usuario
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [email, password, name]
- *             properties:
- *               email: { type: string, format: email }
- *               password: { type: string, minLength: 8 }
- *               name: { type: string }
- *     responses:
- *       201:
- *         description: Usuario registrado
- *       409:
- *         description: Email ya registrado
- */
-router.post('/register',
-  body('email').isEmail().normalizeEmail(),
-  body('password')
-    .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
-    .matches(/[A-Z]/).withMessage('La contraseña debe tener al menos una mayúscula')
-    .matches(/[0-9]/).withMessage('La contraseña debe tener al menos un número'),
-  body('name').trim().notEmpty().isLength({ max: 100 }).withMessage('El nombre es obligatorio'),
-  validate,
-  register
-);
 
 /**
  * @openapi
