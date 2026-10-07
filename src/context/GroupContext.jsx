@@ -2,6 +2,7 @@ import { createContext, useState, useCallback, useContext, useEffect } from 'rea
 import { generateId, today } from '../utils/helpers'
 import { api } from '../services/api'
 import { useAuth } from './AuthContext'
+import { storage } from '../utils/storage'
 
 const STORAGE_KEY = 'groups'
 
@@ -57,7 +58,7 @@ export const GroupContext = createContext(null)
 
 export function GroupProvider({ children }) {
   const { user, useRealBackend } = useAuth()
-  const [groups, setGroups] = useState(() => loadGroups() ?? SAMPLE_GROUPS)
+  const [groups, setGroups] = useState(() => (storage.haySesionReal() ? [] : (loadGroups() ?? SAMPLE_GROUPS)))
   const [currentGroupId, setCurrentGroupId] = useState(null)
 
   useEffect(() => {
@@ -65,8 +66,9 @@ export function GroupProvider({ children }) {
     api.getGroups()
       .then(data => {
         const loaded = Array.isArray(data) ? data.map(normalizeGroup) : []
-        if (loaded.length > 0) setGroups(loaded)
-        // backend vacío → mantener estado actual (localStorage o muestra)
+        // Con el backend real la lista del servidor manda, aunque venga vacía: antes quedaban
+        // los grupos de ejemplo (Frontend Team...) cuando no había ninguno creado.
+        setGroups(loaded)
       })
       .catch(() => {})
   }, [useRealBackend, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps

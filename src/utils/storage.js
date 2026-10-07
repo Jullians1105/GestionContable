@@ -23,7 +23,19 @@ function set(key, value) {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
+// Hay sesión real (JWT del backend) y no la de ejemplo sin servidor (esa empieza por 'token-').
+// Con sesión real los datos vienen del servidor: no se deben pintar los de ejemplo mientras cargan.
+const haySesionReal = () => {
+  try {
+    const t = localStorage.getItem(KEYS.AUTH_TOKEN)
+    return !!t && !t.startsWith('token-')
+  } catch {
+    return false
+  }
+}
+
 export const storage = {
+  haySesionReal,
   getTasks: () => get(KEYS.TASKS),
   saveTasks: (tasks) => set(KEYS.TASKS, tasks),
   getMembers: () => get(KEYS.MEMBERS),
