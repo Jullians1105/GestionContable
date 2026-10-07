@@ -10,6 +10,9 @@ export const TeamContext = createContext(null)
 export function TeamProvider({ children }) {
   const { user, useRealBackend } = useAuth()
   const [members, setMembers] = useState(() => {
+    // Con sesión real los usuarios llegan del servidor: arrancar vacío evita mostrar
+    // un instante los usuarios de ejemplo (María García, Carlos López...) al recargar.
+    if (storage.haySesionReal()) return []
     const saved = storage.getMembers()
     return (saved && saved.length > 0) ? saved : SAMPLE_MEMBERS
   })
@@ -37,7 +40,7 @@ export function TeamProvider({ children }) {
   }, [useRealBackend, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (useRealBackend) return
+    if (useRealBackend || storage.haySesionReal()) return
     storage.saveMembers(members)
   }, [members, useRealBackend])
 
