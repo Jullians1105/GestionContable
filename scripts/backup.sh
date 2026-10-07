@@ -50,6 +50,30 @@ if [ -f "${MKCERT_CA}" ]; then
 fi
 
 # 5. Comprimir todo el backup en un solo archivo
+# Copia para Google Drive: la base de datos EN CLARO (bd_*.tar.gz) y el .env CIFRADO (env_*.enc).
+# El .env trae DIAN_CLAVES_KEY (descifra las claves DIAN guardadas en la BD) y JWT_SECRET (permite
+# fabricar sesiones de admin), así que nunca viaja sin cifrar. Las llaves privadas SSL no se suben.
+# El backup completo (con .env y certs en claro) queda únicamente en el disco local.
+# La contraseña vive en BACKUP_PASS_FILE (solo en el servidor, nunca en Drive ni en el repo) y hay
+# que guardarla además en un gestor de contraseñas: sin ella el .env de Drive no se puede abrir.
+# Descifrar:  openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in env_X.enc -out .env -pass file:<archivo>
+DRIVE_ARCHIVE="${BACKUP_DIR}/bd_${TIMESTAMP}.tar.gz"
+tar -czf "${DRIVE_ARCHIVE}" -C "${BACKUP_DIR}" "${TIMESTAMP}/db.sql.gz"
+
+ENV_ENC=""
+BACKUP_PASS_FILE="${BACKUP_PASS_FILE:-${HOME}/.gestcon-backup-pass}"
+if [ -f .env ] && [ -f "${BACKUP_PASS_FILE}" ] && command -v openssl >/dev/null 2>&1; then
+  if openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in .env -out "${BACKUP_DIR}/env_${TIMESTAMP}.enc" -pass "file:${BACKUP_PASS_FILE}"; then
+    ENV_ENC="${BACKUP_DIR}/env_${TIMESTAMP}.enc"
+    echo "  ✔ .env cifrado para Drive"
+  else
+    rm -f "${BACKUP_DIR}/env_${TIMESTAMP}.enc"
+    echo "  ⚠ no se pudo cifrar el .env — no se sube a Drive (el backup local sigue completo)"
+  fi
+else
+  echo "  ⚠ falta ${BACKUP_PASS_FILE} u openssl — el .env NO se sube a Drive (el backup local sigue completo)"
+fi
+
 echo "▶ Comprimiendo backup..."
 tar -czf "${BACKUP_DIR}/backup_${TIMESTAMP}.tar.gz" -C "${BACKUP_DIR}" "${TIMESTAMP}"
 rm -rf "${BACKUP_PATH}"
@@ -58,10 +82,12 @@ echo "  ✔ backup_${TIMESTAMP}.tar.gz"
 # 6. Rotación: eliminar backups más viejos que KEEP_DAYS días
 echo "▶ Rotación (conservando últimos ${KEEP_DAYS} días)..."
 find "${BACKUP_DIR}" -name "backup_*.tar.gz" -mtime "+${KEEP_DAYS}" -delete
+# Restos de subidas a Drive que fallaron (lo normal es que se borren solos al subir)
+find "${BACKUP_DIR}" \( -name "bd_*.tar.gz" -o -name "env_*.enc" \) -mtime "+1" -delete
 TOTAL=$(find "${BACKUP_DIR}" -name "backup_*.tar.gz" | wc -l)
 echo "  ✔ ${TOTAL} backup(s) almacenado(s)"
 
-# 7. Copia fuera del servidor (Google Drive) — en segundo plano, para no retrasar
+# 7. Copia fuera del servidor (Google Drive: BD + .env cifrado — ver paso 5) — en segundo plano, para no retrasar
 # el resto del deploy (git pull / docker compose build / up). El local ya quedó
 # guardado arriba; esto es una copia extra por si la máquina se pierde entera.
 # GDRIVE_KEEP_DAYS controla cuánto se guarda ALLÁ (independiente de KEEP_DAYS,
@@ -73,8 +99,10 @@ RCLONE="${HOME}/bin/rclone"
 if [ -x "${RCLONE}" ]; then
   echo "▶ Subiendo copia a Google Drive (segundo plano)..."
   nohup bash -c "
-    '${RCLONE}' copy '${BACKUP_DIR}/backup_${TIMESTAMP}.tar.gz' '${GDRIVE_REMOTE}' \
-      --log-file '${BACKUP_DIR}/rclone.log' --log-level INFO
+    for f in '${DRIVE_ARCHIVE}' '${ENV_ENC}'; do
+      [ -f \"\$f\" ] && '${RCLONE}' copy \"\$f\" '${GDRIVE_REMOTE}' \
+        --log-file '${BACKUP_DIR}/rclone.log' --log-level INFO && rm -f \"\$f\"
+    done
     '${RCLONE}' delete --min-age ${GDRIVE_KEEP_DAYS}d '${GDRIVE_REMOTE}' \
       --log-file '${BACKUP_DIR}/rclone.log' --log-level INFO
   " >/dev/null 2>&1 &
@@ -82,6 +110,7 @@ if [ -x "${RCLONE}" ]; then
   echo "  ✔ subida iniciada (no bloquea el resto del deploy — ver ${BACKUP_DIR}/rclone.log)"
 else
   echo "  ⚠ rclone no encontrado en ${RCLONE} — se omite la copia a Google Drive"
+  rm -f "${DRIVE_ARCHIVE}" "${ENV_ENC}"
 fi
 
 echo ""
