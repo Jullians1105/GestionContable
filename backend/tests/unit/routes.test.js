@@ -92,7 +92,9 @@ describe('socket/events', () => {
     expect(next).toHaveBeenCalledWith(expect.any(Error));
   });
 
-  test('socket middleware acepta token válido', () => {
+  test('socket middleware acepta token válido', async () => {
+    const db = require('../../src/config/database');
+    db.query.mockResolvedValueOnce({ rows: [{ is_active: true }] });
     const { setupSocket } = require('../../src/socket/events');
     let capturedMiddleware;
     const mockIo = { use: jest.fn((fn) => { capturedMiddleware = fn; }), on: jest.fn(), emit: jest.fn() };
@@ -100,12 +102,27 @@ describe('socket/events', () => {
 
     const mockSocket = { handshake: { auth: { token: 'valid-token' } } };
     const next = jest.fn();
-    capturedMiddleware(mockSocket, next);
+    await capturedMiddleware(mockSocket, next);
     expect(next).toHaveBeenCalledWith();
     expect(mockSocket.user).toBeDefined();
   });
 
-  test('socket middleware rechaza token inválido', () => {
+  test('socket middleware rechaza a un usuario desactivado', async () => {
+    const db = require('../../src/config/database');
+    db.query.mockResolvedValueOnce({ rows: [{ is_active: false }] });
+    const { setupSocket } = require('../../src/socket/events');
+    let capturedMiddleware;
+    const mockIo = { use: jest.fn((fn) => { capturedMiddleware = fn; }), on: jest.fn(), emit: jest.fn() };
+    setupSocket(mockIo);
+
+    const mockSocket = { handshake: { auth: { token: 'valid-token' } } };
+    const next = jest.fn();
+    await capturedMiddleware(mockSocket, next);
+    expect(next).toHaveBeenCalledWith(expect.any(Error));
+    expect(mockSocket.user).toBeUndefined();
+  });
+
+  test('socket middleware rechaza token inválido', async () => {
     jwtUtils.verify.mockImplementation(() => { throw new Error('invalid'); });
     const { setupSocket } = require('../../src/socket/events');
     let capturedMiddleware;
@@ -114,7 +131,7 @@ describe('socket/events', () => {
 
     const mockSocket = { handshake: { auth: { token: 'bad' } } };
     const next = jest.fn();
-    capturedMiddleware(mockSocket, next);
+    await capturedMiddleware(mockSocket, next);
     expect(next).toHaveBeenCalledWith(expect.any(Error));
   });
 
@@ -147,15 +164,16 @@ describe('socket/events', () => {
       expect(mockSocket.join).toHaveBeenCalledWith('user:u1');
       expect(mockIo.emit).toHaveBeenCalledWith('user:online', { userId: 'u1', email: 'test@test.com' });
 
-      if (socketEvents['join:task']) socketEvents['join:task']('task-1');
-      if (socketEvents['leave:task']) socketEvents['leave:task']('task-1');
-      if (socketEvents['join:group']) socketEvents['join:group']('group-1');
+      if (socketEvents['join:task']) socketEvents['join:task']('11111111-1111-4111-8111-111111111111');
+      if (socketEvents['leave:task']) socketEvents['leave:task']('11111111-1111-4111-8111-111111111111');
+      if (socketEvents['join:group']) socketEvents['join:group']('group-1'); // no es UUID: se ignora
       if (socketEvents['leave:group']) socketEvents['leave:group']('group-1');
       if (socketEvents['mark:read']) await socketEvents['mark:read']('notif-1');
       if (socketEvents['disconnect']) socketEvents['disconnect']();
 
-      expect(mockSocket.join).toHaveBeenCalledWith('task:task-1');
-      expect(mockSocket.leave).toHaveBeenCalledWith('task:task-1');
+      expect(mockSocket.join).toHaveBeenCalledWith('task:11111111-1111-4111-8111-111111111111');
+      expect(mockSocket.leave).toHaveBeenCalledWith('task:11111111-1111-4111-8111-111111111111');
+      expect(mockSocket.join).not.toHaveBeenCalledWith('group:group-1');
       expect(mockIo.emit).toHaveBeenCalledWith('user:offline', { userId: 'u1' });
     }
   });

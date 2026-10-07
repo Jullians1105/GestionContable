@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { ROLE_LABELS, getInitials, getAvatarColor } from '../utils/helpers'
+import { validarPassword } from '../utils/validators'
 
 export default function ProfilePage() {
   const { user, updateCurrentUser } = useAuth()
@@ -30,8 +31,9 @@ export default function ProfilePage() {
   const handleChangePassword = async (e) => {
     e.preventDefault()
     if (!passwordForm.currentPassword || !passwordForm.newPassword) return
-    if (passwordForm.newPassword.length < 8) {
-      addToast('La nueva contraseña debe tener al menos 8 caracteres', 'error')
+    const passError = validarPassword(passwordForm.newPassword)
+    if (passError) {
+      addToast(passError, 'error')
       return
     }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {

@@ -3,7 +3,7 @@ import { useTeam } from '../hooks/useTeam'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { useGroups } from '../context/GroupContext'
-import { validators } from '../utils/validators'
+import { validators, validarPassword } from '../utils/validators'
 import { getAvatarColor, ROLE_LABELS } from '../utils/helpers'
 import { PERMISSIONS, getEffectivePermissions } from '../utils/permissions'
 
@@ -157,8 +157,9 @@ export default function UsersManager() {
     const errs = validators.validateMember(form)
     if (!editingUser && !form.password.trim()) {
       errs.password = 'La contraseña es obligatoria'
-    } else if (form.password.trim() && form.password.trim().length < 8) {
-      errs.password = 'Mínimo 8 caracteres'
+    } else if (form.password.trim()) {
+      const passError = validarPassword(form.password.trim())
+      if (passError) errs.password = passError
     }
     if (Object.keys(errs).length > 0) { setErrors(errs); return }
 

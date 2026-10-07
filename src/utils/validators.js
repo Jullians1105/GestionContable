@@ -1,3 +1,11 @@
+// Misma política que el backend (middleware/security.js passwordRules)
+export const validarPassword = (p) => {
+  if (!p || p.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
+  if (!/[A-Z]/.test(p)) return 'La contraseña debe tener al menos una mayúscula'
+  if (!/[0-9]/.test(p)) return 'La contraseña debe tener al menos un número'
+  return null
+}
+
 export const validators = {
   required: (value) => {
     if (!value || (typeof value === 'string' && value.trim() === '')) {
@@ -44,8 +52,9 @@ export const validators = {
       const emailError = validators.email(member.email)
       if (emailError) errors.email = emailError
     }
-    if (isNew && (!member.password || member.password.length < 8)) {
-      errors.password = 'La contraseña debe tener al menos 8 caracteres'
+    if (isNew) {
+      const passError = validarPassword(member.password)
+      if (passError) errors.password = passError
     }
     if (!member.role) errors.role = 'El rol es obligatorio'
     return errors

@@ -108,11 +108,11 @@ const refresh = async (req, res, next) => {
 
     const decoded = verifyRefresh(refreshToken);
     const userResult = await db.query(
-      'SELECT id, email, name, role FROM users WHERE id = $1',
+      'SELECT id, email, name, role, is_active FROM users WHERE id = $1',
       [decoded.userId]
     );
     const user = userResult.rows[0];
-    if (!user) return res.status(401).json({ error: 'Usuario no encontrado' });
+    if (!user || user.is_active === false) return res.status(401).json({ error: 'Usuario no encontrado o desactivado' });
 
     await db.query('UPDATE refresh_tokens SET revoked = true WHERE token = $1', [refreshToken]);
 

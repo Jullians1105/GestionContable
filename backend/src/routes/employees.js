@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 const { v4: uuidv4 } = require('uuid');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
-const { validateUUIDParam } = require('../middleware/security');
+const { validateUUIDParam, passwordRules } = require('../middleware/security');
 
 const router = Router();
 router.use(authMiddleware);
@@ -57,7 +57,7 @@ router.post('/',
   body('email').isEmail().normalizeEmail(),
   body('name').trim().notEmpty(),
   body('role').isIn(['admin', 'leader', 'member', 'viewer']),
-  body('password').isLength({ min: 8 }),
+  passwordRules('password'),
   validate,
   async (req, res, next) => {
     try {
@@ -84,7 +84,7 @@ router.put('/:id',
   body('role').optional().isIn(['admin', 'leader', 'member', 'viewer']),
   body('name').optional().trim().notEmpty(),
   body('email').optional().isEmail().normalizeEmail(),
-  body('password').optional().isLength({ min: 8 }),
+  passwordRules('password').optional(),
   body('permissions').optional(),
   validate,
   async (req, res, next) => {

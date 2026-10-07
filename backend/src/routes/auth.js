@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const { login, refresh, logout, me, updateMe } = require('../controllers/authController');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
+const { passwordRules } = require('../middleware/security');
 
 const router = Router();
 
@@ -118,7 +119,7 @@ router.put('/me',
   body('name').optional().trim().notEmpty().withMessage('El nombre no puede estar vacío'),
   body('email').optional().isEmail().normalizeEmail(),
   body('currentPassword').optional().notEmpty(),
-  body('newPassword').optional().isLength({ min: 8 }).withMessage('La nueva contraseña debe tener al menos 8 caracteres'),
+  passwordRules('newPassword').optional(),
   validate,
   updateMe
 );
