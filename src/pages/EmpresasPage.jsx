@@ -304,7 +304,10 @@ export default function EmpresasPage() {
     })
     const drafts = {}
     Object.entries(empresa.modulos).forEach(([modulo, data]) => {
-      if (data) drafts[modulo] = { anio: data.vigenteHastaAnio ?? '', mes: data.vigenteHastaMes ?? '' }
+      if (data) drafts[modulo] = {
+        anio: data.vigenteHastaAnio ?? '', mes: data.vigenteHastaMes ?? '',
+        desdeAnio: data.vigenteDesdeAnio ?? '', desdeMes: data.vigenteDesdeMes ?? '',
+      }
     })
     setVigenciaDrafts(drafts)
   }
@@ -368,6 +371,43 @@ export default function EmpresasPage() {
     }
   }
 
+  // "Vigente desde": antes de ese mes la empresa no aparece en el seguimiento mensual del módulo
+  // (migración 068). Sin valor = desde siempre. Contabilidad no lo usa.
+  const guardarVigenciaDesde = async (empresa, modulo) => {
+    const draft = vigenciaDrafts[modulo] || {}
+    const moduloId = empresa.modulos[modulo]?.id
+    if (!moduloId) return
+    setGuardandoVigenciaModulo(modulo)
+    setAccionError('')
+    try {
+      await MODULO_UPDATE[modulo](moduloId, {
+        vigenteDesdeAnio: draft.desdeAnio ? Number(draft.desdeAnio) : null,
+        vigenteDesdeMes: draft.desdeMes ? Number(draft.desdeMes) : null,
+      })
+      await cargar()
+    } catch (err) {
+      setAccionError(err.message || 'No se pudo guardar la fecha de inicio')
+    } finally {
+      setGuardandoVigenciaModulo(null)
+    }
+  }
+
+  const quitarVigenciaDesde = async (empresa, modulo) => {
+    const moduloId = empresa.modulos[modulo]?.id
+    if (!moduloId) return
+    setGuardandoVigenciaModulo(modulo)
+    setAccionError('')
+    try {
+      await MODULO_UPDATE[modulo](moduloId, { vigenteDesdeAnio: null, vigenteDesdeMes: null })
+      setVigenciaDrafts((prev) => ({ ...prev, [modulo]: { ...(prev[modulo] || {}), desdeAnio: '', desdeMes: '' } }))
+      await cargar()
+    } catch (err) {
+      setAccionError(err.message || 'No se pudo quitar la fecha de inicio')
+    } finally {
+      setGuardandoVigenciaModulo(null)
+    }
+  }
+
   const quitarVigencia = async (empresa, modulo) => {
     const moduloId = empresa.modulos[modulo]?.id
     if (!moduloId) return
@@ -375,7 +415,7 @@ export default function EmpresasPage() {
     setAccionError('')
     try {
       await MODULO_UPDATE[modulo](moduloId, { vigenteHastaAnio: null, vigenteHastaMes: null })
-      setVigenciaDrafts((prev) => ({ ...prev, [modulo]: { anio: '', mes: '' } }))
+      setVigenciaDrafts((prev) => ({ ...prev, [modulo]: { ...(prev[modulo] || {}), anio: '', mes: '' } }))
       await cargar()
     } catch (err) {
       setAccionError(err.message || 'No se pudo quitar la vigencia')
@@ -963,6 +1003,10 @@ export default function EmpresasPage() {
                                     const vigenciaActual = data.vigenteHastaAnio && data.vigenteHastaMes
                                       ? `Vigente hasta ${MESES[data.vigenteHastaMes - 1]} ${data.vigenteHastaAnio}`
                                       : null
+                                    const usaDesde = modulo !== 'contab'
+                                    const desdeActual = usaDesde && data.vigenteDesdeAnio && data.vigenteDesdeMes
+                                      ? `Desde ${MESES[data.vigenteDesdeMes - 1]} ${data.vigenteDesdeAnio}`
+                                      : null
                                     return (
                                       <div key={modulo} className="rounded-xl overflow-hidden border border-[#e2e4ef]">
                                         <div className="flex items-center gap-2 px-3.5 py-2.5 bg-[#f8f9fc] border-b border-[#e2e4ef]">
@@ -970,12 +1014,55 @@ export default function EmpresasPage() {
                                             {MODULOS_INFO[modulo].icon}
                                           </span>
                                           <span className="text-xs font-bold text-[#191c1e] flex-1">{MODULOS_INFO[modulo].label}</span>
+                                          {desdeActual && (
+                                            <span className="text-[11px] font-semibold text-[#6b7280]">{desdeActual}</span>
+                                          )}
                                           {vigenciaActual && (
                                             <span className="text-[11px] font-semibold text-[#6b7280]">{vigenciaActual}</span>
                                           )}
                                         </div>
+                                        {puedeEditar && usaDesde && (
+                                          <div className="flex items-center gap-1.5 flex-wrap px-3.5 pt-3">
+                                            <span className="w-14 text-[11px] font-semibold text-[#434655]">Desde</span>
+                                            <select
+                                              value={draft.desdeMes ?? ''}
+                                              onChange={(e) => setVigenciaDrafts((prev) => ({ ...prev, [modulo]: { ...draft, desdeMes: e.target.value } }))}
+                                              className="px-2 py-1.5 rounded-lg border border-[#d1d5db] bg-white text-xs text-[#191c1e]"
+                                            >
+                                              <option value="">Mes…</option>
+                                              {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                                            </select>
+                                            <select
+                                              value={draft.desdeAnio ?? ''}
+                                              onChange={(e) => setVigenciaDrafts((prev) => ({ ...prev, [modulo]: { ...draft, desdeAnio: e.target.value } }))}
+                                              className="w-20 px-2 py-1.5 rounded-lg border border-[#d1d5db] bg-white text-xs text-[#191c1e]"
+                                            >
+                                              <option value="">Año…</option>
+                                              {ANIOS_VIGENCIA.map((a) => <option key={a} value={a}>{a}</option>)}
+                                            </select>
+                                            <button
+                                              onClick={() => guardarVigenciaDesde(empresa, modulo)}
+                                              disabled={guardandoVigenciaModulo === modulo || !draft.desdeMes || !draft.desdeAnio}
+                                              title={!draft.desdeMes || !draft.desdeAnio ? 'Elige mes y año' : undefined}
+                                              className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-white disabled:opacity-50"
+                                              style={{ background: '#003B43' }}
+                                            >
+                                              Guardar
+                                            </button>
+                                            {desdeActual && (
+                                              <button
+                                                onClick={() => quitarVigenciaDesde(empresa, modulo)}
+                                                disabled={guardandoVigenciaModulo === modulo}
+                                                className="text-[11px] text-[#6b7280] hover:underline whitespace-nowrap disabled:opacity-50"
+                                              >
+                                                Quitar (desde siempre)
+                                              </button>
+                                            )}
+                                          </div>
+                                        )}
                                         {puedeEditar && (
                                           <div className="flex items-center gap-1.5 flex-wrap px-3.5 py-3">
+                                            {usaDesde && <span className="w-14 text-[11px] font-semibold text-[#434655]">Hasta</span>}
                                             <select
                                               value={draft.mes}
                                               onChange={(e) => setVigenciaDrafts((prev) => ({ ...prev, [modulo]: { ...draft, mes: e.target.value } }))}

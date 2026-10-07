@@ -566,6 +566,8 @@ export default function FondoEmprenderPage() {
           codigoSiigo: e.codigoSiigo ?? null,
           vigenteHastaAnio: e.vigenteHastaAnio ?? null,
           vigenteHastaMes: e.vigenteHastaMes ?? null,
+          vigenteDesdeAnio: e.vigenteDesdeAnio ?? null,
+          vigenteDesdeMes: e.vigenteDesdeMes ?? null,
           cells,
           confirmedNomina: chk.confirmedNomina
             ? { date: (chk.confirmedNominaAt ?? new Date().toISOString()).slice(0, 10) }
@@ -1271,7 +1273,10 @@ export default function FondoEmprenderPage() {
   // calcula una sola vez acá para que tanto los contadores de las pestañas como la grilla
   // (filteredCompanies, abajo) cuenten/muestren exactamente las mismas empresas.
   const companiesVigentes = companies.filter(c =>
-    canEditStructure || !c.vigenteHastaAnio || (year * 12 + (month + 1)) <= (c.vigenteHastaAnio * 12 + c.vigenteHastaMes)
+    canEditStructure || (
+      (!c.vigenteHastaAnio || (year * 12 + (month + 1)) <= (c.vigenteHastaAnio * 12 + c.vigenteHastaMes))
+      && (!c.vigenteDesdeAnio || (year * 12 + (month + 1)) >= (c.vigenteDesdeAnio * 12 + c.vigenteDesdeMes))
+    )
   )
 
   const catCounts = {

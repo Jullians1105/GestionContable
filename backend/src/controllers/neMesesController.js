@@ -52,6 +52,9 @@ const getMesTodasEmpresas = async (req, res, next) => {
          -- los meses hasta ese límite inclusive — el mes pedido ($1,$2) no puede
          -- ser posterior. NULL en ambos = sin límite, se comporta como siempre.
          AND (e.vigente_hasta_anio IS NULL OR (e.vigente_hasta_anio * 100 + e.vigente_hasta_mes) >= ($1::int * 100 + $2::int))
+         -- Contraparte con vigente_desde_* (migración 068): antes de ese mes la empresa no existe
+         -- para el seguimiento (no se sintetiza pendiente). NULL = desde siempre.
+         AND (e.vigente_desde_anio IS NULL OR (e.vigente_desde_anio * 100 + e.vigente_desde_mes) <= ($1::int * 100 + $2::int))
          ${own ? 'AND e.responsable_id = $3' : ''}
        ORDER BY e.name ASC`,
       own ? [anio, mes, req.user.userId] : [anio, mes]

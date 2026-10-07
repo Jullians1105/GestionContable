@@ -14,13 +14,15 @@
 //
 // Requiere `emp` (ne_empresas) y `mes` (ne_meses del mes pedido, LEFT JOIN) ya
 // en el FROM. Expone `prev.estado`, `prev.nota`, `prev.anio` y `prev.mes` del
-// último mes anterior con fila.
+// último mes anterior con fila (a partir de vigente_desde_* de la empresa, si lo tiene).
 const joinMesPrevio = (anioParam, mesParam, { emp = 'e', mes = 'm', prev = 'p' } = {}) => `
   LEFT JOIN LATERAL (
     SELECT pm.estado, pm.nota, pm.anio, pm.mes
     FROM ne_meses pm
     WHERE pm.empresa_id = ${emp}.id
       AND (pm.anio * 100 + pm.mes) < (${anioParam}::int * 100 + ${mesParam}::int)
+      -- No arrastrar desde meses anteriores al ingreso de la empresa (vigente_desde_*, migración 068).
+      AND (${emp}.vigente_desde_anio IS NULL OR (pm.anio * 100 + pm.mes) >= (${emp}.vigente_desde_anio * 100 + ${emp}.vigente_desde_mes))
     ORDER BY pm.anio DESC, pm.mes DESC
     LIMIT 1
   ) ${prev} ON ${mes}.id IS NULL`;
