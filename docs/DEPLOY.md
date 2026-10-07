@@ -223,6 +223,10 @@ Los backups se guardan comprimidos en `backups/backup_YYYYMMDD_HHMMSS.tar.gz`. L
 ```
 Corre todos los días a las 6:00 PM, log en `/var/log/backup-gestion.log` (no dentro del repo).
 
+**Qué va a Google Drive y qué no.** El backup local (`backups/backup_*.tar.gz`) trae la BD, el `.env` y los certificados SSL. A Drive solo se sube `bd_*.tar.gz`, con **únicamente la base de datos**: el `.env` (secretos JWT y `DIAN_CLAVES_KEY`) y las llaves privadas SSL no salen del servidor, para que quien acceda al Drive no pueda descifrar las claves DIAN de las empresas.
+
+Consecuencia al recuperar el servidor desde cero: la BD se restaura desde Drive con `restore.sh`, pero el `.env` hay que reponerlo aparte. **Guarda una copia del `.env` del servidor (en especial `DIAN_CLAVES_KEY`) en un gestor de contraseñas o un lugar privado fuera de Drive/GestconBackups.** Si la llave se pierde, las claves DIAN guardadas quedan ilegibles y hay que volver a cargarlas.
+
 ---
 
 ## 8. Abrir el firewall (si aplica)

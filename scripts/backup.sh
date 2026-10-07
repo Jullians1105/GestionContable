@@ -50,6 +50,13 @@ if [ -f "${MKCERT_CA}" ]; then
 fi
 
 # 5. Comprimir todo el backup en un solo archivo
+# Copia para Google Drive: SOLO la base de datos. El .env (secretos JWT, DIAN_CLAVES_KEY, ...) y las
+# llaves privadas SSL no salen del servidor: quien llegue a ese Drive no debe poder descifrar las
+# claves DIAN de las empresas (están cifradas en la BD con esa llave) ni suplantar el sitio.
+# El backup completo, con .env y certs, queda únicamente en el disco local.
+DRIVE_ARCHIVE="${BACKUP_DIR}/bd_${TIMESTAMP}.tar.gz"
+tar -czf "${DRIVE_ARCHIVE}" -C "${BACKUP_DIR}" "${TIMESTAMP}/db.sql.gz"
+
 echo "▶ Comprimiendo backup..."
 tar -czf "${BACKUP_DIR}/backup_${TIMESTAMP}.tar.gz" -C "${BACKUP_DIR}" "${TIMESTAMP}"
 rm -rf "${BACKUP_PATH}"
@@ -58,10 +65,12 @@ echo "  ✔ backup_${TIMESTAMP}.tar.gz"
 # 6. Rotación: eliminar backups más viejos que KEEP_DAYS días
 echo "▶ Rotación (conservando últimos ${KEEP_DAYS} días)..."
 find "${BACKUP_DIR}" -name "backup_*.tar.gz" -mtime "+${KEEP_DAYS}" -delete
+# Restos de subidas a Drive que fallaron (lo normal es que se borren solos al subir)
+find "${BACKUP_DIR}" -name "bd_*.tar.gz" -mtime "+1" -delete
 TOTAL=$(find "${BACKUP_DIR}" -name "backup_*.tar.gz" | wc -l)
 echo "  ✔ ${TOTAL} backup(s) almacenado(s)"
 
-# 7. Copia fuera del servidor (Google Drive) — en segundo plano, para no retrasar
+# 7. Copia fuera del servidor (Google Drive, solo la BD — ver paso 5) — en segundo plano, para no retrasar
 # el resto del deploy (git pull / docker compose build / up). El local ya quedó
 # guardado arriba; esto es una copia extra por si la máquina se pierde entera.
 # GDRIVE_KEEP_DAYS controla cuánto se guarda ALLÁ (independiente de KEEP_DAYS,
@@ -73,8 +82,8 @@ RCLONE="${HOME}/bin/rclone"
 if [ -x "${RCLONE}" ]; then
   echo "▶ Subiendo copia a Google Drive (segundo plano)..."
   nohup bash -c "
-    '${RCLONE}' copy '${BACKUP_DIR}/backup_${TIMESTAMP}.tar.gz' '${GDRIVE_REMOTE}' \
-      --log-file '${BACKUP_DIR}/rclone.log' --log-level INFO
+    '${RCLONE}' copy '${DRIVE_ARCHIVE}' '${GDRIVE_REMOTE}' \
+      --log-file '${BACKUP_DIR}/rclone.log' --log-level INFO && rm -f '${DRIVE_ARCHIVE}'
     '${RCLONE}' delete --min-age ${GDRIVE_KEEP_DAYS}d '${GDRIVE_REMOTE}' \
       --log-file '${BACKUP_DIR}/rclone.log' --log-level INFO
   " >/dev/null 2>&1 &
@@ -82,6 +91,7 @@ if [ -x "${RCLONE}" ]; then
   echo "  ✔ subida iniciada (no bloquea el resto del deploy — ver ${BACKUP_DIR}/rclone.log)"
 else
   echo "  ⚠ rclone no encontrado en ${RCLONE} — se omite la copia a Google Drive"
+  rm -f "${DRIVE_ARCHIVE}"
 fi
 
 echo ""
