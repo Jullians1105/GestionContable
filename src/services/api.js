@@ -21,18 +21,54 @@ function clearTokens() {
   localStorage.removeItem('auth_user');
 }
 
-async function refreshAccessToken() {
-  if (_refreshPromise) return _refreshPromise;
-  _refreshPromise = fetch(`${BASE}/auth/refresh`, {
+const REFRESH_LOCK = 'gestcon-refresh-token';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// El token de renovación sirve UNA sola vez: con dos pestañas (o ventanas) abiertas, ambas intentan
+// renovar a la vez, una gana y la otra recibía "inválido" y cerraba la sesión de todas (comparten
+// localStorage). Se serializa entre pestañas con Web Locks y, si otra ya renovó, se reutiliza su token.
+const conLockEntrePestanas = (fn) => (typeof navigator !== 'undefined' && navigator.locks?.request
+  ? navigator.locks.request(REFRESH_LOCK, fn)
+  : fn());
+
+async function renovarSesion(tokenRechazado) {
+  // Otra pestaña ya renovó mientras esperábamos el turno: usar lo que dejó guardado
+  const vigente = getToken();
+  if (vigente && vigente !== tokenRechazado) return vigente;
+
+  const usado = getRefreshToken();
+  const res = await fetch(`${BASE}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken: getRefreshToken() }),
-  }).then(async (res) => {
-    if (!res.ok) { clearTokens(); window.location.href = '/login'; throw new Error('Session expired'); }
+    body: JSON.stringify({ refreshToken: usado }),
+  });
+
+  if (res.ok) {
     const data = await res.json();
     setTokens(data.token, data.refreshToken);
     return data.token;
-  }).finally(() => { _refreshPromise = null; });
+  }
+
+  // Fallo del servidor o límite de peticiones (p. ej. 502 mientras se despliega): la sesión sigue
+  // siendo válida, solo no se pudo renovar ahora. No se cierra, el siguiente intento lo reintenta.
+  if (res.status !== 401 && res.status !== 403) throw new Error('No se pudo renovar la sesión ahora');
+
+  // Sin Web Locks otra pestaña pudo ganar la carrera: darle un momento para guardar sus tokens nuevos
+  for (let i = 0; i < 6; i++) {
+    await sleep(500);
+    const rt = getRefreshToken();
+    if (rt && rt !== usado && getToken()) return getToken();
+  }
+
+  clearTokens();
+  window.location.href = '/login';
+  throw new Error('Session expired');
+}
+
+async function refreshAccessToken(tokenRechazado) {
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = conLockEntrePestanas(() => renovarSesion(tokenRechazado))
+    .finally(() => { _refreshPromise = null; });
   return _refreshPromise;
 }
 
@@ -55,7 +91,7 @@ async function fetchWithAuth(path, options = {}, retry = true) {
   if (res.status === 401 && retry) {
     if (getRefreshToken()) {
       try {
-        await refreshAccessToken();
+        await refreshAccessToken(token);
         return fetchWithAuth(path, options, false);
       } catch {
         throw new Error('Sesión expirada');
