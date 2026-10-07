@@ -201,10 +201,6 @@ const updateMe = async (req, res, next) => {
       [name?.trim() || null, email?.toLowerCase() || null, passwordHash || null, userId]
     );
 
-    if (passwordHash) {
-      await db.query('UPDATE refresh_tokens SET revoked = true WHERE user_id = $1', [userId]);
-    }
-
     logger.info({ userId }, 'Usuario actualizó su perfil');
     res.json({ user: updated.rows[0] });
   } catch (err) {
