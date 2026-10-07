@@ -17,6 +17,8 @@ export function TeamProvider({ children }) {
     return (saved && saved.length > 0) ? saved : SAMPLE_MEMBERS
   })
   const [allUsers, setAllUsers] = useState([])
+  // true mientras llega la lista del servidor: las pantallas muestran 'Cargando' y no 'No se encontraron'
+  const [cargando, setCargando] = useState(() => storage.haySesionReal())
 
   useEffect(() => {
     if (!useRealBackend || !user) return
@@ -37,6 +39,7 @@ export function TeamProvider({ children }) {
         setMembers(users)
       })
       .catch(() => {})
+      .finally(() => setCargando(false))
   }, [useRealBackend, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -141,7 +144,7 @@ export function TeamProvider({ children }) {
   const getMemberById = useCallback((id) => members.find(m => m.id === id), [members])
 
   return (
-    <TeamContext.Provider value={{ members, allUsers, createUser, addMember, updateMember, deleteMember, removeFromTeam, getMemberById }}>
+    <TeamContext.Provider value={{ members, allUsers, cargando, createUser, addMember, updateMember, deleteMember, removeFromTeam, getMemberById }}>
       {children}
     </TeamContext.Provider>
   )
