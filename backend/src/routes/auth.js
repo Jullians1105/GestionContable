@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { login, refresh, logout, me, updateMe, forgotPassword, resetPassword } = require('../controllers/authController');
+const { login, refresh, logout, me, updateMe } = require('../controllers/authController');
 const { authMiddleware } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 
@@ -121,63 +121,6 @@ router.put('/me',
   body('newPassword').optional().isLength({ min: 8 }).withMessage('La nueva contraseña debe tener al menos 8 caracteres'),
   validate,
   updateMe
-);
-
-/**
- * @openapi
- * /api/auth/forgot-password:
- *   post:
- *     tags: [Auth]
- *     summary: Solicitar recuperación de contraseña
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [email]
- *             properties:
- *               email: { type: string, format: email }
- *     responses:
- *       200:
- *         description: Mensaje genérico (siempre 200, exista o no el email)
- */
-router.post('/forgot-password',
-  body('email').isEmail().normalizeEmail(),
-  validate,
-  forgotPassword
-);
-
-/**
- * @openapi
- * /api/auth/reset-password:
- *   post:
- *     tags: [Auth]
- *     summary: Restablecer contraseña usando un token de recuperación
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [token, password]
- *             properties:
- *               token: { type: string }
- *               password: { type: string, minLength: 8 }
- *     responses:
- *       200:
- *         description: Contraseña actualizada
- *       400:
- *         description: Token inválido o expirado
- */
-router.post('/reset-password',
-  body('token').notEmpty(),
-  body('password')
-    .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
-    .matches(/[A-Z]/).withMessage('La contraseña debe tener al menos una mayúscula')
-    .matches(/[0-9]/).withMessage('La contraseña debe tener al menos un número'),
-  validate,
-  resetPassword
 );
 
 module.exports = router;

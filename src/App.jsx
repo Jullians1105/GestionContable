@@ -22,8 +22,6 @@ import TeamPage from './pages/TeamPage'
 import SettingsPage from './pages/SettingsPage'
 import ProfilePage from './pages/ProfilePage'
 import LoginPage from './pages/LoginPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
 import GroupsPage from './pages/GroupsPage'
 import KanbanPage from './pages/KanbanPage'
 import CalendarPage from './pages/CalendarPage'
@@ -151,8 +149,6 @@ export default function App() {
                     <TagProvider>
                       <Routes>
                         <Route path="/login" element={<LoginPage />} />
-                        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                        <Route path="/reset-password" element={<ResetPasswordPage />} />
                         <Route path="/*" element={<Layout />} />
                       </Routes>
                     </TagProvider>

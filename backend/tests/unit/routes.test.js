@@ -1,5 +1,4 @@
 jest.mock('../../src/config/database');
-jest.mock('../../src/utils/email', () => ({ sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('../../src/utils/logger', () => ({
   info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn(),
 }));

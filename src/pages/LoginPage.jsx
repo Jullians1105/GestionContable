@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import logoTexto from '../assets/logo-texto.png'
 
@@ -73,9 +73,6 @@ export default function LoginPage() {
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-xs font-semibold text-[#434655]">Contraseña</label>
-                    <Link to="/forgot-password" className="text-xs font-semibold text-[#003B43] hover:opacity-80 transition-opacity">
-                      ¿Olvidaste tu contraseña?
-                    </Link>
                   </div>
                   <input
                     type="password"
