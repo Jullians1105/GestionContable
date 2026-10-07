@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { body } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
-const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware, canEdit } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 
 const router = Router();
@@ -25,6 +25,7 @@ router.get('/', async (req, res, next) => {
 });
 
 router.post('/',
+  canEdit,
   body('name').trim().notEmpty(),
   body('color').optional().matches(/^#[0-9A-Fa-f]{6}$/),
   validate,

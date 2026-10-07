@@ -6,7 +6,7 @@
 // 4 catálogos de módulo (que hoy dejan crear/editar a cualquier autenticado).
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware, canEdit } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const { requireEmpresasMatricula } = require('../middleware/empresasAccess');
@@ -26,7 +26,7 @@ router.get('/rues-fuente', getRuesFuente);
 // Abierto a cualquier autenticado (no admin/leader): generar el token es una acción operativa
 // del día a día para cualquiera de los ~14 usuarios de la página, no algo que deba limitarse
 // como sí se limita crear/fusionar empresas (ahí el riesgo es duplicar identidad; acá no).
-router.post('/:id/generar-token-dian', ...validateUUIDParam('id'), generarTokenDian);
+router.post('/:id/generar-token-dian', canEdit, ...validateUUIDParam('id'), generarTokenDian);
 
 // Consulta el RUES y actualiza el estado de la matrícula mercantil de las empresas (migración 064).
 // Body opcional { forzar: true } para repasar todas; por defecto solo las pendientes. 409 si ya hay

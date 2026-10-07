@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
-const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware, canEdit } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const {
@@ -63,6 +63,7 @@ router.get('/:id', ...validateUUIDParam('id'), getEmpresa);
  *         description: Empresa no encontrada
  */
 router.put('/:id',
+  canEdit,
   ...validateUUIDParam('id'),
   body('name').optional().trim().notEmpty().isLength({ max: 255 }),
   body('activa').optional().isBoolean().withMessage('activa debe ser boolean'),

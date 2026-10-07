@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const { body, param } = require('express-validator');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, canEdit } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const { validateUUIDParam } = require('../middleware/security');
 const { getLink, upsertLink, deleteLink } = require('../controllers/fondoLinksController');
@@ -39,6 +39,7 @@ router.get('/:id/fondo-link', ...validateTaskId, getLink);
  *       - bearerAuth: []
  */
 router.post('/:id/fondo-link',
+  canEdit,
   ...validateTaskId,
   body('empresaId').isUUID().withMessage('empresaId debe ser UUID'),
   body('linkType').isIn(['macroproceso', 'checklist']).withMessage('linkType debe ser macroproceso o checklist'),
@@ -60,6 +61,6 @@ router.post('/:id/fondo-link',
  *     security:
  *       - bearerAuth: []
  */
-router.delete('/:id/fondo-link', ...validateTaskId, deleteLink);
+router.delete('/:id/fondo-link', canEdit, ...validateTaskId, deleteLink);
 
 module.exports = router;
