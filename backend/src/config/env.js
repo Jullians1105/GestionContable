@@ -25,16 +25,10 @@ module.exports = {
   FROM_EMAIL: process.env.FROM_EMAIL || 'noreply@gestcon.work',
   SLACK_WEBHOOK_URL: process.env.SLACK_WEBHOOK_URL || '',
 
-  SMTP_HOST: process.env.SMTP_HOST || '',
-  SMTP_PORT: process.env.SMTP_PORT || 1025,
-  SMTP_SECURE: process.env.SMTP_SECURE === 'true',
-  SMTP_USER: process.env.SMTP_USER || '',
-  SMTP_PASS: process.env.SMTP_PASS || '',
 
   // Opcional: app token gratuito de datos.gov.co (Socrata) para consultar el RUES con cupo propio.
   SOCRATA_APP_TOKEN: process.env.SOCRATA_APP_TOKEN || '',
 
-  SHOW_RESET_TOKEN: process.env.SHOW_RESET_TOKEN === 'true',
 
   VAPID_EMAIL:       process.env.VAPID_EMAIL       || '',
   VAPID_PUBLIC_KEY:  process.env.VAPID_PUBLIC_KEY  || '',

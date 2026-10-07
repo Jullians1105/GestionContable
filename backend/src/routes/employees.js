@@ -128,6 +128,8 @@ router.put('/:id',
       }
 
       if (!result.rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
+      // Si el admin cambió la contraseña, las sesiones abiertas de esa persona dejan de renovarse
+      if (password) await db.query('UPDATE refresh_tokens SET revoked = true WHERE user_id = $1', [req.params.id]);
       res.json(result.rows[0]);
     } catch (err) {
       next(err);

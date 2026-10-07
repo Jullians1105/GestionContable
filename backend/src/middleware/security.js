@@ -53,10 +53,6 @@ const validateProductionEnv = () => {
     logger.fatal('SECURITY ABORT: JWT_REFRESH_SECRET usa un valor por defecto inseguro. Configure un secreto fuerte en .env');
     process.exit(1);
   }
-  if (env.SHOW_RESET_TOKEN) {
-    logger.fatal('SECURITY ABORT: SHOW_RESET_TOKEN=true expone tokens de recuperación. No debe estar activo en producción.');
-    process.exit(1);
-  }
 };
 
 module.exports = { validateUUIDParam, sanitizePagination, requireOwnerOrRole, validateProductionEnv };

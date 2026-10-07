@@ -97,51 +97,6 @@ export function AuthProvider({ children }) {
     setToken(null)
   }, [useRealBackend])
 
-  const requestPasswordReset = useCallback(async (email) => {
-    const hasBackend = await checkBackend()
-    if (hasBackend) {
-      let devToken
-      try {
-        const data = await api.forgotPassword(email)
-        devToken = data?.devToken
-      } catch { /* respuesta genérica de todas formas */ }
-      return { success: true, message: 'Si el email existe, se enviaron instrucciones para restablecer la contraseña', devToken }
-    }
-    // Fallback localStorage: no hay servicio de email, generamos un token visible para pruebas
-    const members = storage.getMembers() ?? SAMPLE_MEMBERS
-    const found = members.find((m) => m.email.toLowerCase() === email.toLowerCase())
-    if (!found) return { success: false, error: 'No existe ninguna cuenta con ese email' }
-    const token = generateId('reset')
-    const tokens = storage.getPasswordResetTokens()
-    tokens[token] = { email: found.email, expires: Date.now() + 30 * 60 * 1000 }
-    storage.savePasswordResetTokens(tokens)
-    return { success: true, devToken: token }
-  }, [])
-
-  const confirmPasswordReset = useCallback(async (token, newPassword) => {
-    const hasBackend = await checkBackend()
-    if (hasBackend) {
-      try {
-        await api.resetPassword(token, newPassword)
-        return { success: true }
-      } catch (err) {
-        return { success: false, error: err.message }
-      }
-    }
-    // Fallback localStorage
-    const tokens = storage.getPasswordResetTokens()
-    const entry = tokens[token]
-    if (!entry || entry.expires < Date.now()) {
-      return { success: false, error: 'Token inválido o expirado' }
-    }
-    const members = storage.getMembers() ?? SAMPLE_MEMBERS
-    const updatedMembers = members.map((m) => (m.email.toLowerCase() === entry.email.toLowerCase() ? { ...m, password: newPassword } : m))
-    storage.saveMembers(updatedMembers)
-    delete tokens[token]
-    storage.savePasswordResetTokens(tokens)
-    return { success: true }
-  }, [])
-
   const updateCurrentUser = useCallback(async (updates) => {
     const { currentPassword, newPassword, ...rest } = updates
 
@@ -179,7 +134,7 @@ export function AuthProvider({ children }) {
   return (
     <AuthContext.Provider value={{
       user, token, isAuthenticated, useRealBackend,
-      login, logout, requestPasswordReset, confirmPasswordReset, updateCurrentUser, canEdit, isAdmin, isLeader, hasPermission,
+      login, logout, updateCurrentUser, canEdit, isAdmin, isLeader, hasPermission,
     }}>
       {children}
     </AuthContext.Provider>

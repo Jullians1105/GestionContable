@@ -2,7 +2,6 @@ jest.mock('../../src/config/database');
 jest.mock('bcrypt');
 jest.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
 jest.mock('../../src/utils/jwt');
-jest.mock('../../src/utils/email', () => ({ sendPasswordResetEmail: jest.fn().mockResolvedValue(true) }));
 jest.mock('../../src/utils/logger', () => ({ info: jest.fn(), error: jest.fn(), warn: jest.fn() }));
 jest.mock('../../src/config/env', () => ({
   JWT_SECRET: 'test-secret',
@@ -15,7 +14,7 @@ jest.mock('../../src/config/env', () => ({
 const bcrypt = require('bcrypt');
 const db = require('../../src/config/database');
 const jwtUtils = require('../../src/utils/jwt');
-const { login, refresh, logout, me, updateMe, forgotPassword, resetPassword } = require('../../src/controllers/authController');
+const { login, refresh, logout, me, updateMe } = require('../../src/controllers/authController');
 
 function mockRes() {
   const res = {};
@@ -278,66 +277,5 @@ describe('updateMe', () => {
     await updateMe(req, res, mockNext);
 
     expect(res.json).toHaveBeenCalledWith({ user: baseUser });
-  });
-});
-
-describe('forgotPassword', () => {
-  test('retorna mensaje genérico cuando el usuario no existe', async () => {
-    db.query.mockResolvedValueOnce({ rows: [] });
-
-    const req = { body: { email: 'noexiste@test.com' } };
-    const res = mockRes();
-    await forgotPassword(req, res, mockNext);
-
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.any(String) }));
-  });
-
-  test('retorna mensaje genérico cuando el usuario existe', async () => {
-    db.query
-      .mockResolvedValueOnce({ rows: [{ id: 'mock-uuid' }] })
-      .mockResolvedValueOnce({ rows: [] });
-
-    const req = { body: { email: 'test@test.com' } };
-    const res = mockRes();
-    await forgotPassword(req, res, mockNext);
-
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.any(String) }));
-  });
-
-  test('llama a next en caso de error', async () => {
-    db.query.mockRejectedValueOnce(new Error('DB error'));
-
-    const req = { body: { email: 'test@test.com' } };
-    const res = mockRes();
-    await forgotPassword(req, res, mockNext);
-
-    expect(mockNext).toHaveBeenCalled();
-  });
-});
-
-describe('resetPassword', () => {
-  test('resetea la contraseña con token válido', async () => {
-    db.query
-      .mockResolvedValueOnce({ rows: [{ user_id: 'mock-uuid' }] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] });
-    bcrypt.hash.mockResolvedValue('new-hashed');
-
-    const req = { body: { token: 'valid-token', password: 'newpass123' } };
-    const res = mockRes();
-    await resetPassword(req, res, mockNext);
-
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.any(String) }));
-  });
-
-  test('retorna 400 con token inválido', async () => {
-    db.query.mockResolvedValueOnce({ rows: [] });
-
-    const req = { body: { token: 'invalid-token', password: 'newpass123' } };
-    const res = mockRes();
-    await resetPassword(req, res, mockNext);
-
-    expect(res.status).toHaveBeenCalledWith(400);
   });
 });
