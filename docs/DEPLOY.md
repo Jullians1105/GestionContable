@@ -223,9 +223,15 @@ Los backups se guardan comprimidos en `backups/backup_YYYYMMDD_HHMMSS.tar.gz`. L
 ```
 Corre todos los días a las 6:00 PM, log en `/var/log/backup-gestion.log` (no dentro del repo).
 
-**Qué va a Google Drive y qué no.** El backup local (`backups/backup_*.tar.gz`) trae la BD, el `.env` y los certificados SSL. A Drive solo se sube `bd_*.tar.gz`, con **únicamente la base de datos**: el `.env` (secretos JWT y `DIAN_CLAVES_KEY`) y las llaves privadas SSL no salen del servidor, para que quien acceda al Drive no pueda descifrar las claves DIAN de las empresas.
+**Qué va a Google Drive y qué no.** El backup local (`backups/backup_*.tar.gz`) trae la BD, el `.env` y los certificados SSL en claro. A Drive se suben dos archivos: `bd_*.tar.gz` (solo la base de datos) y `env_*.enc` (el `.env` **cifrado** con AES-256). Las llaves privadas SSL no se suben. Motivo: el `.env` trae `DIAN_CLAVES_KEY` (descifra las claves DIAN guardadas en la BD) y `JWT_SECRET` (permite fabricar sesiones de admin); en claro, quien llegara al Drive controlaría la app.
 
-Consecuencia al recuperar el servidor desde cero: la BD se restaura desde Drive con `restore.sh`, pero el `.env` hay que reponerlo aparte. **Guarda una copia del `.env` del servidor (en especial `DIAN_CLAVES_KEY`) en un gestor de contraseñas o un lugar privado fuera de Drive/GestconBackups.** Si la llave se pierde, las claves DIAN guardadas quedan ilegibles y hay que volver a cargarlas.
+La contraseña de cifrado está en `~/.gestcon-backup-pass` del servidor (permisos 600, fuera del repo y de Drive). **Guárdala también en un gestor de contraseñas**: sin ella el `.env` de Drive no se puede abrir. Si el archivo no existe, el backup sigue funcionando pero el `.env` no se sube a Drive (avisa en el log); el deploy no se detiene.
+
+Recuperar el servidor desde cero: `restore.sh` con el `bd_*.tar.gz` restaura la BD, y el `.env` se descifra con:
+```bash
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in env_YYYYMMDD_HHMMSS.enc -out .env -pass file:<archivo-con-la-contraseña>
+```
+Si la contraseña se pierde, la BD se recupera igual pero las claves DIAN quedan ilegibles y hay que volver a cargarlas.
 
 ---
 
