@@ -86,7 +86,7 @@ const inputCls = 'w-full border border-[#c3c6d7] rounded-lg px-3 h-10 text-sm te
 const inputErrCls = 'border-[#EF4444] focus:ring-[#EF4444]'
 
 export default function UsersManager() {
-  const { members, createUser, updateMember, deleteMember } = useTeam()
+  const { members, cargando, createUser, updateMember, deleteMember } = useTeam()
   const { addToast } = useToast()
   const { isAdmin } = useAuth()
   const { groups, setGroupLeader } = useGroups()
@@ -364,7 +364,7 @@ export default function UsersManager() {
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={showPermCols ? 8 : 4} className="text-center py-10 text-sm text-[#434655]">
-                  No se encontraron usuarios
+                  {cargando ? 'Cargando usuarios...' : 'No se encontraron usuarios'}
                 </td>
               </tr>
             )}
