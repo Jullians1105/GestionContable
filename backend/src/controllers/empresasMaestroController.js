@@ -109,10 +109,13 @@ const getDirectorio = async (req, res, next) => {
         (e.dian_clave_cifrada IS NOT NULL) AS dian_tiene_clave, e.dian_clave_estado, e.dian_clave_verificada_at, e.iva_periodicidad,
         fe.id AS fondo_id, fe.categoria AS fondo_categoria, fe.monthly_fee AS fondo_monthly_fee,
         fe.vigente_hasta_anio AS fondo_vigente_hasta_anio, fe.vigente_hasta_mes AS fondo_vigente_hasta_mes,
+        fe.vigente_desde_anio AS fondo_vigente_desde_anio, fe.vigente_desde_mes AS fondo_vigente_desde_mes,
         ee.id AS ext_id, ee.responsable_id AS ext_responsable_id,
         ee.vigente_hasta_anio AS ext_vigente_hasta_anio, ee.vigente_hasta_mes AS ext_vigente_hasta_mes,
+        ee.vigente_desde_anio AS ext_vigente_desde_anio, ee.vigente_desde_mes AS ext_vigente_desde_mes,
         ne.id AS ne_id, ne.responsable_id AS ne_responsable_id,
         ne.vigente_hasta_anio AS ne_vigente_hasta_anio, ne.vigente_hasta_mes AS ne_vigente_hasta_mes,
+        ne.vigente_desde_anio AS ne_vigente_desde_anio, ne.vigente_desde_mes AS ne_vigente_desde_mes,
         ce.id AS contab_id, ce.nit AS contab_nit,
         ce.vigente_hasta_anio AS contab_vigente_hasta_anio, ce.vigente_hasta_mes AS contab_vigente_hasta_mes
       FROM empresas e
@@ -129,14 +132,17 @@ const getDirectorio = async (req, res, next) => {
           id: r.fondo_id, categoria: r.fondo_categoria,
           monthlyFee: r.fondo_monthly_fee != null ? parseFloat(r.fondo_monthly_fee) : null,
           vigenteHastaAnio: r.fondo_vigente_hasta_anio ?? null, vigenteHastaMes: r.fondo_vigente_hasta_mes ?? null,
+          vigenteDesdeAnio: r.fondo_vigente_desde_anio ?? null, vigenteDesdeMes: r.fondo_vigente_desde_mes ?? null,
         } : null,
         ext: r.ext_id ? {
           id: r.ext_id, responsableId: r.ext_responsable_id,
           vigenteHastaAnio: r.ext_vigente_hasta_anio ?? null, vigenteHastaMes: r.ext_vigente_hasta_mes ?? null,
+          vigenteDesdeAnio: r.ext_vigente_desde_anio ?? null, vigenteDesdeMes: r.ext_vigente_desde_mes ?? null,
         } : null,
         ne: r.ne_id ? {
           id: r.ne_id, responsableId: r.ne_responsable_id,
           vigenteHastaAnio: r.ne_vigente_hasta_anio ?? null, vigenteHastaMes: r.ne_vigente_hasta_mes ?? null,
+          vigenteDesdeAnio: r.ne_vigente_desde_anio ?? null, vigenteDesdeMes: r.ne_vigente_desde_mes ?? null,
         } : null,
         contab: r.contab_id ? {
           id: r.contab_id, nit: r.contab_nit,

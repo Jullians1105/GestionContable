@@ -102,6 +102,7 @@ async function contarPorResponsable(anio, mes) {
     LEFT JOIN ne_meses m ON m.empresa_id = e.id AND m.anio = $1 AND m.mes = $2
     ${joinMesPrevio('$1', '$2')}
     WHERE e.responsable_id IS NOT NULL AND e.activa = true
+      AND (e.vigente_desde_anio IS NULL OR (e.vigente_desde_anio * 100 + e.vigente_desde_mes) <= ($1::int * 100 + $2::int))
     GROUP BY e.responsable_id
   `, [anio, mes]);
   return rows

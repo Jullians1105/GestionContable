@@ -524,6 +524,8 @@ export default function EmpresasExternasPage() {
           activa: e.activa,
           vigenteHastaAnio: e.vigenteHastaAnio ?? null,
           vigenteHastaMes: e.vigenteHastaMes ?? null,
+          vigenteDesdeAnio: e.vigenteDesdeAnio ?? null,
+          vigenteDesdeMes: e.vigenteDesdeMes ?? null,
           cells,
           resultado: chk.resultado ?? { tipo: null, valor: null },
         }
@@ -619,6 +621,9 @@ export default function EmpresasExternasPage() {
     if (!canEditStructure && c.activa === false) return false
     if (!canEditStructure && c.vigenteHastaAnio
         && (year * 12 + (month + 1)) > (c.vigenteHastaAnio * 12 + c.vigenteHastaMes)) return false
+    // vigente desde: antes de su mes de ingreso la empresa no aparece (mismo bypass para canEditStructure)
+    if (!canEditStructure && c.vigenteDesdeAnio
+        && (year * 12 + (month + 1)) < (c.vigenteDesdeAnio * 12 + c.vigenteDesdeMes)) return false
     return true
   })
 

@@ -41,6 +41,7 @@ const getChecklistMes = async (req, res, next) => {
               ON i.mes_id = m.id AND i.proceso_id = p.id
        LEFT JOIN ne_empresas ne
               ON ne.fondo_empresa_id = $1
+             AND (ne.vigente_desde_anio IS NULL OR (ne.vigente_desde_anio * 100 + ne.vigente_desde_mes) <= ($2::int * 100 + $3::int))
        LEFT JOIN ne_meses nm
               ON nm.empresa_id = ne.id AND nm.anio = $2 AND nm.mes = $3
        ${joinMesPrevio('$2', '$3', { emp: 'ne', mes: 'nm', prev: 'nmp' })}
@@ -114,6 +115,7 @@ const getChecklistMesTodasEmpresas = async (req, res, next) => {
               ON i.mes_id = m.id AND i.proceso_id = p.id
        LEFT JOIN ne_empresas ne
               ON ne.fondo_empresa_id = e.id
+             AND (ne.vigente_desde_anio IS NULL OR (ne.vigente_desde_anio * 100 + ne.vigente_desde_mes) <= ($1::int * 100 + $2::int))
        LEFT JOIN ne_meses nm
               ON nm.empresa_id = ne.id AND nm.anio = $1 AND nm.mes = $2
        ${joinMesPrevio('$1', '$2', { emp: 'ne', mes: 'nm', prev: 'nmp' })}
@@ -175,7 +177,12 @@ const updateChecklistItem = async (req, res, next) => {
     // (ver nominaElectronicaSync.js y migración 045).
     const procesoResult = await db.query('SELECT macroproceso_id FROM fondo_procesos WHERE id = $1', [procesoId]);
     if (procesoResult.rows[0]?.macroproceso_id === 'mp3') {
-      const neLink = await db.query('SELECT id FROM ne_empresas WHERE fondo_empresa_id = $1', [empresaId]);
+      // Antes de su vigente_desde (migración 068) el enlace no cuenta: ese mes la celda es propia.
+      const neLink = await db.query(
+        `SELECT id FROM ne_empresas WHERE fondo_empresa_id = $1
+           AND (vigente_desde_anio IS NULL OR (vigente_desde_anio * 100 + vigente_desde_mes) <= ($2::int * 100 + $3::int))`,
+        [empresaId, anio, mes]
+      );
       if (neLink.rows[0]) {
         return res.status(409).json({ error: 'Este proceso se marca desde Nómina Electrónica — la empresa ya está enlazada allá' });
       }

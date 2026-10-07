@@ -60,7 +60,7 @@ describe('getDirectorio', () => {
     await getDirectorio(req, res, mockNext);
 
     const [empresa] = res.json.mock.calls[0][0];
-    expect(empresa.modulos.fondo).toEqual({ id: 'f1', categoria: 'contable', monthlyFee: 150000, vigenteHastaAnio: null, vigenteHastaMes: null });
+    expect(empresa.modulos.fondo).toEqual({ id: 'f1', categoria: 'contable', monthlyFee: 150000, vigenteHastaAnio: null, vigenteHastaMes: null, vigenteDesdeAnio: null, vigenteDesdeMes: null });
     expect(empresa.modulos.ext).toBeNull();
   });
 

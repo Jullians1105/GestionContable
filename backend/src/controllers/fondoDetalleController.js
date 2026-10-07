@@ -159,6 +159,7 @@ const getDetalle = async (req, res, next) => {
                 ON i.mes_id = m.id AND i.proceso_id = p.id
          LEFT JOIN ne_empresas ne
                 ON ne.fondo_empresa_id = $1
+               AND (ne.vigente_desde_anio IS NULL OR (ne.vigente_desde_anio * 100 + ne.vigente_desde_mes) <= ($2::int * 100 + $3::int))
          LEFT JOIN ne_meses nm
                 ON nm.empresa_id = ne.id AND nm.anio = $2 AND nm.mes = $3
        ${joinMesPrevio('$2', '$3', { emp: 'ne', mes: 'nm', prev: 'nmp' })}
