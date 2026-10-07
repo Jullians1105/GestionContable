@@ -17,7 +17,14 @@ const authMiddleware = async (req, res, next) => {
       return res.status(401).json({ error: 'Token inválido' });
     }
     const decoded = verify(token);
-    req.user = decoded;
+    // El JWT dura 1 h: el rol y el estado se leen de la BD para que desactivar a alguien
+    // o cambiarle el rol aplique de inmediato y no cuando expire el token.
+    const current = await db.query('SELECT role, is_active FROM users WHERE id = $1', [decoded.userId]);
+    const row = current.rows[0];
+    if (!row || row.is_active === false) {
+      return res.status(401).json({ error: 'Cuenta desactivada o inexistente' });
+    }
+    req.user = { ...decoded, role: row.role };
     req.token = token;
     next();
   } catch {

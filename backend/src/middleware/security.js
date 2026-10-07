@@ -1,4 +1,4 @@
-const { param, query } = require('express-validator');
+const { param, query, body } = require('express-validator');
 const { validate } = require('./validation');
 const logger = require('../utils/logger');
 const env = require('../config/env');
@@ -11,6 +11,12 @@ const validateUUIDParam = (paramName = 'id') => [
     .withMessage(`${paramName} debe ser un UUID válido`),
   validate,
 ];
+
+// Política única de contraseña (usuario nuevo, cambio de perfil, cambio por admin).
+const passwordRules = (field = 'password') => body(field)
+  .isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
+  .matches(/[A-Z]/).withMessage('La contraseña debe tener al menos una mayúscula')
+  .matches(/[0-9]/).withMessage('La contraseña debe tener al menos un número');
 
 // Caps page/limit to safe integer bounds — prevents runaway queries
 const sanitizePagination = [
@@ -55,4 +61,4 @@ const validateProductionEnv = () => {
   }
 };
 
-module.exports = { validateUUIDParam, sanitizePagination, requireOwnerOrRole, validateProductionEnv };
+module.exports = { passwordRules, validateUUIDParam, sanitizePagination, requireOwnerOrRole, validateProductionEnv };

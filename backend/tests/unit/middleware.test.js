@@ -47,7 +47,9 @@ describe('authMiddleware', () => {
   });
 
   test('llama a next con token válido no en blacklist', async () => {
-    db.query.mockResolvedValueOnce({ rows: [] });
+    db.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ role: 'member', is_active: true }] });
     jwtUtils.verify.mockReturnValue({ userId: 'u1', email: 'test@test.com', role: 'member' });
 
     const req = { headers: { authorization: 'Bearer valid-token' } };
@@ -57,6 +59,30 @@ describe('authMiddleware', () => {
     expect(mockNext).toHaveBeenCalledWith();
     expect(req.user).toEqual({ userId: 'u1', email: 'test@test.com', role: 'member' });
     expect(req.token).toBe('valid-token');
+  });
+
+  test('retorna 401 si el usuario está desactivado', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ role: 'member', is_active: false }] });
+    jwtUtils.verify.mockReturnValue({ userId: 'u1', role: 'member' });
+
+    const req = { headers: { authorization: 'Bearer valid-token' } };
+    const res = mockRes();
+    await authMiddleware(req, res, mockNext);
+    expect(res.status).toHaveBeenCalledWith(401);
+  });
+
+  test('usa el rol actual de la BD y no el del token', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ role: 'viewer', is_active: true }] });
+    jwtUtils.verify.mockReturnValue({ userId: 'u1', role: 'admin' });
+
+    const req = { headers: { authorization: 'Bearer valid-token' } };
+    const res = mockRes();
+    await authMiddleware(req, res, mockNext);
+    expect(req.user.role).toBe('viewer');
   });
 
   test('retorna 401 si el token es inválido', async () => {

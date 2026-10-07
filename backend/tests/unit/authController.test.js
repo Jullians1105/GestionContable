@@ -122,6 +122,18 @@ describe('refresh', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ token: 'mock-token' }));
   });
 
+  test('retorna 401 si el usuario del refresh token está desactivado', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ user_id: 'mock-uuid' }] })
+      .mockResolvedValueOnce({ rows: [{ ...baseUser, is_active: false }] });
+
+    const req = { body: { refreshToken: 'valid-refresh-token' } };
+    const res = mockRes();
+    await refresh(req, res, mockNext);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+  });
+
   test('retorna 400 si no se proporciona refreshToken', async () => {
     const req = { body: {} };
     const res = mockRes();
