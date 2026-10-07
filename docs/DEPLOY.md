@@ -223,13 +223,14 @@ Los backups se guardan comprimidos en `backups/backup_YYYYMMDD_HHMMSS.tar.gz`. L
 ```
 Corre todos los días a las 6:00 PM, log en `/var/log/backup-gestion.log` (no dentro del repo).
 
-**Qué va a Google Drive y qué no.** El backup local (`backups/backup_*.tar.gz`) trae la BD, el `.env` y los certificados SSL en claro. A Drive se suben dos archivos: `bd_*.tar.gz` (solo la base de datos) y `env_*.enc` (el `.env` **cifrado** con AES-256). Las llaves privadas SSL no se suben. Motivo: el `.env` trae `DIAN_CLAVES_KEY` (descifra las claves DIAN guardadas en la BD) y `JWT_SECRET` (permite fabricar sesiones de admin); en claro, quien llegara al Drive controlaría la app.
+**Qué va a Google Drive y qué no.** El backup local (`backups/backup_*.tar.gz`) trae la BD, el `.env` y los certificados SSL en claro. A Drive se sube **un solo archivo por backup**, `gestcon_*.tar.gz`, que contiene `db.sql.gz` (la base de datos) y `env.enc` (el `.env` **cifrado** con AES-256). Las llaves privadas SSL no se suben. Motivo: el `.env` trae `DIAN_CLAVES_KEY` (descifra las claves DIAN guardadas en la BD) y `JWT_SECRET` (permite fabricar sesiones de admin); en claro, quien llegara al Drive controlaría la app.
 
-La contraseña de cifrado está en `~/.gestcon-backup-pass` del servidor (permisos 600, fuera del repo y de Drive). **Guárdala también en un gestor de contraseñas**: sin ella el `.env` de Drive no se puede abrir. Si el archivo no existe, el backup sigue funcionando pero el `.env` no se sube a Drive (avisa en el log); el deploy no se detiene.
+La contraseña de cifrado está en `~/.gestcon-backup-pass` del servidor (permisos 600, fuera del repo y de Drive). **Guárdala también en un gestor de contraseñas**: sin ella el `.env` de Drive no se puede abrir. Si el archivo no existe, el backup sigue funcionando pero a Drive solo sube la BD (avisa en el log); el deploy no se detiene.
 
-Recuperar el servidor desde cero: `restore.sh` con el `bd_*.tar.gz` restaura la BD, y el `.env` se descifra con:
+Recuperar el servidor desde cero: se extrae el archivo de Drive, `restore.sh` restaura la BD con él, y el `.env` se descifra con:
 ```bash
-openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in env_YYYYMMDD_HHMMSS.enc -out .env -pass file:<archivo-con-la-contraseña>
+tar -xzf gestcon_YYYYMMDD_HHMMSS.tar.gz
+openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in YYYYMMDD_HHMMSS/env.enc -out .env -pass file:<archivo-con-la-contraseña>
 ```
 Si la contraseña se pierde, la BD se recupera igual pero las claves DIAN quedan ilegibles y hay que volver a cargarlas.
 
