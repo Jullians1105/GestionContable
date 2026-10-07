@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const multer = require('multer');
 const { body } = require('express-validator');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, canEdit } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const { uploadDian, patchBorrador, getBorrador, patchNomina, exportarBorrador, aplicarClasificacionRapida, marcarAnomaliaRevisada, TASAS_AUTORRETENCION, CLASES_IVA, CONCEPTOS } = require('../controllers/dianController');
 
@@ -92,6 +92,7 @@ router.use(authMiddleware);
  *         description: No autenticado.
  */
 router.post('/upload',
+  canEdit,
   handleUpload,
   // express-validator solo puede leer req.body después de que multer lo llene — de ahí que
   // este chequeo vaya después de handleUpload, a diferencia del resto de rutas del archivo.
@@ -149,6 +150,7 @@ router.get('/borradores/:id', getBorrador);
  *         description: Borrador no encontrado o no pertenece al usuario.
  */
 router.patch('/borradores/:id',
+  canEdit,
   body('indice').notEmpty().isInt({ min: 0 }).withMessage('"indice" debe ser entero >= 0').toInt(),
   body('clasificacionRetencion').optional({ nullable: true }).isString(),
   body('tasaRetencion').optional({ nullable: true }).isFloat({ min: 0 }).toFloat(),
@@ -159,6 +161,7 @@ router.patch('/borradores/:id',
 );
 
 router.patch('/borradores/:id/aplicar-clasificacion-rapida',
+  canEdit,
   body('campo').optional().isIn(['clasificacionRetencion', 'clasificacionIva', 'concepto']),
   body('clasificacionRetencion').optional({ nullable: true }).isString(),
   body('clasificacionIva').optional({ nullable: true }).isIn(CLASES_IVA),
@@ -185,6 +188,7 @@ router.patch('/borradores/:id/aplicar-clasificacion-rapida',
  *         description: Borrador no encontrado o no pertenece al usuario.
  */
 router.patch('/borradores/:id/nomina',
+  canEdit,
   body('empleados').optional({ nullable: true }).isInt({ min: 0 }).toInt(),
   body('meses').optional({ nullable: true }).isInt({ min: 0 }).toInt(),
   body('salario').optional({ nullable: true }).isFloat({ min: 0 }).toFloat(),
@@ -222,6 +226,7 @@ router.patch('/borradores/:id/nomina',
  *         description: Borrador no encontrado o no pertenece al usuario.
  */
 router.patch('/borradores/:id/revisar-anomalia',
+  canEdit,
   body('tipo').notEmpty().isString(),
   validate,
   marcarAnomaliaRevisada

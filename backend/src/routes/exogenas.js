@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const multer = require('multer');
 const { body } = require('express-validator');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, canEdit } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const {
   uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado,
@@ -69,6 +69,7 @@ router.use(authMiddleware);
  *         description: No autenticado.
  */
 router.post('/upload',
+  canEdit,
   handleUpload,
   body('formato').notEmpty().isIn(FORMATOS_SOPORTADOS).withMessage(`"formato" debe ser uno de: ${FORMATOS_SOPORTADOS.join(', ')}`),
   validate,
@@ -109,7 +110,7 @@ router.get('/borradores/:id', getExogenasBorrador);
  *       404:
  *         description: Borrador no encontrado o no pertenece al usuario.
  */
-router.post('/borradores/:id/generar', generarExogenas);
+router.post('/borradores/:id/generar', canEdit, generarExogenas);
 
 /**
  * @openapi
@@ -136,6 +137,7 @@ router.post('/borradores/:id/generar', generarExogenas);
  *         description: Alguno de los borradores no existe, ya expiró o no pertenece al usuario.
  */
 router.post('/generar-combinado',
+  canEdit,
   body('ids').isArray({ min: 1 }).withMessage('Se requiere un arreglo "ids" con al menos un borrador'),
   body('ids.*').isUUID().withMessage('Cada id debe ser un UUID válido'),
   validate,

@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const multer = require('multer');
 const { body } = require('express-validator');
-const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+const { authMiddleware, roleMiddleware, canEdit } = require('../middleware/auth');
 const { validate } = require('../middleware/validation');
 const {
   uploadTerceros, consultarTercero, verificarRuesLote, TIPOS_OPERACION,
@@ -67,6 +67,7 @@ router.use(authMiddleware);
  *         description: No autenticado.
  */
 router.post('/upload',
+  canEdit,
   handleUploadPdfs,
   body('tipoOperacion').notEmpty().isIn(TIPOS_OPERACION).withMessage(`"tipoOperacion" debe ser uno de: ${TIPOS_OPERACION.join(', ')}`),
   validate,
