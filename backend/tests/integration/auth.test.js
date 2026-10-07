@@ -40,35 +40,28 @@ const testUser = {
 let authToken;
 let refreshToken;
 
-describe('POST /api/auth/register', () => {
-  test('registra usuario nuevo correctamente', async () => {
+describe('Registro público', () => {
+  // El registro abierto se eliminó: las cuentas las crea un admin (POST /api/employees).
+  test('POST /api/auth/register ya no existe', async () => {
     if (skipTests) return;
     const res = await request(app).post('/api/auth/register').send(testUser);
-    expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty('token');
-    expect(res.body).toHaveProperty('refreshToken');
-    expect(res.body.user.email).toBe(testUser.email);
-    expect(res.body.user).not.toHaveProperty('password_hash');
+    expect(res.status).toBe(404);
+  });
+
+  // El usuario de prueba se inserta directo en la BD y se obtienen los tokens por login.
+  test('crea el usuario de prueba y obtiene tokens por login', async () => {
+    if (skipTests) return;
+    const db = require('../../src/config/database');
+    const bcrypt = require('bcrypt');
+    const { v4: uuidv4 } = require('uuid');
+    await db.query(
+      "INSERT INTO users (id, email, password_hash, name, role) VALUES ($1, $2, $3, $4, 'member')",
+      [uuidv4(), testUser.email, await bcrypt.hash(testUser.password, 10), testUser.name]
+    );
+    const res = await request(app).post('/api/auth/login').send({ email: testUser.email, password: testUser.password });
+    expect(res.status).toBe(200);
     authToken = res.body.token;
     refreshToken = res.body.refreshToken;
-  });
-
-  test('rechaza email duplicado', async () => {
-    if (skipTests) return;
-    const res = await request(app).post('/api/auth/register').send(testUser);
-    expect(res.status).toBe(409);
-  });
-
-  test('rechaza contraseña corta', async () => {
-    if (skipTests) return;
-    const res = await request(app).post('/api/auth/register').send({ ...testUser, password: '123' });
-    expect(res.status).toBe(400);
-  });
-
-  test('rechaza email inválido', async () => {
-    if (skipTests) return;
-    const res = await request(app).post('/api/auth/register').send({ ...testUser, email: 'not-an-email' });
-    expect(res.status).toBe(400);
   });
 });
 

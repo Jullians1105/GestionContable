@@ -100,7 +100,6 @@ function buildPeriodoParams(empresaId, periodo) {
 
 export const api = {
   // Auth
-  register: (data) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: async (email, password) => {
     const data = await request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }), skipAuthRedirect: true });
     setTokens(data.token, data.refreshToken);

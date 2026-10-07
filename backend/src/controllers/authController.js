@@ -1,6 +1,5 @@
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const { v4: uuidv4 } = require('uuid');
 const db = require('../config/database');
 const { sign, signRefresh, verify, verifyRefresh } = require('../utils/jwt');
 const { sendPasswordResetEmail } = require('../utils/email');
@@ -8,41 +7,6 @@ const logger = require('../utils/logger');
 const env = require('../config/env');
 
 const hashToken = (token) => crypto.createHash('sha256').update(token).digest('hex');
-
-const register = async (req, res, next) => {
-  try {
-    const { email, password, name } = req.body;
-
-    const existing = await db.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ error: 'El email ya está registrado' });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const id = uuidv4();
-
-    const result = await db.query(
-      `INSERT INTO users (id, email, password_hash, name, role)
-       VALUES ($1, $2, $3, $4, 'member')
-       RETURNING id, email, name, role, created_at`,
-      [id, email.toLowerCase(), passwordHash, name]
-    );
-    const user = result.rows[0];
-
-    const token = sign({ userId: user.id, email: user.email, role: user.role });
-    const refreshToken = signRefresh({ userId: user.id });
-
-    await db.query(
-      'INSERT INTO refresh_tokens (token, user_id, expires_at) VALUES ($1, $2, NOW() + INTERVAL \'7 days\') ON CONFLICT (token) DO NOTHING',
-      [refreshToken, user.id]
-    );
-
-    logger.info({ userId: user.id }, 'User registered');
-    res.status(201).json({ token, refreshToken, user });
-  } catch (err) {
-    next(err);
-  }
-};
 
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000; // 15 min
 const LOCKOUT_MAX_ATTEMPTS = 5;
@@ -307,4 +271,4 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, refresh, logout, me, updateMe, forgotPassword, resetPassword };
+module.exports = { login, refresh, logout, me, updateMe, forgotPassword, resetPassword };
