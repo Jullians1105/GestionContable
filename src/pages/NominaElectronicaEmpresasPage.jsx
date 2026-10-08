@@ -4,6 +4,7 @@ import { api } from '../services/api'
 import { useTeam } from '../context/TeamContext'
 import { useAuth } from '../context/AuthContext'
 import { ORIGEN_LABELS, ORIGEN_ACCENTS } from '../data/nominaElectronica'
+import { normalizarBusqueda, contiene } from '../utils/busqueda'
 
 // ─── catálogo de empresas — admin o permiso canGestionar ──────────────────────
 // Mismo diseño de 3 columnas (Maritza | Diana | Externas) y mismo mecanismo de
@@ -122,10 +123,10 @@ export default function NominaElectronicaEmpresasPage() {
     }
   }
 
-  const q = search.trim().toLowerCase()
+  const q = normalizarBusqueda(search)
   const grouped = { maritza: [], diana: [], externas: [], otras: [] }
   for (const emp of empresas) {
-    if (q && !emp.name.toLowerCase().includes(q)) continue
+    if (q && !contiene(emp.name, q)) continue
     ;(grouped[emp.origen] ?? grouped.otras).push(emp)
   }
 

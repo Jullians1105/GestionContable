@@ -8,6 +8,7 @@ import { useGroups } from '../context/GroupContext'
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import { normalizeAssignedTo } from '../utils/helpers'
+import { normalizarBusqueda, contiene } from '../utils/busqueda'
 
 const PAGE_SIZE = 9
 const EMPTY_FILTERS = { search: '', status: '', priority: '', assignedTo: '', groupId: '', tagId: '', createdByMe: false }
@@ -48,8 +49,8 @@ export default function TaskList({ initialFilters = {}, openTaskId = null, openC
     if (!canSeeAll && !normalizeAssignedTo(t.assignedTo).includes(user?.id) && t.createdBy !== user?.id) return false
     if (currentGroupId && t.groupId !== currentGroupId) return false
     if (filters.search) {
-      const q = filters.search.toLowerCase()
-      if (!t.title.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q)) return false
+      const q = normalizarBusqueda(filters.search)
+      if (!contiene(t.title, q) && !contiene(t.description, q)) return false
     }
     if (filters.status && t.status !== filters.status) return false
     if (filters.priority && t.priority !== filters.priority) return false

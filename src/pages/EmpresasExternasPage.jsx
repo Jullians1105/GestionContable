@@ -8,6 +8,7 @@ import { useTeam } from '../context/TeamContext'
 import { backdropClose } from '../utils/backdropClose'
 import Cargando from '../components/Cargando'
 import { useToast } from '../context/ToastContext'
+import { normalizarBusqueda, contiene } from '../utils/busqueda'
 
 // ─── page-level constants ─────────────────────────────────────────────────────
 // Mismos valores/patrones que FondoEmprenderPage.jsx (Seguimiento Mensual de
@@ -1118,11 +1119,11 @@ export default function EmpresasExternasPage() {
 
   // ── filters: search + column filter ───────────────────────────────────────
 
-  const q = search.toLowerCase()
+  const q = normalizarBusqueda(search)
   const filteredCompanies = visibleCompanies.filter(c => {
     // Solo empresa: Responsable/Contador ya tienen su propio filtro por
     // columna, no hace falta que el buscador también los cubra.
-    const matchSearch = !q || c.name.toLowerCase().includes(q)
+    const matchSearch = !q || contiene(c.name, q)
     const matchColumnFilters = Object.entries(columnFilters).every(([key, allowed]) => {
       if (key === RESPONSABLE_FILTER_KEY) return allowed.has(firstName(c.responsableNombre) || SIN_ASIGNAR)
       if (key === CONTADOR_FILTER_KEY) return allowed.has(c.contador?.trim() || SIN_ASIGNAR)

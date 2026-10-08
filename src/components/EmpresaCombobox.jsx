@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { normalizarBusqueda, contiene } from '../utils/busqueda'
 
 // Combobox liviano: input con filtro en vivo + lista desplegable, en vez de un <select> plano
 // con decenas de empresas sin buscador. Solo permite elegir entre empresas existentes — crear
@@ -19,9 +20,9 @@ export default function EmpresaCombobox({ empresas, value, onChange }) {
     return () => document.removeEventListener('mousedown', onClickFuera)
   }, [])
 
-  const queryNormalizada = query.trim().toLowerCase()
+  const queryNormalizada = normalizarBusqueda(query)
   const filtradas = queryNormalizada
-    ? empresas.filter((e) => e.name.toLowerCase().includes(queryNormalizada))
+    ? empresas.filter((e) => contiene(e.name, queryNormalizada))
     : empresas
 
   const seleccionar = (empresa) => {

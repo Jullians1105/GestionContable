@@ -18,6 +18,7 @@ import { useSocket } from '../context/SocketContext'
 import { useAuth } from '../context/AuthContext'
 import { backdropClose } from '../utils/backdropClose'
 import { useToast } from '../context/ToastContext'
+import { normalizarBusqueda, contiene } from '../utils/busqueda'
 
 // ─── page-level constants ─────────────────────────────────────────────────────
 
@@ -1297,13 +1298,13 @@ export default function FondoEmprenderPage() {
     { key: 'tributario', label: 'Tributario', count: catCounts.tributario },
   ]
 
-  const q = search.toLowerCase()
+  const q = normalizarBusqueda(search)
   const filteredCompanies = companiesVigentes.filter(c => {
     // La búsqueda también entra por código Siigo: es el identificador con el
     // que llega media consulta desde el software contable.
     const matchSearch = !q
-      || c.name.toLowerCase().includes(q)
-      || (c.codigoSiigo ?? '').toLowerCase().includes(q)
+      || contiene(c.name, q)
+      || contiene(c.codigoSiigo, q)
     const matchCat    = activeTab === 'todas' || (c.categoria ?? 'contable') === activeTab
     const matchColumnFilters = Object.entries(columnFilters).every(([procId, allowed]) => {
       const status = c.cells[procId]?.status ?? 'pending'

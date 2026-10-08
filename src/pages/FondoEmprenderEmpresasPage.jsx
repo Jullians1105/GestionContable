@@ -5,6 +5,7 @@ import { getMacroStats, getMesVencidoHabilitado, resolveMesInicial, MACRO_PROCES
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
 import { useToast } from '../context/ToastContext'
+import { normalizarBusqueda, contiene } from '../utils/busqueda'
 
 const SEM_COLOR = {
   green:  '#16a34a',
@@ -226,9 +227,9 @@ export default function FondoEmprenderEmpresasPage() {
   ]
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase()
+    const q = normalizarBusqueda(search)
     return empresas.filter(c => {
-      const matchSearch = !q || c.name.toLowerCase().includes(q)
+      const matchSearch = !q || contiene(c.name, q)
       const matchCat    = activeTab === 'todas' || (c.categoria ?? 'contable') === activeTab
       const matchMacros = !appliedMacroFilter || appliedMacroFilter.macros.every(
         mpId => (c.macroEstados?.[mpId] ?? 'pending') === appliedMacroFilter.estado

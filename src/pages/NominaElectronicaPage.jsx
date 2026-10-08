@@ -6,6 +6,7 @@ import { useSocket } from '../context/SocketContext'
 import { useAuth } from '../context/AuthContext'
 import Cargando from '../components/Cargando'
 import { useToast } from '../context/ToastContext'
+import { normalizarBusqueda, contiene } from '../utils/busqueda'
 
 // ─── page-level constants ─────────────────────────────────────────────────────
 // Misma celda + dropdown flotante que usa Seguimiento Mensual (Empresas
@@ -356,9 +357,9 @@ export default function NominaElectronicaPage() {
   // parten de acá, así ambos se recalculan juntos cada vez que cambia el
   // filtro (antes stats se calculaba sobre `rows` sin filtrar). ────────────
   const filteredRows = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    const q = normalizarBusqueda(search)
     return rows.filter(r => {
-      if (q && !r.name.toLowerCase().includes(q)) return false
+      if (q && !contiene(r.name, q)) return false
       if (respFilter === 'mine' && r.responsableId !== user?.id) return false
       return true
     })
