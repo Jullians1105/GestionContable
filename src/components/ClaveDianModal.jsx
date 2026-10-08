@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { api } from '../services/api'
 import { useToast } from '../context/ToastContext'
 import { backdropClose } from '../utils/backdropClose'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 // Ventana modal simple (clic fuera = cerrar). La usan la ficha del Directorio y Deudas DIAN.
 export function Modal({ onClose, children, ancho = 'max-w-md' }) {
+  useEscapeKey(onClose)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" {...backdropClose(onClose)}>
       <div className={`bg-white rounded-2xl shadow-xl p-6 ${ancho} w-full max-h-[90vh] overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
@@ -98,6 +100,7 @@ export default function ClaveDianModal({ empresa, llaveConfigurada = true, onClo
           value={clave}
           onChange={(e) => setClave(e.target.value)}
           autoComplete="off"
+          autoFocus
           spellCheck={false}
           disabled={guardando}
           onKeyDown={(e) => { if (e.key === 'Enter' && clave.trim() && !guardando) guardar() }}

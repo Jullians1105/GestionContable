@@ -6,6 +6,7 @@ import { useTasks } from '../hooks/useTasks'
 import { useGroups } from '../context/GroupContext'
 import TagSelector from './Tags/TagSelector'
 import FondoLinkSelector from './FondoLinkSelector'
+import { normalizarBusqueda, contiene } from '../utils/busqueda'
 
 const EMPTY_TASK = {
   title: '',
@@ -62,7 +63,7 @@ export default function TaskForm({ task, onSubmit, onCancel, forceRecurring = fa
     return map
   }, [tasks, task, form.groupId])
 
-  const filteredMembers = members.filter(m => m.name.toLowerCase().includes(assigneeSearch.toLowerCase()))
+  const filteredMembers = members.filter(m => contiene(m.name, normalizarBusqueda(assigneeSearch)))
   const visibleMembers = task
     ? filteredMembers
     : [...filteredMembers].sort((a, b) => (workloadByMember.get(a.id) || 0) - (workloadByMember.get(b.id) || 0))

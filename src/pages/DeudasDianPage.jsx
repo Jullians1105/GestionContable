@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { Modal } from '../components/ClaveDianModal'
 import CopiarDatosDian, { useClavesDian } from '../components/CopiarDatosDian'
 import Cargando from '../components/Cargando'
+import { normalizarBusqueda, contiene, documentoDeBusqueda } from '../utils/busqueda'
 
 // Deudas vencidas DIAN: revisión mensual de cada empresa contra MUISCA (ver dianDeudasService.js).
 // El botón "Revisar" entra a la DIAN con la clave guardada de la empresa, lee las deudas vencidas
@@ -353,8 +354,9 @@ export default function DeudasDianPage() {
 
   const filtradas = useMemo(() => {
     const tabActivo = TABS.find((t) => t.key === tab) ?? TABS[0]
-    const q = busqueda.trim().toLowerCase()
-    return empresas.filter((e) => tabActivo.fn(e) && (!q || e.name.toLowerCase().includes(q) || (e.nit ?? '').includes(q)))
+    const q = normalizarBusqueda(busqueda)
+    const doc = documentoDeBusqueda(busqueda)
+    return empresas.filter((e) => tabActivo.fn(e) && (!q || contiene(e.name, q) || (doc && (e.nit ?? '').includes(doc))))
   }, [empresas, TABS, tab, busqueda])
 
   const revisar = async (empresa) => {

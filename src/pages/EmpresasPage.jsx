@@ -4,8 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import ClaveDianModal from '../components/ClaveDianModal'
 import CopiarDatosDian, { useClavesDian } from '../components/CopiarDatosDian'
 import { backdropClose } from '../utils/backdropClose'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 import { avisosDocumento, avisosNombre } from '../utils/avisosEmpresa'
 import Cargando from '../components/Cargando'
+import { normalizarBusqueda, contiene, documentoDeBusqueda } from '../utils/busqueda'
 
 // Ver empresasMaestroController.js — 'fondo'/'ext'/'ne'/'contab' son las claves que usa el
 // backend para MODULOS, no se inventan acá.
@@ -230,16 +232,16 @@ export default function EmpresasPage() {
   }, [empresas])
 
   const empresasFiltradas = useMemo(() => {
-    const q = busqueda.trim().toLowerCase()
+    const q = normalizarBusqueda(busqueda)
+    const doc = documentoDeBusqueda(busqueda)
     return empresas.filter((e) => {
       // 'naturales' no es un módulo: filtra por tipo de contribuyente (personas naturales).
       if (moduloFiltro === 'naturales') { if (e.tipoContribuyente !== 'natural') return false }
       else if (moduloFiltro !== 'todas' && !e.modulos[moduloFiltro]) return false
       if (matriculaFiltro !== 'todas' && (e.matricula?.situacion ?? 'sin_verificar') !== matriculaFiltro) return false
       if (!q) return true
-      return e.name.toLowerCase().includes(q)
-        || e.nit?.toLowerCase().includes(q)
-        || e.cedulaRepresentante?.toLowerCase().includes(q)
+      return contiene(e.name, q)
+        || (doc && (e.nit?.includes(doc) || e.cedulaRepresentante?.includes(doc)))
     })
   }, [empresas, busqueda, moduloFiltro, matriculaFiltro])
 
@@ -275,6 +277,8 @@ export default function EmpresasPage() {
     setErrorCrear('')
     setModalNuevaEmpresa(true)
   }
+
+  useEscapeKey(() => setModalNuevaEmpresa(false), modalNuevaEmpresa && !creandoEmpresa)
 
   const crearEmpresa = async () => {
     const nombre = nuevaEmpresaForm.name.trim()
@@ -338,6 +342,16 @@ export default function EmpresasPage() {
     setVigenciaDrafts(drafts)
   }
 
+  // ¿La identidad en edición es igual a la guardada? (el documento se compara con el guardado tal cual,
+  // no con el precargado de una cédula vieja en el campo del representante: ese caso sí se puede guardar).
+  const identidadSinCambios = (empresa) => {
+    if (!identidadEdit) return true
+    return identidadEdit.name === empresa.name
+      && identidadEdit.tipoContribuyente === (empresa.tipoContribuyente || 'empresa')
+      && (identidadEdit.nit ?? '') === (empresa.nit ?? '')
+      && (identidadEdit.cedulaRepresentante ?? '') === (empresa.cedulaRepresentante ?? '')
+  }
+
   const guardarIdentidad = async (empresaId) => {
     if (!identidadEdit) return
     setGuardandoIdentidad(true)
@@ -360,13 +374,23 @@ export default function EmpresasPage() {
     }
   }
 
+  // Al habilitar, "Desde" viene con el mes y año actuales (lo más probable es que la empresa empiece
+  // a trabajarse ya); se puede cambiar, o dejar en "Desde siempre". Contabilidad no usa esta fecha.
+  const desdeActual = () => ({ mes: String(new Date().getMonth() + 1), anio: String(ANIO_ACTUAL) })
+  const [desdeNuevo, setDesdeNuevo] = useState(desdeActual)
+
   const habilitar = async (empresaId) => {
     if (!moduloNuevo) return
     setAccionEnCurso(true)
     setAccionError('')
     try {
-      await api.habilitarEmpresaModulo(empresaId, { modulo: moduloNuevo })
+      const conDesde = moduloNuevo !== 'contab' && desdeNuevo.mes && desdeNuevo.anio
+      await api.habilitarEmpresaModulo(empresaId, {
+        modulo: moduloNuevo,
+        ...(conDesde ? { vigenteDesdeAnio: Number(desdeNuevo.anio), vigenteDesdeMes: Number(desdeNuevo.mes) } : {}),
+      })
       setModuloNuevo('')
+      setDesdeNuevo(desdeActual())
       await cargar()
     } catch (err) {
       setAccionError(err.message || 'No se pudo habilitar')
@@ -489,6 +513,7 @@ export default function EmpresasPage() {
 
   // ── fusionar duplicados sugeridos ──────────────────────────────────────────
   const [fusionando, setFusionando] = useState(null) // { empresaA, empresaB } | null
+  useEscapeKey(() => setFusionando(null), !!fusionando)
   const [fusionError, setFusionError] = useState('')
 
   const confirmarFusion = async (conservar, descartar) => {
@@ -967,7 +992,8 @@ export default function EmpresasPage() {
                                   <div className="flex items-center gap-2 mt-1">
                                     <button
                                       onClick={() => guardarIdentidad(empresa.id)}
-                                      disabled={guardandoIdentidad}
+                                      disabled={guardandoIdentidad || identidadSinCambios(empresa)}
+                                      title={identidadSinCambios(empresa) ? 'No hay cambios por guardar' : undefined}
                                       className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white disabled:opacity-50"
                                       style={{ background: '#003B43' }}
                                     >
@@ -1135,7 +1161,7 @@ export default function EmpresasPage() {
                               )}
 
                               {puedeEditar && modulosSinHabilitar.length > 0 && (
-                                <div className="flex items-center gap-2 mb-3">
+                                <div className="flex items-center gap-2 mb-3 flex-wrap">
                                   <select
                                     value={moduloNuevo}
                                     onChange={(e) => setModuloNuevo(e.target.value)}
@@ -1146,6 +1172,28 @@ export default function EmpresasPage() {
                                       <option key={m} value={m}>{MODULOS_INFO[m].label}</option>
                                     ))}
                                   </select>
+                                  {moduloNuevo && moduloNuevo !== 'contab' && (
+                                    <>
+                                      <span className="text-xs font-semibold text-[#434655]">Desde</span>
+                                      <select
+                                        value={desdeNuevo.mes}
+                                        onChange={(e) => setDesdeNuevo((prev) => ({ ...prev, mes: e.target.value }))}
+                                        className="px-2 py-1.5 rounded-lg border border-[#d1d5db] bg-white text-xs text-[#191c1e]"
+                                      >
+                                        <option value="">Desde siempre</option>
+                                        {MESES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+                                      </select>
+                                      {desdeNuevo.mes && (
+                                        <select
+                                          value={desdeNuevo.anio}
+                                          onChange={(e) => setDesdeNuevo((prev) => ({ ...prev, anio: e.target.value }))}
+                                          className="w-20 px-2 py-1.5 rounded-lg border border-[#d1d5db] bg-white text-xs text-[#191c1e]"
+                                        >
+                                          {ANIOS_VIGENCIA.map((a) => <option key={a} value={a}>{a}</option>)}
+                                        </select>
+                                      )}
+                                    </>
+                                  )}
                                   <button
                                     onClick={() => habilitar(empresa.id)}
                                     disabled={!moduloNuevo || accionEnCurso}
@@ -1172,7 +1220,16 @@ export default function EmpresasPage() {
       {/* ── Modal: nueva empresa ────────────────────────────────────────── */}
       {modalNuevaEmpresa && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" {...backdropClose(() => setModalNuevaEmpresa(false))}>
-          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.target.tagName === 'INPUT' && !creandoEmpresa && nuevaEmpresaForm.name.trim()) {
+                e.preventDefault()
+                crearEmpresa()
+              }
+            }}
+          >
             <div className="flex items-center gap-2 mb-1">
               <span className="material-symbols-outlined text-[#E5A70C]" style={{ fontSize: 20 }}>add_business</span>
               <h3 className="text-base font-bold text-[#191c1e]">Nueva empresa</h3>
@@ -1185,6 +1242,7 @@ export default function EmpresasPage() {
               <div>
                 <label className="text-xs font-semibold text-[#434655] block mb-1">Nombre</label>
                 <input
+                  autoFocus
                   value={nuevaEmpresaForm.name}
                   {...campoProps('nuevo.nombre', (v) => setNuevaEmpresaForm((prev) => ({ ...prev, name: v })))}
                   placeholder="Ej. Achiras del Rancho"

@@ -6,6 +6,8 @@ import TeamForm from "./TeamForm"
 import { getInitials, getAvatarColor, ROLE_LABELS } from "../utils/helpers"
 import { useToast } from "../context/ToastContext"
 import { useSocket } from "../context/SocketContext"
+import { useEscapeKey } from "../hooks/useEscapeKey"
+import { normalizarBusqueda, contiene } from "../utils/busqueda"
 
 const ROLE_BADGE = {
   admin: "bg-[#ffdad6] text-[#93000a]",
@@ -23,8 +25,8 @@ function MemberPicker({ allUsers, members, onAdd, onClose }) {
   const available = useMemo(() =>
     allUsers.filter(u =>
       !memberIds.has(u.id) &&
-      (u.name?.toLowerCase().includes(search.toLowerCase()) ||
-       u.email?.toLowerCase().includes(search.toLowerCase()))
+      (contiene(u.name, normalizarBusqueda(search)) ||
+       contiene(u.email, normalizarBusqueda(search)))
     ),
     [allUsers, memberIds, search]
   )
@@ -93,6 +95,8 @@ export default function TeamManager() {
   const openCreate = () => { setEditingMember(null); setModalOpen(true) }
   const openEdit = (m) => { setEditingMember(m); setModalOpen(true) }
   const closeModal = () => { setModalOpen(false); setEditingMember(null) }
+  // Escape cierra primero la confirmación de borrado (queda encima) y luego el formulario.
+  useEscapeKey(() => { if (deleteConfirm) setDeleteConfirm(null); else closeModal() }, modalOpen || !!deleteConfirm)
 
   const handleAdd = async (user) => {
     await addMember({ id: user.id })

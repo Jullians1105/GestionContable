@@ -4,6 +4,7 @@ import { api } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { backdropClose } from '../utils/backdropClose'
 import { useToast } from '../context/ToastContext'
+import { normalizarBusqueda, contiene } from '../utils/busqueda'
 
 // ─── month utilities ──────────────────────────────────────────────────────────
 
@@ -797,8 +798,8 @@ export default function FondoEmprenderPagosPage() {
   }, [scopedRows, statsSelectedYM])
 
   const visibleRows = useMemo(() => {
-    const q = search.toLowerCase()
-    return scopedRows.filter(r => !q || r.empresa.name.toLowerCase().includes(q))
+    const q = normalizarBusqueda(search)
+    return scopedRows.filter(r => !q || contiene(r.empresa.name, q))
   }, [scopedRows, search])
 
   // Ventana deslizante de VENTANA_MESES meses (máximo) — nunca antes de
