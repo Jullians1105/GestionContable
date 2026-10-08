@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import Cargando from '../components/Cargando'
 import { getInitials, getAvatarColor } from '../utils/helpers'
 import { puedeVerActividad } from '../utils/permissions'
+import ActividadAccesos from '../components/ActividadAccesos'
 
 // Registro de actividad del equipo: qué hizo cada persona en un día. Lee /api/actividad (que ya
 // viene traducido a frases) y lo agrupa por persona. Solo lectura. Acceso: admin, o quien tenga el
@@ -91,8 +92,7 @@ function TarjetaPersona({ persona }) {
   )
 }
 
-export default function ActividadPage() {
-  const { user } = useAuth()
+function AccionesDelDia() {
   const hoy = hoyBogota()
   const [fecha, setFecha] = useState(hoy)
   const [datos, setDatos] = useState(null)
@@ -119,23 +119,8 @@ export default function ActividadPage() {
   const personas = useMemo(() => datos?.usuarios ?? [], [datos])
   const visibles = persona === 'todas' ? personas : personas.filter((p) => (p.userId ?? 'sistema') === persona)
 
-  if (!puedeVerActividad(user)) {
-    return (
-      <div className="max-w-md mx-auto mt-24 text-center">
-        <span className="material-symbols-outlined text-[#9ca3af]" style={{ fontSize: 48 }}>lock</span>
-        <h1 className="mt-3 text-lg font-bold text-[#191c1e]">No tienes acceso a esta sección</h1>
-        <p className="mt-1 text-sm text-[#6b7280]">Pídele al administrador el permiso «Ver registro de actividad».</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="mb-5">
-        <h1 className="text-xl font-bold text-[#191c1e]">Actividad del equipo</h1>
-        <p className="text-sm text-[#6b7280]">Qué hizo cada persona, día por día.</p>
-      </div>
-
+    <div>
       <div className="flex items-center gap-2 flex-wrap mb-5">
         <button
           onClick={() => setFecha((f) => moverDia(f, -1))}
@@ -209,6 +194,52 @@ export default function ActividadPage() {
           {visibles.map((p) => <TarjetaPersona key={p.userId ?? 'sistema'} persona={p} />)}
         </div>
       )}
+    </div>
+  )
+}
+
+const VISTAS = [
+  { id: 'acciones', label: 'Acciones', icon: 'history', texto: 'Qué hizo cada persona, día por día.' },
+  { id: 'accesos', label: 'Accesos', icon: 'login', texto: 'Cómo usa el equipo la aplicación: quién entra, cuándo y cuánto.' },
+]
+
+export default function ActividadPage() {
+  const { user } = useAuth()
+  const [vista, setVista] = useState('acciones')
+
+  if (!puedeVerActividad(user)) {
+    return (
+      <div className="max-w-md mx-auto mt-24 text-center">
+        <span className="material-symbols-outlined text-[#9ca3af]" style={{ fontSize: 48 }}>lock</span>
+        <h1 className="mt-3 text-lg font-bold text-[#191c1e]">No tienes acceso a esta sección</h1>
+        <p className="mt-1 text-sm text-[#6b7280]">Pídele al administrador el permiso «Ver registro de actividad».</p>
+      </div>
+    )
+  }
+
+  const actual = VISTAS.find((v) => v.id === vista)
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-4">
+        <h1 className="text-xl font-bold text-[#191c1e]">Actividad del equipo</h1>
+        <p className="text-sm text-[#6b7280]">{actual.texto}</p>
+      </div>
+      <div className="flex items-center gap-6 mb-5 border-b border-[#e2e4ef]" role="tablist">
+        {VISTAS.map((v) => (
+          <button
+            key={v.id}
+            role="tab"
+            aria-selected={vista === v.id}
+            onClick={() => setVista(v.id)}
+            className={`relative pb-3 text-sm flex items-center gap-1.5 transition ${vista === v.id ? 'font-bold text-[#003B43]' : 'font-semibold text-[#9ca3af] hover:text-[#434655]'}`}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{v.icon}</span>
+            {v.label}
+            {vista === v.id && <span className="absolute left-0 right-0 -bottom-px h-[2.5px] rounded-full" style={{ background: '#E5A70C' }} />}
+          </button>
+        ))}
+      </div>
+      {vista === 'acciones' ? <AccionesDelDia /> : <ActividadAccesos />}
     </div>
   )
 }
