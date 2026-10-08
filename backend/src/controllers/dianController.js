@@ -573,7 +573,7 @@ const uploadDian = async (req, res, next) => {
       [id, req.file.originalname, req.user.userId, JSON.stringify({ filas, calculos }), bufferNormalizado, empresaId]
     );
     // Solo quién, cuándo, de qué empresa y cuántas filas: nunca el contenido del reporte.
-    await auditLog(req.user.userId, 'CREATE', 'contab_reporte', id, { empresaId, totalFilas: filas.length });
+    await auditLog(req.user.userId, 'CREATE', 'contab_reporte', id, { empresaId });
 
     res.status(201).json({
       id, calculos, totalFilas: filas.length, filasParaClasificar,
@@ -2410,7 +2410,7 @@ const exportarBorrador = async (req, res, next) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(buffer);
-    await auditLog(req.user.userId, 'CREATE', 'contab_exportacion', id, { empresaId, periodo: periodoDesde ? periodoDesde.slice(0, 7) : null, totalFilas });
+    await auditLog(req.user.userId, 'CREATE', 'contab_exportacion', id, { empresaId, periodo: periodoDesde ? periodoDesde.slice(0, 7) : null });
 
     // ── 10. Eliminar borrador tras envío ───────────────────────────────────
     await db.query('DELETE FROM calculo_borradores WHERE id = $1 AND creado_por = $2', [id, req.user.userId]);

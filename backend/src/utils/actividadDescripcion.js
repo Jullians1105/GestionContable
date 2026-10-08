@@ -41,7 +41,7 @@ function describirEvento(row, nombres = {}) {
 
   switch (row.table_name) {
     case 'dian_clave':
-      if (a === 'READ') return { area: 'Claves DIAN', texto: `Abrió una pantalla con las claves DIAN a la vista (Directorio o Deudas DIAN)${c.cantidad ? ` — se cargaron ${c.cantidad} claves` : ''}` };
+      if (a === 'READ') return { area: 'Claves DIAN', texto: 'Abrió una pantalla con las claves DIAN a la vista (Directorio o Deudas DIAN)' };
       if (a === 'DELETE') return { area: 'Claves DIAN', texto: 'Quitó la clave DIAN de una empresa' };
       return { area: 'Claves DIAN', texto: 'Guardó o cambió la clave DIAN de una empresa' };
     case 'dian_token':
@@ -49,7 +49,7 @@ function describirEvento(row, nombres = {}) {
     case 'dian_deudas_revision':
       return { area: 'Deudas DIAN', texto: a === 'CREATE' ? 'Revisó las deudas DIAN de una empresa' : 'Envió un correo de deudas DIAN' };
     case 'dian_deudas_lote':
-      return { area: 'Deudas DIAN', texto: `Revisó deudas DIAN en lote${c.total ? ` (${c.total} empresas)` : ''}` };
+      return { area: 'Deudas DIAN', texto: 'Revisó las deudas DIAN de todas las empresas' };
     case 'dian_deudas_detalle':
       return { area: 'Deudas DIAN', texto: 'Actualizó el estado de una deuda DIAN' };
 
@@ -130,30 +130,24 @@ function describirEvento(row, nombres = {}) {
     }
 
     case 'contab_reporte':
-      return { area: 'Contabilidad', texto: `Subió el reporte DIAN de ${c.empresaId ? emp('contabEmp', c.empresaId) : 'una empresa sin asignar'}${c.totalFilas ? ` (${c.totalFilas} filas)` : ''}` };
+      return { area: 'Contabilidad', texto: `Subió el reporte DIAN de ${c.empresaId ? emp('contabEmp', c.empresaId) : 'una empresa sin asignar'}` };
     case 'contab_exportacion':
       return { area: 'Contabilidad', texto: `Exportó el Excel de contabilidad de ${c.empresaId ? emp('contabEmp', c.empresaId) : 'una empresa sin asignar'}${c.periodo ? ` (${periodoTxt(c.periodo)})` : ''}` };
     case 'exogenas_archivo':
       return {
         area: 'Exógenas',
-        texto: `Analizó la exógena ${c.formato ?? ''}${c.contabEmpresaId ? ` de ${emp('contabEmp', c.contabEmpresaId)}` : ''}${c.anio ? ` (${c.anio})` : ''}${c.totalTerceros ? ` — ${c.totalTerceros} terceros` : ''}`.replace(/\s+/g, ' ').trim(),
+        texto: `Analizó la exógena ${c.formato ?? ''}${c.contabEmpresaId ? ` de ${emp('contabEmp', c.contabEmpresaId)}` : ''}${c.anio ? ` (${c.anio})` : ''}`.replace(/\s+/g, ' ').trim(),
       };
     case 'exogenas_generado':
       return { area: 'Exógenas', texto: `Generó el Excel de exógenas (${(c.formatos || []).join(', ') || 'sin formato'})` };
     case 'terceros_importacion':
-      return {
-        area: 'Terceros',
-        texto: `Importó terceros: ${c.archivos ?? 0} ${c.archivos === 1 ? 'archivo' : 'archivos'}, ${c.nuevos ?? 0} nuevos, ${c.actualizados ?? 0} actualizados${c.errores ? `, ${c.errores} con error` : ''}`,
-      };
+      return { area: 'Terceros', texto: 'Importó terceros' };
     case 'empresas_rues':
-      return {
-        area: 'Directorio',
-        texto: `Actualizó la matrícula mercantil de las empresas en el RUES${c.verificadas != null ? ` — ${c.verificadas} verificadas` : ''}${c.noEncontradas ? `, ${c.noEncontradas} no encontradas` : ''}${c.errores ? `, ${c.errores} con error` : ''}${c.forzar ? ' (todas)' : ''}`,
-      };
+      return { area: 'Directorio', texto: 'Actualizó la matrícula mercantil de las empresas (RUES)' };
     case 'terceros_consulta':
       return { area: 'Terceros', texto: `Consultó el tercero ${c.documento ?? row.record_id}` };
     case 'terceros_rues':
-      return { area: 'Terceros', texto: `Verificó terceros en el RUES${c.pendientes != null ? ` (${c.pendientes} pendientes)` : ''}${c.forzar ? ' — forzando a todos' : ''}` };
+      return { area: 'Terceros', texto: 'Verificó los terceros en el RUES' };
     case 'contab_consolidado_exportacion':
       return { area: 'Consolidado', texto: `Exportó el consolidado de ${c.empresaId ? emp('contabEmp', c.empresaId) : 'una empresa'}${c.periodo ? ` (${periodoTxt(c.periodo)})` : ''}` };
 

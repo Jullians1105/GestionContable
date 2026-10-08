@@ -368,8 +368,8 @@ describe('uploadTerceros', () => {
     expect(db.query).toHaveBeenCalledTimes(2); // SELECT + INSERT
     expect(db.query.mock.calls[0][1][0]).toBe('901939874'); // NIT del Emisor, no del Adquiriente
     expect(res.status).toHaveBeenCalledWith(200);
-    // Queda constancia de quién importó y cuántos (nunca el contenido de los archivos)
-    expect(auditLog).toHaveBeenCalledWith('usuario-1', 'CREATE', 'terceros_importacion', 'lote', expect.objectContaining({ archivos: 1, procesados: 1 }));
+    // Queda constancia de quién importó y cuándo (nunca el contenido de los archivos)
+    expect(auditLog).toHaveBeenCalledWith('usuario-1', 'CREATE', 'terceros_importacion', 'lote');
     const body = res.json.mock.calls[0][0];
     expect(body.procesados).toBe(1);
     expect(body.errores).toEqual([]);

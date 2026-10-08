@@ -558,9 +558,7 @@ const verificarMatricula = async (req, res, next) => {
   try {
     const forzar = req.body?.forzar === true;
     const resumen = await empresasRues.verificarEmpresas({ forzar });
-    await auditLog(req.user.userId, 'UPDATE', 'empresas_rues', 'lote', {
-      forzar, pendientes: resumen.pendientes, verificadas: resumen.verificadas, noEncontradas: resumen.noEncontradas, errores: resumen.errores,
-    });
+    await auditLog(req.user.userId, 'UPDATE', 'empresas_rues', 'lote');
     req.io?.emit('empresas:updated', { tipo: 'matricula' });
     res.json(resumen);
   } catch (err) {

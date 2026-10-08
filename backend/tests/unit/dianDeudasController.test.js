@@ -163,13 +163,13 @@ describe('guardarClave', () => {
 });
 
 describe('claves (mostrar/copiar)', () => {
-  it('entrega las claves sin caché y deja UNA línea de auditoría (quién, cuántas; nunca las claves)', async () => {
+  it('entrega las claves sin caché y deja UNA línea de auditoría (quién y cuándo; nunca las claves)', async () => {
     servicio.claves.mockResolvedValue({ claves: { e1: 'Secreta*1', e2: 'Otra*2' }, sinDescifrar: 0 });
     const res = mockRes();
     await c.claves(req(), res, next);
     expect(res.set).toHaveBeenCalledWith('Cache-Control', 'no-store');
     expect(res.json).toHaveBeenCalledWith({ claves: { e1: 'Secreta*1', e2: 'Otra*2' }, sinDescifrar: 0 });
-    expect(auditLog).toHaveBeenCalledWith('u1', 'READ', 'dian_clave', 'todas', { cantidad: 2 });
+    expect(auditLog).toHaveBeenCalledWith('u1', 'READ', 'dian_clave', 'todas');
     expect(JSON.stringify(auditLog.mock.calls)).not.toContain('Secreta');
   });
   it('un error del servicio va al manejador general', async () => {

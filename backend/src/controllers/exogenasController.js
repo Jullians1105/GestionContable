@@ -111,7 +111,7 @@ const uploadExogenas = async (req, res, next) => {
     );
 
     await auditLog(req.user.userId, 'CREATE', 'exogenas_archivo', rows[0].id, {
-      formato, contabEmpresaId: opciones.contabEmpresaId ?? null, anio: opciones.anio ?? null, totalTerceros: registros.length,
+      formato, contabEmpresaId: opciones.contabEmpresaId ?? null, anio: opciones.anio ?? null,
     });
 
     res.status(201).json({
