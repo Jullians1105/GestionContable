@@ -6,6 +6,8 @@ import { useGroups } from '../context/GroupContext'
 import { validators, validarPassword } from '../utils/validators'
 import { getAvatarColor, ROLE_LABELS } from '../utils/helpers'
 import { PERMISSIONS, getEffectivePermissions } from '../utils/permissions'
+import { useEscapeKey } from '../hooks/useEscapeKey'
+import { normalizarBusqueda, contiene } from '../utils/busqueda'
 
 const TASK_PERMS = [
   { key: 'canCreateTask',   icon: 'add_task',        label: 'Crear tareas' },
@@ -111,9 +113,9 @@ export default function UsersManager() {
   }
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase()
+    const q = normalizarBusqueda(search)
     let list = members.filter(m =>
-      m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+      contiene(m.name, q) || contiene(m.email, q)
     )
     if (sortBy) {
       list = [...list].sort((a, b) => {
@@ -146,6 +148,7 @@ export default function UsersManager() {
     setEditingUser(null)
     setErrors({})
   }
+  useEscapeKey(closeModal, modalOpen)
 
   const handleChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }))

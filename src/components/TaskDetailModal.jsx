@@ -8,6 +8,7 @@ import { formatDate, isDueDateOverdue, isDueDateSoon, getInitials, getAvatarColo
 import SubtaskList from './Subtasks/SubtaskList'
 import CommentSection from './Comments/CommentSection'
 import DeleteRequestModal from './DeleteRequestModal'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 const PRIORITY_COLORS = { high: '#EF4444', medium: '#FBBF24', low: '#10B981' }
 const STATUS_COLORS = { pending: '#888', in_progress: '#004ac6', completed: '#10B981' }
@@ -27,6 +28,7 @@ export default function TaskDetailModal({ task, onClose, onEdit, scrollToComment
   const [resolvingRequest, setResolvingRequest] = useState(false)
 
   const liveTask = getTaskById(task?.id) ?? task
+  useEscapeKey(onClose, !showDeleteRequestModal)
 
   useEffect(() => {
     if (!liveTask) return

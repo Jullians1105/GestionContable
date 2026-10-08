@@ -5,11 +5,14 @@ import CommentSection from './Comments/CommentSection'
 import { useTasks } from '../hooks/useTasks'
 import { useToast } from '../context/ToastContext'
 import { api } from '../services/api'
+import { useEscapeKey } from '../hooks/useEscapeKey'
 
 export default function TaskModal({ isOpen, task, onClose, forceRecurring = false }) {
   const { addTask, updateTask, getTaskById } = useTasks()
   const { addToast } = useToast()
   const [activeTab, setActiveTab] = useState('form')
+
+  useEscapeKey(onClose, isOpen !== false)
 
   const isEdit = !!task
   const liveTask = task ? getTaskById(task.id) : null
