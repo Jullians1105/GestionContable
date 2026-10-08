@@ -134,7 +134,7 @@ describe('PUT /api/auth/me', () => {
     const res = await request(app)
       .put('/api/auth/me')
       .set('Authorization', `Bearer ${authToken}`)
-      .send({ newPassword: 'newpassword123' });
+      .send({ newPassword: 'Newpassword123' });
     expect(res.status).toBe(400);
   });
 
@@ -143,7 +143,7 @@ describe('PUT /api/auth/me', () => {
     const res = await request(app)
       .put('/api/auth/me')
       .set('Authorization', `Bearer ${authToken}`)
-      .send({ currentPassword: 'wrongpassword', newPassword: 'newpassword123' });
+      .send({ currentPassword: 'wrongpassword', newPassword: 'Newpassword123' });
     expect(res.status).toBe(401);
   });
 
@@ -152,12 +152,12 @@ describe('PUT /api/auth/me', () => {
     const res = await request(app)
       .put('/api/auth/me')
       .set('Authorization', `Bearer ${authToken}`)
-      .send({ currentPassword: testUser.password, newPassword: 'newpassword123' });
+      .send({ currentPassword: testUser.password, newPassword: 'Newpassword123' });
     expect(res.status).toBe(200);
 
     const loginRes = await request(app).post('/api/auth/login').send({
       email: testUser.email,
-      password: 'newpassword123',
+      password: 'Newpassword123',
     });
     expect(loginRes.status).toBe(200);
   });
