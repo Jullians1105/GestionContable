@@ -104,7 +104,7 @@ describe('verificarRuesLote', () => {
     await verificarRuesLote({ body: {}, user: { userId: 'u1' } }, res, jest.fn());
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ pendientes: 3, verificados: 1, noEncontrados: 1, errores: 1, omitidos: 0 });
-    expect(auditLog).toHaveBeenCalledWith('u1', 'UPDATE', 'terceros_rues', 'lote', { pendientes: 3, forzar: false });
+    expect(auditLog).toHaveBeenCalledWith('u1', 'UPDATE', 'terceros_rues', 'lote');
     expect(db.query).toHaveBeenCalledTimes(3); // 1 SELECT + 2 UPDATE (el error no escribe)
   });
 

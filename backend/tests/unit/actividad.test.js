@@ -24,7 +24,7 @@ describe('describirEvento', () => {
       { extEmp: { [EMP]: 'ACME SAS' }, extProc: { [PROC]: 'Declaración de IVA' } }
     );
     expect(r.area).toBe('Empresas Externas');
-    expect(r.texto).toBe('ACME SAS: Declaración de IVA → Realizado (septiembre 2026)');
+    expect(r.texto).toBe('Marcó «Declaración de IVA» de ACME SAS como Realizado (septiembre 2026)');
   });
 
   test('incluye la nota cuando existe y cae a "una empresa" si el nombre ya no existe', () => {
@@ -32,25 +32,25 @@ describe('describirEvento', () => {
       { action: 'UPDATE', table_name: 'fondo_checklist_items', changes: { empresaId: EMP, procesoId: PROC, estado: 'na', mes: 9, anio: 2026, nota: 'SALDO A FAVOR' } },
       {}
     );
-    expect(r.texto).toBe('una empresa: un proceso → No aplica (septiembre 2026) — nota: «SALDO A FAVOR»');
+    expect(r.texto).toBe('Marcó «un proceso» de una empresa como No aplica (septiembre 2026) — nota: SALDO A FAVOR');
   });
 
   test('claves DIAN: nunca muestra contenido, solo la acción y la cantidad', () => {
     const r = describirEvento({ action: 'READ', table_name: 'dian_clave', changes: { cantidad: 12, clave: 'secreta' } });
-    expect(r.texto).toBe('Abrió una pantalla con las claves DIAN a la vista (Directorio o Deudas DIAN) — se cargaron 12 claves');
+    expect(r.texto).toBe('Abrió una pantalla con claves DIAN');
     expect(r.texto).not.toContain('secreta');
   });
 
   test('token DIAN fallido se distingue del exitoso', () => {
-    expect(describirEvento({ action: 'CREATE', table_name: 'dian_token', changes: { success: false } }).texto).toMatch(/no se pudo/);
+    expect(describirEvento({ action: 'CREATE', table_name: 'dian_token', changes: { success: false } }).texto).toMatch(/falló/);
     expect(describirEvento({ action: 'CREATE', table_name: 'dian_token', changes: { success: true } }).texto).toBe('Generó un token DIAN');
   });
 
   test('nómina electrónica: estados legibles', () => {
     const base = { action: 'UPDATE', table_name: 'ne_meses' };
-    expect(describirEvento({ ...base, changes: { empresaId: EMP, estado: 'presentada', mes: 9, anio: 2026 } }, { neEmp: { [EMP]: 'ACME' } }).texto).toContain('→ Presentada');
-    expect(describirEvento({ ...base, changes: { empresaId: EMP, estado: 'no_aplica', mes: 9, anio: 2026 } }).texto).toContain('→ En espera');
-    expect(describirEvento({ ...base, changes: { empresaId: EMP, estado: 'pendiente', autorizada: true, mes: 9, anio: 2026 } }).texto).toContain('→ Autorizada');
+    expect(describirEvento({ ...base, changes: { empresaId: EMP, estado: 'presentada', mes: 9, anio: 2026 } }, { neEmp: { [EMP]: 'ACME' } }).texto).toContain('como Presentada');
+    expect(describirEvento({ ...base, changes: { empresaId: EMP, estado: 'no_aplica', mes: 9, anio: 2026 } }).texto).toContain('Dejó en espera la nómina electrónica');
+    expect(describirEvento({ ...base, changes: { empresaId: EMP, estado: 'pendiente', autorizada: true, mes: 9, anio: 2026 } }).texto).toContain('Autorizó la nómina electrónica');
   });
 
   test('"vigente desde" de una empresa se describe con mes y año', () => {
@@ -58,7 +58,7 @@ describe('describirEvento', () => {
       { action: 'UPDATE', table_name: 'ne_empresas', record_id: EMP, changes: { vigenteDesdeAnio: 2026, vigenteDesdeMes: 9 } },
       { neEmp: { [EMP]: 'ACME' } }
     );
-    expect(r.texto).toBe('Fijó el inicio de ACME en Nómina Electrónica: septiembre 2026');
+    expect(r.texto).toBe('Empezó ACME en Nómina Electrónica desde septiembre 2026');
   });
 
   test('tabla desconocida usa una descripción genérica en vez de fallar', () => {
@@ -116,7 +116,7 @@ describe('getActividad', () => {
 
     const out = res.json.mock.calls[0][0];
     expect(out.total).toBe(3);
-    expect(out.usuarios[0]).toMatchObject({ nombre: 'Ruben', total: 2, areas: { 'Empresas Externas': 2 } });
+    expect(out.usuarios[0]).toMatchObject({ nombre: 'Ruben', nombreCorto: 'Ruben', total: 2, areas: { 'Empresas Externas': 2 } });
     expect(out.usuarios[1].eventos[0].texto).toContain('Llamar al cliente');
     const sql = db.query.mock.calls[0][0];
     expect(sql).toContain("AT TIME ZONE 'America/Bogota'");

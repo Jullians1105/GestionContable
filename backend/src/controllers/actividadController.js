@@ -3,6 +3,7 @@
 // permissions.modulos.actividad.canVer). Ver utils/actividadDescripcion.js para el texto de cada acción.
 const db = require('../config/database');
 const { describirEvento, clasificarEvento } = require('../utils/actividadDescripcion');
+const { nombresCortos } = require('../utils/nombreCorto');
 
 const TZ = 'America/Bogota';
 const MAX_EVENTOS = 5000; // tope de seguridad por día
@@ -125,12 +126,19 @@ const getActividad = async (req, res, next) => {
     );
 
     const nombres = await cargarNombres(rows);
+    const { rows: todosLosUsuarios } = await db.query('SELECT id, name FROM users');
+    const cortos = nombresCortos(todosLosUsuarios || []);
 
     const porUsuario = new Map();
     for (const r of rows) {
       const clave = r.user_id || 'sistema';
       if (!porUsuario.has(clave)) {
-        porUsuario.set(clave, { userId: r.user_id, nombre: r.user_name || 'Sistema', total: 0, areas: {}, eventos: [] });
+        porUsuario.set(clave, {
+          userId: r.user_id,
+          nombre: r.user_name || 'Sistema',
+          nombreCorto: cortos.get(r.user_id) || String(r.user_name || 'Sistema').trim().split(/\s+/)[0],
+          total: 0, areas: {}, eventos: [],
+        });
       }
       const grupo = porUsuario.get(clave);
       const { area, texto } = describirEvento(r, nombres);

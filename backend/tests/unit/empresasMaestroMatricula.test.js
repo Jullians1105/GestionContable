@@ -137,6 +137,11 @@ describe('verificarMatricula', () => {
     expect(empresasRues.verificarEmpresas).toHaveBeenCalledWith({ forzar: false });
     expect(res.json).toHaveBeenCalledWith({ pendientes: 3, verificadas: 2, noEncontradas: 1, errores: 0, sinDocumento: 0 });
     expect(req.io.emit).toHaveBeenCalledWith('empresas:updated', { tipo: 'matricula' });
+    // Queda constancia de quién actualizó las matrículas y con qué resultado
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO audit_log'),
+      expect.arrayContaining(['user-1', 'UPDATE', 'empresas_rues', 'lote'])
+    );
   });
 
   test('con forzar: true repasa todas', async () => {

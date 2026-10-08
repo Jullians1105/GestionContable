@@ -25,7 +25,7 @@ export default function LineaDelDia({ usuarios }) {
   const [mostrar, setMostrar] = useState(POR_PAGINA)
 
   const filas = useMemo(() => {
-    const todas = usuarios.flatMap((u) => u.eventos.map((e, i) => ({ ...e, nombre: u.nombre, orden: i })))
+    const todas = usuarios.flatMap((u) => u.eventos.map((e, i) => ({ ...e, nombre: u.nombre, nombreCorto: u.nombreCorto ?? u.nombre, orden: i })))
     // "HH:mm" del mismo día ordena bien como texto; dentro del mismo minuto se respeta el orden del servidor.
     return todas.sort((a, b) => (a.hora < b.hora ? 1 : a.hora > b.hora ? -1 : a.orden - b.orden))
   }, [usuarios])
@@ -58,7 +58,7 @@ export default function LineaDelDia({ usuarios }) {
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0 ${getAvatarColor(f.nombre)}`}>{getInitials(f.nombre)}</div>
-                      <span className="font-semibold text-[#191c1e] truncate">{f.nombre}</span>
+                      <span className="font-semibold text-[#191c1e] truncate" title={f.nombre}>{f.nombreCorto}</span>
                     </div>
                   </td>
                   <td className="px-3 py-2 text-[#191c1e] break-words">{f.texto}</td>

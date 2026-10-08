@@ -368,8 +368,8 @@ describe('uploadTerceros', () => {
     expect(db.query).toHaveBeenCalledTimes(2); // SELECT + INSERT
     expect(db.query.mock.calls[0][1][0]).toBe('901939874'); // NIT del Emisor, no del Adquiriente
     expect(res.status).toHaveBeenCalledWith(200);
-    // Queda constancia de quién importó y cuántos (nunca el contenido de los archivos)
-    expect(auditLog).toHaveBeenCalledWith('usuario-1', 'CREATE', 'terceros_importacion', 'lote', expect.objectContaining({ archivos: 1, procesados: 1 }));
+    // Queda constancia de quién importó y cuándo (nunca el contenido de los archivos)
+    expect(auditLog).toHaveBeenCalledWith('usuario-1', 'CREATE', 'terceros_importacion', 'lote');
     const body = res.json.mock.calls[0][0];
     expect(body.procesados).toBe(1);
     expect(body.errores).toEqual([]);
@@ -516,7 +516,8 @@ describe('consultarTercero', () => {
     fechaActualizacionFuente.mockResolvedValue(new Date('2026-09-04T19:15:35Z'));
     db.query.mockResolvedValueOnce({ rows: [{ nit: '901939874', razon_social: 'X', tiene_pdf: true }] });
     const res1 = mockRes();
-    await consultarTercero({ params: { nit: '901939874' } }, res1, jest.fn());
+    await consultarTercero({ params: { nit: '901939874' }, user: { userId: 'u1' } }, res1, jest.fn());
+    expect(auditLog).toHaveBeenCalledWith('u1', 'READ', 'terceros_consulta', '901939874', { documento: '901939874' });
     expect(res1.json.mock.calls[0][0].ruesFuenteActualizadaAl).toBe('2026-09-04T19:15:35.000Z');
 
     db.query.mockResolvedValueOnce({ rows: [] });
@@ -525,14 +526,14 @@ describe('consultarTercero', () => {
       datos: { razonSocial: 'EMPRESA EJEMPLO SAS', estado: 'ACTIVA', ciiu: null, representanteLegal: null, organizacionJuridica: null, ultimoAnoRenovado: 2026 },
     }]]));
     const res2 = mockRes();
-    await consultarTercero({ params: { nit: '900123456' } }, res2, jest.fn());
+    await consultarTercero({ params: { nit: '900123456' }, user: { userId: 'u1' } }, res2, jest.fn());
     expect(res2.json.mock.calls[0][0]).toMatchObject({ guardado: false, ruesFuenteActualizadaAl: '2026-09-04T19:15:35.000Z' });
   });
 
   test('si no se puede saber la fecha de la foto, ruesFuenteActualizadaAl es null y la búsqueda sigue funcionando', async () => {
     db.query.mockResolvedValueOnce({ rows: [{ nit: '901939874', razon_social: 'X', tiene_pdf: true }] });
     const res = mockRes();
-    await consultarTercero({ params: { nit: '901939874' } }, res, jest.fn());
+    await consultarTercero({ params: { nit: '901939874' }, user: { userId: 'u1' } }, res, jest.fn());
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json.mock.calls[0][0].ruesFuenteActualizadaAl).toBeNull();
   });
@@ -553,7 +554,7 @@ describe('consultarTercero', () => {
     };
     db.query.mockResolvedValue({ rows: [fila] });
 
-    const req = { params: { nit: '901.939.874-0' } }; // con puntos/guion, como lo pegaría el usuario
+    const req = { params: { nit: '901.939.874-0' }, user: { userId: 'u1' } }; // con puntos/guion, como lo pegaría el usuario
     const res = mockRes();
     await consultarTercero(req, res, jest.fn());
 
@@ -569,19 +570,19 @@ describe('consultarTercero', () => {
   test('describe el régimen fiscal con la tabla de códigos DIAN, o null si no se reconoce', async () => {
     db.query.mockResolvedValue({ rows: [{ nit: '111', regimen_fiscal: 'R-99-PN' }] });
     const res1 = mockRes();
-    await consultarTercero({ params: { nit: '111' } }, res1, jest.fn());
+    await consultarTercero({ params: { nit: '111' }, user: { userId: 'u1' } }, res1, jest.fn());
     expect(res1.json.mock.calls[0][0].regimen_fiscal_descripcion).toBe('No responsable');
 
     db.query.mockResolvedValue({ rows: [{ nit: '222', regimen_fiscal: 'CODIGO-DESCONOCIDO' }] });
     const res2 = mockRes();
-    await consultarTercero({ params: { nit: '222' } }, res2, jest.fn());
+    await consultarTercero({ params: { nit: '222' }, user: { userId: 'u1' } }, res2, jest.fn());
     expect(res2.json.mock.calls[0][0].regimen_fiscal_descripcion).toBeNull();
   });
 
   test('responde 404 si no está guardado y tampoco aparece en el RUES', async () => {
     db.query.mockResolvedValue({ rows: [] });
     consultarRues.mockResolvedValue(new Map([['999999999', { consulta: 'no_encontrado' }]]));
-    const req = { params: { nit: '999999999' } };
+    const req = { params: { nit: '999999999' }, user: { userId: 'u1' } };
     const res = mockRes();
     await consultarTercero(req, res, jest.fn());
     expect(res.status).toHaveBeenCalledWith(404);
@@ -599,7 +600,7 @@ describe('consultarTercero', () => {
       },
     }]]));
     const res = mockRes();
-    await consultarTercero({ params: { nit: '900123456' } }, res, jest.fn());
+    await consultarTercero({ params: { nit: '900123456' }, user: { userId: 'u1' } }, res, jest.fn());
     expect(res.status).toHaveBeenCalledWith(200);
     const cuerpo = res.json.mock.calls[0][0];
     expect(cuerpo).toMatchObject({ origen: 'rues', guardado: false, razon_social_oficial: 'EMPRESA EJEMPLO SAS' });
@@ -611,7 +612,7 @@ describe('consultarTercero', () => {
     db.query.mockResolvedValue({ rows: [] });
     consultarRues.mockResolvedValue(new Map([['999999999', { consulta: 'error' }]]));
     const res = mockRes();
-    await consultarTercero({ params: { nit: '999999999' } }, res, jest.fn());
+    await consultarTercero({ params: { nit: '999999999' }, user: { userId: 'u1' } }, res, jest.fn());
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json.mock.calls[0][0].ruesNoDisponible).toBe(true);
   });
@@ -623,7 +624,7 @@ describe('consultarTercero', () => {
       rues_estado: 'ACTIVA', rues_ultimo_ano_renovado: new Date().getFullYear(),
     }] });
     const res = mockRes();
-    await consultarTercero({ params: { nit: '901939874' } }, res, jest.fn());
+    await consultarTercero({ params: { nit: '901939874' }, user: { userId: 'u1' } }, res, jest.fn());
     expect(res.json.mock.calls[0][0]).toMatchObject({
       origen: 'ambos',
       razon_social_oficial: 'ASOCIACION AVICOLA CHICAMOCHA ASOAVICHI',
@@ -642,7 +643,7 @@ describe('consultarTercero', () => {
       datos: { razonSocial: 'ASOCIACION AVICOLA CHICAMOCHA ASOAVICHI', estado: 'CANCELADA', ciiu: null, representanteLegal: null, organizacionJuridica: null, ultimoAnoRenovado: 2025, representanteDocumento: null, representanteTipoDocumento: null },
     }]]));
     const res = mockRes();
-    await consultarTercero({ params: { nit: '901939874' } }, res, jest.fn());
+    await consultarTercero({ params: { nit: '901939874' }, user: { userId: 'u1' } }, res, jest.fn());
     expect(db.query).toHaveBeenCalledTimes(2);
     expect(db.query.mock.calls[1][0]).toMatch(/UPDATE terceros/);
     // Solo escribe columnas rues_*: ni la dirección ni el nombre de la factura (razon_social a secas).
@@ -655,7 +656,7 @@ describe('consultarTercero', () => {
 
   test('en la búsqueda espera poco por intento pero reintenta una vez (el servicio falla de forma intermitente)', async () => {
     db.query.mockResolvedValue({ rows: [{ nit: '901939874', razon_social: 'X', tiene_pdf: true }] });
-    await consultarTercero({ params: { nit: '901939874' } }, mockRes(), jest.fn());
+    await consultarTercero({ params: { nit: '901939874' }, user: { userId: 'u1' } }, mockRes(), jest.fn());
     expect(consultarRues).toHaveBeenCalledWith(['901939874'], { timeoutMs: 4000, reintentos: 1, pausaMs: 300 });
   });
 
@@ -664,7 +665,7 @@ describe('consultarTercero', () => {
     db.query.mockResolvedValue({ rows: [fila] });
     consultarRues.mockResolvedValue(new Map([['901939874', { consulta: 'error' }]]));
     const res = mockRes();
-    await consultarTercero({ params: { nit: '901939874' } }, res, jest.fn());
+    await consultarTercero({ params: { nit: '901939874' }, user: { userId: 'u1' } }, res, jest.fn());
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json.mock.calls[0][0]).toMatchObject({ ruesDesactualizado: true, rues_estado: 'ACTIVA' });
     expect(db.query).toHaveBeenCalledTimes(1); // solo el SELECT: no se pisa el dato anterior
@@ -674,13 +675,13 @@ describe('consultarTercero', () => {
     db.query.mockResolvedValue({ rows: [{ nit: '12345', razon_social: 'X', tiene_pdf: true }] });
     consultarRues.mockResolvedValue(new Map()); // el servicio omite los documentos inválidos
     const res = mockRes();
-    await consultarTercero({ params: { nit: '12345' } }, res, jest.fn());
+    await consultarTercero({ params: { nit: '12345' }, user: { userId: 'u1' } }, res, jest.fn());
     expect(res.json.mock.calls[0][0].ruesDesactualizado).toBe(false);
     expect(db.query).toHaveBeenCalledTimes(1);
   });
 
   test('responde 400 si el documento queda vacío tras limpiar', async () => {
-    const req = { params: { nit: '---' } };
+    const req = { params: { nit: '---' }, user: { userId: 'u1' } };
     const res = mockRes();
     await consultarTercero(req, res, jest.fn());
     expect(res.status).toHaveBeenCalledWith(400);
