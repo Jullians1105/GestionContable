@@ -6,6 +6,7 @@ const ExcelJS = require('exceljs');
 const db = require('../config/database');
 const { limpiarIdentificacion } = require('../services/exogenas/utils/dian');
 const { enriquecerConTerceros } = require('../services/exogenas/formato1001');
+const auditLog = require('../utils/auditLog');
 
 const CUATRIMESTRES = { 1: [1, 2, 3, 4], 2: [5, 6, 7, 8], 3: [9, 10, 11, 12] };
 const MESES_ES = [
@@ -373,6 +374,7 @@ const exportarConsolidado = async (req, res, next) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(Buffer.from(buffer));
+    await auditLog(req.user.userId, 'CREATE', 'contab_consolidado_exportacion', empresaId, { empresaId, periodo: nombrePeriodoArchivo, tipo });
   } catch (err) {
     next(err);
   }

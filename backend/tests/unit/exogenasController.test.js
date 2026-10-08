@@ -1,7 +1,9 @@
 jest.mock('../../src/config/database');
+jest.mock('../../src/utils/auditLog', () => jest.fn().mockResolvedValue());
 
 const ExcelJS = require('exceljs');
 const db = require('../../src/config/database');
+const auditLog = require('../../src/utils/auditLog');
 const {
   uploadExogenas, getExogenasBorrador, generarExogenas, generarExogenasCombinado,
 } = require('../../src/controllers/exogenasController');
@@ -359,6 +361,7 @@ describe('generarExogenas', () => {
     const deleteCall = db.query.mock.calls[1];
     expect(deleteCall[0]).toMatch(/DELETE FROM exogenas_borradores/);
     expect(deleteCall[1]).toEqual(['b1', 'u1']);
+    expect(auditLog).toHaveBeenCalledWith('u1', 'CREATE', 'exogenas_generado', 'b1', { formatos: ['1005'] });
   });
 });
 
@@ -437,5 +440,6 @@ describe('generarExogenasCombinado', () => {
     const deleteCall = db.query.mock.calls[1];
     expect(deleteCall[0]).toMatch(/DELETE FROM exogenas_borradores/);
     expect(deleteCall[1]).toEqual([['b1', 'b2'], 'u1']);
+    expect(auditLog).toHaveBeenCalledWith('u1', 'CREATE', 'exogenas_generado', 'combinado', { formatos: ['1005', '1006'] });
   });
 });
