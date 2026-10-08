@@ -4,6 +4,7 @@ import StatsCard from '../components/StatsCard'
 import { getMacroStats, getMesVencidoHabilitado, resolveMesInicial, MACRO_PROCESSES } from '../data/fondoEmprender'
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
+import { useToast } from '../context/ToastContext'
 
 const SEM_COLOR = {
   green:  '#16a34a',
@@ -28,6 +29,7 @@ const CATEGORIAS = [
 ]
 
 export default function FondoEmprenderEmpresasPage() {
+  const { addToast } = useToast()
   const navigate = useNavigate()
   const { socket } = useSocket()
 
@@ -176,9 +178,9 @@ export default function FondoEmprenderEmpresasPage() {
       closeEdit()
     } catch (err) {
       if (err.status === 403) {
-        alert('No tienes permiso para editar')
+        addToast('No tienes permiso para editar', 'error')
       } else {
-        alert('Error: ' + err.message)
+        addToast('Error: ' + err.message, 'error')
       }
     }
   }
@@ -192,9 +194,9 @@ export default function FondoEmprenderEmpresasPage() {
       if (editingId === empresaId) setEditingId(null)
     } catch (err) {
       if (err.status === 403) {
-        alert('No tienes permiso para eliminar')
+        addToast('No tienes permiso para eliminar', 'error')
       } else {
-        alert('Error: ' + err.message)
+        addToast('Error: ' + err.message, 'error')
       }
     }
   }

@@ -16,6 +16,8 @@ import { migrateLegacyLocalStorage, getMigrationReport, dismissMigrationReport, 
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
 import { useAuth } from '../context/AuthContext'
+import { backdropClose } from '../utils/backdropClose'
+import { useToast } from '../context/ToastContext'
 
 // ─── page-level constants ─────────────────────────────────────────────────────
 
@@ -419,6 +421,7 @@ function GroupHeaderCell({ grupo, procesos, collapsed, editable, paletteIndex, o
 // ─── component ───────────────────────────────────────────────────────────────
 
 export default function FondoEmprenderPage() {
+  const { addToast } = useToast()
   const { socket } = useSocket()
   const { isAdmin } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -605,9 +608,10 @@ export default function FondoEmprenderPage() {
       await api.updateFondoChecklistItem(companyId, procId, year, month + 1, { nota: note || null })
     } catch (err) {
       console.error('Error al guardar nota:', err.message)
+      addToast(err.message || 'No se pudo guardar el cambio', 'error')
       fetchGrid()
     }
-  }, [year, month, fetchGrid])
+  }, [year, month, fetchGrid, addToast])
 
   // A refetch (window focus, another user's edit) replaces `companies`
   // wholesale. If the note popup is open with unsaved keystrokes, that
@@ -805,6 +809,7 @@ export default function FondoEmprenderPage() {
       await api.updateFondoChecklistItem(companyId, procId, year, month + 1, { estado: status })
     } catch (err) {
       console.error('Error al guardar estado:', err.message)
+      addToast(err.message || 'No se pudo guardar el cambio', 'error')
       fetchGrid()
     } finally {
       pendingCellWritesRef.current.delete(key)
@@ -824,9 +829,9 @@ export default function FondoEmprenderPage() {
     try {
       await api.updateFondoEmpresa(companyId, { codigoSiigo: nuevo })
     } catch (err) {
-      alert(err.status === 403
+      addToast(err.status === 403
         ? 'Solo un administrador puede editar el código Siigo'
-        : 'Error al guardar el código Siigo: ' + err.message)
+        : 'Error al guardar el código Siigo: ' + err.message, 'error')
       fetchGrid()
     }
   }
@@ -893,6 +898,7 @@ export default function FondoEmprenderPage() {
     } catch (err) {
       setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, [confirmedKey]: previousConfirmed, [enviadoKey]: previousEnviado } : c))
       console.error(`Error al confirmar ${tipo}:`, err.message)
+      addToast(err.message || 'No se pudo guardar el cambio', 'error')
     }
   }
 
@@ -922,6 +928,7 @@ export default function FondoEmprenderPage() {
     } catch (err) {
       setCompanies(prev => prev.map(c => c.id === companyId ? { ...c, [enviadoKey]: previous } : c))
       console.error(`Error al marcar ${tipo} como enviada:`, err.message)
+      addToast(err.message || 'No se pudo guardar el cambio', 'error')
     }
   }
 
@@ -1023,7 +1030,7 @@ export default function FondoEmprenderPage() {
         })
         setProcesses(prev => [...prev, created])
       } catch (err) {
-        alert('Error al crear proceso: ' + err.message)
+        addToast('Error al crear proceso: ' + err.message, 'error')
       }
       return
     }
@@ -1036,7 +1043,7 @@ export default function FondoEmprenderPage() {
       await api.updateFondoProceso(modal.id, { name, vigenteHasta })
     } catch (err) {
       setProcesses(prev => prev.map(p => p.id === modal.id ? previous : p))
-      alert('Error al editar proceso: ' + err.message)
+      addToast('Error al editar proceso: ' + err.message, 'error')
     }
   }
 
@@ -1052,7 +1059,7 @@ export default function FondoEmprenderPage() {
         setGrupos(prev => prev.filter(g => g.id !== id))
         setProcesses(prev => prev.map(p => p.grupoId === id ? { ...p, grupoId: null } : p))
       } catch (err) {
-        alert('Error al eliminar grupo: ' + err.message)
+        addToast('Error al eliminar grupo: ' + err.message, 'error')
       }
       return
     }
@@ -1062,7 +1069,7 @@ export default function FondoEmprenderPage() {
       await api.updateFondoProceso(id, { activo: false })
       setProcesses(prev => prev.filter(p => p.id !== id))
     } catch (err) {
-      alert('Error al eliminar proceso: ' + err.message)
+      addToast('Error al eliminar proceso: ' + err.message, 'error')
     }
   }
 
@@ -1077,7 +1084,7 @@ export default function FondoEmprenderPage() {
       const created = await api.createFondoProcesoGrupo({ name })
       setGrupos(prev => [...prev, created])
     } catch (err) {
-      alert('Error al crear grupo: ' + err.message)
+      addToast('Error al crear grupo: ' + err.message, 'error')
     }
   }
 
@@ -1096,7 +1103,7 @@ export default function FondoEmprenderPage() {
       await api.updateFondoProcesoGrupo(editing.id, { name: newName })
     } catch (err) {
       setGrupos(prev => prev.map(g => g.id === editing.id ? { ...g, name: editing.oldName } : g))
-      alert('Error al renombrar grupo: ' + err.message)
+      addToast('Error al renombrar grupo: ' + err.message, 'error')
     }
   }
 
@@ -1208,7 +1215,7 @@ export default function FondoEmprenderPage() {
           reordered.map((p, idx) => api.updateFondoProceso(p.id, { orden: idx }))
         )
       } catch (err) {
-        alert('Error al reordenar: ' + err.message)
+        addToast('Error al reordenar: ' + err.message, 'error')
         fetchGrid()
       }
       return
@@ -1223,7 +1230,7 @@ export default function FondoEmprenderPage() {
       await api.updateFondoProceso(activeId, { grupoId: grupoIdDestino, orden: newOrden })
     } catch (err) {
       setProcesses(prev => prev.map(p => p.id === activeId ? previous : p))
-      alert('Error al mover el proceso: ' + err.message)
+      addToast('Error al mover el proceso: ' + err.message, 'error')
     }
   }
 
@@ -2258,7 +2265,7 @@ export default function FondoEmprenderPage() {
 
       {/* ── Crear / editar proceso ───────────────────────────────────────────── */}
       {procesoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={closeProcesoModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdropClose(closeProcesoModal)}>
           <div
             className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}
@@ -2351,7 +2358,7 @@ export default function FondoEmprenderPage() {
 
       {/* ── Delete confirmation ───────────────────────────────────────────── */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setDeleteConfirm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdropClose(() => setDeleteConfirm(null))}>
           <div
             className="bg-white rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}
