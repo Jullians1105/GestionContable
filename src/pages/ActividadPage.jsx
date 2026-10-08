@@ -5,6 +5,8 @@ import Cargando from '../components/Cargando'
 import { getInitials, getAvatarColor } from '../utils/helpers'
 import { puedeVerActividad } from '../utils/permissions'
 import ActividadAccesos from '../components/ActividadAccesos'
+import ResumenActividad from '../components/ResumenActividad'
+import LineaDelDia from '../components/LineaDelDia'
 
 // Registro de actividad del equipo: qué hizo cada persona en un día. Lee /api/actividad (que ya
 // viene traducido a frases) y lo agrupa por persona. Solo lectura. Acceso: admin, o quien tenga el
@@ -191,6 +193,9 @@ function AccionesDelDia() {
           {datos?.truncado && (
             <p className="text-xs text-amber-700">Hay muchas acciones este día; se muestran las más recientes.</p>
           )}
+          <ResumenActividad usuarios={personas} persona={persona} />
+          <LineaDelDia usuarios={visibles} />
+          <h2 className="text-sm font-bold text-[#434655] mt-2">Detalle por persona</h2>
           {visibles.map((p) => <TarjetaPersona key={p.userId ?? 'sistema'} persona={p} />)}
         </div>
       )}
