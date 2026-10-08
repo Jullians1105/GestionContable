@@ -131,7 +131,7 @@ const createPago = async (req, res, next) => {
       return res.status(409).json({ error: 'Ya existe un pago para esta empresa y período' });
     }
 
-    await auditLog(req.user.userId, 'INSERT', 'fondo_pagos', result.rows[0].id, {
+    await auditLog(req.user.userId, 'CREATE', 'fondo_pagos', result.rows[0].id, {
       empresaId, anio, mes, monto,
     });
 
