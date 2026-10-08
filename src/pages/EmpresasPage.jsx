@@ -3,6 +3,9 @@ import { api } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import ClaveDianModal from '../components/ClaveDianModal'
 import CopiarDatosDian, { useClavesDian } from '../components/CopiarDatosDian'
+import { backdropClose } from '../utils/backdropClose'
+import { avisosDocumento, avisosNombre } from '../utils/avisosEmpresa'
+import Cargando from '../components/Cargando'
 
 // Ver empresasMaestroController.js — 'fondo'/'ext'/'ne'/'contab' son las claves que usa el
 // backend para MODULOS, no se inventan acá.
@@ -242,6 +245,24 @@ export default function EmpresasPage() {
 
   const stats = useMemo(() => ({ total: empresas.length }), [empresas])
 
+  // ── avisos al escribir la identidad (duplicados, formato) ───────────────────
+  // La lógica vive en utils/avisosEmpresa.js. Los avisos son informativos (no bloquean) y solo se
+  // muestran cuando la persona sale del campo, no mientras escribe: `revisado` guarda qué campos
+  // ya se abandonaron ('nuevo.nombre', 'nuevo.doc', 'nuevo.rep', 'edicion.…'); volver a escribir en
+  // un campo lo oculta hasta que se vuelva a salir.
+  const [revisado, setRevisado] = useState({})
+  const campoProps = (clave, onCambio) => ({
+    onChange: (e) => { onCambio(e.target.value); setRevisado((prev) => (prev[clave] ? { ...prev, [clave]: false } : prev)) },
+    onBlur: () => setRevisado((prev) => ({ ...prev, [clave]: true })),
+  })
+  const reiniciarRevisado = (grupo) => setRevisado((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith(`${grupo}.`))))
+  const AVISO_ESTILO = { repetido: 'text-amber-700', info: 'text-[#434655]', ayuda: 'text-[#6b7280]', error: 'text-red-600' }
+  const mostrarAvisos = (clave, lista) => (revisado[clave] && lista.length > 0 ? (
+    <div className="mt-1 flex flex-col gap-0.5">
+      {lista.map((a) => <p key={a.texto} className={`text-[11px] ${AVISO_ESTILO[a.nivel]}`}>{a.texto}</p>)}
+    </div>
+  ) : null)
+
   // ── crear empresa nueva (modal: nombre + tipo + NIT/cédula) ─────────────────
   const [modalNuevaEmpresa, setModalNuevaEmpresa] = useState(false)
   const [nuevaEmpresaForm, setNuevaEmpresaForm] = useState({ name: '', tipoContribuyente: 'empresa', nit: '', cedulaRepresentante: '' })
@@ -250,6 +271,7 @@ export default function EmpresasPage() {
 
   const abrirModalNuevaEmpresa = () => {
     setNuevaEmpresaForm({ name: '', tipoContribuyente: 'empresa', nit: '', cedulaRepresentante: '' })
+    reiniciarRevisado('nuevo')
     setErrorCrear('')
     setModalNuevaEmpresa(true)
   }
@@ -297,6 +319,7 @@ export default function EmpresasPage() {
     setExpandidoId(empresa.id)
     setAccionError('')
     setModuloNuevo('')
+    reiniciarRevisado('edicion')
     setIdentidadEdit({
       name: empresa.name,
       tipoContribuyente: empresa.tipoContribuyente || 'empresa',
@@ -495,13 +518,7 @@ export default function EmpresasPage() {
 
   if (cargando) {
     return (
-      <div className="max-w-5xl mx-auto mt-20 text-center">
-        <svg className="animate-spin h-10 w-10 text-[#003B43] mx-auto" viewBox="0 0 24 24" fill="none">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-        </svg>
-        <p className="mt-4 text-[#6b7280]">Cargando directorio de empresas…</p>
-      </div>
+      <Cargando texto="Cargando directorio de empresas…" />
     )
   }
 
@@ -883,10 +900,11 @@ export default function EmpresasPage() {
                                   <label className="text-[11px] font-semibold text-[#9ca3af] uppercase block mb-1">Nombre</label>
                                   <input
                                     value={identidadEdit?.name ?? empresa.name}
-                                    onChange={(e) => setIdentidadEdit((prev) => ({ ...prev, name: e.target.value }))}
+                                    {...campoProps('edicion.nombre', (v) => setIdentidadEdit((prev) => ({ ...prev, name: v })))}
                                     disabled={!puedeEditar}
                                     className="w-full px-3 py-1.5 rounded-lg border border-[#d1d5db] bg-white text-sm text-[#191c1e] disabled:bg-[#f3f4f6] disabled:text-[#6b7280]"
                                   />
+                                  {mostrarAvisos('edicion.nombre', avisosNombre({ valor: identidadEdit?.name, empresas, excluirId: empresa.id }))}
                                 </div>
                                 <div>
                                   <label className="text-[11px] font-semibold text-[#9ca3af] uppercase block mb-1">Tipo</label>
@@ -919,22 +937,30 @@ export default function EmpresasPage() {
                                   </label>
                                   <input
                                     value={identidadEdit?.nit ?? ''}
-                                    onChange={(e) => setIdentidadEdit((prev) => ({ ...prev, nit: e.target.value }))}
+                                    {...campoProps('edicion.doc', (v) => setIdentidadEdit((prev) => ({ ...prev, nit: v })))}
                                     disabled={!puedeEditar}
                                     inputMode="numeric"
                                     className="w-full px-3 py-1.5 rounded-lg border border-[#d1d5db] bg-white text-sm text-[#191c1e] disabled:bg-[#f3f4f6] disabled:text-[#6b7280]"
                                   />
+                                  {mostrarAvisos('edicion.doc', avisosDocumento({
+                                    campo: 'documento', valor: identidadEdit?.nit, tipoContribuyente: identidadEdit?.tipoContribuyente,
+                                    empresas, excluirId: empresa.id,
+                                  }))}
                                 </div>
                                 {identidadEdit?.tipoContribuyente !== 'natural' && (
                                   <div>
                                     <label className="text-[11px] font-semibold text-[#9ca3af] uppercase block mb-1">Cédula representante</label>
                                     <input
                                       value={identidadEdit?.cedulaRepresentante ?? ''}
-                                      onChange={(e) => setIdentidadEdit((prev) => ({ ...prev, cedulaRepresentante: e.target.value }))}
+                                      {...campoProps('edicion.rep', (v) => setIdentidadEdit((prev) => ({ ...prev, cedulaRepresentante: v })))}
                                       disabled={!puedeEditar}
                                       inputMode="numeric"
                                       className="w-full px-3 py-1.5 rounded-lg border border-[#d1d5db] bg-white text-sm text-[#191c1e] disabled:bg-[#f3f4f6] disabled:text-[#6b7280]"
                                     />
+                                    {mostrarAvisos('edicion.rep', avisosDocumento({
+                                      campo: 'representante', valor: identidadEdit?.cedulaRepresentante,
+                                      empresas, excluirId: empresa.id, documentoPropio: identidadEdit?.nit,
+                                    }))}
                                   </div>
                                 )}
                                 {puedeEditar && (
@@ -1145,7 +1171,7 @@ export default function EmpresasPage() {
 
       {/* ── Modal: nueva empresa ────────────────────────────────────────── */}
       {modalNuevaEmpresa && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setModalNuevaEmpresa(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" {...backdropClose(() => setModalNuevaEmpresa(false))}>
           <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-1">
               <span className="material-symbols-outlined text-[#E5A70C]" style={{ fontSize: 20 }}>add_business</span>
@@ -1160,10 +1186,11 @@ export default function EmpresasPage() {
                 <label className="text-xs font-semibold text-[#434655] block mb-1">Nombre</label>
                 <input
                   value={nuevaEmpresaForm.name}
-                  onChange={(e) => setNuevaEmpresaForm((prev) => ({ ...prev, name: e.target.value }))}
+                  {...campoProps('nuevo.nombre', (v) => setNuevaEmpresaForm((prev) => ({ ...prev, name: v })))}
                   placeholder="Ej. Achiras del Rancho"
                   className="w-full px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#191c1e]"
                 />
+                {mostrarAvisos('nuevo.nombre', avisosNombre({ valor: nuevaEmpresaForm.name, empresas }))}
               </div>
               <div>
                 <label className="text-xs font-semibold text-[#434655] block mb-1">Tipo de contribuyente</label>
@@ -1190,22 +1217,28 @@ export default function EmpresasPage() {
                 </label>
                 <input
                   value={nuevaEmpresaForm.nit}
-                  onChange={(e) => setNuevaEmpresaForm((prev) => ({ ...prev, nit: e.target.value }))}
+                  {...campoProps('nuevo.doc', (v) => setNuevaEmpresaForm((prev) => ({ ...prev, nit: v })))}
                   placeholder={nuevaEmpresaForm.tipoContribuyente === 'natural' ? 'Ej. 1052395147' : 'Ej. 901234567'}
                   inputMode="numeric"
                   className="w-full px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#191c1e]"
                 />
+                {mostrarAvisos('nuevo.doc', avisosDocumento({
+                  campo: 'documento', valor: nuevaEmpresaForm.nit, tipoContribuyente: nuevaEmpresaForm.tipoContribuyente, empresas,
+                }))}
               </div>
               {nuevaEmpresaForm.tipoContribuyente === 'empresa' && (
                 <div>
                   <label className="text-xs font-semibold text-[#434655] block mb-1">Cédula representante legal</label>
                   <input
                     value={nuevaEmpresaForm.cedulaRepresentante}
-                    onChange={(e) => setNuevaEmpresaForm((prev) => ({ ...prev, cedulaRepresentante: e.target.value }))}
+                    {...campoProps('nuevo.rep', (v) => setNuevaEmpresaForm((prev) => ({ ...prev, cedulaRepresentante: v })))}
                     placeholder="Ej. 1052395147"
                     inputMode="numeric"
                     className="w-full px-3 py-2 rounded-lg border border-[#d1d5db] text-sm text-[#191c1e]"
                   />
+                  {mostrarAvisos('nuevo.rep', avisosDocumento({
+                    campo: 'representante', valor: nuevaEmpresaForm.cedulaRepresentante, empresas, documentoPropio: nuevaEmpresaForm.nit,
+                  }))}
                 </div>
               )}
             </div>
@@ -1228,7 +1261,7 @@ export default function EmpresasPage() {
 
       {/* ── Modal de fusión ─────────────────────────────────────────────── */}
       {fusionando && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => setFusionando(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" {...backdropClose(() => setFusionando(null))}>
           <div className="bg-white rounded-2xl shadow-xl p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-[#191c1e] mb-2">¿Cuál nombre se conserva?</h3>
             <p className="text-sm text-[#6b7280] mb-4">

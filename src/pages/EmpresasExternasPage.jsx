@@ -5,6 +5,9 @@ import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
 import { useAuth } from '../context/AuthContext'
 import { useTeam } from '../context/TeamContext'
+import { backdropClose } from '../utils/backdropClose'
+import Cargando from '../components/Cargando'
+import { useToast } from '../context/ToastContext'
 
 // ─── page-level constants ─────────────────────────────────────────────────────
 // Mismos valores/patrones que FondoEmprenderPage.jsx (Seguimiento Mensual de
@@ -424,6 +427,7 @@ function NameFilterHeaderCell({ label, width, left, rowSpan = 1, onFilterClick, 
 // ─── component ───────────────────────────────────────────────────────────────
 
 export default function EmpresasExternasPage() {
+  const { addToast } = useToast()
   const { socket } = useSocket()
   const { isAdmin } = useAuth()
   const { members } = useTeam()
@@ -548,9 +552,10 @@ export default function EmpresasExternasPage() {
       await api.updateExtChecklistItem(companyId, procId, year, month + 1, { nota: note || null })
     } catch (err) {
       console.error('Error al guardar nota:', err.message)
+      addToast(err.message || 'No se pudo guardar el cambio', 'error')
       fetchGrid()
     }
-  }, [year, month, fetchGrid])
+  }, [year, month, fetchGrid, addToast])
 
   const flushPendingNote = useCallback(() => {
     const oc = openCellRef.current
@@ -773,6 +778,7 @@ export default function EmpresasExternasPage() {
       await api.updateExtChecklistItem(companyId, procId, year, month + 1, { estado: status })
     } catch (err) {
       console.error('Error al guardar estado:', err.message)
+      addToast(err.message || 'No se pudo guardar el cambio', 'error')
       fetchGrid()
     } finally {
       pendingCellWritesRef.current.delete(key)
@@ -799,6 +805,7 @@ export default function EmpresasExternasPage() {
       await api.updateExtResultado(companyId, year, month + 1, { tipo, valor })
     } catch (err) {
       console.error('Error al guardar utilidad/pérdida:', err.message)
+      addToast(err.message || 'No se pudo guardar el cambio', 'error')
       fetchGrid()
     }
   }
@@ -941,7 +948,7 @@ export default function EmpresasExternasPage() {
         const created = await api.createExtProceso({ name, grupoId })
         setProcesses(prev => [...prev, created])
       } catch (err) {
-        alert('Error al crear proceso: ' + err.message)
+        addToast('Error al crear proceso: ' + err.message, 'error')
       }
       return
     }
@@ -953,7 +960,7 @@ export default function EmpresasExternasPage() {
       await api.updateExtProceso(modal.id, { name, grupoId })
     } catch (err) {
       setProcesses(prev => prev.map(p => p.id === modal.id ? previous : p))
-      alert('Error al editar proceso: ' + err.message)
+      addToast('Error al editar proceso: ' + err.message, 'error')
     }
   }
 
@@ -966,7 +973,7 @@ export default function EmpresasExternasPage() {
         await api.deleteExtEmpresa(id)
         setCompanies(prev => prev.filter(c => c.id !== id))
       } catch (err) {
-        alert('Error al eliminar empresa: ' + err.message)
+        addToast('Error al eliminar empresa: ' + err.message, 'error')
       }
       return
     }
@@ -978,7 +985,7 @@ export default function EmpresasExternasPage() {
         setGrupos(prev => prev.filter(g => g.id !== id))
         setProcesses(prev => prev.map(p => p.grupoId === id ? { ...p, grupoId: null } : p))
       } catch (err) {
-        alert('Error al eliminar grupo: ' + err.message)
+        addToast('Error al eliminar grupo: ' + err.message, 'error')
       }
       return
     }
@@ -988,7 +995,7 @@ export default function EmpresasExternasPage() {
       await api.updateExtProceso(id, { activo: false })
       setProcesses(prev => prev.filter(p => p.id !== id))
     } catch (err) {
-      alert('Error al eliminar proceso: ' + err.message)
+      addToast('Error al eliminar proceso: ' + err.message, 'error')
     }
   }
 
@@ -1009,7 +1016,7 @@ export default function EmpresasExternasPage() {
       await api.updateExtProcesoGrupo(editing.id, { name: newName })
     } catch (err) {
       setGrupos(prev => prev.map(g => g.id === editing.id ? { ...g, name: editing.oldName } : g))
-      alert('Error al renombrar grupo: ' + err.message)
+      addToast('Error al renombrar grupo: ' + err.message, 'error')
     }
   }
 
@@ -1022,7 +1029,7 @@ export default function EmpresasExternasPage() {
       const created = await api.createExtProcesoGrupo({ name })
       setGrupos(prev => [...prev, created])
     } catch (err) {
-      alert('Error al crear grupo: ' + err.message)
+      addToast('Error al crear grupo: ' + err.message, 'error')
     }
   }
 
@@ -1054,7 +1061,7 @@ export default function EmpresasExternasPage() {
       })
       fetchGrid()
     } catch (err) {
-      alert('Error al editar empresa: ' + err.message)
+      addToast('Error al editar empresa: ' + err.message, 'error')
     }
   }
 
@@ -1083,7 +1090,7 @@ export default function EmpresasExternasPage() {
         api.updateExtProceso(b.id, { orden: a.orden }),
       ])
     } catch (err) {
-      alert('Error al reordenar: ' + err.message)
+      addToast('Error al reordenar: ' + err.message, 'error')
       fetchGrid()
     }
   }
@@ -1288,12 +1295,7 @@ export default function EmpresasExternasPage() {
 
   // ── loading / error states ────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center py-20 text-[#8890b5]">
-      <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
-        progress_activity
-      </span>
-      Cargando seguimiento mensual…
-    </div>
+    <Cargando texto="Cargando seguimiento mensual…" />
   )
 
   if (error) return (
@@ -1960,7 +1962,7 @@ export default function EmpresasExternasPage() {
 
       {/* ── Crear / editar proceso ───────────────────────────────────────── */}
       {procesoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={closeProcesoModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdropClose(closeProcesoModal)}>
           <div
             className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}
@@ -2009,7 +2011,7 @@ export default function EmpresasExternasPage() {
 
       {/* ── Editar empresa (crear una nueva vive en el directorio maestro, /empresas) ── */}
       {empresaModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={closeEmpresaModal}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdropClose(closeEmpresaModal)}>
           <div
             className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}
@@ -2090,7 +2092,7 @@ export default function EmpresasExternasPage() {
 
       {/* ── Delete confirmation ───────────────────────────────────────────── */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setDeleteConfirm(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdropClose(() => setDeleteConfirm(null))}>
           <div
             className="bg-white rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}

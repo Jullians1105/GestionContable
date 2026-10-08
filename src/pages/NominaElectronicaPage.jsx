@@ -4,6 +4,8 @@ import { ESTADOS_VISUAL, resolveEstadoVisual, ORIGEN_LABELS, ORIGEN_ACCENTS, MON
 import { api } from '../services/api'
 import { useSocket } from '../context/SocketContext'
 import { useAuth } from '../context/AuthContext'
+import Cargando from '../components/Cargando'
+import { useToast } from '../context/ToastContext'
 
 // ─── page-level constants ─────────────────────────────────────────────────────
 // Misma celda + dropdown flotante que usa Seguimiento Mensual (Empresas
@@ -56,6 +58,7 @@ const IDS_RESPONSABLES_PLAZO = [
 ]
 
 export default function NominaElectronicaPage() {
+  const { addToast } = useToast()
   const { isAdmin, user } = useAuth()
   const puedeGestionarCatalogo = isAdmin() || user?.permissions?.modulos?.nominaElectronica?.canGestionar === true
   const puedeEditarPlazo = IDS_RESPONSABLES_PLAZO.includes(user?.id)
@@ -146,7 +149,7 @@ export default function NominaElectronicaPage() {
       setPlazo(data)
       setEditandoPlazo(false)
     } catch (err) {
-      alert('Error al guardar el plazo: ' + err.message)
+      addToast('Error al guardar el plazo: ' + err.message, 'error')
     } finally {
       setSavingPlazo(false)
     }
@@ -195,9 +198,9 @@ export default function NominaElectronicaPage() {
       await api.updateNEMes(empresaId, anio, mes, body)
     } catch (err) {
       silentRefetch()
-      alert(err.status === 403 ? (err.message || 'Sin permiso (403)') : 'Error: ' + err.message)
+      addToast(err.status === 403 ? (err.message || 'Sin permiso (403)') : 'Error: ' + err.message, 'error')
     }
-  }, [anio, mes, silentRefetch])
+  }, [anio, mes, silentRefetch, addToast])
 
   // Guarda cualquier nota/novedad tecleada pero aún no confirmada por blur —
   // se llama SIEMPRE antes de cerrar el popup o de pisar `rows` con un
@@ -617,12 +620,7 @@ export default function NominaElectronicaPage() {
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-20 text-[#8890b5]">
-          <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
-            progress_activity
-          </span>
-          Cargando seguimiento…
-        </div>
+        <Cargando texto="Cargando seguimiento…" />
       ) : !error && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
           {ORIGEN_ORDER.map(key => (

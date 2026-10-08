@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { api } from '../services/api'
 import { getInitials, getAvatarColor, PRIORITY_LABELS } from '../utils/helpers'
+import Cargando from '../components/Cargando'
+import { useToast } from '../context/ToastContext'
 
 const MONTHS = [
   'Enero','Febrero','Marzo','Abril','Mayo','Junio',
@@ -147,6 +149,7 @@ function ResponsableBadges({ macroId }) {
 }
 
 export default function FondoEmprenderEmpresaDetallePage() {
+  const { addToast } = useToast()
   const { empresaId } = useParams()
   const [searchParams] = useSearchParams()
   const today = new Date()
@@ -210,7 +213,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
 
   const handleEditarMacro = useCallback(async (macroId, updates) => {
     if (macroId === 5) {
-      alert('mp5/Contabilidad no se puede editar directamente')
+      addToast('mp5/Contabilidad no se puede editar directamente', 'warning')
       return
     }
     try {
@@ -220,9 +223,9 @@ export default function FondoEmprenderEmpresaDetallePage() {
         setNotasDraft(prev => ({ ...prev, [macroId]: actualizado.nota ?? '' }))
       }
     } catch (err) {
-      alert(err.status === 403 ? err.message : 'Error: ' + err.message)
+      addToast(err.status === 403 ? err.message : 'Error: ' + err.message, 'error')
     }
-  }, [empresaId, anio, mes])
+  }, [empresaId, anio, mes, addToast])
 
   const handleUpdateImpuesto = useCallback(async (item, updates) => {
     const previous = impuestosItems
@@ -238,9 +241,9 @@ export default function FondoEmprenderEmpresaDetallePage() {
     } catch (err) {
       setImpuestosItems(previous)
       setMacros(prev => prev.map(m => m.id !== 6 ? m : { ...m, estado: deriveImpuestosEstado(previous) }))
-      alert(err.status === 403 ? err.message : 'Error: ' + err.message)
+      addToast(err.status === 403 ? err.message : 'Error: ' + err.message, 'error')
     }
-  }, [empresaId, anio, mes, impuestosItems])
+  }, [empresaId, anio, mes, impuestosItems, addToast])
 
   // Progress summary — mp5/Contabilidad ya viene con su estado derivado del
   // grupo CONTABILIDAD del checklist mensual (igual que mp2/mp3/mp4/mp6), no
@@ -254,12 +257,7 @@ export default function FondoEmprenderEmpresaDetallePage() {
 
   // ── Loading / error ───────────────────────────────────────────────────────
   if (loading) return (
-    <div className="flex items-center justify-center py-20 text-[#8890b5]">
-      <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
-        progress_activity
-      </span>
-      Cargando macroprocesos…
-    </div>
+    <Cargando texto="Cargando macroprocesos…" />
   )
 
   if (error) return (

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import StatsCard from '../components/StatsCard'
 import EmpresaCombobox from '../components/EmpresaCombobox'
 import { api } from '../services/api'
+import Cargando from '../components/Cargando'
 
 const VALID_EXTS  = ['.xlsx', '.xls']
 const VALID_MIMES = [
@@ -437,13 +438,7 @@ export default function ExogenasUploadPage() {
       </div>
 
       {estado === 'restaurando' && (
-        <div className="flex flex-col items-center justify-center gap-3 py-24">
-          <svg className="w-8 h-8 animate-spin text-[#E5A70C]" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-30" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-            <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-          </svg>
-          <p className="text-sm text-[#6b7280]">Recuperando tu último análisis…</p>
-        </div>
+        <Cargando texto="Recuperando tu último análisis…" className="py-24" />
       )}
 
       {(estado === 'idle' || estado === 'analizando' || estado === 'error') && (

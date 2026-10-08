@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, useCallback, Fragment } from 'react'
 import StatsCard from '../components/StatsCard'
 import { api } from '../services/api'
 import { useAuth } from '../context/AuthContext'
+import { backdropClose } from '../utils/backdropClose'
+import { useToast } from '../context/ToastContext'
 
 // ─── month utilities ──────────────────────────────────────────────────────────
 
@@ -460,6 +462,7 @@ function PagoCell({ empresa, anio, mes, mesesDebidos, historialCompleto, onActio
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export default function FondoEmprenderPagosPage() {
+  const { addToast } = useToast()
   const { user } = useAuth()
   const canAutorizar = user?.role === 'admin' || user?.permissions?.modulos?.fondoEmprender?.canAutorizarPagos === true
 
@@ -557,7 +560,7 @@ export default function FondoEmprenderPagosPage() {
       else await api.retrocederFondoPagosMesActual()
       await fetchAll()
     } catch (err) {
-      alert(err.status === 403 ? 'Sin permiso para modificar el mes habilitado (403)' : 'Error: ' + err.message)
+      addToast(err.status === 403 ? 'Sin permiso para modificar el mes habilitado (403)' : 'Error: ' + err.message, 'error')
     } finally {
       setAvanzandoMes(false)
     }
@@ -602,7 +605,7 @@ export default function FondoEmprenderPagosPage() {
           }))
         } catch (err) {
           refreshEmpresa(empresaId)
-          alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
+          addToast(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message, 'error')
         }
         break
       }
@@ -619,7 +622,7 @@ export default function FondoEmprenderPagosPage() {
           await api.updateFondoPago(empresaId, pagoId, { estado: 'aprobado' })
         } catch (err) {
           refreshEmpresa(empresaId)
-          alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
+          addToast(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message, 'error')
         }
         break
       }
@@ -641,7 +644,7 @@ export default function FondoEmprenderPagosPage() {
           await api.updateFondoPago(empresaId, pagoId, { estado: 'rechazado', nota })
         } catch (err) {
           refreshEmpresa(empresaId)
-          alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
+          addToast(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message, 'error')
         }
         break
       }
@@ -683,7 +686,7 @@ export default function FondoEmprenderPagosPage() {
           }))
         } catch (err) {
           refreshEmpresa(empresaId)
-          alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
+          addToast(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message, 'error')
         }
         break
       }
@@ -702,7 +705,7 @@ export default function FondoEmprenderPagosPage() {
           await api.updateFondoPago(empresaId, pagoId, { estado: 'pendiente' })
         } catch (err) {
           refreshEmpresa(empresaId)
-          alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
+          addToast(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message, 'error')
         }
         break
       }
@@ -721,7 +724,7 @@ export default function FondoEmprenderPagosPage() {
           if (!pagoId) refreshEmpresa(empresaId)
         } catch (err) {
           refreshEmpresa(empresaId)
-          alert(err.status === 403 ? 'Sin permiso para autorizar pagos (403)' : 'Error: ' + err.message)
+          addToast(err.status === 403 ? 'Sin permiso para autorizar pagos (403)' : 'Error: ' + err.message, 'error')
         }
         break
       }
@@ -742,12 +745,12 @@ export default function FondoEmprenderPagosPage() {
           await api.updateFondoPago(empresaId, pagoId, { estado: 'enviado' })
         } catch (err) {
           refreshEmpresa(empresaId)
-          alert(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message)
+          addToast(err.status === 403 ? 'Sin permiso para modificar pagos (403)' : 'Error: ' + err.message, 'error')
         }
         break
       }
     }
-  }, [refreshEmpresa, mesHabilitadoYM])
+  }, [refreshEmpresa, mesHabilitadoYM, addToast])
 
   // ── derived values ────────────────────────────────────────────────────────────
 
@@ -1160,7 +1163,7 @@ export default function FondoEmprenderPagosPage() {
 
       {/* ── Confirmación habilitar/deshacer mes ──────────────────────────── */}
       {confirmMes && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setConfirmMes(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" {...backdropClose(() => setConfirmMes(null))}>
           <div
             className="bg-white rounded-2xl shadow-2xl p-6 max-w-xs mx-4 border border-[#e2e4ef]"
             onClick={e => e.stopPropagation()}

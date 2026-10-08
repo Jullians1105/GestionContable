@@ -1,5 +1,5 @@
-import { useState, Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useEffect, Suspense, lazy } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { usePullToRefresh } from './hooks/usePullToRefresh'
 import { TaskProvider } from './context/TaskContext'
 import { TeamProvider } from './context/TeamContext'
@@ -10,6 +10,9 @@ import { TagProvider } from './context/TagContext'
 import { ToastProvider } from './context/ToastContext'
 import { SocketProvider } from './context/SocketContext'
 import Sidebar from './components/Sidebar'
+import Cargando from './components/Cargando'
+import NotFoundPage from './pages/NotFoundPage'
+import { tituloDePagina } from './utils/titulosPagina'
 import Header from './components/Header'
 import Toast from './components/Toast'
 import DashboardPage from './pages/DashboardPage'
@@ -52,6 +55,8 @@ function Layout() {
   const { isAuthenticated } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { pullY, releasing, ready } = usePullToRefresh()
+  const { pathname } = useLocation()
+  useEffect(() => { document.title = tituloDePagina(pathname) }, [pathname])
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
   return (
@@ -92,11 +97,7 @@ function Layout() {
             <Route
               path="/notas"
               element={
-                <Suspense fallback={
-                  <div className="flex items-center justify-center py-20 text-[#8890b5]">
-                    <span className="material-symbols-outlined animate-spin">progress_activity</span>
-                  </div>
-                }>
+                <Suspense fallback={<Cargando texto="Cargando notas…" />}>
                   <PersonalNotesPage />
                 </Suspense>
               }
@@ -129,6 +130,7 @@ function Layout() {
             <Route path="/dian/consulta-tercero"             element={<ConsultaTerceroPage />} />
             <Route path="/dian/deudas"                       element={<DeudasDianPage />} />
             <Route path="/tasks/recurrentes" element={<RecurringTasksPage />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </div>
       </main>

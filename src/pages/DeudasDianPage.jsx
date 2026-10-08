@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext'
 import { Link } from 'react-router-dom'
 import { Modal } from '../components/ClaveDianModal'
 import CopiarDatosDian, { useClavesDian } from '../components/CopiarDatosDian'
+import Cargando from '../components/Cargando'
 
 // Deudas vencidas DIAN: revisión mensual de cada empresa contra MUISCA (ver dianDeudasService.js).
 // El botón "Revisar" entra a la DIAN con la clave guardada de la empresa, lee las deudas vencidas
@@ -402,13 +403,7 @@ export default function DeudasDianPage() {
   const pctLote = progreso?.total ? progreso.hechas / progreso.total : 0
 
   if (cargando) return (
-    <div className="max-w-6xl mx-auto mt-20 text-center">
-      <svg className="animate-spin h-10 w-10 text-[#003B43] mx-auto" viewBox="0 0 24 24" fill="none">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-      </svg>
-      <p className="mt-4 text-[#6b7280]">Cargando deudas DIAN…</p>
-    </div>
+    <Cargando texto="Cargando deudas DIAN…" />
   )
 
   if (error) return (
