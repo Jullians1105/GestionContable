@@ -473,8 +473,43 @@ describe('habilitarModulo', () => {
     await habilitarModulo(req, res, mockNext);
 
     const insertCall = client.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO fondo_empresas'));
-    expect(insertCall[1]).toEqual(['mock-uuid', 'ACME', 'tributario', 'empresa-1']);
+    expect(insertCall[1]).toEqual(['mock-uuid', 'ACME', 'tributario', 'empresa-1', null, null]);
     expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  test('con mes y año de inicio los guarda en vigente_desde (migración 068)', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ id: 'empresa-1', name: 'ACME' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] });
+    const client = mockClient();
+    db.getClient.mockResolvedValue(client);
+
+    const req = baseReq({ params: { id: 'empresa-1' }, body: { modulo: 'ne', vigenteDesdeAnio: 2026, vigenteDesdeMes: 9 } });
+    const res = mockRes();
+    await habilitarModulo(req, res, mockNext);
+
+    const insertCall = client.query.mock.calls.find(([sql]) => sql.includes('INSERT INTO ne_empresas'));
+    expect(insertCall[0]).toContain('vigente_desde_anio, vigente_desde_mes');
+    expect(insertCall[1]).toEqual(['mock-uuid', 'ACME', 'empresa-1', 2026, 9]);
+    expect(res.status).toHaveBeenCalledWith(201);
+  });
+
+  test('mes sin año (o fuera de rango) se rechaza y no se crea nada', async () => {
+    for (const body of [{ vigenteDesdeMes: 9 }, { vigenteDesdeAnio: 2026, vigenteDesdeMes: 13 }]) {
+      jest.clearAllMocks();
+      db.query
+        .mockResolvedValueOnce({ rows: [{ id: 'empresa-1', name: 'ACME' }] })
+        .mockResolvedValueOnce({ rows: [] });
+      const client = mockClient();
+      db.getClient.mockResolvedValue(client);
+      const next = jest.fn();
+
+      await habilitarModulo(baseReq({ params: { id: 'empresa-1' }, body: { modulo: 'ext', ...body } }), mockRes(), next);
+
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 400 }));
+      expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+    }
   });
 });
 

@@ -12,32 +12,51 @@ const dianTokenService = require('../services/dianTokenService');
 const { calcularSituacionMatricula, fechaActualizacionFuente } = require('../services/terceros/ruesService');
 const empresasRues = require('../services/empresasRuesService');
 
+// "Vigente desde" al habilitar (migración 068): par año/mes opcional en el body. Ambos o ninguno;
+// ninguno = desde siempre. Contabilidad no lo usa (sus períodos solo existen si se cargaron).
+function leerVigenteDesde(extra) {
+  const anio = extra?.vigenteDesdeAnio ?? null;
+  const mes = extra?.vigenteDesdeMes ?? null;
+  if (anio === null && mes === null) return { anio: null, mes: null };
+  const a = Number(anio);
+  const m = Number(mes);
+  if (anio === null || mes === null || !Number.isInteger(a) || !Number.isInteger(m) || a < 2000 || a > 2100 || m < 1 || m > 12) {
+    const err = new Error('El mes y el año de inicio deben venir juntos y ser válidos');
+    err.status = 400;
+    throw err;
+  }
+  return { anio: a, mes: m };
+}
+
 // Un módulo = una tabla de habilitación. `insertar` arma el INSERT con lo mínimo de cada una.
 const MODULOS = {
   fondo: {
     tabla: 'fondo_empresas',
     insertar: async (client, { id, name, empresaId, extra }) => {
+      const desde = leerVigenteDesde(extra);
       await client.query(
-        `INSERT INTO fondo_empresas (id, name, categoria, empresa_id) VALUES ($1, $2, $3, $4)`,
-        [id, name, extra?.categoria ?? 'contable', empresaId]
+        `INSERT INTO fondo_empresas (id, name, categoria, empresa_id, vigente_desde_anio, vigente_desde_mes) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [id, name, extra?.categoria ?? 'contable', empresaId, desde.anio, desde.mes]
       );
     },
   },
   ext: {
     tabla: 'ext_empresas',
-    insertar: async (client, { id, name, empresaId }) => {
+    insertar: async (client, { id, name, empresaId, extra }) => {
+      const desde = leerVigenteDesde(extra);
       await client.query(
-        `INSERT INTO ext_empresas (id, name, empresa_id) VALUES ($1, $2, $3)`,
-        [id, name, empresaId]
+        `INSERT INTO ext_empresas (id, name, empresa_id, vigente_desde_anio, vigente_desde_mes) VALUES ($1, $2, $3, $4, $5)`,
+        [id, name, empresaId, desde.anio, desde.mes]
       );
     },
   },
   ne: {
     tabla: 'ne_empresas',
-    insertar: async (client, { id, name, empresaId }) => {
+    insertar: async (client, { id, name, empresaId, extra }) => {
+      const desde = leerVigenteDesde(extra);
       await client.query(
-        `INSERT INTO ne_empresas (id, name, empresa_id) VALUES ($1, $2, $3)`,
-        [id, name, empresaId]
+        `INSERT INTO ne_empresas (id, name, empresa_id, vigente_desde_anio, vigente_desde_mes) VALUES ($1, $2, $3, $4, $5)`,
+        [id, name, empresaId, desde.anio, desde.mes]
       );
     },
   },
