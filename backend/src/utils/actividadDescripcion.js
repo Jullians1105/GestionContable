@@ -15,7 +15,12 @@ const ACCION = { CREATE: 'Creó', UPDATE: 'Actualizó', DELETE: 'Eliminó', READ
 
 const mesAnio = (c) => (c.mes && c.anio ? ` (${MESES[c.mes - 1]} ${c.anio})` : '');
 const desdeMes = (anio, mes) => `${MESES[mes - 1]} ${anio}`;
-const nota = (c) => (c.nota ? ` — nota: «${c.nota}»` : '');
+const nota = (c) => (c.nota ? ` — nota: ${c.nota}` : '');
+// "2026-10-15" -> "15 de octubre de 2026"
+const fechaLarga = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  return m ? `${Number(m[3])} de ${MESES[Number(m[2]) - 1]} de ${m[1]}` : iso;
+};
 const dinero = (v) => `$${Number(v).toLocaleString('es-CO')}`;
 // "2026-09" -> "septiembre 2026"; "2026-C2" -> "cuatrimestre 2 de 2026"; "2026" -> "2026"
 const periodoTxt = (p) => {
@@ -41,17 +46,17 @@ function describirEvento(row, nombres = {}) {
 
   switch (row.table_name) {
     case 'dian_clave':
-      if (a === 'READ') return { area: 'Claves DIAN', texto: 'Abrió una pantalla con las claves DIAN a la vista (Directorio o Deudas DIAN)' };
+      if (a === 'READ') return { area: 'Claves DIAN', texto: 'Abrió una pantalla con claves DIAN' };
       if (a === 'DELETE') return { area: 'Claves DIAN', texto: 'Quitó la clave DIAN de una empresa' };
-      return { area: 'Claves DIAN', texto: 'Guardó o cambió la clave DIAN de una empresa' };
+      return { area: 'Claves DIAN', texto: 'Cambió la clave DIAN de una empresa' };
     case 'dian_token':
-      return { area: 'Claves DIAN', texto: c.success === false ? 'Intentó generar un token DIAN (no se pudo)' : 'Generó un token DIAN' };
+      return { area: 'Claves DIAN', texto: c.success === false ? 'Intentó generar un token DIAN (falló)' : 'Generó un token DIAN' };
     case 'dian_deudas_revision':
-      return { area: 'Deudas DIAN', texto: a === 'CREATE' ? 'Revisó las deudas DIAN de una empresa' : 'Envió un correo de deudas DIAN' };
+      return { area: 'Deudas DIAN', texto: a === 'CREATE' ? 'Revisó las deudas DIAN de una empresa' : 'Envió el correo de deudas DIAN' };
     case 'dian_deudas_lote':
       return { area: 'Deudas DIAN', texto: 'Revisó las deudas DIAN de todas las empresas' };
     case 'dian_deudas_detalle':
-      return { area: 'Deudas DIAN', texto: 'Actualizó el estado de una deuda DIAN' };
+      return { area: 'Deudas DIAN', texto: 'Cambió el estado de una deuda DIAN' };
 
     case 'empresas':
       if (a === 'CREATE') return { area: 'Directorio', texto: `Creó la empresa ${c.name ?? ''}`.trim() };
@@ -69,52 +74,51 @@ function describirEvento(row, nombres = {}) {
       const nombre = n(mapa, row.record_id);
       if (a === 'CREATE') return { area, texto: `Habilitó ${nombre ?? 'una empresa'} en ${area}` };
       if (a === 'DELETE') return { area, texto: `Quitó una empresa de ${area}` };
-      if (c.vigenteDesdeAnio) return { area, texto: `Fijó el inicio de ${nombre ?? 'una empresa'} en ${area}: ${desdeMes(c.vigenteDesdeAnio, c.vigenteDesdeMes)}` };
-      if (c.vigenteHastaAnio) return { area, texto: `Fijó el fin de ${nombre ?? 'una empresa'} en ${area}: ${desdeMes(c.vigenteHastaAnio, c.vigenteHastaMes)}` };
+      if (c.vigenteDesdeAnio) return { area, texto: `Empezó ${nombre ?? 'una empresa'} en ${area} desde ${desdeMes(c.vigenteDesdeAnio, c.vigenteDesdeMes)}` };
+      if (c.vigenteHastaAnio) return { area, texto: `Terminó ${nombre ?? 'una empresa'} en ${area} en ${desdeMes(c.vigenteHastaAnio, c.vigenteHastaMes)}` };
       return { area, texto: `Editó ${nombre ?? 'una empresa'} en ${area}` };
     }
 
     case 'fondo_checklist_items':
-      return { area: 'Fondo Emprender', texto: `${emp('fondoEmp', c.empresaId)}: ${n('fondoProc', c.procesoId) ?? 'un proceso'} → ${ESTADO_ITEM[c.estado] ?? c.estado}${mesAnio(c)}${nota(c)}` };
+      return { area: 'Fondo Emprender', texto: `Marcó «${n('fondoProc', c.procesoId) ?? 'un proceso'}» de ${emp('fondoEmp', c.empresaId)} como ${ESTADO_ITEM[c.estado] ?? c.estado}${mesAnio(c)}${nota(c)}` };
     case 'ext_checklist_items':
-      return { area: 'Empresas Externas', texto: `${emp('extEmp', c.empresaId)}: ${n('extProc', c.procesoId) ?? 'un proceso'} → ${ESTADO_ITEM[c.estado] ?? c.estado}${mesAnio(c)}${nota(c)}` };
+      return { area: 'Empresas Externas', texto: `Marcó «${n('extProc', c.procesoId) ?? 'un proceso'}» de ${emp('extEmp', c.empresaId)} como ${ESTADO_ITEM[c.estado] ?? c.estado}${mesAnio(c)}${nota(c)}` };
     case 'ext_checklist_meses':
       return {
         area: 'Empresas Externas',
-        texto: `${emp('extEmp', c.empresaId)}: registró ${c.resultadoTipo === 'perdida' ? 'una pérdida' : 'una utilidad'}${c.resultadoValor != null ? ` de ${dinero(c.resultadoValor)}` : ''}${mesAnio(c)}`,
+        texto: `Registró ${c.resultadoTipo === 'perdida' ? 'una pérdida' : 'una utilidad'}${c.resultadoValor != null ? ` de ${dinero(c.resultadoValor)}` : ''} en ${emp('extEmp', c.empresaId)}${mesAnio(c)}`,
       };
     case 'fondo_checklist_meses': {
       const que = c.tipo === 'nomina' ? 'nómina' : (c.tipo ?? '');
+      const empresa = emp('fondoEmp', c.empresaId);
       if (c.enviado !== undefined) {
-        return { area: 'Fondo Emprender', texto: `${emp('fondoEmp', c.empresaId)}: ${c.enviado ? 'marcó como enviada' : 'quitó la marca de enviada'} la información de ${que}${mesAnio(c)}` };
+        return { area: 'Fondo Emprender', texto: `${c.enviado ? 'Marcó como enviada' : 'Quitó la marca de enviada de'} la ${que} de ${empresa}${mesAnio(c)}` };
       }
-      return { area: 'Fondo Emprender', texto: `${emp('fondoEmp', c.empresaId)}: ${c.confirmed ? 'confirmó' : 'quitó la confirmación de'} ${que}${mesAnio(c)}` };
+      return { area: 'Fondo Emprender', texto: `${c.confirmed ? 'Confirmó' : 'Quitó la confirmación de'} la ${que} de ${empresa}${mesAnio(c)}` };
     }
     case 'fondo_detalle_macroprocesos':
-      return { area: 'Fondo Emprender', texto: `${emp('fondoEmp', c.empresaId)}: macroproceso ${MP_NAMES[c.macroId] ?? c.macroId} → ${ESTADO_ITEM[c.estado] ?? c.estado}` };
+      return { area: 'Fondo Emprender', texto: `Marcó «${MP_NAMES[c.macroId] ?? c.macroId}» de ${emp('fondoEmp', c.empresaId)} como ${ESTADO_ITEM[c.estado] ?? c.estado}` };
     case 'fondo_impuestos_items':
-      return { area: 'Fondo Emprender', texto: `${emp('fondoEmp', c.empresaId)}: ${n('impuestos', c.impuestoId) ?? 'un impuesto'} → ${ESTADO_ITEM[c.estado] ?? c.estado}${mesAnio(c)}` };
+      return { area: 'Fondo Emprender', texto: `Marcó «${n('impuestos', c.impuestoId) ?? 'un impuesto'}» de ${emp('fondoEmp', c.empresaId)} como ${ESTADO_ITEM[c.estado] ?? c.estado}${mesAnio(c)}` };
 
     case 'fondo_pagos':
-      if (c.monto !== undefined) return { area: 'Pagos', texto: `${emp('fondoEmp', c.empresaId)}: creó el pago${mesAnio(c)} por ${dinero(c.monto)}` };
-      if (c.autorizado !== undefined) return { area: 'Pagos', texto: `${emp('fondoEmp', c.empresaId)}: ${c.autorizado ? 'autorizó' : 'quitó la autorización de'} el pago${mesAnio(c)}` };
-      return { area: 'Pagos', texto: `${emp('fondoEmp', c.empresaId)}: pago → ${ESTADO_PAGO[c.estado] ?? c.estado}${nota(c)}` };
+      if (c.monto !== undefined) return { area: 'Pagos', texto: `Creó el pago de ${emp('fondoEmp', c.empresaId)} por ${dinero(c.monto)}${mesAnio(c)}` };
+      if (c.autorizado !== undefined) return { area: 'Pagos', texto: `${c.autorizado ? 'Autorizó' : 'Quitó la autorización de'} el pago de ${emp('fondoEmp', c.empresaId)}${mesAnio(c)}` };
+      return { area: 'Pagos', texto: `Marcó el pago de ${emp('fondoEmp', c.empresaId)} como ${ESTADO_PAGO[c.estado] ?? c.estado}${nota(c)}` };
     case 'fondo_pagos_mes_actual':
-      return { area: 'Pagos', texto: `${c.accion === 'retroceder' ? 'Retrocedió' : 'Habilitó'} el mes de pagos: ${desdeMes(c.nuevoAnio, c.nuevoMes)}` };
+      return { area: 'Pagos', texto: c.accion === 'retroceder' ? `Retrocedió el mes de pagos a ${desdeMes(c.nuevoAnio, c.nuevoMes)}` : `Habilitó ${desdeMes(c.nuevoAnio, c.nuevoMes)} para pagos` };
 
     case 'ne_meses': {
-      let est = 'sin marcar';
-      if (c.estado === 'presentada') est = 'Presentada';
-      else if (c.estado === 'no_aplica') est = 'En espera';
-      else if (c.autorizada) est = 'Autorizada';
-      return {
-        area: 'Nómina Electrónica',
-        texto: `${emp('neEmp', c.empresaId)}: nómina electrónica → ${est}${mesAnio(c)}${nota(c)}${c.novedadNota ? ` — novedad: «${c.novedadNota}»` : ''}`,
-      };
+      const empresa = emp('neEmp', c.empresaId);
+      let accion = `Dejó sin marcar la nómina electrónica de ${empresa}`;
+      if (c.estado === 'presentada') accion = `Marcó la nómina electrónica de ${empresa} como Presentada`;
+      else if (c.estado === 'no_aplica') accion = `Dejó en espera la nómina electrónica de ${empresa}`;
+      else if (c.autorizada) accion = `Autorizó la nómina electrónica de ${empresa}`;
+      return { area: 'Nómina Electrónica', texto: `${accion}${mesAnio(c)}${nota(c)}${c.novedadNota ? ` — novedad: ${c.novedadNota}` : ''}` };
     }
     case 'ne_plazo_mes':
     case 'ne_plazo':
-      return { area: 'Nómina Electrónica', texto: `Fijó la fecha límite de nómina electrónica${c.fechaLimite ? `: ${c.fechaLimite}` : ''}` };
+      return { area: 'Nómina Electrónica', texto: `Fijó la fecha límite de nómina electrónica${c.fechaLimite ? `: ${fechaLarga(c.fechaLimite)}` : ''}` };
 
     case 'fondo_procesos':
     case 'ext_procesos':
@@ -155,7 +159,7 @@ function describirEvento(row, nombres = {}) {
       const titulo = c.title ?? n('tasks', row.record_id);
       const t = titulo ? ` «${titulo}»` : '';
       if (a === 'CREATE') return { area: 'Tareas', texto: `Creó la tarea${t}` };
-      if (a === 'DELETE') return { area: 'Tareas', texto: `Eliminó una tarea${t}` };
+      if (a === 'DELETE') return { area: 'Tareas', texto: titulo ? `Eliminó la tarea${t}` : 'Eliminó una tarea' };
       if (c.status && c.status.to) return { area: 'Tareas', texto: `Pasó la tarea${t} a ${ESTADO_TAREA[c.status.to] ?? c.status.to}` };
       return { area: 'Tareas', texto: `Editó la tarea${t}` };
     }
