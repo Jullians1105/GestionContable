@@ -37,7 +37,7 @@ describe('describirEvento', () => {
 
   test('claves DIAN: nunca muestra contenido, solo la acción y la cantidad', () => {
     const r = describirEvento({ action: 'READ', table_name: 'dian_clave', changes: { cantidad: 12, clave: 'secreta' } });
-    expect(r.texto).toBe('Consultó claves DIAN (12 empresas)');
+    expect(r.texto).toBe('Abrió una pantalla con las claves DIAN a la vista (Directorio o Deudas DIAN) — se cargaron 12 claves');
     expect(r.texto).not.toContain('secreta');
   });
 

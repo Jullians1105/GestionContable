@@ -2,7 +2,7 @@
 // Solo lectura. El acceso lo decide requireActividad (admin siempre; otros con
 // permissions.modulos.actividad.canVer). Ver utils/actividadDescripcion.js para el texto de cada acción.
 const db = require('../config/database');
-const { describirEvento } = require('../utils/actividadDescripcion');
+const { describirEvento, clasificarEvento } = require('../utils/actividadDescripcion');
 
 const TZ = 'America/Bogota';
 const MAX_EVENTOS = 5000; // tope de seguridad por día
@@ -12,6 +12,37 @@ const FECHA_RE = /^\d{4}-\d{2}-\d{2}$/;
 // Fecha de hoy en Bogotá (YYYY-MM-DD) — el día del equipo, no el del servidor.
 function hoyBogota() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date());
+}
+
+// Resumen de lo que hizo una persona, para leerlo de un vistazo: por proceso (o tipo de acción), en cuántas
+// empresas quedó cada estado (el ÚLTIMO del día por casilla: si alguien la cambió varias veces, cuenta
+// cómo quedó) y cuántos cambios hizo. `eventos` viene del más reciente al más antiguo.
+function armarResumen(eventos) {
+  const filas = new Map();
+  const casillasVistas = new Set();
+  const empresas = new Set();
+  const totales = { hecho: 0, proceso: 0, noaplica: 0, pendiente: 0 };
+
+  for (const e of eventos) {
+    const k = `${e.area}||${e.clasificacion.item}`;
+    if (!filas.has(k)) {
+      filas.set(k, { area: e.area, item: e.clasificacion.item, hecho: 0, proceso: 0, noaplica: 0, pendiente: 0, empresas: new Set(), cambios: 0 });
+    }
+    const fila = filas.get(k);
+    fila.cambios += 1;
+    const { estadoClave, empresa, clave } = e.clasificacion;
+    if (empresa) { fila.empresas.add(empresa); empresas.add(empresa); }
+    if (estadoClave && clave && !casillasVistas.has(clave)) {
+      casillasVistas.add(clave);
+      fila[estadoClave] += 1;
+      totales[estadoClave] += 1;
+    }
+  }
+
+  const items = Array.from(filas.values())
+    .map((f) => ({ area: f.area, item: f.item, hecho: f.hecho, proceso: f.proceso, noaplica: f.noaplica, pendiente: f.pendiente, empresas: f.empresas.size, cambios: f.cambios }))
+    .sort((a, b) => a.area.localeCompare(b.area, 'es') || b.cambios - a.cambios);
+  return { cambios: eventos.length, empresas: empresas.size, ...totales, items };
 }
 
 const hora = (d) => new Intl.DateTimeFormat('es-CO', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(d));
@@ -100,10 +131,14 @@ const getActividad = async (req, res, next) => {
       const { area, texto } = describirEvento(r, nombres);
       grupo.total += 1;
       grupo.areas[area] = (grupo.areas[area] || 0) + 1;
-      grupo.eventos.push({ id: r.id, hora: hora(r.created_at), area, texto });
+      grupo.eventos.push({ id: r.id, hora: hora(r.created_at), area, texto, clasificacion: clasificarEvento(r, nombres) });
     }
 
     const usuarios = Array.from(porUsuario.values()).sort((a, b) => b.total - a.total);
+    for (const u of usuarios) {
+      u.resumen = armarResumen(u.eventos.map((e) => ({ area: e.area, clasificacion: e.clasificacion })));
+      u.eventos = u.eventos.map(({ clasificacion, ...resto }) => resto); // la clasificación solo sirve para el resumen
+    }
     res.json({ fecha, total: rows.length, truncado: rows.length >= MAX_EVENTOS, usuarios });
   } catch (err) {
     next(err);

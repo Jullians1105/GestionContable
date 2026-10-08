@@ -33,7 +33,7 @@ function describirEvento(row, nombres = {}) {
 
   switch (row.table_name) {
     case 'dian_clave':
-      if (a === 'READ') return { area: 'Claves DIAN', texto: `Consultó claves DIAN${c.cantidad ? ` (${c.cantidad} empresas)` : ''}` };
+      if (a === 'READ') return { area: 'Claves DIAN', texto: `Abrió una pantalla con las claves DIAN a la vista (Directorio o Deudas DIAN)${c.cantidad ? ` — se cargaron ${c.cantidad} claves` : ''}` };
       if (a === 'DELETE') return { area: 'Claves DIAN', texto: 'Quitó la clave DIAN de una empresa' };
       return { area: 'Claves DIAN', texto: 'Guardó o cambió la clave DIAN de una empresa' };
     case 'dian_token':
@@ -135,4 +135,72 @@ function describirEvento(row, nombres = {}) {
   }
 }
 
-module.exports = { describirEvento };
+// ── Clasificación para el resumen ────────────────────────────────────────────────
+// Además de la frase, cada registro se clasifica para poder contar: qué se hizo (`item`, un proceso o
+// un tipo de acción), en qué estado quedó (`estadoClave`: hecho | proceso | noaplica | pendiente, o null
+// si la acción no es de estado) y sobre qué empresa. `clave` identifica la misma casilla (empresa +
+// proceso + mes) para quedarse con el último estado del día cuando alguien la cambia varias veces.
+const ESTADO_CLAVE = { done: 'hecho', in_progress: 'proceso', na: 'noaplica', pending: 'pendiente' };
+
+function clasificarEvento(row, nombres = {}) {
+  const c = row.changes || {};
+  const a = row.action;
+  const n = (mapa, id) => (nombres[mapa] && nombres[mapa][id]) || null;
+  const casilla = (empresaId, que) => `${empresaId ?? ''}|${que ?? ''}|${c.anio ?? ''}-${c.mes ?? ''}`;
+  const accion = (item) => ({ item, estadoClave: null, empresa: null, clave: null });
+
+  switch (row.table_name) {
+    case 'fondo_checklist_items':
+      return { item: n('fondoProc', c.procesoId) ?? 'Proceso sin nombre', estadoClave: ESTADO_CLAVE[c.estado] ?? null, empresa: n('fondoEmp', c.empresaId), clave: casilla(c.empresaId, c.procesoId) };
+    case 'ext_checklist_items':
+      return { item: n('extProc', c.procesoId) ?? 'Proceso sin nombre', estadoClave: ESTADO_CLAVE[c.estado] ?? null, empresa: n('extEmp', c.empresaId), clave: casilla(c.empresaId, c.procesoId) };
+    case 'fondo_impuestos_items':
+      return { item: n('impuestos', c.impuestoId) ?? 'Impuesto', estadoClave: ESTADO_CLAVE[c.estado] ?? null, empresa: n('fondoEmp', c.empresaId), clave: casilla(c.empresaId, `imp-${c.impuestoId}`) };
+    case 'fondo_detalle_macroprocesos':
+      return { item: `Macroproceso: ${MP_NAMES[c.macroId] ?? c.macroId}`, estadoClave: ESTADO_CLAVE[c.estado] ?? null, empresa: n('fondoEmp', c.empresaId), clave: `${c.empresaId}|macro-${c.macroId}` };
+    case 'ne_meses': {
+      let estadoClave = 'pendiente';
+      if (c.estado === 'presentada') estadoClave = 'hecho';
+      else if (c.estado === 'no_aplica') estadoClave = 'noaplica';
+      else if (c.autorizada) estadoClave = 'proceso';
+      return { item: 'Nómina electrónica', estadoClave, empresa: n('neEmp', c.empresaId), clave: casilla(c.empresaId, 'ne') };
+    }
+    case 'fondo_checklist_meses': {
+      const que = c.tipo === 'nomina' ? 'nómina' : (c.tipo ?? '');
+      if (c.enviado !== undefined) return { item: `Envío de ${que}`, estadoClave: c.enviado ? 'hecho' : 'pendiente', empresa: n('fondoEmp', c.empresaId), clave: casilla(c.empresaId, `envio-${c.tipo}`) };
+      return { item: `Confirmación de ${que}`, estadoClave: c.confirmed ? 'hecho' : 'pendiente', empresa: n('fondoEmp', c.empresaId), clave: casilla(c.empresaId, `conf-${c.tipo}`) };
+    }
+    case 'ext_checklist_meses':
+      return { item: 'Utilidad o pérdida del mes', estadoClave: 'hecho', empresa: n('extEmp', c.empresaId), clave: casilla(c.empresaId, 'resultado') };
+    case 'fondo_pagos': {
+      let estadoClave = 'pendiente';
+      if (c.estado === 'enviado' || c.estado === 'pagado') estadoClave = 'hecho';
+      else if (c.monto !== undefined || c.autorizado === true) estadoClave = 'proceso';
+      return { item: 'Pago a la fiduciaria', estadoClave, empresa: n('fondoEmp', c.empresaId), clave: casilla(c.empresaId, 'pago') };
+    }
+
+    case 'dian_clave': return accion(a === 'READ' ? 'Abrir pantallas con claves DIAN a la vista' : 'Guardar o quitar clave DIAN');
+    case 'dian_token': return accion('Generar token DIAN');
+    case 'dian_deudas_revision':
+    case 'dian_deudas_lote':
+    case 'dian_deudas_detalle': return accion('Revisar deudas DIAN');
+    case 'empresas': return accion(a === 'CREATE' ? 'Crear empresa en el directorio' : 'Editar empresa del directorio');
+    case 'fondo_empresas':
+    case 'ext_empresas':
+    case 'ne_empresas': return accion('Habilitar o editar empresa en un módulo');
+    case 'fondo_procesos':
+    case 'ext_procesos':
+    case 'fondo_proceso_grupos':
+    case 'ext_proceso_grupos': return accion('Editar procesos y grupos');
+    case 'fondo_pagos_mes_actual': return accion('Habilitar el mes de pagos');
+    case 'ne_plazo_mes':
+    case 'ne_plazo': return accion('Fijar la fecha límite de nómina electrónica');
+    case 'tasks':
+      if (a === 'CREATE') return accion('Crear tarea');
+      if (a === 'DELETE') return accion('Eliminar tarea');
+      return accion(c.status && c.status.to ? 'Cambiar el estado de una tarea' : 'Editar tarea');
+    default: return accion(`Otras acciones (${row.table_name})`);
+  }
+}
+
+module.exports = { describirEvento, clasificarEvento };
