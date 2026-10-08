@@ -4,6 +4,7 @@ const { limpiarIdentificacion } = require('../services/exogenas/utils/dian');
 const { consultarRues, clasificarEstado, fechaActualizacionFuente } = require('../services/terceros/ruesService');
 const { nombresSeParecen } = require('../utils/nombresSeParecen');
 const logger = require('../utils/logger');
+const auditLog = require('../utils/auditLog');
 
 const TIPOS_OPERACION = ['compras', 'ventas'];
 
@@ -273,6 +274,11 @@ const uploadTerceros = async (req, res, next) => {
     // la lista genérica de errores por archivo (pedido explícito del usuario, 2026-09-28).
     const erroresFormato = errores.filter((e) => e.formatoNoReconocido).length;
 
+    await auditLog(req.user.userId, 'CREATE', 'terceros_importacion', 'lote', {
+      archivos: archivos.length, procesados: terceros.length, nuevos: terceros.filter((t) => t.esNuevo).length,
+      actualizados: actualizados.length, errores: errores.length,
+    });
+
     res.status(200).json({
       totalArchivos: archivos.length,
       procesados: terceros.length,
@@ -359,6 +365,7 @@ const verificarRuesLote = async (req, res, next) => {
       [forzar, DIAS_REVERIFICACION, MAX_LOTE_VERIFICACION]
     );
     const conteo = await verificarYGuardar(rows.map((r) => r.nit));
+    await auditLog(req.user.userId, 'UPDATE', 'terceros_rues', 'lote', { pendientes: rows.length, forzar });
     res.status(200).json({ pendientes: rows.length, ...conteo });
   } catch (err) {
     next(err);

@@ -49,7 +49,7 @@ const hora = (d) => new Intl.DateTimeFormat('es-CO', { timeZone: TZ, hour: '2-di
 
 // Traduce los ids que aparecen en los registros del día a nombres (una consulta por tipo).
 async function cargarNombres(rows) {
-  const ids = { fondoEmp: new Set(), extEmp: new Set(), neEmp: new Set(), fondoProc: new Set(), extProc: new Set(), impuestos: new Set(), tasks: new Set() };
+  const ids = { fondoEmp: new Set(), extEmp: new Set(), neEmp: new Set(), contabEmp: new Set(), fondoProc: new Set(), extProc: new Set(), impuestos: new Set(), tasks: new Set() };
   const add = (set, id) => { if (typeof id === 'string' && UUID_RE.test(id)) set.add(id); };
 
   for (const r of rows) {
@@ -69,6 +69,10 @@ async function cargarNombres(rows) {
       case 'fondo_procesos': add(ids.fondoProc, r.record_id); break;
       case 'ext_procesos': add(ids.extProc, r.record_id); break;
       case 'tasks': add(ids.tasks, r.record_id); break;
+      case 'contab_reporte':
+      case 'contab_exportacion':
+      case 'contab_consolidado_exportacion': add(ids.contabEmp, c.empresaId); break;
+      case 'exogenas_archivo': add(ids.contabEmp, c.contabEmpresaId); break;
       default: break;
     }
   }
@@ -77,6 +81,7 @@ async function cargarNombres(rows) {
     ['fondoEmp', 'SELECT id, name FROM fondo_empresas WHERE id = ANY($1::uuid[])'],
     ['extEmp', 'SELECT id, name FROM ext_empresas WHERE id = ANY($1::uuid[])'],
     ['neEmp', 'SELECT id, name FROM ne_empresas WHERE id = ANY($1::uuid[])'],
+    ['contabEmp', 'SELECT id, name FROM contab_empresas WHERE id = ANY($1::uuid[])'],
     ['fondoProc', 'SELECT id, name FROM fondo_procesos WHERE id = ANY($1::uuid[])'],
     ['extProc', 'SELECT id, name FROM ext_procesos WHERE id = ANY($1::uuid[])'],
     ['impuestos', 'SELECT id, nombre AS name FROM fondo_impuestos WHERE id = ANY($1::uuid[])'],

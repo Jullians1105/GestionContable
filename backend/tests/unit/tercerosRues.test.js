@@ -1,4 +1,5 @@
 jest.mock('../../src/config/database');
+jest.mock('../../src/utils/auditLog', () => jest.fn().mockResolvedValue());
 // Nunca pegarle al RUES real desde los tests: se conserva la lógica pura y solo se simula la red.
 jest.mock('../../src/services/terceros/ruesService', () => ({
   ...jest.requireActual('../../src/services/terceros/ruesService'),
@@ -6,6 +7,7 @@ jest.mock('../../src/services/terceros/ruesService', () => ({
 }));
 
 const db = require('../../src/config/database');
+const auditLog = require('../../src/utils/auditLog');
 const { consultarRues } = require('../../src/services/terceros/ruesService');
 const {
   verificarRuesLote, calcularAlertas, origenDe,
@@ -99,9 +101,10 @@ describe('verificarRuesLote', () => {
       ['333333333', { consulta: 'error' }],
     ]));
     const res = mockRes();
-    await verificarRuesLote({ body: {} }, res, jest.fn());
+    await verificarRuesLote({ body: {}, user: { userId: 'u1' } }, res, jest.fn());
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ pendientes: 3, verificados: 1, noEncontrados: 1, errores: 1, omitidos: 0 });
+    expect(auditLog).toHaveBeenCalledWith('u1', 'UPDATE', 'terceros_rues', 'lote', { pendientes: 3, forzar: false });
     expect(db.query).toHaveBeenCalledTimes(3); // 1 SELECT + 2 UPDATE (el error no escribe)
   });
 

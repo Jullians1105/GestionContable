@@ -2,6 +2,7 @@ const db = require('../config/database');
 const { getEstrategia, llenarPlantillaCombinada } = require('../services/exogenas');
 const formato1001 = require('../services/exogenas/formato1001');
 const formato1007 = require('../services/exogenas/formato1007');
+const auditLog = require('../utils/auditLog');
 
 // 1001 y 1007 generan Excel con lo confirmado. El 1001 llena CPT/PAGO desde `contab_documentos`
 // cuando hay empresa/año seleccionados y datos clasificados ahí; si no, quedan en blanco, igual
@@ -109,6 +110,10 @@ const uploadExogenas = async (req, res, next) => {
       ]
     );
 
+    await auditLog(req.user.userId, 'CREATE', 'exogenas_archivo', rows[0].id, {
+      formato, contabEmpresaId: opciones.contabEmpresaId ?? null, anio: opciones.anio ?? null, totalTerceros: registros.length,
+    });
+
     res.status(201).json({
       id: rows[0].id,
       formato,
@@ -178,6 +183,7 @@ const generarExogenas = async (req, res, next) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(Buffer.from(buffer));
+    await auditLog(req.user.userId, 'CREATE', 'exogenas_generado', id, { formatos: [formato] });
 
     await db.query('DELETE FROM exogenas_borradores WHERE id = $1 AND creado_por = $2', [id, req.user.userId]);
   } catch (err) {
@@ -226,6 +232,7 @@ const generarExogenasCombinado = async (req, res, next) => {
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(Buffer.from(buffer));
+    await auditLog(req.user.userId, 'CREATE', 'exogenas_generado', 'combinado', { formatos: Object.keys(registrosPorFormato).sort() });
 
     await db.query('DELETE FROM exogenas_borradores WHERE id = ANY($1) AND creado_por = $2', [ids, req.user.userId]);
   } catch (err) {

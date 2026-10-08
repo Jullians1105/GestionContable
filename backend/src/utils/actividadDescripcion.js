@@ -17,6 +17,14 @@ const mesAnio = (c) => (c.mes && c.anio ? ` (${MESES[c.mes - 1]} ${c.anio})` : '
 const desdeMes = (anio, mes) => `${MESES[mes - 1]} ${anio}`;
 const nota = (c) => (c.nota ? ` — nota: «${c.nota}»` : '');
 const dinero = (v) => `$${Number(v).toLocaleString('es-CO')}`;
+// "2026-09" -> "septiembre 2026"; "2026-C2" -> "cuatrimestre 2 de 2026"; "2026" -> "2026"
+const periodoTxt = (p) => {
+  const mes = /^(\d{4})-(\d{2})$/.exec(p);
+  if (mes) return `${MESES[Number(mes[2]) - 1]} ${mes[1]}`;
+  const cuatri = /^(\d{4})-C(\d)$/.exec(p);
+  if (cuatri) return `cuatrimestre ${cuatri[2]} de ${cuatri[1]}`;
+  return p;
+};
 
 const EMPRESAS_MODULO = {
   fondo_empresas: ['fondoEmp', 'Fondo Emprender'],
@@ -121,6 +129,27 @@ function describirEvento(row, nombres = {}) {
       return { area, texto: `Editó ${que}${nombre ? ` «${nombre}»` : ''}` };
     }
 
+    case 'contab_reporte':
+      return { area: 'Contabilidad', texto: `Subió el reporte DIAN de ${c.empresaId ? emp('contabEmp', c.empresaId) : 'una empresa sin asignar'}${c.totalFilas ? ` (${c.totalFilas} filas)` : ''}` };
+    case 'contab_exportacion':
+      return { area: 'Contabilidad', texto: `Exportó el Excel de contabilidad de ${c.empresaId ? emp('contabEmp', c.empresaId) : 'una empresa sin asignar'}${c.periodo ? ` (${periodoTxt(c.periodo)})` : ''}` };
+    case 'exogenas_archivo':
+      return {
+        area: 'Exógenas',
+        texto: `Analizó la exógena ${c.formato ?? ''}${c.contabEmpresaId ? ` de ${emp('contabEmp', c.contabEmpresaId)}` : ''}${c.anio ? ` (${c.anio})` : ''}${c.totalTerceros ? ` — ${c.totalTerceros} terceros` : ''}`.replace(/\s+/g, ' ').trim(),
+      };
+    case 'exogenas_generado':
+      return { area: 'Exógenas', texto: `Generó el Excel de exógenas (${(c.formatos || []).join(', ') || 'sin formato'})` };
+    case 'terceros_importacion':
+      return {
+        area: 'Terceros',
+        texto: `Importó terceros: ${c.archivos ?? 0} ${c.archivos === 1 ? 'archivo' : 'archivos'}, ${c.nuevos ?? 0} nuevos, ${c.actualizados ?? 0} actualizados${c.errores ? `, ${c.errores} con error` : ''}`,
+      };
+    case 'terceros_rues':
+      return { area: 'Terceros', texto: `Verificó terceros en el RUES${c.pendientes != null ? ` (${c.pendientes} pendientes)` : ''}${c.forzar ? ' — forzando a todos' : ''}` };
+    case 'contab_consolidado_exportacion':
+      return { area: 'Consolidado', texto: `Exportó el consolidado de ${c.empresaId ? emp('contabEmp', c.empresaId) : 'una empresa'}${c.periodo ? ` (${periodoTxt(c.periodo)})` : ''}` };
+
     case 'tasks': {
       const titulo = c.title ?? n('tasks', row.record_id);
       const t = titulo ? ` «${titulo}»` : '';
@@ -179,6 +208,13 @@ function clasificarEvento(row, nombres = {}) {
       return { item: 'Pago a la fiduciaria', estadoClave, empresa: n('fondoEmp', c.empresaId), clave: casilla(c.empresaId, 'pago') };
     }
 
+    case 'contab_reporte': return { ...accion('Subir reporte DIAN'), empresa: n('contabEmp', c.empresaId) };
+    case 'contab_exportacion': return { ...accion('Exportar Excel de contabilidad'), empresa: n('contabEmp', c.empresaId) };
+    case 'exogenas_archivo': return { ...accion('Analizar exógenas'), empresa: n('contabEmp', c.contabEmpresaId) };
+    case 'exogenas_generado': return accion('Generar Excel de exógenas');
+    case 'terceros_importacion': return accion('Importar terceros');
+    case 'terceros_rues': return accion('Verificar terceros en el RUES');
+    case 'contab_consolidado_exportacion': return { ...accion('Exportar consolidado'), empresa: n('contabEmp', c.empresaId) };
     case 'dian_clave': return accion(a === 'READ' ? 'Abrir pantallas con claves DIAN a la vista' : 'Guardar o quitar clave DIAN');
     case 'dian_token': return accion('Generar token DIAN');
     case 'dian_deudas_revision':
