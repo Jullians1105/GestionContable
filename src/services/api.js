@@ -219,6 +219,11 @@ export const api = {
   // Stats
   getStats: () => request('/stats'),
   getWorkload: () => request('/stats/workload'),
+  // Registro de actividad: qué hizo cada persona en un día (fecha=AAAA-MM-DD, userId opcional)
+  getActividad: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/actividad${qs ? `?${qs}` : ''}`);
+  },
   getAuditLog: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/audit${qs ? `?${qs}` : ''}`);

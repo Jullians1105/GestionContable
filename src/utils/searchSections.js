@@ -9,13 +9,14 @@ const normalizar = (texto) => quitarAcentos(texto).toLowerCase().trim()
 // Mismas reglas de visibilidad que Sidebar.jsx#visible — para que el buscador no ofrezca una
 // sección que el usuario no vería nunca en el menú (Reportes/Carga de trabajo/Grupos piden
 // admin o leader; Usuarios pide admin; Recurrentes es leaderOnly).
-function filtrarPorPermiso(items, { isAdmin, isLeader }) {
+function filtrarPorPermiso(items, { isAdmin, isLeader, verActividad }) {
   return items.filter((item) => {
     if (item.leaderOnly && !isAdmin && !isLeader) return false
     if (item.to === '/reports' && !isAdmin && !isLeader) return false
     if (item.to === '/workload' && !isAdmin && !isLeader) return false
     if (item.to === '/groups' && !isAdmin && !isLeader) return false
     if (item.to === '/usuarios' && !isAdmin) return false
+    if (item.to === '/actividad' && !verActividad) return false
     return true
   })
 }
@@ -23,9 +24,9 @@ function filtrarPorPermiso(items, { isAdmin, isLeader }) {
 // DIAN_NAV/FONDO_NAV/EMPRESAS_MAESTRO_NAV no tienen guardas de permiso en Sidebar.jsx hoy
 // (cualquier usuario autenticado los ve) — el buscador respeta ese mismo comportamiento, no
 // inventa restricciones nuevas.
-export function buildSearchableSections({ isAdmin, isLeader }) {
+export function buildSearchableSections({ isAdmin, isLeader, verActividad = false }) {
   return [
-    ...filtrarPorPermiso(navItems, { isAdmin, isLeader }).map((item) => ({ ...item, module: 'tasks' })),
+    ...filtrarPorPermiso(navItems, { isAdmin, isLeader, verActividad }).map((item) => ({ ...item, module: 'tasks' })),
     ...DIAN_NAV.map((item) => ({ ...item, module: 'dian' })),
     ...FONDO_NAV.map((item) => ({ ...item, module: 'fondo' })),
     ...EMPRESAS_MAESTRO_NAV.map((item) => ({ ...item, module: 'empresas-directorio' })),

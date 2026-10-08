@@ -7,6 +7,7 @@ import { useSocket } from '../context/SocketContext'
 import { getInitials, getAvatarColor, ROLE_LABELS, normalizeAssignedTo } from '../utils/helpers'
 import { buildSearchableSections, filtrarSecciones } from '../utils/searchSections'
 import { moduleForPath } from '../config/navigation'
+import { puedeVerActividad } from '../utils/permissions'
 import NotificationBell from './Notifications/NotificationBell'
 import logoTexto from '../assets/logo-texto.png'
 
@@ -39,8 +40,8 @@ export default function Header({ onMenuToggle }) {
   // Lista de secciones navegables (Sidebar + submenús) que este usuario puede ver — se
   // recalcula solo si cambia el rol, no en cada tecla.
   const secciones = useMemo(
-    () => buildSearchableSections({ isAdmin: isAdmin(), isLeader: isLeader() }),
-    [isAdmin, isLeader]
+    () => buildSearchableSections({ isAdmin: isAdmin(), isLeader: isLeader(), verActividad: puedeVerActividad(user) }),
+    [isAdmin, isLeader, user]
   )
   const seccionesFiltradas = useMemo(() => filtrarSecciones(secciones, search), [secciones, search])
 

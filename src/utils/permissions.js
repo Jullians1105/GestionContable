@@ -14,6 +14,14 @@ export const DEFAULT_PERMISSIONS = {
   viewer: { canCreateTask: false, canEditTask: false, canDeleteTask: false, canComment: false, canViewReports: false, canManageGroups: false },
 }
 
+// Registro de actividad: admin siempre; los demás (menos viewer) con permissions.modulos.actividad.canVer.
+// El servidor lo valida igual (middleware/actividadAccess.js).
+export function puedeVerActividad(user) {
+  if (!user) return false
+  if (user.role === 'admin') return true
+  return user.role !== 'viewer' && user.permissions?.modulos?.actividad?.canVer === true
+}
+
 export function getEffectivePermissions(user) {
   const base = DEFAULT_PERMISSIONS[user?.role] ?? DEFAULT_PERMISSIONS.viewer
   if (!user?.permissions || Object.keys(user.permissions).length === 0) return base

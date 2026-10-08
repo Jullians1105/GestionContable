@@ -50,6 +50,7 @@ import EmpresasExternasPage from './pages/EmpresasExternasPage'
 import EmpresasPage from './pages/EmpresasPage'
 import NominaElectronicaPage from './pages/NominaElectronicaPage'
 import NominaElectronicaEmpresasPage from './pages/NominaElectronicaEmpresasPage'
+import ActividadPage from './pages/ActividadPage'
 
 function Layout() {
   const { isAuthenticated } = useAuth()
@@ -112,6 +113,7 @@ function Layout() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/usuarios" element={<UsersPage />} />
+            <Route path="/actividad" element={<ActividadPage />} />
             <Route path="/fondo-emprender" element={<FondoEmprenderPage />} />
             <Route path="/fondo-emprender/empresas" element={<FondoEmprenderEmpresasPage />} />
             <Route path="/fondo-emprender/empresas/:empresaId" element={<FondoEmprenderEmpresaDetallePage />} />
