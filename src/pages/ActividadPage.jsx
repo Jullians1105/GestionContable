@@ -38,6 +38,10 @@ const AREA_COLOR = {
   'Claves DIAN': { bg: '#ffdad6', fg: '#93000a' },
   'Deudas DIAN': { bg: '#ffedd5', fg: '#9a3412' },
   Pagos: { bg: '#dcfce7', fg: '#166534' },
+  Contabilidad: { bg: '#cffafe', fg: '#155e75' },
+  'Exógenas': { bg: '#fae8ff', fg: '#86198f' },
+  Terceros: { bg: '#ecfccb', fg: '#3f6212' },
+  Consolidado: { bg: '#e0f2fe', fg: '#075985' },
   Directorio: { bg: '#e0e7ff', fg: '#3730a3' },
   Tareas: { bg: '#f3f4f6', fg: '#374151' },
 }
