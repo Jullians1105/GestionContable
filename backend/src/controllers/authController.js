@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const db = require('../config/database');
 const { sign, signRefresh, verify, verifyRefresh } = require('../utils/jwt');
 const logger = require('../utils/logger');
+const { clientIp } = require('../utils/clientIp');
 
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000; // 15 min
 const LOCKOUT_MAX_ATTEMPTS = 5;
@@ -40,7 +41,7 @@ const isLockedOut = async (email, ip) => {
 };
 
 const login = async (req, res, next) => {
-  const ip = req.ip || req.connection?.remoteAddress;
+  const ip = clientIp(req);
   try {
     const { email, password } = req.body;
     const normalizedEmail = email.toLowerCase();

@@ -110,4 +110,128 @@ const getActividad = async (req, res, next) => {
   }
 };
 
-module.exports = { getActividad, hoyBogota };
+// ── Accesos: cómo usa el equipo la aplicación ────────────────────────────────────
+// Señales de uso por persona (todas en hora de Bogotá):
+//   login  → inicio de sesión exitoso (login_attempts)
+//   sesion → sesión renovada (refresh_tokens): con la aplicación abierta se renueva cada hora, así que
+//            sirve para estimar el tiempo conectado
+//   accion → algo guardado (audit_log)
+// "Día activo" = algún día con alguna señal. "Horas conectadas" = horas distintas con alguna señal
+// (es una estimación: no mide cuánto tiempo estuvo la pestaña abierta sin usarse).
+const DIAS_VALIDOS = new Set([1, 7, 30]);
+// $1 = primer día, $2 = último día (inclusive), ambos en hora de Bogotá.
+const RANGO_SQL = `
+  WITH rango AS (
+    SELECT ($1::date::timestamp AT TIME ZONE '${TZ}') AS ini, (($2::date + 1)::timestamp AT TIME ZONE '${TZ}') AS fin
+  )`;
+const SENALES_SQL = `${RANGO_SQL}, senales AS (
+    SELECT u.id AS user_id, la.created_at AS ts, 'login' AS tipo
+      FROM login_attempts la JOIN users u ON lower(u.email) = la.email, rango
+      WHERE la.success AND la.created_at >= rango.ini AND la.created_at < rango.fin
+    UNION ALL
+    SELECT r.user_id, r.created_at, 'sesion' FROM refresh_tokens r, rango
+      WHERE r.created_at >= rango.ini AND r.created_at < rango.fin
+    UNION ALL
+    SELECT a.user_id, a.created_at, 'accion' FROM audit_log a, rango
+      WHERE a.user_id IS NOT NULL AND a.created_at >= rango.ini AND a.created_at < rango.fin
+  )`;
+
+// Las IP de Docker/proxy no dicen nada de la persona: se ocultan (ver nginx.conf, CF-Connecting-IP).
+const IP_INTERNA = /^(::ffff:)?(172\.(1[6-9]|2\d|3[01])\.|127\.)|^::1$/;
+const ipVisible = (ip) => (!ip || IP_INTERNA.test(ip) ? null : ip.replace(/^::ffff:/, ''));
+
+function sumarDias(fecha, dias) {
+  const [a, m, d] = fecha.split('-').map(Number);
+  return new Date(Date.UTC(a, m - 1, d + dias)).toISOString().slice(0, 10);
+}
+
+// GET /api/actividad/accesos?hasta=YYYY-MM-DD&dias=1|7|30
+const getAccesos = async (req, res, next) => {
+  try {
+    const hasta = req.query.hasta || hoyBogota();
+    if (!FECHA_RE.test(hasta) || Number.isNaN(Date.parse(hasta))) {
+      return res.status(400).json({ error: 'La fecha debe tener el formato AAAA-MM-DD' });
+    }
+    const dias = parseInt(req.query.dias ?? '1', 10);
+    if (!DIAS_VALIDOS.has(dias)) return res.status(400).json({ error: 'dias debe ser 1, 7 o 30' });
+    const desde = sumarDias(hasta, -(dias - 1));
+    const params = [desde, hasta];
+
+    const [personasSql, horasSql, diasSql, fallidosSql, fallidosPorUsuarioSql, usuariosSql] = await Promise.all([
+      db.query(
+        `${SENALES_SQL}
+         SELECT user_id,
+                count(*) FILTER (WHERE tipo = 'login')  AS inicios,
+                count(*) FILTER (WHERE tipo = 'accion') AS acciones,
+                count(DISTINCT (ts AT TIME ZONE '${TZ}')::date) AS dias,
+                count(DISTINCT date_trunc('hour', ts AT TIME ZONE '${TZ}')) AS horas,
+                min(ts) AS primero, max(ts) AS ultimo
+         FROM senales GROUP BY user_id`, params),
+      db.query(
+        `${SENALES_SQL}
+         SELECT extract(hour FROM ts AT TIME ZONE '${TZ}')::int AS hora,
+                count(DISTINCT (user_id, date_trunc('hour', ts AT TIME ZONE '${TZ}'))) AS personas
+         FROM senales GROUP BY 1 ORDER BY 1`, params),
+      db.query(
+        `${SENALES_SQL}
+         SELECT (ts AT TIME ZONE '${TZ}')::date AS fecha, count(DISTINCT user_id) AS personas
+         FROM senales GROUP BY 1 ORDER BY 1`, params),
+      db.query(
+        `${RANGO_SQL}
+         SELECT la.created_at, la.email, la.ip_address, u.name
+         FROM login_attempts la LEFT JOIN users u ON lower(u.email) = la.email, rango
+         WHERE NOT la.success AND la.created_at >= rango.ini AND la.created_at < rango.fin
+         ORDER BY la.created_at DESC LIMIT 50`, params),
+      db.query(
+        `${RANGO_SQL}
+         SELECT u.id AS user_id, count(*) AS fallidos
+         FROM login_attempts la LEFT JOIN users u ON lower(u.email) = la.email, rango
+         WHERE NOT la.success AND la.created_at >= rango.ini AND la.created_at < rango.fin
+         GROUP BY u.id`, params),
+      db.query('SELECT id, name, role FROM users WHERE is_active = true ORDER BY name'),
+    ]);
+
+    const uso = new Map(personasSql.rows.map((r) => [r.user_id, r]));
+    const fallosPorUsuario = new Map(fallidosPorUsuarioSql.rows.map((r) => [r.user_id, Number(r.fallidos)]));
+
+    const personas = usuariosSql.rows.map((u) => {
+      const r = uso.get(u.id);
+      return {
+        userId: u.id,
+        nombre: u.name,
+        rol: u.role,
+        iniciosSesion: r ? Number(r.inicios) : 0,
+        acciones: r ? Number(r.acciones) : 0,
+        diasActivos: r ? Number(r.dias) : 0,
+        horasConectadas: r ? Number(r.horas) : 0,
+        primerAcceso: r ? r.primero : null,
+        ultimoAcceso: r ? r.ultimo : null,
+        fallidos: fallosPorUsuario.get(u.id) || 0,
+      };
+    });
+    // Primero quienes más usaron la aplicación; al final quienes no entraron en el período.
+    personas.sort((a, b) => (b.horasConectadas - a.horasConectadas) || (b.acciones - a.acciones) || a.nombre.localeCompare(b.nombre));
+
+    const fallidosDesconocidos = fallosPorUsuario.get(null) || 0;
+    res.json({
+      desde,
+      hasta,
+      dias,
+      resumen: {
+        inicios: personas.reduce((t, p) => t + p.iniciosSesion, 0),
+        fallidos: Array.from(fallosPorUsuario.values()).reduce((t, n) => t + n, 0),
+        fallidosCorreoDesconocido: fallidosDesconocidos,
+        personasActivas: personas.filter((p) => p.horasConectadas > 0).length,
+        personasTotal: personas.length,
+      },
+      personas,
+      porHora: horasSql.rows.map((r) => ({ hora: r.hora, personas: Number(r.personas) })),
+      porDia: diasSql.rows.map((r) => ({ fecha: new Date(r.fecha).toISOString().slice(0, 10), personas: Number(r.personas) })),
+      fallidos: fallidosSql.rows.map((r) => ({ cuando: r.created_at, correo: r.email, nombre: r.name || null, ip: ipVisible(r.ip_address) })),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getActividad, getAccesos, hoyBogota };

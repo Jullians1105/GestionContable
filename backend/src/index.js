@@ -11,6 +11,7 @@ const swaggerUi = require('swagger-ui-express');
 const env = require('./config/env');
 const logger = require('./utils/logger');
 const { verify } = require('./utils/jwt');
+const { clientIp } = require('./utils/clientIp');
 const { validateProductionEnv } = require('./middleware/security');
 const { setupSocket } = require('./socket/events');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -104,7 +105,7 @@ const keyByUserOrIp = (req) => {
       // token inválido/expirado — se cuenta por IP como fallback
     }
   }
-  return req.ip;
+  return clientIp(req);
 };
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
