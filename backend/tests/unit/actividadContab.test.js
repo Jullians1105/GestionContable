@@ -19,6 +19,8 @@ describe('Contabilidad y Gestión Tributaria: frases', () => {
     ['terceros_importacion', { archivos: 12, nuevos: 5, actualizados: 3, errores: 1 }, 'Terceros', 'Importó terceros: 12 archivos, 5 nuevos, 3 actualizados, 1 con error'],
     ['terceros_importacion', { archivos: 1, nuevos: 0, actualizados: 0, errores: 0 }, 'Terceros', 'Importó terceros: 1 archivo, 0 nuevos, 0 actualizados'],
     ['terceros_rues', { pendientes: 40, forzar: true }, 'Terceros', 'Verificó terceros en el RUES (40 pendientes) — forzando a todos'],
+    ['empresas_rues', { forzar: false, pendientes: 20, verificadas: 18, noEncontradas: 1, errores: 1 }, 'Directorio', 'Actualizó la matrícula mercantil de las empresas en el RUES — 18 verificadas, 1 no encontradas, 1 con error'],
+    ['terceros_consulta', { documento: '901939874' }, 'Terceros', 'Consultó el tercero 901939874'],
     ['contab_consolidado_exportacion', { empresaId: E1, periodo: '2026-C2' }, 'Consolidado', 'Exportó el consolidado de ACME SAS (cuatrimestre 2 de 2026)'],
     ['contab_consolidado_exportacion', { empresaId: E1, periodo: '2026' }, 'Consolidado', 'Exportó el consolidado de ACME SAS (2026)'],
   ])('%s', (tabla, cambios, area, texto) => {

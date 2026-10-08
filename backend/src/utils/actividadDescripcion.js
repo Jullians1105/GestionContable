@@ -145,6 +145,13 @@ function describirEvento(row, nombres = {}) {
         area: 'Terceros',
         texto: `Importó terceros: ${c.archivos ?? 0} ${c.archivos === 1 ? 'archivo' : 'archivos'}, ${c.nuevos ?? 0} nuevos, ${c.actualizados ?? 0} actualizados${c.errores ? `, ${c.errores} con error` : ''}`,
       };
+    case 'empresas_rues':
+      return {
+        area: 'Directorio',
+        texto: `Actualizó la matrícula mercantil de las empresas en el RUES${c.verificadas != null ? ` — ${c.verificadas} verificadas` : ''}${c.noEncontradas ? `, ${c.noEncontradas} no encontradas` : ''}${c.errores ? `, ${c.errores} con error` : ''}${c.forzar ? ' (todas)' : ''}`,
+      };
+    case 'terceros_consulta':
+      return { area: 'Terceros', texto: `Consultó el tercero ${c.documento ?? row.record_id}` };
     case 'terceros_rues':
       return { area: 'Terceros', texto: `Verificó terceros en el RUES${c.pendientes != null ? ` (${c.pendientes} pendientes)` : ''}${c.forzar ? ' — forzando a todos' : ''}` };
     case 'contab_consolidado_exportacion':
@@ -214,6 +221,8 @@ function clasificarEvento(row, nombres = {}) {
     case 'exogenas_generado': return accion('Generar Excel de exógenas');
     case 'terceros_importacion': return accion('Importar terceros');
     case 'terceros_rues': return accion('Verificar terceros en el RUES');
+    case 'empresas_rues': return accion('Actualizar matrícula (RUES) de las empresas');
+    case 'terceros_consulta': return accion('Consultar un tercero');
     case 'contab_consolidado_exportacion': return { ...accion('Exportar consolidado'), empresa: n('contabEmp', c.empresaId) };
     case 'dian_clave': return accion(a === 'READ' ? 'Abrir pantallas con claves DIAN a la vista' : 'Guardar o quitar clave DIAN');
     case 'dian_token': return accion('Generar token DIAN');

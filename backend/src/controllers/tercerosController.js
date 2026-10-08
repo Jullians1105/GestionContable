@@ -302,6 +302,8 @@ const consultarTercero = async (req, res, next) => {
     if (!nit) {
       return res.status(400).json({ error: 'Documento inválido.' });
     }
+    // Esta pantalla muestra datos personales (régimen, teléfono, correo): queda constancia de quién consultó qué documento.
+    await auditLog(req.user.userId, 'READ', 'terceros_consulta', nit, { documento: nit });
 
     const { rows } = await db.query('SELECT * FROM terceros WHERE nit = $1', [nit]);
     if (rows.length > 0) {

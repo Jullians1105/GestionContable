@@ -556,7 +556,11 @@ const getRuesFuente = async (_req, res, next) => {
 // con `forzar: true`, todas. Admin/líder (ver rutas).
 const verificarMatricula = async (req, res, next) => {
   try {
-    const resumen = await empresasRues.verificarEmpresas({ forzar: req.body?.forzar === true });
+    const forzar = req.body?.forzar === true;
+    const resumen = await empresasRues.verificarEmpresas({ forzar });
+    await auditLog(req.user.userId, 'UPDATE', 'empresas_rues', 'lote', {
+      forzar, pendientes: resumen.pendientes, verificadas: resumen.verificadas, noEncontradas: resumen.noEncontradas, errores: resumen.errores,
+    });
     req.io?.emit('empresas:updated', { tipo: 'matricula' });
     res.json(resumen);
   } catch (err) {
