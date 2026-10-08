@@ -11,6 +11,7 @@ const swaggerUi = require('swagger-ui-express');
 const env = require('./config/env');
 const logger = require('./utils/logger');
 const { verify } = require('./utils/jwt');
+const { clientIp } = require('./utils/clientIp');
 const { validateProductionEnv } = require('./middleware/security');
 const { setupSocket } = require('./socket/events');
 const { errorHandler, notFound } = require('./middleware/errorHandler');
@@ -25,6 +26,7 @@ const employeeRoutes = require('./routes/employees');
 const groupRoutes = require('./routes/groups');
 const tagRoutes = require('./routes/tags');
 const statsRoutes = require('./routes/stats');
+const actividadRoutes = require('./routes/actividad');
 const notificationRoutes = require('./routes/notifications');
 const fondoEmpresasRoutes   = require('./routes/fondoEmpresas');
 const fondoProcesosRoutes   = require('./routes/fondoProcesos');
@@ -103,7 +105,7 @@ const keyByUserOrIp = (req) => {
       // token inválido/expirado — se cuenta por IP como fallback
     }
   }
-  return req.ip;
+  return clientIp(req);
 };
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -166,6 +168,7 @@ app.use('/api/employees', employeeRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/actividad', actividadRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/fondo/empresas',   fondoEmpresasRoutes);
 app.use('/api/fondo/procesos',   fondoProcesosRoutes);

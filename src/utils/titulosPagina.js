@@ -16,6 +16,7 @@ const TITULOS = [
   [/^\/settings/, 'Configuración'],
   [/^\/profile/, 'Perfil'],
   [/^\/usuarios/, 'Usuarios'],
+  [/^\/actividad/, 'Actividad del equipo'],
   [/^\/fondo-emprender\/empresas\/[^/]+/, 'Empresa · Fondo Emprender'],
   [/^\/fondo-emprender\/empresas/, 'Empresas · Fondo Emprender'],
   [/^\/fondo-emprender\/pagos/, 'Pagos · Fondo Emprender'],

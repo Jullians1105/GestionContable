@@ -15,6 +15,7 @@ export const navItems = [
   { to: '/reports', label: 'Reportes', icon: 'bar_chart' },
   { to: '/workload', label: 'Carga de trabajo', icon: 'balance' },
   { to: '/usuarios', label: 'Usuarios', icon: 'manage_accounts' },
+  { to: '/actividad', label: 'Actividad', icon: 'history' },
   { to: '/notifications', label: 'Notificaciones', icon: 'notifications' },
   { to: '/settings', label: 'Configuración', icon: 'settings' },
 ]

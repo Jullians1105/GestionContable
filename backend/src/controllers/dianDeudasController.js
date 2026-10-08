@@ -118,7 +118,7 @@ const revisarTodas = async (req, res, next) => {
     const resumen = await servicio.revisarTodas({
       userId: req.user.userId, soloPendientes: req.body?.soloPendientes !== false, io: req.io,
     });
-    await auditLog(req.user.userId, 'CREATE', 'dian_deudas_lote', null, { total: resumen.total });
+    await auditLog(req.user.userId, 'CREATE', 'dian_deudas_lote', 'lote', { total: resumen.total });
     res.status(202).json(resumen);
   } catch (err) {
     responderError(err, res, next);

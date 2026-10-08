@@ -1,6 +1,7 @@
 const { Router } = require('express');
 const { getStats, getAuditLog, getWorkload } = require('../controllers/statsController');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+const { requireActividad } = require('../middleware/actividadAccess');
 
 const router = Router();
 router.use(authMiddleware);
@@ -21,7 +22,7 @@ router.get('/', getStats);
  * /api/audit:
  *   get:
  *     tags: [Audit]
- *     summary: Log de auditoría (solo admin/leader)
+ *     summary: Log de auditoría crudo (admin, o con permiso actividad.canVer)
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -31,7 +32,7 @@ router.get('/', getStats);
  *       - { name: action, in: query, schema: { type: string, enum: [CREATE, UPDATE, DELETE] } }
  *       - { name: table, in: query, schema: { type: string } }
  */
-router.get('/audit', roleMiddleware('admin', 'leader'), getAuditLog);
+router.get('/audit', requireActividad, getAuditLog);
 
 /**
  * @openapi

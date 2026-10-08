@@ -6,9 +6,10 @@ import { useNotifications } from '../context/NotificationContext'
 import TaskModal from './TaskModal'
 import logoBlanco from '../assets/logo-icono-blanco.png'
 import { navItems, modules, MODULE_TITLES, DIAN_NAV, EMPRESAS_MAESTRO_NAV, FONDO_NAV, moduleForPath } from '../config/navigation'
+import { puedeVerActividad } from '../utils/permissions'
 
 export default function Sidebar({ open, onClose }) {
-  const { isAdmin, isLeader, hasPermission } = useAuth()
+  const { user, isAdmin, isLeader, hasPermission } = useAuth()
   const { addToast } = useToast()
   const { unreadCount } = useNotifications()
   const location = useLocation()
@@ -42,6 +43,7 @@ export default function Sidebar({ open, onClose }) {
     if (item.to === '/workload' && !isAdmin() && !isLeader()) return false
     if (item.to === '/groups' && !isAdmin() && !isLeader()) return false
     if (item.to === '/usuarios' && !isAdmin()) return false
+    if (item.to === '/actividad' && !puedeVerActividad(user)) return false
     return true
   })
 

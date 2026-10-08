@@ -65,6 +65,16 @@ function getEmpresasPerm(user, key) {
   return user.permissions?.modulos?.empresas?.[key] ?? false
 }
 
+// Registro de actividad (/actividad): quién hizo qué, por día. El administrador siempre puede verlo;
+// este permiso se lo da a otros usuarios (por ejemplo líderes) — validado en el backend, ver actividadAccess.js.
+const ACTIVIDAD_PERMS = [
+  { key: 'canVer', icon: 'history', label: 'Ver registro de actividad' },
+]
+
+function getActividadPerm(user, key) {
+  return user.permissions?.modulos?.actividad?.[key] ?? false
+}
+
 const ROLE_OPTIONS = [
   { value: 'admin', label: 'Administrador' },
   { value: 'leader', label: 'Líder' },
@@ -273,6 +283,23 @@ export default function UsersManager() {
     }
   }
 
+  const handleToggleActividadPerm = async (user, key) => {
+    const currentModulos = user.permissions?.modulos ?? {}
+    const current = currentModulos.actividad?.[key] ?? false
+    const updated = {
+      ...(user.permissions ?? {}),
+      modulos: {
+        ...currentModulos,
+        actividad: { ...currentModulos.actividad, [key]: !current },
+      },
+    }
+    try {
+      await updateMember(user.id, { permissions: updated })
+    } catch (err) {
+      addToast(err.message || 'Error al actualizar el permiso de actividad', 'error')
+    }
+  }
+
   const handleDelete = async (userId) => {
     try {
       await deleteMember(userId)
@@ -360,6 +387,11 @@ export default function UsersManager() {
                   Empresas
                 </th>
               )}
+              {showPermCols && (
+                <th className="px-4 py-3 text-xs font-semibold text-[#434655] text-left hidden lg:table-cell">
+                  Actividad
+                </th>
+              )}
               <th className="px-4 py-3 text-xs font-semibold text-[#434655] text-right">Acciones</th>
             </tr>
           </thead>
@@ -367,7 +399,7 @@ export default function UsersManager() {
             {filtered.length === 0 && (
               <tr>
                 {cargando ? (
-                  <td colSpan={showPermCols ? 9 : 4} className="py-12 text-[#8890b5]">
+                  <td colSpan={showPermCols ? 10 : 4} className="py-12 text-[#8890b5]">
                     <div className="flex items-center justify-center">
                       <span className="material-symbols-outlined mr-2" style={{ fontSize: 20, animation: 'spin 1s linear infinite' }}>
                         progress_activity
@@ -376,7 +408,7 @@ export default function UsersManager() {
                     </div>
                   </td>
                 ) : (
-                  <td colSpan={showPermCols ? 9 : 4} className="text-center py-10 text-sm text-[#434655]">
+                  <td colSpan={showPermCols ? 10 : 4} className="text-center py-10 text-sm text-[#434655]">
                     No se encontraron usuarios
                   </td>
                 )}
@@ -390,10 +422,7 @@ export default function UsersManager() {
                   <tr className="bg-white hover:bg-[#eef3ff] transition">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                          style={{ background: getAvatarColor(user.name) }}
-                        >
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${getAvatarColor(user.name)}`}>
                           {user.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
@@ -548,6 +577,31 @@ export default function UsersManager() {
                       </td>
                     )}
 
+                    {/* ── Registro de actividad ─────────────────────── */}
+                    {showPermCols && (
+                      <td className="px-4 py-3 hidden lg:table-cell">
+                        <div className="flex flex-wrap gap-1">
+                          {ACTIVIDAD_PERMS.map(({ key, icon, label }) => {
+                            const active = getActividadPerm(user, key)
+                            return (
+                              <button
+                                key={key}
+                                title={label}
+                                onClick={() => handleToggleActividadPerm(user, key)}
+                                className="w-6 h-6 rounded flex items-center justify-center transition hover:scale-110"
+                                style={{
+                                  background: active ? '#dcfce7' : '#f3f4f6',
+                                  color:      active ? '#16a34a' : '#9ca3af',
+                                }}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{icon}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </td>
+                    )}
+
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         {showPermCols && (
@@ -596,7 +650,7 @@ export default function UsersManager() {
                   </tr>
                   {isExpanded && (
                     <tr className="bg-[#eef3ff]">
-                      <td colSpan={showPermCols ? 8 : 4} className="px-6 py-4 space-y-4">
+                      <td colSpan={showPermCols ? 9 : 4} className="px-6 py-4 space-y-4">
                         {/* Gestor de Tareas */}
                         <div>
                           <p className="text-xs font-semibold text-[#434655] mb-3 flex items-center gap-1.5">
@@ -746,6 +800,31 @@ export default function UsersManager() {
                                   type="checkbox"
                                   checked={getEmpresasPerm(user, key)}
                                   onChange={() => handleToggleEmpresasPerm(user, key)}
+                                  className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
+                                />
+                                <span className="material-symbols-outlined text-[#8890b5]" style={{ fontSize: 13 }}>{icon}</span>
+                                <span className="text-xs text-[#191c1e]">{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Registro de actividad */}
+                        <div>
+                          <p className="text-xs font-semibold text-[#434655] mb-3 flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-sm">history</span>
+                            Actividad
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            {ACTIVIDAD_PERMS.map(({ key, icon, label }) => (
+                              <label
+                                key={key}
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-[#c3c6d7] cursor-pointer hover:border-[#004ac6] transition select-none"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={getActividadPerm(user, key)}
+                                  onChange={() => handleToggleActividadPerm(user, key)}
                                   className="accent-[#004ac6] w-3.5 h-3.5 flex-shrink-0"
                                 />
                                 <span className="material-symbols-outlined text-[#8890b5]" style={{ fontSize: 13 }}>{icon}</span>

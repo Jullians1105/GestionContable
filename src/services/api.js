@@ -219,6 +219,16 @@ export const api = {
   // Stats
   getStats: () => request('/stats'),
   getWorkload: () => request('/stats/workload'),
+  // Registro de actividad: qué hizo cada persona en un día (fecha=AAAA-MM-DD, userId opcional)
+  getActividad: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/actividad${qs ? `?${qs}` : ''}`);
+  },
+  // Accesos: cómo usa el equipo la aplicación (hasta=AAAA-MM-DD, dias=1|7|30)
+  getActividadAccesos: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return request(`/actividad/accesos${qs ? `?${qs}` : ''}`);
+  },
   getAuditLog: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return request(`/audit${qs ? `?${qs}` : ''}`);
