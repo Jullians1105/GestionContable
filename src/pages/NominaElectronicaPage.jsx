@@ -699,20 +699,20 @@ export default function NominaElectronicaPage() {
             })}
           </div>
 
-          {openRow.estado === 'no_aplica' && (
-            <div className="mb-3">
-              <p className="text-[10px] font-bold uppercase text-[#8890b5] mb-1">Motivo</p>
-              <textarea
-                ref={motivoTextareaRef}
-                value={motivoDraft}
-                onChange={(e) => { dirtyRef.current.nota = true; setMotivoDraft(e.target.value) }}
-                onBlur={(e) => handleNota(openRow.empresaId, e.target.value)}
-                placeholder="¿Por qué no se pudo hacer este mes?"
-                rows={2}
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
-              />
-            </div>
-          )}
+          {/* El comentario se queda al cambiar de estado: antes el cuadro solo existía en "En espera" y al pasar
+              a otro estado el texto seguía guardado pero ya no se veía. */}
+          <div className="mb-3">
+            <p className="text-[10px] font-bold uppercase text-[#8890b5] mb-1">{openRow.estado === 'no_aplica' ? 'Motivo' : 'Comentario'}</p>
+            <textarea
+              ref={motivoTextareaRef}
+              value={motivoDraft}
+              onChange={(e) => { dirtyRef.current.nota = true; setMotivoDraft(e.target.value) }}
+              onBlur={(e) => handleNota(openRow.empresaId, e.target.value)}
+              placeholder={openRow.estado === 'no_aplica' ? '¿Por qué no se pudo hacer este mes?' : 'Agrega un comentario (opcional)'}
+              rows={2}
+              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#e2e4ef] bg-[#f8f9fc] text-[#191c1e] outline-none focus:ring-2 focus:ring-[#003B43]/30 resize-none"
+            />
+          </div>
 
           <div className="border-t border-[#e2e4ef] pt-2.5">
             <label className="flex items-center gap-2 text-xs font-medium text-[#434655] cursor-pointer select-none">
@@ -775,11 +775,11 @@ function CompanyColumn({ title, accent, rows, onCellClick, openEmpresaId, onShow
           const visualKey = resolveEstadoVisual(row)
           const cfg = ESTADOS_VISUAL[visualKey]
           const isOpen = row.empresaId === openEmpresaId
-          const motivo = row.estado === 'no_aplica' ? row.nota?.trim() : ''
+          const motivo = row.nota?.trim() || ''
           const novedad = row.tieneNovedad ? row.novedadNota?.trim() : ''
           const hasNote = !!motivo || !!novedad
           const tooltipContent = [
-            motivo && `${row.heredadaDe ? `Observación de ${MONTHS[row.heredadaDe.mes - 1].toLowerCase()}` : 'Motivo'}: ${motivo}`,
+            motivo && `${row.heredadaDe ? `Observación de ${MONTHS[row.heredadaDe.mes - 1].toLowerCase()}` : (row.estado === 'no_aplica' ? 'Motivo' : 'Comentario')}: ${motivo}`,
             novedad && `Novedad: ${novedad}`,
           ].filter(Boolean).join('\n\n')
 
@@ -797,7 +797,7 @@ function CompanyColumn({ title, accent, rows, onCellClick, openEmpresaId, onShow
                   style={{ background: '#003B43' }}
                 />
               )}
-              {hasNote && <span style={NOTE_TRIANGLE} title="Tiene motivo/novedad — pasa el mouse" />}
+              {hasNote && <span style={NOTE_TRIANGLE} title="Tiene comentario o novedad — pasa el mouse" />}
               <span className="flex-1 truncate text-[13px] font-medium text-[#191c1e]" title={row.name}>
                 {row.name}
               </span>
